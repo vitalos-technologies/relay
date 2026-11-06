@@ -30,3 +30,8 @@ Read `docs/API.md`, `packages/core/src/*` and `packages/db/migrations/001_core.s
 - Typecheck: `npx tsc -p tsconfig.json --noEmit` (packages, worker, tests) and `cd apps/web && npx tsc --noEmit`.
 - Local infra is already running (`docker compose -f infra/compose.yaml ps`). Env: `.env` at repo root (dev DB `socialite_dev`, test DB `socialite_test`). Do not stop or reset the dev database; tests use `socialite_test`.
 - Do not `git commit`; the lead commits integrated milestones.
+
+## Environment recovery
+If the container restarts, Docker stops. Recover with:
+`pgrep dockerd || (nohup dockerd >/tmp/claude-0/dockerd.log 2>&1 &)` then `docker compose -f infra/compose.yaml up -d --wait`.
+Load env in a shell with `set -a; . ./.env; set +a`.
