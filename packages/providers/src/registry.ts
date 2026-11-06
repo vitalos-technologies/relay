@@ -56,7 +56,7 @@ export function transportFor(sel: TransportSelection): Transport {
     if (!sel.mockStore) throw new TransportSelectionError('Mock transport requires a store');
     return new MockTransport(FAKES[sel.provider](), {
       provider: sel.provider, accountId: sel.providerAccountId, scenario: sel.mockScenario ?? 'success', store: sel.mockStore,
-    });
+    }, Math.max(0, Number(process.env.MOCK_PROVIDER_LATENCY_MS ?? 0) || 0)); // per simulated request (load tests)
   }
   if (sel.providerAccountId.startsWith('mock_')) throw new TransportSelectionError('A mock_ identity cannot use live transport');
   return new HttpTransport(sel.liveOptions);

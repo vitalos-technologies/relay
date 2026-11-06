@@ -11,3 +11,4 @@ playwright-report/
 evidence/tmp/
 .data/
 *.log
+evidence/restore-drill/*.dump

@@ -14,8 +14,9 @@ const bundleWorkspace = {
 };
 
 await build({
-  entryPoints: ['src/main.ts'],
-  outfile: 'dist/main.mjs',
+  entryPoints: { main: 'src/main.ts', migrate: '../../packages/db/src/cli.ts' },
+  outdir: 'dist',
+  outExtension: { '.js': '.mjs' },
   bundle: true,
   platform: 'node',
   target: 'node22',
