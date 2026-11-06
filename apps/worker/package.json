@@ -1,0 +1,20 @@
+{
+  "name": "@social-lite/worker",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false src/main.ts",
+    "start": "node dist/main.mjs",
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  },
+  "dependencies": {
+    "@social-lite/core": "workspace:*",
+    "@social-lite/db": "workspace:*",
+    "@social-lite/providers": "workspace:*",
+    "@social-lite/services": "workspace:*"
+  }
+}

@@ -1,0 +1,55 @@
+# Local development / review infrastructure. All services are disposable and
+# bound to 127.0.0.1 only. Production uses managed equivalents (see docs/DEPLOYMENT.md).
+name: social-lite
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: socialite
+      POSTGRES_PASSWORD: socialite-local-only
+      POSTGRES_DB: socialite_dev
+    ports: ["127.0.0.1:54329:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U socialite -d socialite_dev"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # S3-compatible object storage (SeaweedFS). Private buckets; access via signed URLs only.
+  storage:
+    image: chrislusf/seaweedfs:3.80
+    command: ["server", "-dir=/data", "-s3", "-s3.port=8333", "-s3.config=/etc/seaweedfs/s3.json", "-master.volumeSizeLimitMB=256", "-volume.max=0"]
+    ports: ["127.0.0.1:8333:8333"]
+    volumes:
+      - s3data:/data
+      - ./seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8333/healthz || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+
+  # Standards-based OIDC provider with disposable local users (development only).
+  oidc:
+    image: dexidp/dex:v2.41.1
+    command: ["dex", "serve", "/etc/dex/config.yaml"]
+    ports: ["127.0.0.1:5556:5556"]
+    volumes:
+      - ./dex/config.yaml:/etc/dex/config.yaml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:5556/dex/.well-known/openid-configuration || exit 1"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # Local email capture. UI: http://localhost:8025
+  mail:
+    image: axllent/mailpit:latest
+    ports: ["127.0.0.1:1025:1025", "127.0.0.1:8025:8025"]
+
+volumes:
+  pgdata:
+  s3data:

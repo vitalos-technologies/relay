@@ -1,0 +1,49 @@
+# Development-only OIDC provider. These identities are disposable and synthetic.
+# Production must use a managed OIDC provider (see docs/DEPLOYMENT.md).
+issuer: http://localhost:5556/dex
+storage:
+  type: memory
+web:
+  http: 0.0.0.0:5556
+oauth2:
+  skipApprovalScreen: true
+  responseTypes: ["code"]
+staticClients:
+  - id: social-lite-local
+    name: Social Lite (local)
+    secret: social-lite-local-client-secret
+    redirectURIs:
+      - http://localhost:3000/api/auth/callback
+      - http://127.0.0.1:3000/api/auth/callback
+      - http://localhost:3100/api/auth/callback
+enablePasswordDB: true
+# Password for every local user: "socialite-demo"
+staticPasswords:
+  - email: owner@demo.social-lite.test
+    hash: "$2b$10$AoJ4t3o9vvJ5G2FXU4wxVerlx81LQu35jpICPphDWjbTbMoGfWsdy"
+    username: owner
+    userID: "8d1f1c2a-0001-4a7e-9a10-000000000001"
+  - email: admin@demo.social-lite.test
+    hash: "$2b$10$AoJ4t3o9vvJ5G2FXU4wxVerlx81LQu35jpICPphDWjbTbMoGfWsdy"
+    username: admin
+    userID: "8d1f1c2a-0002-4a7e-9a10-000000000002"
+  - email: editor@demo.social-lite.test
+    hash: "$2b$10$AoJ4t3o9vvJ5G2FXU4wxVerlx81LQu35jpICPphDWjbTbMoGfWsdy"
+    username: editor
+    userID: "8d1f1c2a-0003-4a7e-9a10-000000000003"
+  - email: approver@demo.social-lite.test
+    hash: "$2b$10$AoJ4t3o9vvJ5G2FXU4wxVerlx81LQu35jpICPphDWjbTbMoGfWsdy"
+    username: approver
+    userID: "8d1f1c2a-0004-4a7e-9a10-000000000004"
+  - email: viewer@demo.social-lite.test
+    hash: "$2b$10$AoJ4t3o9vvJ5G2FXU4wxVerlx81LQu35jpICPphDWjbTbMoGfWsdy"
+    username: viewer
+    userID: "8d1f1c2a-0005-4a7e-9a10-000000000005"
+  - email: outsider@other.social-lite.test
+    hash: "$2b$10$AoJ4t3o9vvJ5G2FXU4wxVerlx81LQu35jpICPphDWjbTbMoGfWsdy"
+    username: outsider
+    userID: "8d1f1c2a-0006-4a7e-9a10-000000000006"
+  - email: invitee@demo.social-lite.test
+    hash: "$2b$10$AoJ4t3o9vvJ5G2FXU4wxVerlx81LQu35jpICPphDWjbTbMoGfWsdy"
+    username: invitee
+    userID: "8d1f1c2a-0007-4a7e-9a10-000000000007"
