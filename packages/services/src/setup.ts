@@ -93,7 +93,7 @@ async function settingItem(key: SettingKey, db: Queryable): Promise<SetupItem> {
     const provider = key === 'META_APP_ID' ? 'facebook' : 'x';
     item.hint = `${def.hint} OAuth redirect URI: ${config().APP_BASE_URL.replace(/\/$/, '')}/api/oauth/${provider}/callback`;
   }
-  if (key === 'META_GRAPH_VERSION' && source === null) { item.value = 'v24.0'; item.is_set = true; item.hint = `${def.hint} (default in use)`; }
+  if (key === 'META_GRAPH_VERSION' && source === null) { item.value = 'v26.0'; item.is_set = true; item.hint = `${def.hint} (default in use)`; }
   return item;
 }
 

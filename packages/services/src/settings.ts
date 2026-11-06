@@ -31,8 +31,8 @@ export const SETTING_DEFS: Record<SettingKey, SettingDef> = {
     validate: (v) => (/^\d{5,25}$/.test(v) ? null : 'Meta app IDs are numeric'), docsUrl: 'https://developers.facebook.com/apps/' },
   META_APP_SECRET: { key: 'META_APP_SECRET', label: 'Meta app secret', secret: true, group: 'meta', hint: 'App Secret from the same page. Stored encrypted; never shown again.',
     validate: (v) => (/^[A-Za-z0-9]{16,128}$/.test(v) ? null : 'Meta app secrets are 16-128 alphanumeric characters') },
-  META_GRAPH_VERSION: { key: 'META_GRAPH_VERSION', label: 'Graph API version', secret: false, group: 'meta', hint: 'Pinned Graph API version, e.g. v24.0.',
-    validate: (v) => (/^v\d{1,3}\.\d$/.test(v) ? null : 'Use the form v24.0') },
+  META_GRAPH_VERSION: { key: 'META_GRAPH_VERSION', label: 'Graph API version', secret: false, group: 'meta', hint: 'Pinned Graph API version, e.g. v26.0.',
+    validate: (v) => (/^v\d{1,3}\.\d$/.test(v) ? null : 'Use the form v26.0') },
   X_CLIENT_ID: { key: 'X_CLIENT_ID', label: 'X OAuth 2.0 client ID', secret: false, group: 'x', hint: 'From the X developer portal → your app → Keys and tokens → OAuth 2.0 Client ID.',
     validate: noWhitespace, docsUrl: 'https://developer.x.com/en/portal/dashboard' },
   X_CLIENT_SECRET: { key: 'X_CLIENT_SECRET', label: 'X OAuth 2.0 client secret', secret: true, group: 'x', hint: 'Confidential client secret. Stored encrypted; never shown again.', validate: noWhitespace },
@@ -72,7 +72,7 @@ export async function getSetting(key: SettingKey, db: Queryable = getPool()): Pr
 }
 
 /** Built-in defaults used when neither env nor setup provides a value. */
-const SETTING_DEFAULTS: Partial<Record<SettingKey, string>> = { META_GRAPH_VERSION: 'v24.0' };
+const SETTING_DEFAULTS: Partial<Record<SettingKey, string>> = { META_GRAPH_VERSION: 'v26.0' };
 
 /** Where a setting currently comes from (no values). */
 export async function settingSource(key: SettingKey, db: Queryable = getPool()): Promise<'env' | 'setup' | null> {

@@ -122,6 +122,6 @@ describe('setup settings (app_settings)', () => {
   it('validates values before storing', async () => {
     delete process.env.META_APP_ID;
     await expect(setSetting('META_APP_ID', 'not-numeric', null, testPool())).rejects.toThrow(/numeric/);
-    expect(await getSetting('META_GRAPH_VERSION', testPool())).toBe(process.env.META_GRAPH_VERSION || 'v24.0');
+    expect(await getSetting('META_GRAPH_VERSION', testPool())).toBe(process.env.META_GRAPH_VERSION || 'v26.0');
   });
 });

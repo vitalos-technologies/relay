@@ -28,7 +28,7 @@ const schema = z.object({
   // Provider app configuration (may also be set via the protected setup page).
   META_APP_ID: z.string().optional(),
   META_APP_SECRET: z.string().optional(),
-  META_GRAPH_VERSION: z.string().default('v24.0'),
+  META_GRAPH_VERSION: z.string().default('v26.0'),
   X_CLIENT_ID: z.string().optional(),
   X_CLIENT_SECRET: z.string().optional(),
   TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
