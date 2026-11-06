@@ -6,3 +6,6 @@ export * from './audit.js';
 export * from './tenancy.js';
 export * from './idempotency.js';
 export * from './auth/session.js';
+export * from './crypto.js';
+export * from './mock-store.js';
+export * from './engine/hooks.js';
