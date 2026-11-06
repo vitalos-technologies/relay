@@ -1,7 +1,5 @@
-// OWNED BY: Telegram/X provider workstream. Placeholder until implemented.
-import type { PublishingAdapter, TelegramConnector } from '@social-lite/core';
-import type { FakeHandler } from '../transport/mock.js';
-const todo = (): never => { throw new Error('telegram adapter not implemented yet'); };
-export const telegramAdapter = new Proxy({ provider: 'telegram' }, { get: (t, k) => (k in t ? (t as Record<string | symbol, unknown>)[k] : todo) }) as unknown as PublishingAdapter;
-export const telegramConnector = null as unknown as TelegramConnector;
-export const telegramFake: FakeHandler = async () => todo();
+// Telegram provider: publishing adapter, channel connector and simulated API.
+export { telegramAdapter, TELEGRAM_CONSTRAINTS, TELEGRAM_CONSTRAINTS_VERSION, telegramMessageUrl } from './adapter.js';
+export { telegramConnector, TelegramSetupError, parseChannelInput } from './connector.js';
+export { telegramFake, FAKE_BOT as TELEGRAM_FAKE_BOT } from './fake.js';
+export { TelegramApiError, classifyTelegramError, sanitizeTelegramText } from './api.js';

@@ -1,0 +1,412 @@
+'use client';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState, type DragEvent } from 'react';
+import { CalendarClock, CalendarDays, ChevronLeft, ChevronRight, Copy, Ellipsis, LayoutGrid, List, Plus, SquareArrowOutUpRight, Undo2 } from 'lucide-react';
+import { resolveWallTime, toLocalInput, type PostAggregateStatus } from '@social-lite/core';
+import { api } from '@/lib/client/api';
+import { useSession } from '@/lib/client/session';
+import { useApi } from '@/lib/client/use-api';
+import { useBrandFilter, useHrefWithBrand, useMediaQuery, useQueryState } from '@/lib/client/hooks';
+import { fmtDateTime, fmtTime, localDateKey, postTitle, zoneAbbr } from '@/lib/client/format';
+import type { Connection, PlannerItem, PostDetail } from '@/lib/client/types';
+import {
+  Banner, Button, cn, EmptyState, ErrorState, IconButton, LinkButton, Menu, MenuContent, MenuItem, MenuTrigger, PageHeader,
+  POST_STATUS_LABEL, Segmented, Select, SkeletonRows, useToast,
+} from '@/components/ui';
+import { AgendaItem, DestinationDots } from '@/components/planner/agenda-item';
+import { RescheduleDialog, type RescheduleResult } from '@/components/planner/reschedule-dialog';
+
+type View = 'week' | 'month' | 'agenda';
+const DAY_MS = 86_400_000;
+const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+// ---- calendar date arithmetic on plain YYYY-MM-DD strings (zone-independent)
+function addDays(date: string, n: number): string {
+  const [y, m, d] = date.split('-').map(Number) as [number, number, number];
+  const t = new Date(Date.UTC(y, m - 1, d) + n * DAY_MS);
+  return t.toISOString().slice(0, 10);
+}
+function weekday(date: string): number {
+  const [y, m, d] = date.split('-').map(Number) as [number, number, number];
+  return (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7; // Monday = 0
+}
+function diffDays(a: string, b: string): number {
+  const p = (s: string) => { const [y, m, d] = s.split('-').map(Number) as [number, number, number]; return Date.UTC(y, m - 1, d); };
+  return Math.round((p(a) - p(b)) / DAY_MS);
+}
+/** UTC instant of local midnight (or the first valid minute after a midnight gap). */
+function startOfLocalDay(date: string, tz: string): Date {
+  for (const hm of ['00:00', '01:00', '02:00']) {
+    const r = resolveWallTime(`${date}T${hm}`, tz);
+    if (r.kind === 'ok') return r.instant;
+    if (r.kind === 'ambiguous') return r.options[0]!.instant;
+  }
+  return new Date(`${date}T00:00:00Z`);
+}
+function labelDate(date: string, opts: Intl.DateTimeFormatOptions) {
+  return new Intl.DateTimeFormat('en-GB', { ...opts, timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`));
+}
+
+const RESCHEDULABLE_STATUSES: PostAggregateStatus[] = ['scheduled', 'pending_approval'];
+function canMove(i: PlannerItem) {
+  return (i.schedule_status === 'active' || i.schedule_status === 'pending_approval') && RESCHEDULABLE_STATUSES.includes(i.status) && new Date(i.due_at).getTime() > Date.now();
+}
+
+export default function PlannerPage() {
+  const { session, can } = useSession();
+  const router = useRouter();
+  const toast = useToast();
+  const [brand] = useBrandFilter();
+  const withBrand = useHrefWithBrand();
+  const [params, setParams] = useQueryState();
+  const desktop = useMediaQuery('(min-width: 768px)');
+
+  const viewTz = session.brands.find((b) => b.id === brand)?.timezone ?? session.workspace?.timezone ?? 'Europe/London';
+  const today = localDateKey(new Date(), viewTz);
+  const view: View = (params.get('view') as View | null) ?? (desktop ? 'week' : 'agenda');
+  const anchor = /^\d{4}-\d{2}-\d{2}$/.test(params.get('date') ?? '') ? params.get('date')! : today;
+  const connectionFilter = params.get('account') ?? '';
+  const statusFilter = params.get('status') ?? '';
+
+  // Visible range in the view zone
+  const range = useMemo(() => {
+    if (view === 'week') {
+      const start = addDays(anchor, -weekday(anchor));
+      return { start, days: 7 };
+    }
+    if (view === 'month') {
+      const first = `${anchor.slice(0, 8)}01`;
+      const start = addDays(first, -weekday(first));
+      return { start, days: 42 };
+    }
+    return { start: anchor, days: 14 };
+  }, [view, anchor]);
+  const from = startOfLocalDay(range.start, viewTz).toISOString();
+  const to = startOfLocalDay(addDays(range.start, range.days), viewTz).toISOString();
+
+  const qs = new URLSearchParams({ from, to });
+  if (brand) qs.set('brand_id', brand);
+  if (connectionFilter) qs.set('connection_id', connectionFilter);
+  if (statusFilter) qs.set('status', statusFilter);
+  const { data, error, loading, refetch, refreshing } = useApi<{ items: PlannerItem[] }>(`/api/planner?${qs.toString()}`, { keepPrevious: true, poll: 30_000 });
+  const conns = useApi<{ items: Connection[] }>(brand ? `/api/brands/${brand}/connections` : null);
+
+  const byDay = useMemo(() => {
+    const m = new Map<string, PlannerItem[]>();
+    for (const i of data?.items ?? []) {
+      const k = localDateKey(i.due_at, viewTz);
+      const arr = m.get(k) ?? [];
+      arr.push(i);
+      m.set(k, arr);
+    }
+    for (const arr of m.values()) arr.sort((a, b) => a.due_at.localeCompare(b.due_at));
+    return m;
+  }, [data, viewTz]);
+
+  const brandName = (id: string) => session.brands.find((b) => b.id === id)?.name ?? '';
+  const mayReschedule = can('drafts.edit') || can('schedule.publish');
+
+  // Reschedule state
+  const [target, setTarget] = useState<{ item: PlannerItem; local: string | null } | null>(null);
+  const [lastMove, setLastMove] = useState<(RescheduleResult & { title: string }) | null>(null);
+  const [undoing, setUndoing] = useState(false);
+  useEffect(() => {
+    if (!lastMove) return;
+    const t = setTimeout(() => setLastMove(null), 30_000);
+    return () => clearTimeout(t);
+  }, [lastMove]);
+
+  const onDropDay = (day: string, e: DragEvent) => {
+    e.preventDefault();
+    const id = e.dataTransfer.getData('text/x-schedule-id');
+    const item = data?.items.find((i) => i.schedule_id === id);
+    if (!item) return;
+    const from = localDateKey(item.due_at, viewTz);
+    const delta = diffDays(day, from);
+    if (delta === 0) return;
+    const original = (item.input_local_time ?? toLocalInput(new Date(item.due_at), item.input_timezone)).slice(0, 16);
+    const moved = `${addDays(original.slice(0, 10), delta)}T${original.slice(11, 16)}`;
+    setTarget({ item, local: moved });
+  };
+
+  const duplicate = async (i: PlannerItem) => {
+    try {
+      const p = await api.post<PostDetail>(`/api/posts/${i.post_id}/duplicate`, {}, { idempotent: true });
+      router.push(`/posts/${p.id}`);
+    } catch (e) {
+      toast.error(e, 'Could not duplicate the post');
+    }
+  };
+
+  const undo = async () => {
+    if (!lastMove) return;
+    setUndoing(true);
+    try {
+      await api.post(`/api/schedules/${lastMove.schedule.id}/reschedule`, {
+        input_local_time: lastMove.previous.local, timezone: lastMove.previous.tz, expected_generation: lastMove.schedule.generation,
+      }, { idempotent: true });
+      toast.success('Move undone');
+      setLastMove(null);
+      void refetch();
+    } catch (e) {
+      toast.error(e, 'Could not undo the move');
+    } finally {
+      setUndoing(false);
+    }
+  };
+
+  const nav = (dir: -1 | 1) => {
+    let next: string;
+    if (view === 'week') next = addDays(anchor, dir * 7);
+    else if (view === 'agenda') next = addDays(anchor, dir * 14);
+    else {
+      const [y, m] = anchor.split('-').map(Number) as [number, number];
+      const d = new Date(Date.UTC(y, m - 1 + dir, 1));
+      next = d.toISOString().slice(0, 10);
+    }
+    setParams({ date: next });
+  };
+
+  const title =
+    view === 'month' ? labelDate(`${anchor.slice(0, 8)}01`, { month: 'long', year: 'numeric' })
+      : view === 'week' ? `${labelDate(range.start, { day: 'numeric', month: 'short' })} – ${labelDate(addDays(range.start, 6), { day: 'numeric', month: 'short', year: 'numeric' })}`
+        : `${labelDate(range.start, { day: 'numeric', month: 'short' })} – ${labelDate(addDays(range.start, 13), { day: 'numeric', month: 'short', year: 'numeric' })}`;
+
+  const preferredZones = [
+    ...(brand ? [{ tz: viewTz, label: `${viewTz} (brand)` }] : []),
+    ...(session.workspace ? [{ tz: session.workspace.timezone, label: `${session.workspace.timezone} (workspace)` }] : []),
+  ];
+
+  const itemMenu = (i: PlannerItem) => (
+    <Menu>
+      <MenuTrigger asChild>
+        <IconButton size="sm" label={`Actions for ${postTitle(i)}`} icon={<Ellipsis aria-hidden className="size-4" />} />
+      </MenuTrigger>
+      <MenuContent>
+        <MenuItem icon={<SquareArrowOutUpRight aria-hidden />} onSelect={() => router.push(`/posts/${i.post_id}`)}>Open post</MenuItem>
+        {mayReschedule ? (
+          <MenuItem icon={<CalendarClock aria-hidden />} disabled={!canMove(i)} onSelect={() => setTarget({ item: i, local: null })}>
+            Reschedule…{!canMove(i) ? ' (not possible now)' : ''}
+          </MenuItem>
+        ) : null}
+        {can('drafts.edit') ? <MenuItem icon={<Copy aria-hidden />} onSelect={() => void duplicate(i)}>Duplicate as draft</MenuItem> : null}
+      </MenuContent>
+    </Menu>
+  );
+
+  return (
+    <>
+      <PageHeader
+        title="Planner"
+        description={<>Calendar days in <span className="text-fg">{viewTz.replace(/_/g, ' ')} ({zoneAbbr(new Date(), viewTz)})</span>. Each post shows its time in the zone it was scheduled in.</>}
+        actions={can('drafts.edit') && session.brands.length ? <LinkButton href={withBrand('/compose')} variant="primary" icon={<Plus aria-hidden className="size-4" />}>New post</LinkButton> : null}
+      />
+
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-center gap-2">
+          <IconButton variant="secondary" label={`Previous ${view === 'agenda' ? 'two weeks' : view}`} icon={<ChevronLeft aria-hidden className="size-4" />} onClick={() => nav(-1)} />
+          <IconButton variant="secondary" label={`Next ${view === 'agenda' ? 'two weeks' : view}`} icon={<ChevronRight aria-hidden className="size-4" />} onClick={() => nav(1)} />
+          <Button variant="ghost" size="sm" onClick={() => setParams({ date: null })} disabled={anchor === today}>Today</Button>
+          <h2 className="ml-1 text-[15px] font-semibold tabular" aria-live="polite">{title}</h2>
+          {refreshing ? <span className="text-xs text-subtle">Updating…</span> : null}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="w-[180px]">
+            <label className="sr-only" htmlFor="pl-account">Account</label>
+            <Select id="pl-account" value={connectionFilter} onChange={(e) => setParams({ account: e.target.value })} disabled={!brand} title={!brand ? 'Choose a brand in the sidebar to filter by account' : undefined} aria-describedby={!brand ? 'pl-account-hint' : undefined}>
+              <option value="">All accounts</option>
+              {conns.data?.items.map((c) => <option key={c.id} value={c.id}>{c.display_name}{c.is_mock ? ' (Simulated)' : ''}</option>)}
+            </Select>
+            {!brand ? <span id="pl-account-hint" className="sr-only">Choose a brand to filter by account.</span> : null}
+          </div>
+          <div className="w-[170px]">
+            <label className="sr-only" htmlFor="pl-status">Status</label>
+            <Select id="pl-status" value={statusFilter} onChange={(e) => setParams({ status: e.target.value })}>
+              <option value="">All statuses</option>
+              {(['scheduled', 'pending_approval', 'publishing', 'published', 'partial', 'needs_attention', 'failed', 'expired', 'cancelled'] as PostAggregateStatus[]).map((s) => (
+                <option key={s} value={s}>{POST_STATUS_LABEL[s]}</option>
+              ))}
+            </Select>
+          </div>
+          <Segmented
+            label="View"
+            value={view}
+            onChange={(v) => setParams({ view: v })}
+            options={[
+              { value: 'week', label: 'Week', icon: <CalendarDays aria-hidden className="size-3.5" />, disabled: !desktop },
+              { value: 'month', label: 'Month', icon: <LayoutGrid aria-hidden className="size-3.5" />, disabled: !desktop },
+              { value: 'agenda', label: 'Agenda', icon: <List aria-hidden className="size-3.5" /> },
+            ]}
+          />
+        </div>
+      </div>
+
+      {lastMove ? (
+        <Banner
+          tone="success"
+          className="mb-4"
+          role="status"
+          title={`Moved “${lastMove.title}”`}
+          actions={<Button size="sm" variant="secondary" icon={<Undo2 aria-hidden className="size-4" />} loading={undoing} onClick={undo}>Undo</Button>}
+        >
+          Now {fmtDateTime(lastMove.schedule.due_at, lastMove.schedule.input_timezone)} {zoneAbbr(lastMove.schedule.due_at, lastMove.schedule.input_timezone)}.
+        </Banner>
+      ) : null}
+
+      {error && !data ? (
+        <ErrorState error={error} onRetry={refetch} />
+      ) : loading ? (
+        <SkeletonRows rows={5} />
+      ) : view === 'agenda' || !desktop ? (
+        <Agenda start={range.start} days={range.days} byDay={byDay} today={today} brandName={brand ? undefined : brandName} menu={itemMenu} empty={!data?.items.length} canCreate={can('drafts.edit')} withBrand={withBrand} />
+      ) : (
+        <CalendarGrid
+          view={view}
+          start={range.start}
+          days={range.days}
+          anchorMonth={anchor.slice(0, 7)}
+          byDay={byDay}
+          today={today}
+          draggable={mayReschedule}
+          onDropDay={onDropDay}
+          menu={itemMenu}
+          onMore={(d) => setParams({ view: 'agenda', date: d })}
+        />
+      )}
+      {view !== 'agenda' && desktop && mayReschedule ? (
+        <p className="mt-3 text-xs text-muted">Drag a scheduled post to another day to move it — you’ll confirm the new time first. Keyboard: use the post’s “…” menu → Reschedule.</p>
+      ) : null}
+
+      <RescheduleDialog
+        open={!!target}
+        onOpenChange={(o) => !o && setTarget(null)}
+        item={target?.item ?? null}
+        initialLocal={target?.local ?? null}
+        preferredZones={preferredZones}
+        onDone={(r) => {
+          setLastMove({ ...r, title: target ? postTitle(target.item) : 'post' });
+          void refetch();
+        }}
+      />
+    </>
+  );
+}
+
+function Agenda({
+  start, days, byDay, today, brandName, menu, empty, canCreate, withBrand,
+}: {
+  start: string; days: number; byDay: Map<string, PlannerItem[]>; today: string; brandName?: (id: string) => string;
+  menu: (i: PlannerItem) => React.ReactNode; empty: boolean; canCreate: boolean; withBrand: (h: string) => string;
+}) {
+  if (empty) {
+    return (
+      <EmptyState icon={<CalendarDays aria-hidden />} title="Nothing scheduled in this period" action={canCreate ? <LinkButton href={withBrand('/compose')} variant="primary">Create a post</LinkButton> : null}>
+        Use the arrows to look at other dates, or clear filters.
+      </EmptyState>
+    );
+  }
+  const list = Array.from({ length: days }, (_, i) => addDays(start, i)).filter((d) => byDay.has(d));
+  return (
+    <div className="flex flex-col gap-6">
+      {list.map((d) => (
+        <section key={d} aria-labelledby={`ag-${d}`}>
+          <h3 id={`ag-${d}`} className="mb-2 flex items-baseline gap-2 text-[13px] font-semibold">
+            {labelDate(d, { weekday: 'long', day: 'numeric', month: 'long' })}
+            {d === today ? <span className="rounded-full bg-accent-soft px-2 text-[11px] font-medium text-accent-text">Today</span> : null}
+          </h3>
+          <ul className="flex flex-col gap-2">
+            {byDay.get(d)!.map((i) => (
+              <li key={i.schedule_id}><AgendaItem item={i} brandName={brandName?.(i.brand_id)} actions={menu(i)} /></li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+function CalendarGrid({
+  view, start, days, anchorMonth, byDay, today, draggable, onDropDay, menu, onMore,
+}: {
+  view: View; start: string; days: number; anchorMonth: string; byDay: Map<string, PlannerItem[]>; today: string; draggable: boolean;
+  onDropDay: (day: string, e: DragEvent) => void; menu: (i: PlannerItem) => React.ReactNode; onMore: (day: string) => void;
+}) {
+  const [over, setOver] = useState<string | null>(null);
+  const cells = Array.from({ length: days }, (_, i) => addDays(start, i));
+  const max = view === 'month' ? 3 : 50;
+  return (
+    <div className="overflow-hidden rounded-xl border border-border bg-surface">
+      <div className="grid grid-cols-7 border-b border-border" aria-hidden>
+        {WEEKDAYS.map((w) => <div key={w} className="px-3 py-2 text-xs font-medium text-muted">{w}</div>)}
+      </div>
+      <div className="grid grid-cols-7" role="list" aria-label="Calendar days">
+        {cells.map((d, idx) => {
+          const items = byDay.get(d) ?? [];
+          const outside = view === 'month' && d.slice(0, 7) !== anchorMonth;
+          return (
+            <div
+              key={d}
+              role="listitem"
+              aria-label={`${labelDate(d, { weekday: 'long', day: 'numeric', month: 'long' })}, ${items.length} post${items.length === 1 ? '' : 's'}`}
+              onDragOver={(e) => { if (draggable && d >= today) { e.preventDefault(); setOver(d); } }}
+              onDragLeave={() => setOver((o) => (o === d ? null : o))}
+              onDrop={(e) => { setOver(null); onDropDay(d, e); }}
+              className={cn(
+                'flex flex-col gap-1.5 border-border p-2',
+                idx % 7 !== 6 && 'border-r',
+                idx < days - 7 && 'border-b',
+                view === 'week' ? 'min-h-[420px]' : 'min-h-[120px]',
+                outside && 'bg-sunken/60',
+                over === d && 'bg-accent-soft outline-2 outline-dashed outline-[var(--focus)] -outline-offset-2',
+              )}
+            >
+              <div className={cn('flex items-center justify-between text-xs tabular', outside ? 'text-subtle' : 'text-muted')}>
+                <span className={cn(d === today && 'inline-flex size-6 items-center justify-center rounded-full bg-accent font-semibold text-on-accent')}>
+                  {Number(d.slice(8))}
+                </span>
+                {d === today ? <span className="sr-only">Today</span> : null}
+              </div>
+              {items.slice(0, max).map((i) => <CalendarItem key={i.schedule_id} item={i} draggable={draggable && canMove(i)} menu={menu(i)} compact={view === 'month'} />)}
+              {items.length > max ? (
+                <button type="button" onClick={() => onMore(d)} className="rounded px-1 text-left text-xs font-medium text-muted hover:text-fg">
+                  +{items.length - max} more
+                </button>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function CalendarItem({ item, draggable, menu, compact }: { item: PlannerItem; draggable: boolean; menu: React.ReactNode; compact: boolean }) {
+  const due = new Date(item.due_at);
+  return (
+    <div
+      draggable={draggable}
+      onDragStart={(e) => {
+        e.dataTransfer.setData('text/x-schedule-id', item.schedule_id);
+        e.dataTransfer.effectAllowed = 'move';
+      }}
+      className={cn(
+        'group relative rounded-lg border border-border bg-raised px-2 py-1.5 text-xs hover:border-border-strong',
+        draggable && 'cursor-grab active:cursor-grabbing',
+        item.status === 'needs_attention' || item.status === 'failed' || item.status === 'partial' ? 'border-l-2 border-l-[var(--warn)]' : '',
+      )}
+    >
+      <div className="flex items-start gap-1">
+        <Link href={`/posts/${item.post_id}`} className="min-w-0 flex-1 rounded">
+          <span className="block font-semibold tabular">
+            {fmtTime(due, item.input_timezone)} <span className="font-normal text-muted">{zoneAbbr(due, item.input_timezone)}</span>
+          </span>
+          <span className={cn('block text-fg', compact ? 'truncate' : 'line-clamp-2')}>{postTitle(item)}</span>
+          <span className="sr-only">{POST_STATUS_LABEL[item.status]}</span>
+        </Link>
+        <span className="-mr-1 -mt-0.5 opacity-70 group-hover:opacity-100 group-focus-within:opacity-100">{menu}</span>
+      </div>
+      {!compact ? <div className="mt-1.5"><DestinationDots destinations={item.destinations} /></div> : null}
+    </div>
+  );
+}
