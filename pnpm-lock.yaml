@@ -111,6 +111,15 @@ importers:
 
   apps/worker:
     dependencies:
+      '@aws-sdk/client-s3':
+        specifier: 3.1163.0
+        version: 3.1163.0
+      '@aws-sdk/s3-presigned-post':
+        specifier: 3.1163.0
+        version: 3.1163.0
+      '@aws-sdk/s3-request-presigner':
+        specifier: 3.1163.0
+        version: 3.1163.0
       '@social-lite/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -123,6 +132,36 @@ importers:
       '@social-lite/services':
         specifier: workspace:*
         version: link:../../packages/services
+      file-type:
+        specifier: 22.3.0
+        version: 22.3.0
+      nodemailer:
+        specifier: 10.3.1
+        version: 10.3.1
+      openid-client:
+        specifier: 6.8.9
+        version: 6.8.9
+      papaparse:
+        specifier: 5.7.0
+        version: 5.7.0
+      pg:
+        specifier: 8.23.1
+        version: 8.23.1
+      pg-boss:
+        specifier: 12.38.1
+        version: 12.38.1(@opentelemetry/api@1.10.0)
+      sharp:
+        specifier: 0.35.5
+        version: 0.35.5(@types/node@22.20.5)
+      twitter-text:
+        specifier: 3.1.0
+        version: 3.1.0
+      uuid:
+        specifier: 14.0.3
+        version: 14.0.3
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
     devDependencies:
       esbuild:
         specifier: 0.28.2

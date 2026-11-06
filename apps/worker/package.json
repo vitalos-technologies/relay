@@ -12,9 +12,22 @@
     "esbuild": "0.28.2"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1163.0",
+    "@aws-sdk/s3-presigned-post": "3.1163.0",
+    "@aws-sdk/s3-request-presigner": "3.1163.0",
     "@social-lite/core": "workspace:*",
     "@social-lite/db": "workspace:*",
     "@social-lite/providers": "workspace:*",
-    "@social-lite/services": "workspace:*"
+    "@social-lite/services": "workspace:*",
+    "file-type": "22.3.0",
+    "nodemailer": "10.3.1",
+    "openid-client": "6.8.9",
+    "papaparse": "5.7.0",
+    "pg": "8.23.1",
+    "pg-boss": "12.38.1",
+    "sharp": "0.35.5",
+    "twitter-text": "3.1.0",
+    "uuid": "14.0.3",
+    "zod": "4.6.7"
   }
 }
