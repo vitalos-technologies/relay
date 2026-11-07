@@ -24,6 +24,15 @@ Last updated: 2026-11-07 07:25 UTC · Lead agent keeps this current after every 
   - `set -a; . ./.env; set +a; npx vitest run --project integration`: real Postgres, disposable DB per run.
   - `pnpm test:e2e`: Playwright.
 
+## Versions (git tags exist locally only; this environment can't push tags)
+| Tag | Commit |
+|---|---|
+| v1.0.0-local | fa905db |
+| v1.1.0-local | e2bc6ec |
+| v2.0.0 | 4815af8 |
+
+To recreate them on GitHub from any machine: `git tag v2.0.0 4815af8 && git push origin v2.0.0` (same for the others).
+
 ## Specs (all in repo)
 | Phase | Brief |
 |---|---|
@@ -42,7 +51,7 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
 
 ## Queue (in order)
 1. V1 + V1.1: **done** (tag `v1.1.0-local`).
-2. V2: streams B/C/D done. **Stream A (identity/security) is finishing.** V2 docs are committed (`docs/V2_*`). Tag v2 after A lands and the full suite + E2E pass.
+2. V2: **done** (all streams A–D). Final run on main: unit 104, contracts 351, integration 321, security E2E 8/8, rehearsal PASS (`docs/V2_TEST_REPORT.md`). Full browser E2E re-run is pending until the redesign lands (last run 33/38).
 3. V3:
    - Providers: done.
    - Lead engine gaps: done.
@@ -51,7 +60,7 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
 4. V3.1 → 5. V3.1 Admin → 6. Collaboration → 7. **V3.5** → 8. Copy cleanup → 9. Docs + Help Centre.
 
 ## Current state (keep updated)
-- **Background agents** (a new session will NOT have them): V2-A (finishing), UX redesign (started 07:5x; brief `docs/queue/018_UX_REDESIGN_BRIEF.md`, progress `docs/v3-progress/ux.md`; told to avoid A's files until A lands, then tell it A landed so it can switch Settings to the new left-nav routes + redirects).
+- **Background agents** (a new session will NOT have them): UX redesign (started 07:5x; brief `docs/queue/018_UX_REDESIGN_BRIEF.md`, progress `docs/v3-progress/ux.md`; A has landed and UX was told it may now edit Settings).
 - **CH follow-ups:** CH's edits to `apps/web/lib/csp.ts`, `apps/web/proxy.ts`, `tests/unit/security-headers.test.ts`, `apps/web/app/(app)/settings/page.tsx` are uncommitted (mixed with A's); commit with A. Live Google/Notion apps + browser Picker untested (activation).
 - **MCP follow-ups:** recreate Keycloak (`docker compose -f infra/compose.yaml up -d --force-recreate oidc`) after A lands to load the `relay-mcp` client/scopes; place MCP settings in the redesigned Settings nav (now `/mcp/settings`). Real MCP clients need public HTTPS (activation checklist).
   - If they're gone, re-launch each from its progress note. Each note lists what is done and what's next:
@@ -64,15 +73,8 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
 - **Lead work in progress:**
   - G7 + G14: committed incl. worker wiring.
   - AN gap: no adapter fetches follower/audience numbers (live shows "not fetched").
-- **Lead checklist after streams land:**
-  1. Integrate and commit each stream's files.
-  2. Apply 015–017 to dev.
-  3. Reset + re-seed the dev DB (E2E fixtures leaked into the demo workspace).
-  4. Fix Keycloak demo identities.
-  5. Run full tests + E2E.
-  6. Tag v2.
-  7. Launch UX.
-  8. Write the V3 docs.
+- **Done:** all streams integrated, Keycloak recreated (MCP client loaded), dev DB reset + re-seeded (`pnpm db:reset` then `npx tsx scripts/analytics-demo.ts`), v2.0.0 tagged.
+- **Lead next:** integrate UX when it reports; full browser E2E + fixes; V3 docs (requirements matrix, build status, gaps, activation, platform capabilities, security & test report); then V3.1.
 - **Known gaps:** `docs/V2_IMPLEMENTATION_GAPS.md`. G3/G4/G5/G6/G8 sent to stream A. Done by lead: G7, G14, G19 (update that doc at integration).
 
 ## Uncommitted work (who owns what)
