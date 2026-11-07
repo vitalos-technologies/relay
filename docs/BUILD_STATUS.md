@@ -1,28 +1,28 @@
 # Build status
 
-**Phase:** V1 + V1.1 complete locally (simulated providers); awaiting external activation. **Next: V2 (security and multi-team upgrade) — queued.**
-**Branch:** `main` (local repository; no remote configured).
+Relay, 2026-11-07. Branch `main` (pushed to GitHub; see `HANDOFF.md`). All providers are simulated: nothing has been verified live.
+
+| Phase | State | Details |
+|---|---|---|
+| V1 + V1.1 | Done (`v1.1.0-local`) | [TEST_REPORT.md](TEST_REPORT.md), [FINAL_ACTIVATION_CHECKLIST.md](FINAL_ACTIVATION_CHECKLIST.md) |
+| V2 security and multi-team | **Done** (`v2.0.0` = 4815af8) | [V2_TEST_REPORT.md](V2_TEST_REPORT.md) |
+| V3 | Backend done; **UX redesign in progress** | [V3_BUILD_STATUS.md](V3_BUILD_STATUS.md) |
+| V3.1 | Backend streams started | [V3_1_WORKSTREAMS.md](V3_1_WORKSTREAMS.md) |
+
+Latest run (2026-11-07): unit 104, contracts 351, integration 321. All passed.
 
 ## Resume
 
 ```bash
 ./scripts/dev.sh --detach      # infra, migrations, seed, worker, web
-pnpm test && pnpm test:integration && pnpm test:e2e
+pnpm test && set -a && . ./.env && set +a && npx vitest run --project integration
 ```
-If the container restarted: Docker may need `rm -f /var/run/docker.pid` (only if the PID is stale) and `dockerd &`.
-
-## Done
-
-- Core schema (4 migrations), tenant isolation via composite FKs, immutable revisions.
-- Durable engine: outbox → pg-boss, claims/leases/fencing, gates, retries, Unknown + reconciliation, sweepers, pause, budgets, circuit breaker.
-- Adapters: Instagram, Facebook (Graph v26.0), Telegram, X v2 + simulators + contract tests.
-- Auth (OIDC), sessions/CSRF, invitations, roles, brands, media pipeline, setup, diagnostics, ops dashboard, notifications.
-- UI: all MVP screens, simplified design pass, desktop + mobile.
-- Worker, Dockerfile (web/worker images built), CI workflow, restore drill, load test.
-- V1.1: CSV import, TipSignal → drafts with deterministic cards, AI caption assistance (Claude, draft-only, capped), carousels/albums/video/Reels, posting slots + queue, image crops, native analytics with quotas, Integrations + Budgets settings.
-- Hardening: Meta deauthorize/data-deletion callbacks, forward-only webhook application, shared Postgres rate limiting, Cloud KMS key custody, X token revoke on disconnect.
+Read `HANDOFF.md` first. Container restarts: see `HANDOFF.md` (Docker recovery).
 
 ## Next
 
-1. V2 upgrade (queued).
-2. Activation items (checklist) → live canaries.
+The queue is in `HANDOFF.md`:
+1. Land the UX redesign.
+2. Re-run E2E.
+3. Close the V3 gaps.
+4. External activation ([V3_FINAL_ACTIVATION_CHECKLIST.md](V3_FINAL_ACTIVATION_CHECKLIST.md)), then live canaries.
