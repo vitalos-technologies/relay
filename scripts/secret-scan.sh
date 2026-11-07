@@ -28,15 +28,19 @@ PATTERNS=(
   '\bsl_live_[a-z0-9]{12}_[a-f0-9]{64}\b'
   '\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{20,}\b'
 )
-# Public documentation examples used as test fixtures (e.g. the Telegram Bot API docs' sample token).
-EXAMPLES='123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsawQ'
+# Known fake fixtures (exact values): the Telegram Bot API docs' sample token, and the synthetic bot token / JWT
+# (payload {"sub":"1"}, signature "signature-value") used by the support-report redaction test.
+EXAMPLES='123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsawQ
+123456789:AAEhBP0av18_xkF2qz5xLm7nO8pQrStUvWx
+eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJlLXZhbHVl'
 for p in "${PATTERNS[@]}"; do
   hits=$(git grep -I -n -E -e "$p" -- . ':!pnpm-lock.yaml' ':!scripts/secret-scan.sh' | grep -v -F "$EXAMPLES" || true)
   [ -z "$hits" ] || report "pattern $p" "$hits"
 done
 
-# 3) Secret-looking assignments with a literal value, minus the documented local-only development values.
-ALLOW='socialite-local-only|socialite-(app|worker|migrator)-local-only|socialite-kc-admin-local-only|social-lite-local-client-secret|socialite-local-secret-not-for-production|socialite-demo|socialite-demo-totp-[a-z-]+|local-dev-1:|change-me|example|placeholder|test-secret|not-a-real|xxxx|\$\{|process\.env|<[^>]+>|Buffer\.alloc|randomBytes'
+# 3) Secret-looking assignments with a literal value, minus the documented local-only development values,
+#    ALL-CAPS setting names (e.g. secret: 'TIKTOK_CLIENT_SECRET') and public https:// endpoints.
+ALLOW='socialite-local-only|socialite-(app|worker|migrator)-local-only|socialite-kc-admin-local-only|social-lite-local-client-secret|socialite-local-secret-not-for-production|socialite-demo|socialite-demo-totp-[a-z-]+|local-dev-1:|change-me|example|placeholder|test-secret|not-a-real|xxxx|\$\{|process\.env|<[^>]+>|Buffer\.alloc|randomBytes|["'"'"'][A-Z][A-Z0-9_]{11,}["'"'"']|["'"'"']https://'
 assign=$(git grep -I -n -i -E -e '(secret|password|passwd|token|api[_-]?key|private[_-]?key|client[_-]?secret)["'"'"']?\s*[:=]\s*["'"'"'][A-Za-z0-9+/_=.:-]{20,}["'"'"']' \
   -- . ':!pnpm-lock.yaml' ':!scripts/secret-scan.sh' ':!tests/**' ':!evidence/**' ':!docs/**' | grep -v -E -i "$ALLOW" || true)
 [ -z "$assign" ] || report "literal secret assignments outside tests/docs" "$assign"
