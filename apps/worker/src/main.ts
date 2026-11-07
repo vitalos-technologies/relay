@@ -1,4 +1,4 @@
-// Social Lite background worker. Runs continuously, independent of browsers and web requests.
+// Relay background worker. Runs continuously, independent of browsers and web requests.
 //  - Outbox dispatcher -> pg-boss (deterministic job ids)
 //  - delivery-due consumer (fast path) + due-work claim loop (recovery path; never relies on the queue alone)
 //  - lease/deadline sweepers, Unknown reconciliation, connection health checks, retention

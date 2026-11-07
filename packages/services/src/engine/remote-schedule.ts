@@ -39,7 +39,7 @@ export async function scopePaused(db: Queryable, d: Pick<ClaimedDelivery, 'id'>)
 /** Ask the adapter to cancel the provider-held release. Never throws: failures are 'uncertain'. */
 export async function cancelRemoteRelease(deps: EngineDeps, d: ClaimedDelivery, rs: RemoteSchedule): Promise<RemoteScheduleCancelOutcome> {
   const adapter = deps.adapterFor(d.provider);
-  if (!adapter.cancelRemoteSchedule) return { kind: 'unsupported', message: `Social Lite cannot cancel this ${d.provider} scheduled release; cancel it on the platform before ${rs.publishAt}.` };
+  if (!adapter.cancelRemoteSchedule) return { kind: 'unsupported', message: `Relay cannot cancel this ${d.provider} scheduled release; cancel it on the platform before ${rs.publishAt}.` };
   try {
     const creds = await deps.getCredentials(d.connection_id);
     const actx = await deps.adapterContext(d.provider, creds.connection);
