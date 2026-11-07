@@ -9,8 +9,9 @@
 4. **Relay V3.1 performance, reliability & workflow resilience** — QUEUED after V3. Full brief: `docs/queue/03b_V3_1_PROMPT.md`.
 5. **Relay V3.1 Admin application** (platform + workspace administration, fully wired, mobile-first QA) — QUEUED after V3.1 core. Full brief: `docs/queue/03c_V3_1_ADMIN_PROMPT.md`.
 6. **Team collaboration completion** (threads, mentions, tasks, reviewer notifications, presence, conflict resolution, revision compare/restore, admin wiring) — QUEUED after V3.1 Admin. Full brief: `docs/queue/03d_COLLABORATION_PROMPT.md`.
-7. **User-facing copy cleanup** (concise text across all screens; docs/Help Centre excluded) — QUEUED after collaboration completion. Full brief: `docs/queue/03e_COPY_CLEANUP_PROMPT.md`.
-8. **Complete documentation + in-app Help Centre** — QUEUED LAST (after copy cleanup so docs match final wording) (user asked "after V3"; placed after V3.1 so docs describe the final product — told the user). Full brief: `docs/queue/04_DOCUMENTATION_PROMPT.md`.
+7. **Relay V3.5: integration hub (Asana, HubSpot, Google Business Profile, monday.com, Cloud Translation, Slack, Mailchimp), unified inbox + customer care (incl. WhatsApp), listening, AI assistant + bounded automation, admin/MCP wiring** — QUEUED after collaboration completion. Full brief: `docs/queue/03f_V3_5_PROMPT.md`.
+8. **User-facing copy cleanup** (concise text across all screens; docs/Help Centre excluded) — QUEUED after V3.5. Full brief: `docs/queue/03e_COPY_CLEANUP_PROMPT.md`.
+9. **Complete documentation + in-app Help Centre** — QUEUED LAST (after copy cleanup so docs match final wording) (user asked "after V3"; placed after V3.1 so docs describe the final product — told the user). Full brief: `docs/queue/04_DOCUMENTATION_PROMPT.md`.
 
 ## Brand (2026-11-07)
 
