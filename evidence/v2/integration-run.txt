@@ -1,0 +1,108 @@
+
+ RUN  v3.2.7 /home/user/social-lite
+
+ ✓ |integration| tests/integration/auth.test.ts (10 tests) 24022ms
+   ✓ OIDC login against Keycloak > logs in with PKCE + nonce, creates the user by (issuer, subject) and a usable session  940ms
+   ✓ assurance, step-up and session rotation (real Keycloak) > password sign-in records acr/amr/auth_time/sid from the verified ID token and asks for the second factor next  325ms
+   ✓ assurance, step-up and session rotation (real Keycloak) > fresh step-up (acr_values=mfa, max_age=0) re-authenticates, refreshes auth_time and binds to the same subject + session  21108ms
+ ✓ |integration| tests/integration/v3-analytics.test.ts (13 tests) 5660ms
+   ✓ demo fixtures and tenant isolation > synthetic demo data never appears in live queries; demo dataset only in demo workspaces  3867ms
+{"ts":"2026-11-07T07:52:08.602Z","level":"warn","svc":"social-lite","msg":"content_import_failed","importId":"d9bae66b-a88f-4f2b-b050-3bed201cf49c","action":"doc_drafts","code":"conflict","err":{"name":"AppError","message":"The source changed after the preview. Preview it again before importing."}}
+ ✓ |integration| tests/integration/mcp.test.ts (21 tests) 3256ms
+ ✓ |integration| tests/integration/v2-product.test.ts (17 tests) 3253ms
+   ✓ fair dispatch across workspaces > concurrent workers never exceed the cap; processing order alternates between workspaces  1161ms
+   ✓ publishing readiness preflight > approval policy, provider limit and X budget reasons  543ms
+ ✓ |integration| tests/integration/v3-analytics-pipeline.test.ts (8 tests) 2628ms
+   ✓ sync runs and cursors > checkpoints, never duplicates on retries, honours job keys and the refresh cadence  503ms
+   ✓ reports and exports > CSV export reproduces the filtered, authorized content table with a manifest and is injection-safe  1063ms
+   ✓ reports and exports > exports re-check authority at request, run and download time; external destinations go through ReportExporter  326ms
+{"ts":"2026-11-07T07:52:18.456Z","level":"info","svc":"social-lite","msg":"asset_processed","assetId":"213db16d-6ad3-4dfd-8ca4-0e2691a9f2a4","status":"ready"}
+{"ts":"2026-11-07T07:52:18.488Z","level":"info","svc":"social-lite","msg":"asset_processed","assetId":"213db16d-6ad3-4dfd-8ca4-0e2691a9f2a4","status":"skipped"}
+{"ts":"2026-11-07T07:52:19.723Z","level":"info","svc":"social-lite","msg":"asset_processed","assetId":"b8b61336-9395-4bd1-bb3a-38a24fd3cabf","status":"ready"}
+{"ts":"2026-11-07T07:52:20.107Z","level":"info","svc":"social-lite","msg":"asset_processed","assetId":"be6f295d-ee57-4d4c-becd-567e432ec7a7","status":"ready"}
+{"ts":"2026-11-07T07:52:20.160Z","level":"info","svc":"social-lite","msg":"asset_processed","assetId":"2caf6035-0f0c-4d6a-8ef0-d21270f0ce87","status":"rejected"}
+{"ts":"2026-11-07T07:52:20.247Z","level":"info","svc":"social-lite","msg":"asset_processed","assetId":"4e87c20c-2d42-4b6c-9c3b-07b3b79ab326","status":"rejected"}
+{"ts":"2026-11-07T07:52:20.287Z","level":"info","svc":"social-lite","msg":"asset_processed","assetId":"dbedf5ed-87f3-49ea-bdeb-d65bc5169493","status":"skipped"}
+ ✓ |integration| tests/integration/media-video.test.ts (6 tests) 3317ms
+   ✓ video upload → worker → derivatives (V1.1) > completeUpload only quarantines and enqueues asset.uploaded; the worker produces poster/preview/thumb + video_publish  485ms
+   ✓ video upload → worker → derivatives (V1.1) > transcodes an incompatible MOV (MPEG-4/PCM 1080p) to H.264/AAC MP4 ≤ 1280×1024 and strips location metadata  1307ms
+   ✓ video upload → worker → derivatives (V1.1) > per-destination validation: a 2 s clip fails Instagram Reels (minimum 3 s) and passes Facebook, Telegram and X  331ms
+   ✓ tenancy > cross-tenant access is denied (not_found) and a forged worker event for another workspace changes nothing  389ms
+ ✓ |integration| tests/integration/v2-collab.test.ts (13 tests) 2716ms
+   ✓ §12 case 12 — separation of duties and quorum of distinct people > a person in two eligible teams counts once toward quorum  493ms
+   ✓ §12 case 14 — guests see only shared reviews > cannot read internal notes, unrelated posts or notifications via API, export or deep link  571ms
+ ✓ |integration| tests/integration/engine.test.ts (24 tests) 3177ms
+   ✓ four-channel scheduling > schedules one image post to four destinations atomically and publishes each independently  302ms
+   ✓ failure handling > partial success: retry resends only the failed destination  306ms
+ ✓ |integration| tests/integration/analytics.test.ts (8 tests) 2496ms
+   ✓ refresh scheduling > on-demand refresh is throttled per delivery; the daily job skips recently refreshed deliveries  1665ms
+{"ts":"2026-11-07T07:52:30.543Z","level":"warn","svc":"social-lite","msg":"content_import_failed","importId":"b798840b-74ca-4459-970b-ba5867a5a4ec","action":"media_asset","code":"invalid_state","err":{"name":"AppError","message":"The owner turned off downloading for this file."}}
+{"ts":"2026-11-07T07:52:30.672Z","level":"warn","svc":"social-lite","msg":"content_import_failed","importId":"cc3559e7-3093-4249-a4a4-d1c057345992","action":"doc_drafts","code":"conflict","err":{"name":"AppError","message":"The source changed after the preview. Preview it again before importing."}}
+{"ts":"2026-11-07T07:52:30.978Z","level":"warn","svc":"social-lite","msg":"content_import_failed","importId":"6523f783-e606-444f-8fc2-1fff86ac43da","action":"refresh","code":"not_found","err":{"name":"SourceAccessError","message":"drive.files.get: not found or not shared with Relay"}}
+{"ts":"2026-11-07T07:52:31.001Z","level":"warn","svc":"social-lite","msg":"content_import_failed","importId":"4de72a73-dd52-41a9-8dce-ac0bae9398ff","action":"refresh","code":"invalid_state","err":{"name":"AppError","message":"The source authorization was revoked or expired. Reconnect it."}}
+{"ts":"2026-11-07T07:52:31.669Z","level":"warn","svc":"social-lite","msg":"content_export_failed","exportId":"b102ac4d-8e5a-4c14-b73b-4febad348df1","code":"validation_failed","err":{"name":"AppError","message":"Select the destination folder or page first."}}
+{"ts":"2026-11-07T07:52:31.855Z","level":"warn","svc":"social-lite","msg":"content_import_failed","importId":"f3ad066f-29c3-44a5-b069-793637976f52","action":"media_asset","code":"not_found","err":{"name":"AppError","message":"The source was removed."}}
+ ✓ |integration| tests/integration/content-hub.test.ts (20 tests) 1814ms
+ ✓ |integration| tests/integration/slots.test.ts (12 tests) 1412ms
+   ✓ add to queue > schedules into the next free occurrence with the slot zone and destinations; next post gets the next one  327ms
+   ✓ add to queue > two users queueing simultaneously never take the same occurrence  404ms
+ ✓ |integration| tests/integration/media.test.ts (12 tests) 1621ms
+   ✓ media upload + validation (ME-01..ME-03) > rejects images whose dimensions exceed the pixel limit (decompression-bomb guard)  637ms
+ ✓ |integration| tests/integration/v2-authority.test.ts (6 tests) 1761ms
+   ✓ publication authority (§12.13) > revoking the scheduler’s publishing grant HOLDS queued work; re-granting does not release it; adoption re-queues  339ms
+   ✓ publication authority (§12.13) > suspension/removal of the scheduler holds; removal via a team and approver revocation hold; the author alone does not  429ms
+   ✓ publication authority (§12.13) > approval-activated work is held when a required approver loses approval rights, not when the draft author leaves  366ms
+   ✓ publication authority (§12.13) > in-flight sends complete; missing records and evaluation failures fail closed (§12.22)  307ms
+ ✓ |integration| tests/integration/crops.test.ts (4 tests) 1287ms
+   ✓ crop derivatives > are deterministic, cached by (asset, rect, transform_version) and contain exactly the cropped pixels  324ms
+   ✓ validation uses the cropped facts > a too-wide image fails Instagram; a 4:5 crop of it passes; an out-of-bounds crop is an exact issue  359ms
+   ✓ approval > the crop is part of the revision content hash; changing it invalidates a pending approval  344ms
+ ✓ |integration| tests/integration/v2-lifecycle.test.ts (10 tests) 1083ms
+ ✓ |integration| tests/integration/v2-teams-grants.test.ts (7 tests) 805ms
+ ✓ |integration| tests/integration/media-video-engine.test.ts (3 tests) 841ms
+   ✓ multi-image publishing through the real adapters (V1.1) > one video → IG Reel, FB Page video (processing → polled → published), Telegram sendVideo, X chunked upload  415ms
+{"ts":"2026-11-07T07:52:42.890Z","level":"warn","svc":"social-lite","msg":"credential_refresh_failed","connectionId":"644f8f2e-6b9b-4d59-8ebc-690d994aa727","provider":"x","permanent":true,"err":{"name":"XOAuthError","message":"X refused the authorization (expired, revoked or already used). Connect the X account again."}}
+ ✓ |integration| tests/integration/connections.test.ts (16 tests) 966ms
+ ✓ |integration| tests/integration/tipsignal.test.ts (5 tests) 601ms
+   ✓ TipSignal events > the service account is the principal: revoked grant or disabled account ⇒ rejected; it can never publish  314ms
+{"ts":"2026-11-07T07:52:44.123Z","level":"info","svc":"social-lite","msg":"ai.suggest","workspaceId":"b2947f92-21c1-42dd-b266-89afd9d64450","brandId":"eb535cdc-3d4e-4f64-9ee0-70cf3501e115","postId":"e310abd0-c58f-463c-9812-b3b07e657f5c","userId":"dbacb66a-eecc-46b5-9751-571b1727e185","task":"shorten","model":"claude-opus-5-5","status":"ok","input_tokens":"<redacted>","output_tokens":"<redacted>","correlationId":"b5c1e881-51ce-45f3-a75b-a4b8d564e93a"}
+{"ts":"2026-11-07T07:52:44.164Z","level":"info","svc":"social-lite","msg":"ai.suggest","workspaceId":"b2947f92-21c1-42dd-b266-89afd9d64450","brandId":"eb535cdc-3d4e-4f64-9ee0-70cf3501e115","postId":"1f8b8023-05f0-4e51-a8a2-7272ebc09afa","userId":"dbacb66a-eecc-46b5-9751-571b1727e185","task":"variants","model":"claude-opus-5-5","status":"ok","input_tokens":"<redacted>","output_tokens":"<redacted>","correlationId":"b5c1e881-51ce-45f3-a75b-a4b8d564e93a"}
+{"ts":"2026-11-07T07:52:44.178Z","level":"info","svc":"social-lite","msg":"ai.suggest","workspaceId":"b2947f92-21c1-42dd-b266-89afd9d64450","brandId":"eb535cdc-3d4e-4f64-9ee0-70cf3501e115","postId":"dd7fe813-7489-4662-b41e-1ec822ea0b5f","userId":"dbacb66a-eecc-46b5-9751-571b1727e185","task":"tone","model":"claude-opus-5-5","status":"ok","input_tokens":"<redacted>","output_tokens":"<redacted>","correlationId":"b5c1e881-51ce-45f3-a75b-a4b8d564e93a"}
+{"ts":"2026-11-07T07:52:44.191Z","level":"info","svc":"social-lite","msg":"ai.suggest","workspaceId":"b2947f92-21c1-42dd-b266-89afd9d64450","brandId":"eb535cdc-3d4e-4f64-9ee0-70cf3501e115","postId":"dd7fe813-7489-4662-b41e-1ec822ea0b5f","userId":"dbacb66a-eecc-46b5-9751-571b1727e185","task":"shorten","model":"claude-opus-5-5","status":"ok","input_tokens":"<redacted>","output_tokens":"<redacted>","correlationId":"b5c1e881-51ce-45f3-a75b-a4b8d564e93a"}
+{"ts":"2026-11-07T07:52:44.219Z","level":"info","svc":"social-lite","msg":"ai.suggest","workspaceId":"b2947f92-21c1-42dd-b266-89afd9d64450","brandId":"eb535cdc-3d4e-4f64-9ee0-70cf3501e115","postId":"6bc34ef3-8a5e-4c41-bf9d-b5f99fca46bd","userId":"dbacb66a-eecc-46b5-9751-571b1727e185","task":"repurpose","model":"claude-opus-5-5","status":"ok","input_tokens":"<redacted>","output_tokens":"<redacted>","correlationId":"b5c1e881-51ce-45f3-a75b-a4b8d564e93a"}
+{"ts":"2026-11-07T07:52:44.356Z","level":"info","svc":"social-lite","msg":"ai.suggest","workspaceId":"b2947f92-21c1-42dd-b266-89afd9d64450","brandId":"eb535cdc-3d4e-4f64-9ee0-70cf3501e115","postId":"1b6bbf8a-7040-45aa-b3a3-ba4e30c1ff5a","userId":"34faaf1e-1f0d-4440-9a01-23c8336e8589","task":"shorten","model":"claude-opus-5-5","status":"ok","input_tokens":"<redacted>","output_tokens":"<redacted>","correlationId":"e05f8879-3b3f-449b-841c-93ee89a4a464"}
+{"ts":"2026-11-07T07:52:44.378Z","level":"info","svc":"social-lite","msg":"ai.suggest","workspaceId":"b2947f92-21c1-42dd-b266-89afd9d64450","brandId":"eb535cdc-3d4e-4f64-9ee0-70cf3501e115","postId":"157b29b3-a883-44c6-bb2e-b872d62fe9eb","userId":"dbacb66a-eecc-46b5-9751-571b1727e185","task":"shorten","model":"test-fixture","status":"fixture","input_tokens":"<redacted>","output_tokens":"<redacted>","correlationId":"b5c1e881-51ce-45f3-a75b-a4b8d564e93a"}
+{"ts":"2026-11-07T07:52:44.420Z","level":"info","svc":"social-lite","msg":"ai.suggest","workspaceId":"0a50beaf-3075-490e-b050-882b9438f3cf","brandId":"64254abf-c4c4-460a-825f-31c3de8ef2a3","postId":"25acac49-db33-44a0-9a37-71e850050a42","userId":"58e75e43-c5d2-4d43-bd00-f91e290436fa","task":"shorten","model":"claude-opus-5-5","status":"ok","input_tokens":"<redacted>","output_tokens":"<redacted>","correlationId":"9571ec69-0cec-40cc-bd50-f48c45f1c6ac"}
+{"ts":"2026-11-07T07:52:44.636Z","level":"info","svc":"social-lite","msg":"ai.suggest","workspaceId":"0a50beaf-3075-490e-b050-882b9438f3cf","brandId":"64254abf-c4c4-460a-825f-31c3de8ef2a3","postId":"25acac49-db33-44a0-9a37-71e850050a42","userId":"58e75e43-c5d2-4d43-bd00-f91e290436fa","task":"shorten","model":"claude-opus-5-5","status":"ok","input_tokens":"<redacted>","output_tokens":"<redacted>","correlationId":"9571ec69-0cec-40cc-bd50-f48c45f1c6ac"}
+{"ts":"2026-11-07T07:52:44.640Z","level":"info","svc":"social-lite","msg":"ai.suggest","workspaceId":"0a50beaf-3075-490e-b050-882b9438f3cf","brandId":"64254abf-c4c4-460a-825f-31c3de8ef2a3","postId":"25acac49-db33-44a0-9a37-71e850050a42","userId":"58e75e43-c5d2-4d43-bd00-f91e290436fa","task":"shorten","model":"claude-opus-5-5","status":"ok","input_tokens":"<redacted>","output_tokens":"<redacted>","correlationId":"9571ec69-0cec-40cc-bd50-f48c45f1c6ac"}
+{"ts":"2026-11-07T07:52:44.671Z","level":"warn","svc":"social-lite","msg":"ai.suggest_failed","workspaceId":"0a50beaf-3075-490e-b050-882b9438f3cf","brandId":"64254abf-c4c4-460a-825f-31c3de8ef2a3","postId":"25acac49-db33-44a0-9a37-71e850050a42","task":"shorten","model":"claude-opus-5-5","correlationId":"9571ec69-0cec-40cc-bd50-f48c45f1c6ac","code":"unexpected"}
+ ✓ |integration| tests/integration/ai.test.ts (9 tests) 632ms
+ ✓ |integration| tests/integration/members.test.ts (5 tests) 494ms
+ ✓ |integration| tests/integration/auth-security.test.ts (10 tests) 450ms
+   ✓ safeFetch > limits redirects, size and time  311ms
+ ✓ |integration| tests/integration/tenancy.test.ts (11 tests) 334ms
+ ✓ |integration| tests/integration/v2-identity-followups.test.ts (5 tests) 494ms
+ ✓ |integration| tests/integration/v3-remote-schedule.test.ts (3 tests) 398ms
+ ✓ |integration| tests/integration/service-accounts.test.ts (4 tests) 256ms
+ ✓ |integration| tests/integration/v3-youtube-early-upload.test.ts (3 tests) 405ms
+ ✓ |integration| tests/integration/engine-handoff.test.ts (2 tests) 322ms
+ ✓ |integration| tests/integration/identity.test.ts (7 tests) 205ms
+ ✓ |integration| tests/integration/webhook-processing.test.ts (3 tests) 310ms
+ ✓ |integration| tests/integration/v2-adversarial.test.ts (6 tests) 228ms
+ ✓ |integration| tests/integration/db-roles.test.ts (5 tests) 174ms
+ ✓ |integration| tests/integration/settings-v11.test.ts (3 tests) 329ms
+ ✓ |integration| tests/integration/overdue.test.ts (1 test) 130ms
+ ✓ |integration| tests/integration/setup.test.ts (5 tests) 218ms
+ ✓ |integration| tests/integration/authz-core.test.ts (4 tests) 161ms
+ ✓ |integration| tests/integration/imports.test.ts (2 tests) 119ms
+ ✓ |integration| tests/integration/v3-connections.test.ts (4 tests) 154ms
+ ✓ |integration| tests/integration/meta-callbacks.test.ts (3 tests) 72ms
+ ✓ |integration| tests/integration/grant-expiry.test.ts (1 test) 88ms
+ ✓ |integration| tests/integration/schema.test.ts (3 tests) 50ms
+ ✓ |integration| tests/integration/crypto.test.ts (7 tests) 36ms
+
+ Test Files  42 passed (42)
+      Tests  321 passed (321)
+   Start at  07:51:34
+   Duration  78.50s (transform 2.59s, setup 0ms, collect 8.30s, tests 68.77s, environment 0ms, prepare 60ms)
+

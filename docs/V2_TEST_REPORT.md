@@ -1,6 +1,6 @@
 # V2 test report
 
-Relay V2 (security & multi-team). Run on 2026-11-07 in the shared development container while V2 stream A and V3 streams were still editing code (uncommitted work in the tree). Results describe that tree, not a tagged release.
+Relay V2 (security & multi-team). **Final run 2026-11-07 on `main` @ 3f43d42** after all V2 streams (A–D) and the V3 backend streams landed. The only uncommitted work in the tree was the V3 UX redesign, which had not yet changed any file these suites exercise.
 
 Environment: Linux container, Node 22.23.4, Vitest 3.2.7, PostgreSQL 16 (`postgres:16-alpine`), SeaweedFS 3.80 (S3), Keycloak 26.4 (OIDC, realm `infra/keycloak/social-lite-realm.json`), Mailpit. Simulated social providers only.
 
@@ -8,22 +8,15 @@ Environment: Linux container, Node 22.23.4, Vitest 3.2.7, PostgreSQL 16 (`postgr
 
 | Suite | Command | Files | Tests | Result |
 |---|---|---|---|---|
-| Unit | `pnpm -s test` (project `unit`) | 9 | 75 | **75 passed** |
-| Provider contracts | `pnpm -s test` (project `contracts`) | 15 | 348 | **348 passed** |
-| Integration (real Postgres + S3 + Keycloak; disposable DB per run) | `set -a; . ./.env; set +a; npx vitest run --project integration` | 35 | 249 | **247 passed, 2 failed** |
-| Browser E2E (Playwright) | `pnpm test:e2e` | 3 specs | – | **Not run in this report** |
-| Typecheck / production build | `pnpm typecheck` / `pnpm build` | – | – | **Not run in this report** |
-| Migration rehearsal | `./scripts/migration-rehearsal.sh` | – | 10 checks | Not re-run; last recorded run **PASS** 2026-11-07T05:12Z (`evidence/v2/migration-rehearsal.txt`) |
+| Unit | `pnpm -s test` (project `unit`) | 12 | 104 | **104 passed** |
+| Provider contracts | `pnpm -s test` (project `contracts`) | 16 | 351 | **351 passed** |
+| Integration (real Postgres + S3 + Keycloak; disposable DB per run) | `set -a; . ./.env; set +a; npx vitest run --project integration` | 42 | 321 | **321 passed** (log: `evidence/v2/integration-run.txt`) |
+| Security E2E (real Keycloak TOTP, step-up, recovery codes, factor removal, sessions, back-channel logout, service-account keys, CSP) | `pnpm test:e2e tests/e2e/security.spec.ts` | 1 spec | 8 | **8 passed** (stream A run; `evidence/v2/e2e-results-A.json`) |
+| Full browser E2E | `pnpm test:e2e` | 3 specs | 38 | Last full run (stream A, before its final fixes): **33 passed, 5 failed** — 4 in `publishing.spec` (one outdated message expectation, since fixed; a simulated X text rejection; dev-server recompiles), 1 in `v2-product` health centre. **To be re-run after the V3 redesign lands.** |
+| Typecheck | `npx tsc -p tsconfig.json --noEmit` and `apps/web` | – | – | **Clean** |
+| Migration rehearsal (V1.1 data → all migrations 001–019) | `./scripts/migration-rehearsal.sh` | – | 10 checks | **PASS** 2026-11-07 (re-run after all streams) |
+| Fresh database install | `pnpm db:reset` | – | – | **Works** (fixed: extensions + guarded grants in `infra/postgres/roles.sql`) |
 | Fairness load test | `scripts/load-test.ts --fairness` | – | – | Not re-run; recorded 2026-11-07T04:01Z (`evidence/v2/fairness.json`) |
-
-### Failures (verbatim)
-
-| File | Test | Error |
-|---|---|---|
-| `tests/integration/imports.test.ts` | CSV import (drafts only) › previews per-row, per-destination issues and commits only valid rows as drafts | `AssertionError: expected 'Instagram: an image or video is requi…' to match /Instagram: an image is required/` |
-| `tests/integration/setup.test.ts` | setup › reports grouped readiness and never returns secret values | `AssertionError: expected [ Array(16) ] to deeply equal [ Array(14) ]` (extra groups `google_content`, `notion`) |
-
-Both are stale expectations from V3 work, not V2 regressions: the validation message now says "an image or video" (`packages/core/src/validation.ts`, last changed in V3 commit `0c57bae`), and the V3 content-hub stream added two setup groups (`packages/services/src/setup.ts`, uncommitted). Side effect: the setup test stops before its "never returns secret values" assertions, so that check is **not currently exercised**.
 
 ## V2 suites and what they prove
 
