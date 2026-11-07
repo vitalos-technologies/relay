@@ -57,6 +57,9 @@ async function claimLoop(slot: number): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  const { initKmsKeyProvider } = await import('@social-lite/services/kms');
+  const kids = await initKmsKeyProvider(); // fail closed if KMS is configured but unusable
+  if (kids) log.info('kms_keys_loaded', { kids });
   const pool = getPool();
   const schema = await maybeOne<{ n: number }>(pool, `SELECT count(*)::int n FROM schema_migrations`).catch(() => null);
   if (!schema) throw new Error('Database is not migrated. Run the migration job first.');

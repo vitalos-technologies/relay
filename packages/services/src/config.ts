@@ -10,6 +10,9 @@ const schema = z.object({
   SESSION_SECRET: z.string().min(32).optional(),
   // Envelope encryption: "kid1:base64key,kid2:base64key"; first entry is the active key.
   KEY_ENCRYPTION_KEYS: z.string().min(1).optional(),
+  // Production alternative: KEKs held as Cloud KMS ciphertext and unwrapped at boot (services/kms.ts).
+  KMS_KEY_NAME: z.string().optional(),
+  KMS_WRAPPED_KEKS: z.string().optional(),
   OIDC_ISSUER: z.string().url().optional(),
   OIDC_CLIENT_ID: z.string().optional(),
   OIDC_CLIENT_SECRET: z.string().optional(),
@@ -66,7 +69,7 @@ export function assertProductionSafe(c: AppConfig): void {
   if (c.OIDC_ALLOW_INSECURE_HTTP) problems.push('OIDC_ALLOW_INSECURE_HTTP must be false in production');
   if (!c.APP_BASE_URL.startsWith('https://')) problems.push('APP_BASE_URL must use https in production');
   if (!c.SESSION_SECRET) problems.push('SESSION_SECRET is required');
-  if (!c.KEY_ENCRYPTION_KEYS) problems.push('KEY_ENCRYPTION_KEYS is required');
+  if (!c.KEY_ENCRYPTION_KEYS && !(c.KMS_KEY_NAME && c.KMS_WRAPPED_KEKS)) problems.push('KEY_ENCRYPTION_KEYS or KMS_KEY_NAME + KMS_WRAPPED_KEKS is required');
   if (!c.OIDC_ISSUER || !c.OIDC_CLIENT_ID || !c.OIDC_CLIENT_SECRET) problems.push('OIDC_ISSUER, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET are required');
   if (c.OIDC_ISSUER && /localhost|127\.0\.0\.1|\/dex$/.test(c.OIDC_ISSUER)) problems.push('OIDC_ISSUER points at the local development identity provider');
   if (!c.S3_ENDPOINT || !c.S3_ACCESS_KEY_ID || !c.S3_SECRET_ACCESS_KEY) problems.push('S3_ENDPOINT, S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY are required');
