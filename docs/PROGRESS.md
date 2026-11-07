@@ -3,7 +3,7 @@
 ## Queue (user-ordered)
 
 1. **V1 + V1.1** — DONE, tagged `v1.1.0-local`.
-2. **V2 security & multi-team upgrade** — IN PROGRESS. Spec: `/root/.claude/uploads/f609c563-89be-5dc6-9e00-6441979fd790/053d4b00-Social_Lite_V2_Autonomous_Upgrade_Prompt.md`
+2. **V2 security & multi-team upgrade** — streams B/C/D DONE, A finishing; rehearsal 004–014 PASS; 418 unit/contract + 242/244 integration (2 = A's Keycloak tests). Spec: `/root/.claude/uploads/f609c563-89be-5dc6-9e00-6441979fd790/053d4b00-Social_Lite_V2_Autonomous_Upgrade_Prompt.md`
 3. **V3 modernisation, analytics, 6 new providers, Google Drive/Docs + Notion, first-party MCP server** — QUEUED, start immediately after V2 is verified. Spec: `/root/.claude/uploads/f609c563-89be-5dc6-9e00-6441979fd790/9becd5de-Social_Lite_V3_Autonomous_Upgrade_Prompt.md`. Required docs: V3_REQUIREMENTS_MATRIX, V3_BUILD_STATUS, V3_IMPLEMENTATION_GAPS, V3_FINAL_ACTIVATION_CHECKLIST. User preference: less text, clean interfaces, send screenshots as you go.
 
 4. **Relay V3.1 performance, reliability & workflow resilience** — QUEUED after V3. Full brief: `docs/queue/03b_V3_1_PROMPT.md`.
@@ -24,7 +24,9 @@ Product is now **Relay** (brand kit: docs/brand/relay-brand-kit.webp; decisions 
 ## V3 early start
 
 - V3-P providers DONE (adapters, connectors, fakes, metrics, 164 contract tests, docs; migration 014 applied to dev). Gaps for V3 streams: Bluesky connect route/UI; composer per-provider required fields (TikTok privacy+consent, YouTube title/privacy/madeForKids, Pinterest board, LinkedIn org); YouTube native scheduling needs early upload dispatch before publishAt; dedicated `manual_handoff` delivery state (TikTok inbox drafts currently Unknown + handoff text); self-hosted Bluesky PDS allow-list.
-- Remaining V3 streams start after V2: design system + shell/left Settings nav; analytics pipeline; Drive/Docs/Notion Content Hub; MCP server (auth via Keycloak AS).
+- V3 streams RUNNING (contracts: docs/V3_WORKSTREAMS.md): AN analytics (015), CH content hub (016), MCP (017). Progress notes docs/v3-progress/{analytics,content-hub,mcp}.md.
+- UX redesign stream (018) starts when V2-A finishes (A relaunched to finish CSP/scans/security UI/Keycloak test fixes; docs/v2-progress/A.md).
+- Lead V3 items: engine gaps (manual_handoff state, YouTube early upload before publishAt), V3 docs.
 
 ## Environment recovery
 
