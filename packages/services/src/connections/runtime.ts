@@ -3,7 +3,7 @@
 // A live connection ALWAYS gets the live HTTP transport (never a mock fallback); a mock_ connection
 // gets the simulated API only when mockProvidersEnabled().
 import type { AdapterContext, Provider, ProviderAppConfig, PublishConnection, Transport } from '@social-lite/core';
-import { HttpTransport, MOCK_SCENARIOS, transportFor, type MockScenario } from '@social-lite/providers';
+import { HttpTransport, MOCK_SCENARIOS, parseExtraHosts, transportFor, type MockScenario } from '@social-lite/providers';
 import { config, mockProvidersEnabled } from '../config.js';
 import { log } from '../log.js';
 import { DbMockStore } from '../mock-store.js';
@@ -71,9 +71,14 @@ export function setLiveTransportFactoryForTests(f: LiveTransportFactory | null):
   liveFactory = f;
 }
 
+/** Operator allow-list additions per provider (self-hosted Bluesky servers). */
+export function extraHostsFor(provider: Provider): string[] {
+  return provider === 'bluesky' ? parseExtraHosts(process.env.BLUESKY_SELF_HOSTED_HOSTS) : [];
+}
+
 function liveTransport(provider: Provider): Transport {
   if (liveFactory && config().APP_ENV !== 'production') return liveFactory(provider);
-  return new HttpTransport({ onLog });
+  return new HttpTransport({ onLog, extraHosts: extraHostsFor(provider) });
 }
 
 export function scenarioOf(metadata: Record<string, unknown>): MockScenario {
@@ -93,7 +98,7 @@ export async function buildAdapterContext(provider: Provider, connection: Publis
   } else {
     // transportFor enforces that a mock_ identity can never use live transport; the test seam is
     // applied only after that check.
-    transport = transportFor({ provider, providerAccountId: connection.providerAccountId, isMock: false, mockProvidersEnabled: false, liveOptions: { onLog } });
+    transport = transportFor({ provider, providerAccountId: connection.providerAccountId, isMock: false, mockProvidersEnabled: false, liveOptions: { onLog, extraHosts: extraHostsFor(provider) } });
     if (liveFactory) transport = liveTransport(provider);
   }
   return { transport, now: () => new Date(), config: cfg };

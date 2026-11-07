@@ -46,6 +46,20 @@ describe('V3 connections', () => {
     await expect(connectBluesky(t.ownerCtx, t.brandId, { handle: 'sim.bsky.social', app_password: 'my-main-password' })).rejects.toMatchObject({ code: 'validation_failed' });
   });
 
+  it('self-hosted Bluesky servers need an operator allow-list entry', async () => {
+    const t = await tenant();
+    const live = new BskyLive();
+    setLiveTransportFactoryForTests(() => live);
+    await expect(connectBluesky(t.ownerCtx, t.brandId, { handle: 'me.example.org', app_password: APP_PW, service: 'https://pds.example.org' }))
+      .rejects.toMatchObject({ code: 'validation_failed', message: expect.stringContaining('not enabled') });
+    expect(live.requests).toHaveLength(0);
+    process.env.BLUESKY_SELF_HOSTED_HOSTS = 'pds.example.org';
+    try {
+      await connectBluesky(t.ownerCtx, t.brandId, { handle: 'me.example.org', app_password: APP_PW, service: 'https://pds.example.org' }).catch(() => undefined);
+      expect(live.requests[0]?.url).toBe('https://pds.example.org/xrpc/com.atproto.server.createSession');
+    } finally { delete process.env.BLUESKY_SELF_HOSTED_HOSTS; }
+  });
+
   it('Bluesky reconnect re-verifies the same account with a new app password (no new connection)', async () => {
     const t = await tenant();
     const live = new BskyLive();

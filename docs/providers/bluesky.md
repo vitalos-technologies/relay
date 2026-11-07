@@ -56,8 +56,8 @@ atproto OAuth is the documented next step (see Gaps).
 - XRPC errors are `{error, message}`; 429 carries `ratelimit-reset` (epoch seconds). Write budget 5,000 points/h,
   35,000/day, create = 3 points (A7, third-party mirror).
 - Web URL `https://bsky.app/profile/{handle}/post/{rkey}`.
-- Entryway `https://bsky.social`; PDS hosts `*.host.bsky.network` are allow-listed; **self-hosted PDS hosts are not**
-  (gap).
+- Entryway `https://bsky.social`; PDS hosts `*.host.bsky.network` are allow-listed. Self-hosted servers are allowed only
+  when the operator lists their exact hostnames in `BLUESKY_SELF_HOSTED_HOSTS` (comma-separated); users cannot add hosts.
 
 ## Behaviour
 
@@ -79,4 +79,4 @@ transaction, encrypted credential, `grantedScopes: ['app_password']`, metadata `
 
 - atproto OAuth (PAR + DPoP + private_key_jwt) not implemented; app passwords only.
 - Video, external link cards (`app.bsky.embed.external` with thumbnail) not implemented.
-- Self-hosted PDS hosts require extending the transport allow-list.
+- Self-hosted PDS: operator allow-list `BLUESKY_SELF_HOSTED_HOSTS`; a non-listed server is refused before any request.

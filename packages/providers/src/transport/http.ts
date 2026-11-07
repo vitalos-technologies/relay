@@ -24,11 +24,23 @@ export const PROVIDER_HOSTS = new Set([
   'bsky.social', 'public.api.bsky.app',
 ]);
 
+/** Operator-supplied hostnames: lower-case DNS names only (no IPs, ports, wildcards or schemes). */
+export function parseExtraHosts(raw: string | undefined | null): string[] {
+  if (!raw) return [];
+  return [...new Set(raw.split(',').map((h) => h.trim().toLowerCase()).filter((h) =>
+    /^(?=.{4,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(h) && h !== 'localhost'))];
+}
+
 /** V3: host suffixes (Bluesky-hosted PDS instances, e.g. morel.us-east.host.bsky.network). */
 export const PROVIDER_HOST_SUFFIXES = ['.host.bsky.network'];
 
 function hostAllowed(host: string, allow: Set<string>, suffixes: readonly string[]): boolean {
   return allow.has(host) || suffixes.some((s) => host.endsWith(s) && host.length > s.length);
+}
+
+/** Whether the default live transport (plus operator extra hosts) may call this host. */
+export function isProviderHostAllowed(host: string, extraHosts: readonly string[] = []): boolean {
+  return hostAllowed(host.toLowerCase(), PROVIDER_HOSTS, PROVIDER_HOST_SUFFIXES) || extraHosts.includes(host.toLowerCase());
 }
 
 const PRE_CONNECT_CODES = new Set(['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'UND_ERR_CONNECT_TIMEOUT', 'ENETUNREACH', 'EHOSTUNREACH']);
@@ -41,6 +53,11 @@ export function redactProviderUrl(url: string): string {
 
 export interface HttpTransportOptions {
   allowHosts?: Set<string>;
+  /**
+   * Extra exact hostnames added to the default allow-list by the OPERATOR (e.g. self-hosted Bluesky servers,
+   * BLUESKY_SELF_HOSTED_HOSTS). Never taken from user input.
+   */
+  extraHosts?: readonly string[];
   defaultTimeoutMs?: number;
   onLog?: (entry: { op: string; method: string; url: string; status?: number; ms: number; error?: string }) => void;
 }
@@ -51,7 +68,7 @@ export class HttpTransport implements Transport {
   private readonly timeout: number;
 
   constructor(private readonly opts: HttpTransportOptions = {}) {
-    this.allow = opts.allowHosts ?? PROVIDER_HOSTS;
+    this.allow = opts.allowHosts ?? (opts.extraHosts?.length ? new Set([...PROVIDER_HOSTS, ...opts.extraHosts]) : PROVIDER_HOSTS);
     this.timeout = opts.defaultTimeoutMs ?? 30_000;
   }
 

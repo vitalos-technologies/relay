@@ -3,12 +3,12 @@
 // transaction, then store the encrypted credential. The UI must label this "App password".
 import { z } from 'zod';
 import { AppError, TransportError } from '@social-lite/core';
-import { getBlueskyConnector } from '@social-lite/providers';
+import { getBlueskyConnector, isProviderHostAllowed } from '@social-lite/providers';
 import { withTx } from '@social-lite/db';
 import type { Ctx } from '../context.js';
 import { assertBrand, requireAction } from '../tenancy.js';
 import { log } from '../log.js';
-import { setupContext } from './runtime.js';
+import { extraHostsFor, setupContext } from './runtime.js';
 import { toConnectionJson, upsertConnectionFromDestination, type ConnectionJson } from './store.js';
 
 export const blueskyConnectSchema = z.object({
@@ -22,6 +22,11 @@ export async function connectBluesky(ctx: Ctx, brandId: string, body: unknown, o
   requireAction(ctx, 'connections.manage', 'Only owners and admins can connect accounts.');
   await assertBrand(ctx, brandId);
   const input = blueskyConnectSchema.parse(body);
+  // Self-hosted servers must be allow-listed by the operator first (no user-supplied outbound hosts).
+  if (input.service && !isProviderHostAllowed(new URL(input.service).hostname, extraHostsFor('bluesky'))) {
+    const msg = 'This Bluesky server is not enabled for Relay. Ask your administrator to allow it.';
+    throw new AppError('validation_failed', msg, { service: msg });
+  }
   let dest;
   try {
     dest = await getBlueskyConnector().verify(await setupContext('bluesky'), { identifier: input.handle, appPassword: input.app_password, service: input.service });
