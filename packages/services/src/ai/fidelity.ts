@@ -99,6 +99,25 @@ export function findProhibited(text: string, phrases: string[]): string[] {
   });
 }
 
+// V3.1 (§12): wording that presents an estimate/probability as a certainty. Matched as whole words, case-insensitive.
+const PROMISE_RE = [
+  /\bguarantee(?:d|s)?\b/giu, /\bsure[- ](?:thing|bet|win|winner|fire)\b/giu, /\bcan(?:'|’)?t lose\b/giu, /\bcannot lose\b/giu,
+  /\brisk[- ]free\b/giu, /\b(?:stone[- ]cold |nailed[- ]on |)lock of the (?:day|week|weekend)\b/giu, /\bnailed[- ]on\b/giu,
+  /\bcertain(?:ty)? (?:to )?win\b/giu, /\b100\s?% (?:sure|certain|guaranteed|win|winner|lock)\b/giu, /\bwill (?:definitely |surely |certainly )?win\b/giu,
+  /\b(?:easy|free) money\b/giu, /\bno[- ]brainer\b/giu, /\bbanker\b/giu, /\bdead cert\b/giu, /\bcan(?:'|’)?t miss\b/giu,
+];
+
+/** Promise/certainty phrases found in `text` (normalised, lower case, deduplicated). */
+export function findPromiseLanguage(text: string): string[] {
+  const hay = text.normalize('NFKC');
+  const out = new Set<string>();
+  for (const re of PROMISE_RE) {
+    re.lastIndex = 0;
+    for (const m of hay.matchAll(re)) out.add(m[0].toLowerCase().replace(/\s+/g, ' ').replace('’', "'"));
+  }
+  return [...out];
+}
+
 export interface LimitTarget {
   label: string;
   constraints: Pick<ChannelConstraints, 'maxTextLength' | 'maxCaptionLength' | 'textCounting' | 'maxHashtags'>;
@@ -169,7 +188,17 @@ export function checkSuggestion(input: CheckInput): SuggestionIssue[] {
   }
 
   // --- brand voice
-  for (const p of findProhibited(text, input.prohibited ?? [])) add('prohibited_phrase', 'block', `Uses the prohibited phrase “${p}”.`);
+  const prohibitedHits = findProhibited(text, input.prohibited ?? []);
+  for (const p of prohibitedHits) add('prohibited_phrase', 'block', `Uses the prohibited phrase “${p}”.`);
+
+  // --- V3.1: never turn a probability/estimate into a promise. Blocking when the source carries a probability or
+  // exact facts are required (TipSignal); otherwise flagged. Phrases already in the source/brand text are allowed.
+  const already = new Set([...findPromiseLanguage(input.sourceText), ...findPromiseLanguage(input.allowedText ?? '')]);
+  const hasProbability = src.some((f) => f.kind === 'percent');
+  const coveredByProhibited = (p: string) => prohibitedHits.some((h) => h.toLowerCase().includes(p) || p.includes(h.toLowerCase()));
+  for (const p of findPromiseLanguage(text).filter((x) => !already.has(x) && !coveredByProhibited(x))) {
+    add('promise_language', input.strict || hasProbability ? 'block' : 'warn', `“${p}” presents an estimate as a certainty.`);
+  }
 
   // --- destination limits (flag, never truncate)
   for (const t of input.targets ?? []) {

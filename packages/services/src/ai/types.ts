@@ -21,7 +21,9 @@ export type IssueSeverity = 'block' | 'warn';
 export type IssueCode =
   | 'fact_altered' | 'fact_dropped' | 'fact_invented'
   | 'link_dropped' | 'link_invented'
-  | 'prohibited_phrase' | 'over_limit' | 'too_many_hashtags' | 'empty';
+  | 'prohibited_phrase' | 'over_limit' | 'too_many_hashtags' | 'empty'
+  // V3.1 (§12): wording that turns a probability/estimate into a promise ("guaranteed", "sure win") not in the source.
+  | 'promise_language';
 
 export interface SuggestionIssue {
   code: IssueCode;

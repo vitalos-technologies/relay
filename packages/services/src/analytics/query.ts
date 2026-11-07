@@ -216,7 +216,16 @@ export async function postStates(scope: Scope, period: Period, o: PostScopeOpts 
 const rep = (p: Provider, f: MetricFamily): MetricDefinition | undefined => fetchedPostDefinitions(p).find((d) => d.family === f);
 const supportsFamily = (p: Provider, f: MetricFamily) => !!rep(p, f) && rep(p, f)!.availability !== 'excluded';
 
+// V3.1 PERF: pure function of the (immutable) registry, called per post per day in trends/health — memoised.
+const SUPPORTS = new Map<string, boolean>();
 export function providerSupports(p: Provider, m: MeasureKey): boolean {
+  const k = `${p}|${m}`;
+  let v = SUPPORTS.get(k);
+  if (v === undefined) { v = providerSupportsUncached(p, m); SUPPORTS.set(k, v); }
+  return v;
+}
+
+function providerSupportsUncached(p: Provider, m: MeasureKey): boolean {
   const M = MEASURES[m];
   switch (M.kind) {
     case 'app': return true;
@@ -388,16 +397,21 @@ function evaluate(m: MeasureKey, scope: Scope, period: Period, aggs: Agg[], post
   const by_network: Kpi['by_network'] = [];
   const items: Array<{ def: MetricDefinition; value: number; connectionId?: string }> = [];
   const M = MEASURES[m];
+  // V3.1 PERF: group once by connection (was a full pass over all aggs + posts per provider and per connection).
+  const aggsByConn = groupBy(aggs, (a) => a.connection_id);
+  const postsByConn = groupBy(posts, (x) => x.connection_id);
   for (const p of providers) {
     const conns = new Set(scope.connections.filter((c) => c.provider === p).map((c) => c.id));
-    const v = measureFromAggs(m, aggs.filter((a) => conns.has(a.connection_id)), posts.filter((x) => conns.has(x.connection_id)).length);
-    by_network.push({ provider: p, value: v.value, health: seriesHealth(m, posts, v, tz, cur, conns) });
+    const pAggs = [...conns].flatMap((c) => aggsByConn.get(c) ?? []);
+    const pPosts = [...conns].flatMap((c) => postsByConn.get(c) ?? []);
+    const v = measureFromAggs(m, pAggs, pPosts.length);
+    by_network.push({ provider: p, value: v.value, health: seriesHealth(m, pPosts, v, tz, cur, conns) });
     if (M.kind === 'family' && v.value !== null) {
       const def = rep(p, M.families[0]!);
       if (def) {
         if (FAMILIES[def.family].unique) {
           for (const c of conns) {
-            const cv = measureFromAggs(m, aggs.filter((a) => a.connection_id === c), 0);
+            const cv = measureFromAggs(m, aggsByConn.get(c) ?? [], 0);
             if (cv.value !== null) items.push({ def, value: cv.value, connectionId: c });
           }
         } else items.push({ def, value: v.value });
@@ -755,14 +769,17 @@ export async function overview(ctx: Ctx, filters: AnalyticsFilters, opts: { meas
 function channelComparison(m: MeasureKey, scope: Scope, b: Bundle): ChannelComparison {
   const M = MEASURES[m];
   const excluded: ChannelComparison['excluded'] = [];
+  const aggsByConn = groupBy(b.aggs, (a) => a.connection_id);
+  const postsByConn = groupBy(b.posts, (p) => p.connection_id);
   const rows = scope.connections.filter((c) => {
     if (providerSupports(c.provider, m)) return true;
     excluded.push({ connection_id: c.id, provider: c.provider, display_name: c.display_name, reason: `${PROVIDER_LABEL[c.provider]} does not report ${M.label.toLowerCase()}.` });
     return false;
   }).map((c) => {
-    const v = measureFromAggs(m, b.aggs.filter((a) => a.connection_id === c.id), b.posts.filter((p) => p.connection_id === c.id).length);
+    const cPosts = postsByConn.get(c.id) ?? [];
+    const v = measureFromAggs(m, aggsByConn.get(c.id) ?? [], cPosts.length);
     return { connection_id: c.id, provider: c.provider, display_name: c.display_name, value: v.value, share: null as number | null,
-      health: seriesHealth(m, b.posts, v, scope.period.timezone, b.cur, new Set([c.id])) };
+      health: seriesHealth(m, cPosts, v, scope.period.timezone, b.cur, new Set([c.id])) };
   });
   const unique = M.kind === 'family' && FAMILIES[M.families[0]!].unique;
   const groupsBy = new Map<string, typeof rows>();

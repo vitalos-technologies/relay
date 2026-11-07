@@ -229,8 +229,18 @@ export function definition(id: string, version?: number): MetricDefinition | und
   return version === undefined ? LATEST.get(id) : BY_ID.get(`${id}@${version}`);
 }
 
+// V3.1 PERF: the registry is fixed at module load (LATEST is built once from METRIC_DEFINITIONS), so per-provider lists
+// are memoised; callers get a fresh array copy (they may sort/filter it). Was a full scan per call (hot in analytics views).
+const BY_PROVIDER = new Map<Provider, MetricDefinition[]>();
+const FETCHED_POST = new Map<Provider, MetricDefinition[]>();
+function providerDefs(p: Provider): MetricDefinition[] {
+  let l = BY_PROVIDER.get(p);
+  if (!l) { l = [...LATEST.values()].filter((d) => d.provider === p); BY_PROVIDER.set(p, l); }
+  return l;
+}
+
 export function definitionsFor(p: Provider): MetricDefinition[] {
-  return [...LATEST.values()].filter((d) => d.provider === p);
+  return [...providerDefs(p)];
 }
 
 /** Map a provider-native point name to its (current) definition. Account scope only when asked. */
@@ -241,7 +251,9 @@ export function resolveNative(p: Provider, nativeName: string, scope: 'resource-
 
 /** Post/video metrics the current adapter fetches for a provider. */
 export function fetchedPostDefinitions(p: Provider): MetricDefinition[] {
-  return definitionsFor(p).filter((d) => d.scope !== 'account' && d.fetched);
+  let l = FETCHED_POST.get(p);
+  if (!l) { l = providerDefs(p).filter((d) => d.scope !== 'account' && d.fetched); FETCHED_POST.set(p, l); }
+  return [...l];
 }
 
 export function familyOf(id: string): MetricFamily | undefined {

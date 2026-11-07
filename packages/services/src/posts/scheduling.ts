@@ -16,6 +16,7 @@ import { assetsByIds } from '../media/assets.js';
 import { brandConnections, contentHash, scheduleFingerprint, type ConnectionRow } from './shared.js';
 import { loadPost, validateDraft, deliveriesForSchedule, type PostRow } from './service.js';
 import { approvalJson, deliveryJson, scheduleJson, type ApprovalRow, type ScheduleRow } from './serialize.js';
+import { enforceBrandRules } from '../gov/brand-rules.js';
 import { approvalRequiredFor, createReviewRequest, recordApproval, recordRejection, type ReviewRequestRow } from './approval-policy.js';
 
 const PAST_TOLERANCE_MS = 60_000;
@@ -141,6 +142,8 @@ async function createScheduleTx(ctx: Ctx, postId: string, rawReq: unknown, idemK
       throw new AppError('validation_failed', 'Fix the highlighted destinations or deselect them, then try again.', undefined, { issues: validation.issues, per_destination: validation.per_destination });
     }
     const time = resolveScheduleTime(req, brand, mode === 'immediate' || (mode === 'submit' && !req.input_local_time) ? (mode === 'submit' ? 'on_approval' : 'immediate') : 'timed');
+    // V3.1 (§12): mandatory brand rules (incl. TipSignal fact preservation, expired assets) refuse submit/schedule/publish.
+    await enforceBrandRules(tx, ctx, post, ids, time.dueAt);
     const snap = await snapshotRevision(tx, ctx, post, ids, conns);
     await supersedeLive(tx, post.id);
     const gen = await one<{ schedule_generation: number }>(tx, `UPDATE posts SET schedule_generation=schedule_generation+1 WHERE id=$1 RETURNING schedule_generation`, [post.id]);

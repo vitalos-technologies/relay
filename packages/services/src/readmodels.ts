@@ -5,6 +5,8 @@ import type { Ctx } from './context.js';
 import { DELIVERY_SELECT, deliveryJson, type DeliveryRow } from './posts/serialize.js';
 import { excerpt } from './posts/shared.js';
 import { requireAction } from './tenancy.js';
+import { signedGetUrl } from './storage.js';
+import { TRANSFORM_VERSION } from './media/process.js';
 
 const MAX_PLANNER_DAYS = 62;
 const PROVIDERS = new Set(['instagram', 'facebook', 'telegram', 'x']);
@@ -95,7 +97,8 @@ export async function historyCsv(ctx: Ctx, f: HistoryFilters): Promise<string> {
   return lines.join('\r\n') + '\r\n';
 }
 
-export async function planner(ctx: Ctx, q: { from?: string; to?: string; brand_id?: string; connection_id?: string; status?: string }) {
+export async function planner(ctx: Ctx, q: { from?: string; to?: string; brand_id?: string; connection_id?: string; status?: string; limit?: number }) {
+  const max = Math.min(Math.max(Math.floor(q.limit ?? PLANNER_MAX_ITEMS), 1), PLANNER_MAX_ITEMS);
   requireAction(ctx, 'history.read');
   const from = parseDate(q.from, 'from'); const to = parseDate(q.to, 'to');
   if (!from || !to) throw new AppError('validation_failed', 'from and to are required (UTC ISO instants)');
@@ -105,29 +108,64 @@ export async function planner(ctx: Ctx, q: { from?: string; to?: string; brand_i
   params.push(from, to);
   where += ` AND s.due_at >= $${params.length - 1} AND s.due_at < $${params.length} AND s.status IN ('active','pending_approval','completed','cancelled')`;
   if (q.connection_id) { params.push(q.connection_id); where += ` AND EXISTS (SELECT 1 FROM variants v WHERE v.revision_id=s.revision_id AND v.connection_id=$${params.length}::uuid)`; }
-  const rows = await many<{ id: string; post_id: string; brand_id: string; title: string | null; base_text: string; due_at: Date; input_timezone: string; input_local_time: string; status: string; generation: number; is_immediate: boolean }>(getPool(),
-    `SELECT s.id, s.post_id, s.brand_id, p.title, r.base_text, s.due_at, s.input_timezone, s.input_local_time, s.status, s.generation, s.is_immediate
+  const rows = await many<{ id: string; post_id: string; brand_id: string; title: string | null; base_text: string; due_at: Date; input_timezone: string; input_local_time: string; status: string; generation: number; is_immediate: boolean; first_asset_id: string | null }>(getPool(),
+    `SELECT s.id, s.post_id, s.brand_id, p.title, r.base_text, s.due_at, s.input_timezone, s.input_local_time, s.status, s.generation, s.is_immediate,
+            r.base_asset_ids[1] AS first_asset_id
        FROM schedules s JOIN posts p ON p.id=s.post_id JOIN post_revisions r ON r.id=s.revision_id
-      WHERE ${where} AND s.generation = p.schedule_generation ORDER BY s.due_at LIMIT 1000`, params);
+      WHERE ${where} AND s.generation = p.schedule_generation ORDER BY s.due_at LIMIT ${max + 1}`, params);
+  // V3.1 PERF: bounded and explicit — more than `max` items in range is reported (truncated), never silently cut.
+  const truncated = rows.length > max;
+  if (truncated) rows.length = max;
   const ids = rows.map((r) => r.id);
   const dels = ids.length ? await many<{ schedule_id: string; connection_id: string; provider: Provider; is_mock: boolean; state: DeliveryState; next_attempt_at: Date | null }>(getPool(),
     `SELECT schedule_id, connection_id, provider, is_mock, state, next_attempt_at FROM deliveries WHERE schedule_id = ANY($1::uuid[])`, [ids]) : [];
   const pendingDest = ids.length ? await many<{ schedule_id: string; connection_id: string; provider: Provider; is_mock: boolean }>(getPool(),
     `SELECT s.id schedule_id, v.connection_id, c.provider, c.is_mock FROM schedules s JOIN variants v ON v.revision_id=s.revision_id JOIN connections c ON c.id=v.connection_id
       WHERE s.id = ANY($1::uuid[]) AND s.status='pending_approval'`, [ids]) : [];
+  // V3 UX: thumbnail of the first base asset (same workspace + brand as the schedule), short-lived signed URL.
+  const thumbs = await plannerThumbs(ctx, rows);
+  const delsBy = groupBy(dels, (d) => d.schedule_id);
+  const pendingBy = groupBy(pendingDest, (d) => d.schedule_id);
   let items = rows.map((r) => {
-    const ds = dels.filter((d) => d.schedule_id === r.id);
+    const ds = delsBy.get(r.id) ?? [];
     let status = ds.length ? aggregateStatus(ds.map((d) => d.state)) : 'scheduled';
     if (r.status === 'pending_approval') status = 'pending_approval';
     if (r.status === 'cancelled' && !ds.some((d) => d.state === 'published')) status = 'cancelled';
     const destinations = ds.length ? ds.map((d) => ({ connection_id: d.connection_id, provider: d.provider, is_mock: d.is_mock, state: d.state, overdue: isDeliveryOverdue(d.state, d.next_attempt_at) }))
-      : pendingDest.filter((d) => d.schedule_id === r.id).map((d) => ({ connection_id: d.connection_id, provider: d.provider, is_mock: d.is_mock, state: null }));
+      : (pendingBy.get(r.id) ?? []).map((d) => ({ connection_id: d.connection_id, provider: d.provider, is_mock: d.is_mock, state: null }));
     return { schedule_id: r.id, post_id: r.post_id, brand_id: r.brand_id, title: r.title, excerpt: excerpt(r.base_text), due_at: r.due_at.toISOString(),
       input_timezone: r.input_timezone, input_local_time: r.input_local_time, status, schedule_status: r.status, generation: r.generation, destinations,
-      overdue: destinations.some((d) => 'overdue' in d && d.overdue) };
+      overdue: destinations.some((d) => 'overdue' in d && d.overdue),
+      thumb_url: (r.first_asset_id && thumbs.get(r.first_asset_id)?.url) ?? null, media_kind: (r.first_asset_id && thumbs.get(r.first_asset_id)?.kind) ?? null };
   });
   if (q.status) items = items.filter((i) => i.status === q.status);
-  return { items };
+  return { items, truncated };
+}
+
+const PLANNER_MAX_ITEMS = 1000;
+const DASHBOARD_TODAY_MAX = 200;
+
+function groupBy<T>(xs: T[], key: (x: T) => string): Map<string, T[]> {
+  const m = new Map<string, T[]>();
+  for (const x of xs) { const k = key(x); const l = m.get(k); if (l) l.push(x); else m.set(k, [x]); }
+  return m;
+}
+
+const THUMB_TTL_SECONDS = 300;
+async function plannerThumbs(ctx: Ctx, rows: Array<{ brand_id: string; first_asset_id: string | null }>): Promise<Map<string, { url: string | null; kind: 'image' | 'video' }>> {
+  const want = rows.filter((r) => r.first_asset_id);
+  if (!want.length) return new Map();
+  const found = await many<{ id: string; brand_id: string; media_kind: string | null; object_key: string | null; mime: string | null }>(getPool(),
+    `SELECT a.id, a.brand_id, a.media_kind, d.object_key, d.mime FROM assets a
+       LEFT JOIN asset_derivatives d ON d.asset_id = a.id AND d.variant = 'thumb' AND d.transform_version = $3
+      WHERE a.workspace_id = $1 AND a.id = ANY($2::uuid[])`,
+    [ctx.access.workspaceId, [...new Set(want.map((r) => r.first_asset_id!))], TRANSFORM_VERSION]);
+  const out = new Map<string, { url: string | null; kind: 'image' | 'video' }>();
+  for (const a of found) {
+    if (!want.some((r) => r.first_asset_id === a.id && r.brand_id === a.brand_id)) continue;
+    out.set(a.id, { url: a.object_key ? await signedGetUrl(a.object_key, THUMB_TTL_SECONDS, { contentType: a.mime ?? undefined }) : null, kind: a.media_kind === 'video' ? 'video' : 'image' });
+  }
+  return out;
 }
 
 export async function dashboard(ctx: Ctx, q: { brand_id?: string }) {
@@ -135,18 +173,19 @@ export async function dashboard(ctx: Ctx, q: { brand_id?: string }) {
   const now = new Date();
   const dayStart = new Date(now.getTime() - 12 * 3600_000);
   const dayEnd = new Date(now.getTime() + 36 * 3600_000);
-  const today = await planner(ctx, { from: dayStart.toISOString(), to: dayEnd.toISOString(), brand_id: q.brand_id });
-  const attention = async (state: string) => {
-    const params: unknown[] = [];
-    const where = scope(ctx, 'd', params, q.brand_id);
-    params.push(state);
-    const rows = await many<DeliveryRow & { post_title: string | null }>(getPool(),
-      `SELECT ${DELIVERY_SELECT}, p.title AS post_title FROM deliveries d JOIN connections c ON c.id=d.connection_id JOIN posts p ON p.id=d.post_id
+  // V3.1 PERF: the overview shows the next items, not the whole calendar (Large: 1,000 items / 794 KB) — bounded, flagged.
+  const today = await planner(ctx, { from: dayStart.toISOString(), to: dayEnd.toISOString(), brand_id: q.brand_id, limit: DASHBOARD_TODAY_MAX });
+  // V3.1 PERF: the five attention lists in ONE query (top 20 per state, newest first); was five sequential queries.
+  const ap: unknown[] = [];
+  const aw = scope(ctx, 'd', ap, q.brand_id);
+  ap.push(['blocked', 'unknown', 'failed', 'expired', 'handoff']);
+  const attRows = await many<DeliveryRow & { post_title: string | null; sort_at?: Date }>(getPool(),
+    `SELECT x.* FROM unnest($${ap.length}::delivery_state[]) st(state) CROSS JOIN LATERAL (
+       SELECT ${DELIVERY_SELECT}, p.title AS post_title, d.updated_at AS sort_at FROM deliveries d JOIN connections c ON c.id=d.connection_id JOIN posts p ON p.id=d.post_id
          JOIN schedules s ON s.id=d.schedule_id
-        WHERE ${where} AND d.state=$${params.length}::delivery_state AND s.generation = p.schedule_generation
-          AND d.updated_at > now() - interval '14 days' ORDER BY d.updated_at DESC LIMIT 20`, params);
-    return rows.map((r) => ({ ...deliveryJson(r), post_title: r.post_title }));
-  };
+        WHERE ${aw} AND d.state = st.state AND s.generation = p.schedule_generation
+          AND d.updated_at > now() - interval '14 days' ORDER BY d.updated_at DESC LIMIT 20) x ORDER BY x.sort_at DESC, x.id`, ap);
+  const attention = (state: string) => attRows.filter((r) => r.state === state).map(({ sort_at: _s, ...r }) => ({ ...deliveryJson(r), post_title: r.post_title }));
   const params: unknown[] = [];
   const cw = scope(ctx, 'c', params, q.brand_id);
   const warnings = await many<Record<string, unknown>>(getPool(),
@@ -157,7 +196,8 @@ export async function dashboard(ctx: Ctx, q: { brand_id?: string }) {
   const pausedBrands = await many<{ id: string }>(getPool(), `SELECT id FROM brands WHERE workspace_id=$1 AND publishing_paused`, [ctx.access.workspaceId]);
   return {
     today: today.items,
-    attention: { blocked: await attention('blocked'), unknown: await attention('unknown'), failed: await attention('failed'), expired: await attention('expired'), handoff: await attention('handoff') },
+    today_truncated: today.truncated,
+    attention: { blocked: attention('blocked'), unknown: attention('unknown'), failed: attention('failed'), expired: attention('expired'), handoff: attention('handoff') },
     delayed: await delayed(ctx, q.brand_id),
     account_warnings: warnings,
     recent: recent.items.filter((r) => !['scheduled', 'paused'].includes(r.state)),
@@ -194,7 +234,7 @@ export async function ops(ctx: Ctx) {
   const lateness = await maybeOne<{ p50: number | null; p95: number | null; n: number }>(db,
     `SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY lag) p50, percentile_cont(0.95) WITHIN GROUP (ORDER BY lag) p95, count(*)::int n FROM (
        SELECT extract(epoch FROM (a.started_at - d.due_at)) lag FROM delivery_attempts a JOIN deliveries d ON d.id=a.delivery_id
-        WHERE d.workspace_id=$1 AND a.attempt_number=1 AND a.kind='automatic' AND a.started_at > now() - interval '7 days') x`, [ws]);
+        WHERE a.workspace_id=$1 AND d.workspace_id=$1 AND a.attempt_number=1 AND a.kind='automatic' AND a.started_at > now() - interval '7 days') x`, [ws]);
   const flag = await maybeOne<{ value: unknown }>(db, `SELECT value FROM system_flags WHERE key='dispatch_enabled'`);
   const circuits = await many<Record<string, unknown>>(db, `SELECT provider, state, failure_count, opened_until FROM provider_circuits`);
   const usage = await many<{ meter: string; period: string; used: string }>(db, `SELECT meter, period, used FROM usage_counters WHERE workspace_id=$1 AND team_id IS NULL ORDER BY period DESC, meter`, [ws]);

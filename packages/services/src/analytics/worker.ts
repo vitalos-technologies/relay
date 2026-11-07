@@ -24,7 +24,11 @@ async function schemaReady(): Promise<boolean> {
   return !!r.rows[0]?.ok;
 }
 
-export async function registerAnalyticsWorkers(boss: PgBoss, o: { workerId: string; track: <T>(p: Promise<T>) => Promise<T>; stopping: () => boolean }): Promise<void> {
+type RunInClass = <T>(cls: 'analytics_refresh' | 'report_export', meta: { queue?: string | null; workspaceId?: string | null; eligibleAt?: Date | null }, fn: () => Promise<T>) => Promise<T>;
+
+export async function registerAnalyticsWorkers(boss: PgBoss, o: { workerId: string; track: <T>(p: Promise<T>) => Promise<T>; stopping: () => boolean; run?: RunInClass }): Promise<void> {
+  // V3.1 PERF: `run` puts each job in its workload class (gates, backpressure, bulk pool, metrics); default: run directly.
+  const run: RunInClass = o.run ?? ((_cls, _meta, fn) => fn());
   if (!(await schemaReady())) { log.warn('analytics_disabled', { reason: 'migration 015_v3_analytics not applied' }); return; }
   enabled = true;
   await ensureMetricRegistry();
@@ -36,12 +40,12 @@ export async function registerAnalyticsWorkers(boss: PgBoss, o: { workerId: stri
       if (o.stopping()) return;
       const deps = await liveAnalyticsDeps();
       for (const job of jobs) {
-        const s = await o.track(runConnectionSync(job.data.connectionId, deps, { workerId: `${o.workerId}#sync`, jobKey: job.data.jobKey }));
+        const s = await o.track(run('analytics_refresh', { queue: QUEUE_ANALYTICS_SYNC }, () => runConnectionSync(job.data.connectionId, deps, { workerId: `${o.workerId}#sync`, jobKey: job.data.jobKey })));
         if (s.status !== 'skipped') log.info('analytics_sync_run', { connectionId: job.data.connectionId, ...s });
       }
     });
   await boss.work<{ exportId: string }>(QUEUE_REPORT_EXPORT, { batchSize: 1, pollingIntervalSeconds: 5, groupConcurrency: 1 }, async (jobs) => {
-    for (const job of jobs) await o.track(runReportExport(job.data.exportId, { workerId: `${o.workerId}#export` }));
+    for (const job of jobs) await o.track(run('report_export', { queue: QUEUE_REPORT_EXPORT }, () => runReportExport(job.data.exportId, { workerId: `${o.workerId}#export` })));
   });
 }
 

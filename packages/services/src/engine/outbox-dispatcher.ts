@@ -11,11 +11,17 @@ import { log } from '../log.js';
 const NAMESPACE = '6b1d2b4e-58f7-4d0a-9d47-4a2f1d1f5c11';
 export const QUEUE_DELIVERY_DUE = 'delivery-due';
 export const QUEUE_EVENTS = 'events';
+/** V3.1 'video' workload class: uploaded videos are validated/transcoded on their own queue (not behind notifications). */
+export const QUEUE_MEDIA_TRANSCODE = 'media-transcode';
 /** V3 workload-class queues (event type → queue). Publishing (delivery-due) keeps its own queue and priority. */
 export const WORKLOAD_QUEUES: Record<string, string> = {
   // V3 Content Hub (content-hub/jobs.ts)
   'source.import_requested': 'source-import', 'source.changes_signal': 'source-import',
   'export.requested': 'report-export', 'writeback.requested': 'writeback',
+  // V3.1 bulk jobs (data/bulk.ts)
+  'bulk.requested': 'bulk-ops',
+  // V3.1 PERF workload isolation (workload/policy.ts)
+  'asset.uploaded': QUEUE_MEDIA_TRANSCODE,
 };
 
 export function jobIdFor(outboxId: string): string {

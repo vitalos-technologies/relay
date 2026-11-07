@@ -8,7 +8,7 @@ import { loadUserAuthz } from '../authz.js';
 import { authorizeCtx, requireAction } from '../tenancy.js';
 import { approvalDetail } from '../posts/scheduling.js';
 import { approvalJson, type ApprovalRow } from '../posts/serialize.js';
-import { evaluateStages, loadPolicy, reviewState, reviewerFacts, stageEligibility, type PolicyDef, type ReviewRequestRow } from '../posts/approval-policy.js';
+import { evaluateStages, loadPolicy, reviewState, reviewerFacts, reviewerFactsMany, stageEligibility, stageProgressFrom, type PolicyDef, type ReviewRequestRow } from '../posts/approval-policy.js';
 import { staffAllowed } from './access.js';
 import { deliverNotification } from './notifications.js';
 
@@ -36,25 +36,37 @@ export async function approvalInbox(ctx: Ctx, q: { status?: string | null; brand
        LEFT JOIN users au ON au.id=a.assignee_user_id LEFT JOIN campaigns c ON c.id=p.campaign_id
       WHERE a.workspace_id=$1 AND ($2::uuid[] IS NULL OR a.brand_id = ANY($2::uuid[])) AND ${status === 'pending' ? `a.decision='pending'` : `a.decision<>'pending'`}${extra}
       ORDER BY ${status === 'pending' ? 'coalesce(a.due_at, s.due_at) ASC NULLS LAST' : 'a.decided_at DESC NULLS LAST'}, a.requested_at DESC LIMIT 150`, params);
+  // V3.1 PERF: batched (was ~8 queries per row). Policies per brand+generation, decisions for all pending requests,
+  // reviewer facts per distinct user (fresh for this request) — same eligibility rules as evaluateStages().
   const policies = new Map<string, PolicyDef>();
-  const me = await reviewerFactsCache(db, ctx);
-  const items = [];
-  for (const r of rows) {
+  const pendingRows = rows.filter((r) => r.decision === 'pending');
+  for (const r of pendingRows) {
     const key = `${r.brand_id}:${r.policy_generation}`;
     if (!policies.has(key)) policies.set(key, await loadPolicy(db, r.workspace_id, r.brand_id, r.policy_generation ?? undefined));
-    const policy = policies.get(key)!;
+  }
+  const decisions = pendingRows.length ? await many<{ approval_id: string; stage: number; user_id: string; decision: string }>(db,
+    `SELECT approval_id, stage, user_id, decision FROM approval_decisions WHERE approval_id = ANY($1::uuid[])`, [pendingRows.map((r) => r.id)]) : [];
+  const decisionsBy = new Map<string, typeof decisions>();
+  for (const d of decisions) { const l = decisionsBy.get(d.approval_id) ?? []; l.push(d); decisionsBy.set(d.approval_id, l); }
+  const facts = await reviewerFactsMany(db, ctx.access.workspaceId, [
+    ...pendingRows.map((r) => ({ userId: ctx.actor.userId, postId: r.post_id })),
+    ...pendingRows.flatMap((r) => (decisionsBy.get(r.id) ?? []).filter((d) => d.decision === 'approved').map((d) => ({ userId: d.user_id, postId: r.post_id }))),
+  ]);
+  const items = [];
+  for (const r of rows) {
     let canDecide = false;
     let stageName: string | null = null;
     let progress: { approvals: number; quorum: number } | null = null;
     if (r.decision === 'pending') {
-      const stages = await evaluateStages(db, r, policy);
+      const policy = policies.get(`${r.brand_id}:${r.policy_generation}`)!;
+      const mine = decisionsBy.get(r.id) ?? [];
+      const stages = stageProgressFrom(mine.filter((d) => d.decision === 'approved'), (uid) => facts(uid, r.post_id), r, policy);
       const cur = stages.find((s) => !s.met);
       if (cur) {
         stageName = cur.name; progress = { approvals: cur.approvals, quorum: cur.quorum };
         const def = policy.stages.find((s) => s.position === cur.position)!;
-        const facts = await me(r.post_id);
-        const e = stageEligibility(facts, def, r.brand_id, ctx.actor.userId, { enabled: policy.separation_of_duties, authorIds: r.author_ids });
-        const decided = await maybeOne(db, `SELECT 1 FROM approval_decisions WHERE approval_id=$1 AND user_id=$2 AND (stage=$3 OR decision='approved')`, [r.id, ctx.actor.userId, cur.position]);
+        const e = stageEligibility(facts(ctx.actor.userId, r.post_id), def, r.brand_id, ctx.actor.userId, { enabled: policy.separation_of_duties, authorIds: r.author_ids });
+        const decided = mine.some((d) => d.user_id === ctx.actor.userId && (d.stage === cur.position || d.decision === 'approved'));
         canDecide = e.eligible && !decided;
       }
     }
@@ -70,14 +82,6 @@ export async function approvalInbox(ctx: Ctx, q: { status?: string | null; brand
     });
   }
   return { items };
-}
-
-function reviewerFactsCache(db: Queryable, ctx: Ctx) {
-  const cache = new Map<string, Awaited<ReturnType<typeof reviewerFacts>>>();
-  return async (postId: string) => {
-    if (!cache.has(postId)) cache.set(postId, await reviewerFacts(db, ctx.access.workspaceId, ctx.actor.userId, postId));
-    return cache.get(postId)!;
-  };
 }
 
 /** Approval detail for staff: V1 detail (exact variants + diff) + V2 policy progress, decisions and eligibility. */

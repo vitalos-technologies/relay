@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import pg from 'pg';
 
 // Return timestamptz as JS Date (default), bigint/int8 as string to avoid precision loss.
@@ -31,8 +32,19 @@ export function createPool(connectionString = databaseUrl(), max = Number(proces
   return pool;
 }
 
-/** Process-wide pool (web and worker each create one). */
+// V3.1 workload isolation: the worker runs bulk work inside runWithPool(bulkPool, …) so every getPool() call made by
+// that work uses a separate, smaller pool and can never take the connections reserved for publishing.
+const scopedPool = new AsyncLocalStorage<pg.Pool>();
+
+/** Run fn (and everything it awaits) with getPool() returning `pool`. */
+export function runWithPool<T>(pool: pg.Pool, fn: () => T): T {
+  return scopedPool.run(pool, fn);
+}
+
+/** Process-wide pool (web and worker each create one), or the pool of the current runWithPool() scope. */
 export function getPool(): pg.Pool {
+  const scoped = scopedPool.getStore();
+  if (scoped) return scoped;
   if (!shared) shared = createPool();
   return shared;
 }

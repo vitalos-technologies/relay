@@ -37,6 +37,8 @@ import { commitPublication, preparePublication } from './intents.js';
 import { REPORT_KINDS, createReportExport, getJobStatus } from './jobs.js';
 import { listSourceItems, previewDocument } from '../content-hub/items.js';
 import { getImport, requestImport } from '../content-hub/imports.js';
+import { registerDataTools } from './tools-data.js';
+import { registerGovTools } from './tools-gov.js';
 
 // ------------------------------------------------------------------ shared schema pieces
 
@@ -117,9 +119,9 @@ async function idempotent<T extends object>(s: CallScope, tool: string, key: str
   }
 }
 
-type Shape = z.ZodRawShape;
+export type Shape = z.ZodRawShape;
 
-interface ToolDef<I extends Shape, O extends Shape> {
+export interface ToolDef<I extends Shape, O extends Shape> {
   name: string;
   title: string;
   description: string;
@@ -128,7 +130,7 @@ interface ToolDef<I extends Shape, O extends Shape> {
   run(args: z.infer<z.ZodObject<I>>, call: ToolCall): Promise<Record<string, unknown>>;
 }
 
-function register<I extends Shape, O extends Shape>(server: McpServer, hooks: ToolHooks, def: ToolDef<I, O>) {
+export function register<I extends Shape, O extends Shape>(server: McpServer, hooks: ToolHooks, def: ToolDef<I, O>) {
   const info = MCP_TOOLS.find((t) => t.name === def.name);
   if (!info) throw new Error(`tool ${def.name} missing from MCP_TOOLS`);
   const outputSchema = loose(def.output as Shape);
@@ -747,6 +749,12 @@ export function registerTools(server: McpServer, hooks: ToolHooks = {}): void {
       return getJobStatus(s, a.job_id);
     },
   });
+
+  // ---------------- V3.1 data tools (search, draft recovery, bulk status)
+  registerDataTools(server, hooks, register);
+
+  // ---------------- V3.1 governance tools (brand rules, integration diagnostics; read-only)
+  registerGovTools(server, hooks, register);
 }
 
 /** Units for provider-native metric names (counts unless known otherwise). */

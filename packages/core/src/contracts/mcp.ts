@@ -78,6 +78,15 @@ export const MCP_TOOLS: McpToolInfo[] = [
   { name: 'get_data_coverage', group: 'analyse', scopes: ['analytics.read'], readOnly: true, destructive: false, idempotent: true },
   { name: 'create_report_export', group: 'reports', scopes: ['reports.export'], readOnly: false, destructive: false, idempotent: true },
   { name: 'get_job_status', group: 'reports', scopes: ['reports.export', 'social.read'], readOnly: true, destructive: false, idempotent: true },
+  // V3.1 DATA (services/mcp/tools-data.ts): authorized global search, draft recovery status, bulk preview + job status.
+  // Bulk jobs are started only in Relay (no model-supplied confirmation can start or undo one).
+  { name: 'search', group: 'find', scopes: ['social.read'], readOnly: true, destructive: false, idempotent: true },
+  { name: 'get_draft_recovery_status', group: 'draft', scopes: ['social.read'], readOnly: true, destructive: false, idempotent: true },
+  { name: 'preview_bulk_action', group: 'draft', scopes: ['drafts.write', 'publishing.schedule'], readOnly: true, destructive: false, idempotent: true },
+  { name: 'get_bulk_job_status', group: 'recover', scopes: ['social.read'], readOnly: true, destructive: false, idempotent: true },
+  // V3.1 GOV (services/mcp/tools-gov.ts): read-only brand rules + integration diagnostics (same services/permissions as the app).
+  { name: 'get_brand_rules', group: 'discover', scopes: ['social.read'], readOnly: true, destructive: false, idempotent: true },
+  { name: 'get_integration_diagnostics', group: 'discover', scopes: ['social.read'], readOnly: true, destructive: false, idempotent: true },
 ];
 
 /** Stable, safe error codes returned in tool results (structuredContent.error.code). */

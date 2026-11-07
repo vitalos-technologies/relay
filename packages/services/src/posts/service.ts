@@ -22,7 +22,8 @@ export interface PostRow {
 
 export async function loadPost(ctx: Ctx, postId: string, db: Queryable = getPool(), lock = false): Promise<PostRow> {
   assertUuid(postId, 'Post');
-  const p = await maybeOne<PostRow>(db, `SELECT * FROM posts WHERE id=$1 AND workspace_id=$2 ${lock ? 'FOR UPDATE' : ''}`, [postId, ctx.access.workspaceId]);
+  // V3.1: trashed posts (deleted_at) are invisible to every normal path; data/trash.ts loads them explicitly.
+  const p = await maybeOne<PostRow>(db, `SELECT * FROM posts WHERE id=$1 AND workspace_id=$2 AND deleted_at IS NULL ${lock ? 'FOR UPDATE' : ''}`, [postId, ctx.access.workspaceId]);
   if (!p || !brandAllowed(ctx, p.brand_id)) throw notFound('Post');
   return p;
 }
@@ -118,7 +119,7 @@ async function updateDraftTx(ctx: Ctx, postId: string, input: { expected_version
   });
 }
 
-async function invalidatePendingApprovalIfChanged(tx: Queryable, ctx: Ctx, post: PostRow, draft: DraftContent): Promise<void> {
+export async function invalidatePendingApprovalIfChanged(tx: Queryable, ctx: Ctx, post: PostRow, draft: DraftContent): Promise<void> {
   const pending = await maybeOne<{ schedule_id: string; approval_id: string; content_hash: string; connection_ids: string[] }>(tx,
     `SELECT s.id AS schedule_id, a.id AS approval_id, r.content_hash,
             (SELECT array_agg(v.connection_id::text) FROM variants v WHERE v.revision_id = s.revision_id) AS connection_ids
@@ -170,19 +171,30 @@ export async function validateDraft(db: Queryable, ctx: Ctx, post: PostRow, conn
 export async function validatePost(ctx: Ctx, postId: string, connectionIds?: string[]) {
   const db = getPool();
   const post = await loadPost(ctx, postId, db);
-  return validateDraft(db, ctx, post, connectionIds);
+  const v = await validateDraft(db, ctx, post, connectionIds);
+  // V3.1 (§12): brand rules in composer validation — mandatory and advisory kept apart (advisory never blocks).
+  const { checkPostBrandRules } = await import('../gov/brand-rules.js');
+  const br = await checkPostBrandRules(ctx, post.id, connectionIds?.length ? { connection_ids: connectionIds } : {}, db);
+  return { ...v, brand_rules: { ok: br.ok, rules_version: br.rules_version, mandatory: br.mandatory, advisory: br.advisory } };
 }
 
 async function summariesFor(db: Queryable, posts: PostRow[]) {
   if (!posts.length) return [];
   const ids = posts.map((p) => p.id);
+  // V3.1 PERF: tenant-leading predicates so deliveries_post_idx (workspace_id, post_id) is used (was a full scan of
+  // deliveries), and only the latest schedule's deliveries are read; Map lookups instead of nested filters.
+  const ws = posts[0]!.workspace_id;
   const sched = await many<{ post_id: string; due_at: Date; status: string; id: string }>(db,
-    `SELECT DISTINCT ON (post_id) post_id, due_at, status, id FROM schedules WHERE post_id = ANY($1::uuid[]) ORDER BY post_id, generation DESC`, [ids]);
-  const dels = await many<{ post_id: string; schedule_id: string; connection_id: string; provider: string; is_mock: boolean; state: DeliveryState }>(db,
-    `SELECT post_id, schedule_id, connection_id, provider, is_mock, state FROM deliveries WHERE post_id = ANY($1::uuid[])`, [ids]);
+    `SELECT DISTINCT ON (post_id) post_id, due_at, status, id FROM schedules WHERE workspace_id=$2 AND post_id = ANY($1::uuid[]) ORDER BY post_id, generation DESC`, [ids, ws]);
+  const dels = sched.length ? await many<{ post_id: string; schedule_id: string; connection_id: string; provider: string; is_mock: boolean; state: DeliveryState }>(db,
+    `SELECT post_id, schedule_id, connection_id, provider, is_mock, state FROM deliveries WHERE workspace_id=$2 AND post_id = ANY($1::uuid[]) AND schedule_id = ANY($3::uuid[])`,
+    [ids, ws, sched.map((x) => x.id)]) : [];
+  const schedBy = new Map(sched.map((x) => [x.post_id, x]));
+  const delsBy = new Map<string, typeof dels>();
+  for (const d of dels) { const l = delsBy.get(d.schedule_id); if (l) l.push(d); else delsBy.set(d.schedule_id, [d]); }
   return posts.map((p) => {
-    const s = sched.find((x) => x.post_id === p.id);
-    const ds = s ? dels.filter((d) => d.schedule_id === s.id) : [];
+    const s = schedBy.get(p.id);
+    const ds = s ? delsBy.get(s.id) ?? [] : [];
     let status = ds.length ? aggregateStatus(ds.map((d) => d.state)) : 'draft';
     if (s?.status === 'pending_approval') status = 'pending_approval';
     if (s?.status === 'cancelled' && !ds.some((d) => d.state === 'published')) status = 'cancelled';
@@ -201,7 +213,7 @@ export async function listPosts(ctx: Ctx, brandId: string, q: { q?: string; tag?
   await assertBrand(ctx, brandId, db);
   const limit = Math.min(Math.max(q.limit ?? 30, 1), 100);
   const params: unknown[] = [ctx.access.workspaceId, brandId];
-  let where = `workspace_id=$1 AND brand_id=$2 AND archived_at IS ${q.archived ? 'NOT ' : ''}NULL`;
+  let where = `workspace_id=$1 AND brand_id=$2 AND deleted_at IS NULL AND archived_at IS ${q.archived ? 'NOT ' : ''}NULL`;
   if (q.q) { params.push(`%${q.q.slice(0, 100)}%`); where += ` AND (title ILIKE $${params.length} OR draft->>'baseText' ILIKE $${params.length})`; }
   if (q.tag) { params.push(q.tag); where += ` AND $${params.length} = ANY(tags)`; }
   if (q.cursor) {

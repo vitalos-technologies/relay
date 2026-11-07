@@ -12,7 +12,7 @@ const COALESCE_MINUTES = 10;
 const MAX_LIST = 60;
 
 export async function recordVersion(tx: Queryable, ctx: Ctx, p: {
-  postId: string; version: number; baseVersion: number; kind: 'created' | 'saved' | 'restored'; title: string | null; draft: DraftContent; restoredFrom?: string | null;
+  postId: string; version: number; baseVersion: number; kind: 'created' | 'saved' | 'restored' | 'recovered'; title: string | null; draft: DraftContent; restoredFrom?: string | null;
 }): Promise<void> {
   if (p.kind === 'saved') {
     // Coalesce an autosave burst: replace the same author's immediately preceding plain save.

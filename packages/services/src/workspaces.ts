@@ -10,6 +10,8 @@ import { onScopePaused, onScopeResumed } from './engine/hooks.js';
 import { isUuid, loadAccess, requireAction } from './tenancy.js';
 import { authorize, hasAnywhere } from './authz.js';
 import type { WorkspaceAccess } from './context.js';
+import type { DraftRecoveryPolicy } from '@social-lite/core/contracts/v31-data';
+import { draftRecoveryPolicy } from './data/policy.js';
 
 const ALL_ACTIONS = {
   'workspace.manage_ownership': true, 'workspace.delete': true, 'workspace.settings': true,
@@ -85,6 +87,8 @@ export interface SessionInfo {
   app_env: 'development' | 'test' | 'production';
   /** First-run: true when this user may create a workspace (POST /api/workspaces). */
   can_create_workspace: boolean;
+  /** V3.1: workspace policy for browser-side draft recovery (null without an active workspace). */
+  draft_recovery?: DraftRecoveryPolicy | null;
 }
 
 export async function canCreateWorkspace(userId: string, db: Queryable = getPool()): Promise<boolean> {
@@ -133,6 +137,7 @@ export async function sessionInfo(session: SessionRecord, actor: Actor, db: Quer
     mock_providers_enabled: mockProvidersEnabled(),
     app_env: config().APP_ENV,
     can_create_workspace: workspaces.length === 0 ? await canCreateWorkspace(actor.userId, db) : false,
+    draft_recovery: active && access ? await draftRecoveryPolicy(db, active.id, actor.userId) : null,
   };
 }
 

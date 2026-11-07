@@ -40,7 +40,7 @@ interface AssetRow {
 }
 
 const USAGE_SQL = `(SELECT count(*) FROM posts p
-   WHERE p.workspace_id = a.workspace_id AND p.brand_id = a.brand_id AND p.archived_at IS NULL
+   WHERE p.workspace_id = a.workspace_id AND p.brand_id = a.brand_id AND p.archived_at IS NULL AND p.deleted_at IS NULL
      AND (coalesce(p.draft->'baseAssetIds', '[]'::jsonb) ? a.id::text
           OR jsonb_path_exists(p.draft, '$.variants[*].assetIds[*] ? (@ == $id)', jsonb_build_object('id', a.id::text))))::int`;
 
@@ -89,7 +89,7 @@ async function toDtos(rows: AssetRow[]): Promise<AssetDto[]> {
 async function loadAsset(ctx: Ctx, assetId: string, db: Queryable = getPool(), lock = false): Promise<AssetRow> {
   assertUuid(assetId, 'Asset');
   const row = await maybeOne<AssetRow>(db,
-    `SELECT a.*, ${USAGE_SQL} AS usage_count FROM assets a WHERE a.id = $1 AND a.workspace_id = $2 ${lock ? 'FOR UPDATE OF a' : ''}`,
+    `SELECT a.*, ${USAGE_SQL} AS usage_count FROM assets a WHERE a.id = $1 AND a.workspace_id = $2 AND a.deleted_at IS NULL ${lock ? 'FOR UPDATE OF a' : ''}`,
     [assetId, ctx.access.workspaceId]);
   if (!row || !brandAllowed(ctx, row.brand_id)) throw notFound('Asset');
   return row;
@@ -258,7 +258,7 @@ export async function listAssets(ctx: Ctx, brandId: string, q: AssetListQuery = 
   await assertBrand(ctx, brandId);
   const limit = Math.min(Math.max(q.limit ?? 50, 1), 100);
   const params: unknown[] = [ctx.access.workspaceId, brandId];
-  const where = ['a.workspace_id = $1', 'a.brand_id = $2'];
+  const where = ['a.workspace_id = $1', 'a.brand_id = $2', 'a.deleted_at IS NULL']; // V3.1: trash is listed by data/trash.ts
   const statuses: AssetStatus[] = ['pending_upload', 'quarantined', 'ready', 'rejected', 'archived'];
   if (q.status) {
     if (!statuses.includes(q.status as AssetStatus)) throw new AppError('validation_failed', 'Unknown status filter', { status: 'Unknown status' });

@@ -17,6 +17,7 @@ import { brandConnections } from '../posts/shared.js';
 import { classifyConnection, type ConnectionFacts } from './health.js';
 import { findDuplicates, type DuplicateMatch } from './duplicates.js';
 import { wouldFit } from './budgets.js';
+import { checkPostBrandRules } from '../gov/brand-rules.js';
 
 export const readinessRequestSchema = z.object({
   mode: z.enum(['schedule', 'publish', 'submit']).default('schedule'),
@@ -28,7 +29,7 @@ export const readinessRequestSchema = z.object({
 });
 export type ReadinessRequest = z.infer<typeof readinessRequestSchema>;
 
-export type CheckKey = 'permission' | 'tokens' | 'media' | 'content' | 'approval' | 'deadline' | 'provider_limits' | 'budget' | 'paused' | 'duplicates';
+export type CheckKey = 'permission' | 'tokens' | 'media' | 'content' | 'approval' | 'deadline' | 'provider_limits' | 'budget' | 'paused' | 'duplicates' | 'brand_rules';
 export interface ReadinessCheck {
   key: CheckKey; status: 'pass' | 'warn' | 'fail' | 'info'; title: string; message: string;
   connection_id: string | null; fix: string | null;
@@ -193,6 +194,15 @@ export async function readiness(ctx: Ctx, postId: string, raw: unknown, db: Quer
     add({ key: 'budget', status: 'pass', title: 'Budget', message: 'No billable destinations selected.' });
   }
 
+  // ---- V3.1 brand rules: mandatory findings fail (the schedule API enforces them too); advisory findings only warn
+  let brandRules: Awaited<ReturnType<typeof checkPostBrandRules>> | null = null;
+  if (ids.length) {
+    brandRules = await checkPostBrandRules(ctx, post.id, { connection_ids: ids.filter((id) => all.some((c) => c.id === id)), at: at.toISOString() }, db);
+    for (const f of brandRules.mandatory) add({ key: 'brand_rules', status: 'fail', title: f.connection_id ? `${name(f.connection_id)}: brand rule` : 'Brand rule', message: f.message, connection_id: f.connection_id, fix: 'Edit the post to follow the rule.' });
+    for (const f of brandRules.advisory) add({ key: 'brand_rules', status: 'warn', title: f.connection_id ? `${name(f.connection_id)}: brand guidance` : 'Brand guidance', message: f.message, connection_id: f.connection_id });
+    if (!brandRules.mandatory.length && !brandRules.advisory.length) add({ key: 'brand_rules', status: 'pass', title: 'Brand rules', message: 'Follows the brand rules.' });
+  }
+
   // ---- duplicate / collision warning (advisory; never a hard failure)
   const window = await maybeOne<{ duplicate_window_hours: number }>(db, `SELECT duplicate_window_hours FROM brands WHERE id=$1`, [post.brand_id]);
   const windowHours = window?.duplicate_window_hours ?? 24;
@@ -218,6 +228,7 @@ export async function readiness(ctx: Ctx, postId: string, raw: unknown, db: Quer
     resolved: dueAt ? { due_at: dueAt.toISOString(), publish_before: publishBefore?.toISOString() ?? null } : null,
     duplicate_window_hours: windowHours,
     checks, duplicates,
+    brand_rules: brandRules ? { ok: brandRules.ok, rules_version: brandRules.rules_version, mandatory: brandRules.mandatory, advisory: brandRules.advisory } : null,
     generated_at: new Date().toISOString(),
   };
 }

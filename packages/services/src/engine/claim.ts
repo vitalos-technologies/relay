@@ -17,9 +17,21 @@ export interface ClaimedDelivery {
   scheduling_owner?: string | null;
 }
 
-export async function dispatchEnabled(db: Queryable = getPool()): Promise<boolean> {
+export async function dispatchEnabled(db: Queryable = getPool(), version?: string): Promise<boolean> {
   const r = await maybeOne<{ value: unknown }>(db, `SELECT value FROM system_flags WHERE key='dispatch_enabled'`);
-  return r?.value !== false;
+  if (r?.value === false) return false;
+  // V3.1 (§16): during a rolling deploy only the worker version pinned in system_flags.dispatch_version dispatches.
+  return version === undefined ? true : dispatchVersionAllowed(version, db);
+}
+
+/** Unset/null flag = any version (unchanged behaviour); string or string[] = only those versions; malformed = none. */
+export async function dispatchVersionAllowed(version: string, db: Queryable = getPool()): Promise<boolean> {
+  const r = await maybeOne<{ value: unknown }>(db, `SELECT value FROM system_flags WHERE key='dispatch_version'`);
+  const v = r?.value;
+  if (v === undefined || v === null) return true;
+  if (typeof v === 'string') return v === version;
+  if (Array.isArray(v)) return v.includes(version);
+  return false;
 }
 
 const CLAIM_RETURNING = `id, workspace_id, brand_id, post_id, schedule_id, generation, revision_id, variant_id, connection_id, provider, is_mock,

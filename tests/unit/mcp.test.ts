@@ -30,7 +30,8 @@ describe('MCP scopes', () => {
 
   it('catalogue: every tool has scopes; read-only tools are never destructive', () => {
     expect(new Set(MCP_TOOLS.map((t) => t.name)).size).toBe(MCP_TOOLS.length);
-    expect(MCP_TOOLS).toHaveLength(27);
+    // 27 V3 tools + 4 V3.1 DATA (search, recovery, bulk preview/status) + 2 V3.1 GOV (get_brand_rules, get_integration_diagnostics).
+    expect(MCP_TOOLS).toHaveLength(33);
     for (const t of MCP_TOOLS) {
       expect(t.scopes.length).toBeGreaterThan(0);
       if (t.readOnly) expect(t.destructive).toBe(false);

@@ -136,6 +136,30 @@ export async function reviewerFacts(db: Queryable, workspaceId: string, userId: 
   return { state, teamIds: teams.map((t) => t.team_id), shared: !!shared };
 }
 
+/**
+ * Batched reviewerFacts for many (user, post) pairs (V3.1 PERF: approval inbox N+1). Same facts, same freshness: authority
+ * is loaded from the database once per distinct user for THIS call (never cached across requests); teams and review
+ * shares come from one query each.
+ */
+export async function reviewerFactsMany(db: Queryable, workspaceId: string, pairs: Array<{ userId: string; postId: string }>): Promise<(userId: string, postId: string) => ReviewerFacts> {
+  const users = [...new Set(pairs.map((p) => p.userId))];
+  const posts = [...new Set(pairs.map((p) => p.postId))];
+  const states = new Map<string, AuthzState>();
+  for (const u of users) states.set(u, await loadUserAuthz(u, workspaceId, null, db));
+  const teams = users.length ? await many<{ user_id: string; team_id: string }>(db,
+    `SELECT tm.user_id, tm.team_id FROM team_memberships tm JOIN teams t ON t.id=tm.team_id AND t.archived_at IS NULL
+      WHERE tm.workspace_id=$1 AND tm.user_id = ANY($2::uuid[])`, [workspaceId, users]) : [];
+  const shares = users.length && posts.length ? await many<{ user_id: string; post_id: string }>(db,
+    `SELECT user_id, post_id FROM review_shares WHERE workspace_id=$1 AND user_id = ANY($2::uuid[]) AND post_id = ANY($3::uuid[]) AND revoked_at IS NULL`,
+    [workspaceId, users, posts]) : [];
+  const shared = new Set(shares.map((r) => `${r.user_id}:${r.post_id}`));
+  return (userId, postId) => {
+    const state = states.get(userId);
+    if (!state) throw new Error('reviewerFactsMany: user not loaded');
+    return { state, teamIds: teams.filter((t) => t.user_id === userId).map((t) => t.team_id), shared: shared.has(`${userId}:${postId}`) };
+  };
+}
+
 // ------------------------------------------------------------------ review requests
 export interface ReviewRequestRow {
   id: string; workspace_id: string; brand_id: string; post_id: string; revision_id: string; schedule_id: string; schedule_generation: number;
@@ -185,11 +209,17 @@ export async function evaluateStages(db: Queryable, a: Pick<ReviewRequestRow, 'i
     `SELECT stage, user_id FROM approval_decisions WHERE approval_id=$1 AND decision='approved'`, [a.id]);
   const facts = new Map<string, ReviewerFacts>();
   for (const uid of new Set(decisions.map((d) => d.user_id))) facts.set(uid, await reviewerFacts(db, a.workspace_id, uid, a.post_id));
+  return stageProgressFrom(decisions, (uid) => facts.get(uid)!, a, policy);
+}
+
+/** evaluateStages over already-loaded approved decisions + reviewer facts (pure; used by the batched inbox). */
+export function stageProgressFrom(decisions: Array<{ stage: number; user_id: string }>, factsFor: (userId: string) => ReviewerFacts,
+  a: Pick<ReviewRequestRow, 'brand_id' | 'author_ids'>, policy: PolicyDef): StageProgress[] {
   return policy.stages.map((s) => {
     const ok: string[] = [];
     const discounted: StageProgress['discounted'] = [];
     for (const uid of new Set(decisions.filter((d) => d.stage === s.position).map((d) => d.user_id))) {
-      const e = stageEligibility(facts.get(uid)!, s, a.brand_id, uid, { enabled: policy.separation_of_duties, authorIds: a.author_ids });
+      const e = stageEligibility(factsFor(uid), s, a.brand_id, uid, { enabled: policy.separation_of_duties, authorIds: a.author_ids });
       if (e.eligible) ok.push(uid); else discounted.push({ user_id: uid, reason: e.reason! });
     }
     return { position: s.position, name: s.name, quorum: s.quorum, allow_guests: s.allow_guests, approvals: ok.length, approver_ids: ok, discounted, met: ok.length >= s.quorum };

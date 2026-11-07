@@ -46,8 +46,8 @@ Effective permission per call = V2 grants of the user/service account (central `
 
 | Scope | V2 permissions it can exercise | Tools |
 |---|---|---|
-| `social.read` (default) | workspace/brands/connections/content/assets read | list_workspaces, list_brands, list_connections, get_capabilities, search_content, get_post, list_calendar, validate_post, get_review_status, get_delivery_status, get_job_status |
-| `drafts.write` (default) | content.create, content.edit, content.create_draft | create_draft, update_draft, import_source_to_draft, cancel_schedule (own pending review) |
+| `social.read` (default) | workspace/brands/connections/content/assets read | list_workspaces, list_brands, list_connections, get_capabilities, search_content, get_post, list_calendar, validate_post, get_review_status, get_delivery_status, get_job_status, search, get_draft_recovery_status, get_bulk_job_status, get_brand_rules, get_integration_diagnostics |
+| `drafts.write` (default) | content.create, content.edit, content.create_draft | create_draft, update_draft, import_source_to_draft, cancel_schedule (own pending review), preview_bulk_action |
 | `reviews.submit` | content.submit | submit_for_review |
 | `publishing.schedule` | content.schedule, publishing.pause | prepare/commit_publication (scheduled), cancel_schedule, pause_brand |
 | `publishing.publish` | content.schedule, content.publish | prepare/commit_publication (immediate) |
@@ -89,6 +89,12 @@ All take explicit ids (`workspace_id` from `list_workspaces` + brand/post/schedu
 | get_data_coverage | workspace_id, brand_id? | per destination: supported, posts with metrics, freshness |
 | create_report_export | workspace_id, report (delivery_history/post_metrics), brand_id?, from, to (≤92 d), target=relay_download, idempotency_key | job reference |
 | get_job_status | workspace_id, job_id | status; on success an in-app download link (session-authenticated) |
+| search | workspace_id, query (≤100), kinds? (post/campaign/asset/brand/setting), limit≤20 per kind, include_archived? | V3.1: authorized global search (same service as the command menu): results only on consented brands where the user holds the read permission; plain-text snippets only from readable fields (untrusted); `truncated`, `partial` (time budget); cancellation cancels the SQL statement |
+| get_draft_recovery_status | workspace_id, post_id, base_version? | V3.1: current version + last saver, `editable` / `blocked_reason` (archived, trashed, no_permission), `server_newer`, the user's own conflict copies, workspace local-recovery policy. Read-only |
+| preview_bulk_action | workspace_id, target_kind (post/asset), action, item_ids≤100, params? | V3.1: per-item eligibility + reasons + consequences (scope drafts.write or publishing.schedule; user principals only). Read-only; **bulk jobs are started and undone only in Relay** (no confirmation flag exists; the start token is not returned) |
+| get_bulk_job_status | workspace_id, job_id | V3.1: status, counts, per-item results of a job the user started in Relay (items on brands no longer accessible are omitted) |
+| get_brand_rules | workspace_id, brand_id | V3.1 GOV: brand rules (prohibited/discouraged phrases, preferred terms, required footers/disclaimers, approved link domains), each `mandatory` (enforced by Relay at submit/schedule/publish) or `advisory` (warning only); tone, colours, approved logo asset ids, CTA default, legacy avoid-terms (advisory). Same service and permission (`brands.read`) as the app. Read-only; rule text is untrusted data |
+| get_integration_diagnostics | workspace_id, brand_id?, connection_id? | V3.1 GOV: per destination: authorization, selected account, granted/missing permissions, token expiry/refresh, publishing/media support, analytics access + last successful sync, limits/budget, affected scheduled work, safe correlation ids. Read-only from stored state: never calls a provider, never publishes, never returns tokens (`connections.read`) |
 
 Error codes: `not_found, forbidden, insufficient_scope, consent_required, client_revoked, mfa_required, validation_failed, version_conflict, conflict, invalid_state, idempotency_conflict, in_progress, rate_limited, budget_exhausted, approval_required, needs_choice, intent_stale, intent_expired, confirmation_required, unsupported_principal, source_connections_unavailable, result_too_large, cancelled, internal`. Invisible resources are always `not_found`.
 

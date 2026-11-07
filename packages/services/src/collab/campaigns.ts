@@ -26,7 +26,7 @@ function checkInput(input: { name?: string; description?: string | null; starts_
 }
 
 const SELECT = `SELECT c.id, c.brand_id, c.name, c.description, to_char(c.starts_on, 'YYYY-MM-DD') starts_on, to_char(c.ends_on, 'YYYY-MM-DD') ends_on, c.archived_at, c.created_at,
-  (SELECT count(*)::int FROM posts p WHERE p.campaign_id=c.id AND p.archived_at IS NULL) AS post_count FROM campaigns c`;
+  (SELECT count(*)::int FROM posts p WHERE p.campaign_id=c.id AND p.archived_at IS NULL AND p.deleted_at IS NULL) AS post_count FROM campaigns c`;
 
 export async function listCampaigns(ctx: Ctx, brandId: string, opts: { archived?: boolean } = {}) {
   requireAction(ctx, 'content.read');
