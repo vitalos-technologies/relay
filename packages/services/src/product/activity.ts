@@ -21,7 +21,7 @@ export const ACTIVITY_CATEGORIES = {
   connections: ['connection', 'connections', 'integration', 'credential', 'credentials'],
   publishing: ['schedule', 'approval', 'delivery', 'post', 'publication', 'publishing', 'review', 'campaign', 'slot', 'import', 'source_event'],
   security: ['auth', 'session', 'sessions', 'mfa', 'security', 'api_key', 'service_account', 'step_up', 'login', 'logout', 'recovery', 'passkey',
-    'export', 'budget', 'workspace', 'brand'],
+    'export', 'budget', 'workspace', 'brand', 'support_access', 'platform'],
 } as const;
 export type ActivityCategory = keyof typeof ACTIVITY_CATEGORIES | 'content' | 'all';
 const KNOWN = Object.values(ACTIVITY_CATEGORIES).flat() as string[];

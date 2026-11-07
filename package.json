@@ -13,6 +13,7 @@
     "db:seed": "tsx scripts/seed.ts",
     "db:seed:e2e": "tsx scripts/seed-e2e.ts",
     "db:roles": "tsx scripts/db-roles.ts",
+    "platform:operator": "tsx scripts/platform-operator.ts",
     "db:reset": "tsx packages/db/src/cli.ts reset && pnpm db:roles && pnpm db:migrate && pnpm db:roles && pnpm db:seed",
     "dev:web": "pnpm --filter @social-lite/web dev",
     "dev:worker": "pnpm --filter @social-lite/worker dev",

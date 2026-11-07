@@ -99,3 +99,9 @@ export function useBrowserTimeZone(): string | null {
     () => null,
   );
 }
+
+/** V3.1 Admin: pages mounted in both apps pick the link of the app they're shown in. */
+export function useAreaHref(): (appPath: string, adminPath: string) => string {
+  const admin = (usePathname() ?? '').startsWith('/admin');
+  return (appPath, adminPath) => (admin ? adminPath : appPath);
+}

@@ -1,4 +1,5 @@
 'use client';
+import { useAreaHref } from '@/lib/client/hooks';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { ArrowRight, CheckCheck, ChevronDown, ChevronRight } from 'lucide-react';
@@ -95,6 +96,7 @@ export default function ApprovalsPage() {
 }
 
 function InboxRow({ a, tz, expanded, onToggle }: { a: InboxItem; tz: string; expanded: boolean; onToggle: () => void }) {
+  const area = useAreaHref();
   const d = DECISION[a.decision] ?? DECISION.pending!;
   const reviewDue = a.review_due_at;
   return (
@@ -102,7 +104,7 @@ function InboxRow({ a, tz, expanded, onToggle }: { a: InboxItem; tz: string; exp
       <div className="flex items-center gap-2 px-2 py-3 sm:gap-3 sm:px-3">
         <IconButton size="sm" label={expanded ? 'Hide preview' : 'Preview what will be sent'} aria-expanded={expanded}
           icon={expanded ? <ChevronDown aria-hidden className="size-4" /> : <ChevronRight aria-hidden className="size-4" />} onClick={onToggle} />
-        <Link href={`/approvals/${a.id}`} className="focus-inset flex min-w-0 flex-1 items-center gap-3 rounded-md py-1 hover:bg-raised/50">
+        <Link href={area(`/approvals/${a.id}`, `/admin/approvals/${a.id}`)} className="focus-inset flex min-w-0 flex-1 items-center gap-3 rounded-md py-1 hover:bg-raised/50">
           <div className="min-w-0 flex-1">
             <p className="flex items-center gap-2 text-sm font-medium">
               <span className="truncate">{postTitle({ title: a.title, excerpt: a.excerpt })}</span>

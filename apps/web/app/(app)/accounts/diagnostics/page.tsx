@@ -1,4 +1,5 @@
 'use client';
+import { useAreaHref } from '@/lib/client/hooks';
 // V3.1 §15 test centre: every connection's stored diagnostics (read-only; never posts).
 import { useState } from 'react';
 import { ChevronDown, Stethoscope } from 'lucide-react';
@@ -12,6 +13,7 @@ import { Card, EmptyState, ErrorState, LinkButton, PageHeader, PlatformIcon, Sim
 import { DiagIcon, DiagnosticsDetail, OverallBadge } from '@/components/integrations/diagnostics';
 
 export default function DiagnosticsPage() {
+  const area = useAreaHref();
   const on = useFlag('v31.integration_diagnostics');
   const { session } = useSession();
   const [brand] = useBrandFilter();
@@ -20,13 +22,13 @@ export default function DiagnosticsPage() {
   const { data, error, loading, refetch } = useApi<IntegrationDiagnosticsResponse>(on ? `/api/integrations/diagnostics${brand ? `?brand_id=${brand}` : ''}` : null);
   const [open, setOpen] = useState<Set<string>>(() => new Set(focus ? [focus] : []));
   const brandName = (id: string) => session.brands.find((b) => b.id === id)?.name ?? '';
-  const header = <PageHeader eyebrow="Connections" title="Test centre" meta="Read-only" actions={<LinkButton href="/accounts" variant="ghost">Connections</LinkButton>} />;
+  const header = <PageHeader eyebrow="Connections" title="Test centre" meta="Read-only" actions={<LinkButton href={area('/accounts', '/admin/connections')} variant="ghost">Connections</LinkButton>} />;
   if (!on) return <>{header}<EmptyState icon={<Stethoscope aria-hidden />} title="Not turned on" /></>;
   return (
     <>
       {header}
       {error && !data ? <ErrorState error={error} onRetry={refetch} /> : loading || !data ? <Card><SkeletonRows rows={5} className="p-2" /></Card> : !data.items.length ? (
-        <EmptyState icon={<Stethoscope aria-hidden />} title="No connections" action={<LinkButton href="/accounts" variant="primary">Connect</LinkButton>} />
+        <EmptyState icon={<Stethoscope aria-hidden />} title="No connections" action={<LinkButton href={area('/accounts', '/admin/connections')} variant="primary">Connect</LinkButton>} />
       ) : (
         <Card>
           <ul className="divide-y divide-border">

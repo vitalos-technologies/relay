@@ -12,6 +12,17 @@ import { authorize, hasAnywhere } from './authz.js';
 import type { WorkspaceAccess } from './context.js';
 import type { DraftRecoveryPolicy } from '@social-lite/core/contracts/v31-data';
 import { draftRecoveryPolicy } from './data/policy.js';
+import { loadOperatorRole } from './admin/platform.js';
+
+async function supportBanner(db: Queryable, workspaceId: string, userId: string): Promise<SessionInfo['support_access']> {
+  const r = await maybeOne<{ active: number; pending: number; until: Date | null; mine: boolean }>(db,
+    `SELECT count(*) FILTER (WHERE status='active' AND expires_at > now())::int active,
+            count(*) FILTER (WHERE status='requested' AND request_expires_at > now())::int pending,
+            max(expires_at) FILTER (WHERE status='active' AND expires_at > now()) until,
+            bool_or(status='active' AND expires_at > now() AND operator_user_id=$2) mine
+       FROM support_access_grants WHERE workspace_id=$1 AND status IN ('requested','active')`, [workspaceId, userId]);
+  return r && (r.active || r.pending) ? { active: r.active, pending: r.pending, until: r.until?.toISOString() ?? null, mine: !!r.mine } : null;
+}
 
 const ALL_ACTIONS = {
   'workspace.manage_ownership': true, 'workspace.delete': true, 'workspace.settings': true,
@@ -89,6 +100,10 @@ export interface SessionInfo {
   can_create_workspace: boolean;
   /** V3.1: workspace policy for browser-side draft recovery (null without an active workspace). */
   draft_recovery?: DraftRecoveryPolicy | null;
+  /** V3.1 Admin: platform operator role of this user (re-read every request; UI convenience only). */
+  platform_role?: 'operator' | 'support' | null;
+  /** V3.1 Admin: support access open on the active workspace (banner). */
+  support_access?: { active: number; pending: number; until: string | null; mine: boolean } | null;
 }
 
 export async function canCreateWorkspace(userId: string, db: Queryable = getPool()): Promise<boolean> {
@@ -138,6 +153,8 @@ export async function sessionInfo(session: SessionRecord, actor: Actor, db: Quer
     app_env: config().APP_ENV,
     can_create_workspace: workspaces.length === 0 ? await canCreateWorkspace(actor.userId, db) : false,
     draft_recovery: active && access ? await draftRecoveryPolicy(db, active.id, actor.userId) : null,
+    platform_role: await loadOperatorRole(actor.userId, db),
+    support_access: active && access ? await supportBanner(db, active.id, actor.userId) : null,
   };
 }
 

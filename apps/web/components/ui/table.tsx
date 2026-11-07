@@ -3,7 +3,7 @@ import { cn } from './cn';
 
 export function Table({ children, caption, className }: { children: ReactNode; caption?: string; className?: string }) {
   return (
-    <div className={cn('overflow-x-auto rounded-xl border border-border bg-surface', className)}>
+    <div className={cn('relative overflow-x-auto rounded-xl border border-border bg-surface', className)}>
       <table className="w-full border-collapse text-left text-[13px]">
         {caption ? <caption className="sr-only">{caption}</caption> : null}
         {children}

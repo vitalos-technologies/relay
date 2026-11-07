@@ -60,42 +60,18 @@ Include these at the top of the final consolidated activation checklist and in t
 Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files as `docs/specs/*`.
 
 ## Queue (in order)
-1. V1 + V1.1: **done** (tag `v1.1.0-local`).
-2. V2: **done** (all streams A–D). Final run on main: unit 104, contracts 351, integration 321, security E2E 8/8, rehearsal PASS (`docs/V2_TEST_REPORT.md`). Full browser E2E re-run is pending until the redesign lands (last run 33/38).
-3. V3: **done (v3.0.0)**.
-   - Providers: done.
-   - Lead engine gaps: done.
-   - MCP (017), CH content hub (016), AN analytics (015) **all done and integrated** (864cf18, 57e056b, 523c1dd; MCP source + analytics tools 18b5c53, ed9aa1f).
-   - Next: UX redesign (018 brief), launched when V2-A finishes. Then the V3 docs.
-4. V3.1 **done** → 5. V3.1 Admin (running) → 6. Collaboration → 7. **V3.5** → 8. Copy cleanup → 9. Docs + Help Centre.
+1. V1 + V1.1 **done** (v1.1.0-local) → 2. V2 **done** (v2.0.0) → 3. V3 **done** (v3.0.0) → 4. V3.1 **done** (v3.1.0)
+5. V3.1 Admin **done** (see below; tag v3.1.1 suggested on the admin commit)
+6. Collaboration completion (`docs/queue/03d_COLLABORATION_PROMPT.md`) — **next / running**
+7. **V3.5** (`docs/queue/03f_V3_5_PROMPT.md`) → 8. Copy cleanup (03e) → 9. Docs + Help Centre (04) → 10. One consolidated activation checklist + user reminder.
 
 ## Current state (keep updated)
-- **V3.1 started early (backend only)** while UX owns screens: streams PERF (020), DATA (021), GOV (022); contract `docs/V3_1_WORKSTREAMS.md`, progress `docs/v3-1-progress/{perf,data,gov}.md`. Plus a V3 docs agent (V3_REQUIREMENTS_MATRIX, BUILD_STATUS, GAPS, ACTIVATION, PLATFORM_CAPABILITIES, SECURITY_AND_TEST_REPORT). V3.1 UI comes after UX lands.
-- **V3.1 DATA + GOV: done and committed** (88d4fef) together with PERF's in-place backend edits (worker imports them). Migrations 020/021/022 applied to dev and frozen; follow-ups go in 023 (DATA), 024 (GOV), 025 (PERF). Worker rebuilt + restarted. V3 docs done (1dbc91c). V3.1 API contracts for the UI stream: `packages/core/src/contracts/v31-{data,gov,perf}.ts`, `docs/V3_1_DATA_API.md`, route table in `docs/v3-1-progress/gov.md`.
-- **Brand-rule hold:** decided and done (46d6313): open mandatory review or 'will_edit' holds delivery; 'keep' releases.
-- **V3.1 PERF: done** (277c2ff; docs/PERFORMANCE_{BASELINE,BUDGETS,RESULTS}.md). Round 2 done (per-day analytics summary, migration 025 applied; approval inbox within budget). Only the planner remains over budget (UI decision; UX now loads the visible range with a limit). Worker now uses up to 20 DB connections per instance (main 10 + bulk 6 + pg-boss 4): note for V3.1 activation (production max_connections / pooler sizing).
-- **Open UI decision (PERF):** planner payload ~700–800 KB across all brands; needs paging or per-brand loading in the redesigned Planner.
-- **V3 UX redesign: done and committed** (3e5e3f2). E2E now uses its own seeded "E2E Workspace" (`pnpm db:seed:e2e`; Playwright globalSetup). Dev web now runs as a production build (`next build --webpack` + `next start --port 3000`) to avoid dev-server OOM during E2E.
-- **V3 done:** full E2E 39/39 on a production build, tag v3.0.0. V3 docs being updated for the redesign (docs agent).
-- **Running:** V3.1 UI stream (brief `docs/queue/031_V3_1_UI_BRIEF.md`, progress `docs/v3-1-progress/ui.md`, checkpoints `evidence/v3-1/ui/checkpoints/`). Previously planned: (screens for V3.1 backend: autosave states, trash/undo, bulk, Cmd+K search, brand rules + reviews, queues, links, diagnostics, onboarding, feature flags, release notes, support) and V3.1 docs.
-- **V3.1 done** (screens 0064d92; lead fixes 89286a7: reschedule enforces mandatory brand rules, specific bulk skip reasons, onboarding links). Full E2E 45/45 on a production build. V3.1 docs done; rehearsal PASS; tagged v3.1.0. E2E re-run after 89286a7 pending (do it with the Admin final E2E).
-- **Running:** V3.1 Admin application (brief `docs/queue/03c_V3_1_ADMIN_PROMPT.md`, progress `docs/v3-1-progress/admin.md`, checkpoints `evidence/v3-1/admin/checkpoints/`, migration 026).
-- **Background agents** (a new session will NOT have them): V3.1 Admin. Relaunch any missing one from its progress note + brief (started 07:5x; brief `docs/queue/018_UX_REDESIGN_BRIEF.md`, progress `docs/v3-progress/ux.md`; A has landed and UX was told it may now edit Settings).
-- **CH follow-ups:** CH's edits to `apps/web/lib/csp.ts`, `apps/web/proxy.ts`, `tests/unit/security-headers.test.ts`, `apps/web/app/(app)/settings/page.tsx` are uncommitted (mixed with A's); commit with A. Live Google/Notion apps + browser Picker untested (activation).
-- **MCP follow-ups:** recreate Keycloak (`docker compose -f infra/compose.yaml up -d --force-recreate oidc`) after A lands to load the `relay-mcp` client/scopes; place MCP settings in the redesigned Settings nav (now `/mcp/settings`). Real MCP clients need public HTTPS (activation checklist).
-  - If they're gone, re-launch each from its progress note. Each note lists what is done and what's next:
-    - `docs/v2-progress/A.md`
-    - `docs/v3-progress/{analytics,content-hub,mcp}.md`
-  - Stream contracts: `docs/V2_WORKSTREAMS.md`, `docs/V3_WORKSTREAMS.md`.
-- **Dev DB:**
-  - All migrations 001–019 + 021 + 022 applied (021/022 frozen early because their streams' live code broke the dev server; follow-ups go in 023/024). 020 (PERF) pending. Worker rebuilt and restarted on the new code.
-  - Because of that, `/api/ready` reports `not_ready`.
-- **Lead work in progress:**
-  - G7 + G14: committed incl. worker wiring.
-  - AN gap: no adapter fetches follower/audience numbers (live shows "not fetched").
-- **Done:** all streams integrated, Keycloak recreated (MCP client loaded), dev DB reset + re-seeded (`pnpm db:reset` then `npx tsx scripts/analytics-demo.ts`), v2.0.0 tagged.
-- **Lead next:** integrate UX when it reports; full browser E2E + fixes; V3 docs (requirements matrix, build status, gaps, activation, platform capabilities, security & test report); then V3.1.
-- **Known gaps:** `docs/V2_IMPLEMENTATION_GAPS.md`. G3/G4/G5/G6/G8 sent to stream A. Done by lead: G7, G14, G19 (update that doc at integration).
+- **V3.1 Admin: done and committed.** `/admin` app (Workspace ↔ Platform scope), platform operators (migration 026, applied to dev, frozen; next migration is **027**), support access (owner-approved, time-boxed, step-up), suspension gate in the engine, change-feed sync (10 s poll, ≤ 60 s backoff). Bootstrap an operator: `pnpm platform:operator` (dev seed makes owner@demo one).
+  - Verified: tsc clean; unit 495/495; integration 400/401 (`v31-analytics-summary` timing flake under load, passes alone); **full E2E 51/51 on a production build** (covers lead fixes 89286a7); mobile 30 routes × 8 widths no overflow; perf within budget; secret scan clean.
+  - Docs: `docs/admin/*` (12). Open decisions: G-A1 (Instance setup still owner-gated), G-A5 (optional pg-boss read grant for the web role). Left: large-dataset admin benchmark, screen-reader pass, real-device/RUM.
+- **Dev environment:** all migrations 001–017, 019–022, 025, 026 applied. Web runs as a production build on :3000 (`next build --webpack` + `next start`); a stale `next dev` on :3000 makes `next start` fail — check the process. Worker rebuilt with the worker DB role. E2E uses its own seeded workspaces (`pnpm db:seed:e2e`).
+- **Background agents** (a new session will NOT have them): none yet — Collaboration launching next (progress `docs/collaboration-progress.md`). Relaunch from its progress note + brief if missing.
+- **Known gaps carried forward:** `docs/V2_IMPLEMENTATION_GAPS.md`, `docs/V3_IMPLEMENTATION_GAPS.md`, `docs/V3_1_IMPLEMENTATION_GAPS.md`, `docs/admin/IMPLEMENTATION_GAPS.md` (planner payload, Zod in browser bundles, flags gate UI only, storage orphans, no follower data, TikTok handoff download, lint).
 
 ## Uncommitted work (who owns what)
 Backup: branch `wip/streams` on GitHub is a snapshot of all uncommitted stream work (refreshed by the lead at each stop). In a new session, `git checkout origin/wip/streams -- .` restores it on top of `main`. Then re-launch the streams from their progress notes.

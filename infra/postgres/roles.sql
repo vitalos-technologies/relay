@@ -94,6 +94,10 @@ BEGIN
   IF to_regclass('public.audit_events') IS NOT NULL THEN
     EXECUTE 'REVOKE UPDATE, DELETE, TRUNCATE ON audit_events FROM socialite_app, socialite_worker';
   END IF;
+  -- V3.1 Admin: the platform audit is append-only for the same roles.
+  IF to_regclass('public.platform_audit_events') IS NOT NULL THEN
+    EXECUTE 'REVOKE UPDATE, DELETE, TRUNCATE ON platform_audit_events FROM socialite_app, socialite_worker';
+  END IF;
 END $$;
 -- Migration bookkeeping is read-only outside the migrator.
 DO $$

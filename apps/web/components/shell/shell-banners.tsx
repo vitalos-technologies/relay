@@ -1,5 +1,6 @@
 'use client';
-import { FlaskConical, OctagonPause, WifiOff } from 'lucide-react';
+import Link from 'next/link';
+import { FlaskConical, LifeBuoy, OctagonPause, WifiOff } from 'lucide-react';
 import { useSession } from '@/lib/client/session';
 import { useOnline } from '@/lib/client/hooks';
 import { EmergencyPause } from './emergency-pause';
@@ -22,6 +23,15 @@ export function ShellBanners() {
           <OctagonPause aria-hidden className="size-4 text-danger" />
           <span className="font-medium">Publishing paused</span>
           <EmergencyPause variant="banner" />
+        </div>
+      ) : null}
+      {session.support_access?.active ? (
+        // V3.1 Admin §13: everyone in the workspace sees that Relay support currently has (read-only) access.
+        <div role="status" className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 border-b border-[color-mix(in_srgb,var(--info)_35%,transparent)] bg-info-soft px-4 py-2 text-[13px]">
+          <LifeBuoy aria-hidden className="size-4 text-info" />
+          <span className="font-medium">{session.support_access.mine ? 'You have read-only support access here' : 'Relay support has read-only access'}</span>
+          {session.support_access.until ? <span className="text-muted">until {new Date(session.support_access.until).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span> : null}
+          <Link href="/admin/security/support" className="font-medium underline">Details</Link>
         </div>
       ) : null}
       {ws?.is_demo ? (

@@ -7,10 +7,11 @@ import { api } from '@/lib/client/api';
 import { useSession } from '@/lib/client/session';
 import { useApi } from '@/lib/client/use-api';
 import { Badge, Button, Card, Dialog, EmptyState, ErrorNotice, ErrorState, Field, Input, PageHeader, SkeletonRows, Tooltip, useToast } from '@/components/ui';
-import { TeamNav, V2_ROLE_LABEL, type TeamView } from '@/components/team/shared';
+import { TeamNav, V2_ROLE_LABEL, type TeamView, useTeamHref } from '@/components/team/shared';
 
 
 export default function TeamsPage() {
+  const th = useTeamHref();
   const { canV2 } = useSession();
   const { data, error, loading, refetch } = useApi<{ items: TeamView[] }>(canV2('teams.read') ? '/api/teams' : null);
   const [open, setOpen] = useState(false);
@@ -24,7 +25,7 @@ export default function TeamsPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {data.items.map((t) => (
-            <Link key={t.id} href={`/team/teams/${t.id}`} className="block rounded-xl focus-visible:outline-2">
+            <Link key={t.id} href={th(`/team/teams/${t.id}`)} className="block rounded-xl focus-visible:outline-2">
               <Card className="h-full p-4 transition-colors hover:bg-raised">
                 <div className="flex items-start justify-between gap-2">
                   <h2 className="min-w-0 truncate text-[15px] font-semibold">{t.name}</h2>

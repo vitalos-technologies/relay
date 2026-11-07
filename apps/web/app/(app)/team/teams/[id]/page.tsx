@@ -11,11 +11,12 @@ import { useApi } from '@/lib/client/use-api';
 import {
   Badge, Banner, Button, Card, CardHeader, Checkbox, ConfirmDialog, Dialog, ErrorNotice, ErrorState, Field, IconButton, PageHeader, Select, SkeletonRows, Tooltip, useToast,
 } from '@/components/ui';
-import { Avatar, StatusBadge, TEAM_ROLES, TeamNav, V2_ROLE_LABEL, type TeamView } from '@/components/team/shared';
+import { Avatar, StatusBadge, TEAM_ROLES, TeamNav, V2_ROLE_LABEL, type TeamView, useTeamHref } from '@/components/team/shared';
 
 interface TeamDetail extends TeamView { members: Array<{ user_id: string; email: string; name: string | null; is_manager: boolean; status: string }> }
 
 export default function TeamPage() {
+  const th = useTeamHref();
   const { id } = useParams<{ id: string }>();
   const { session } = useSession();
   const toast = useToast();
@@ -38,7 +39,7 @@ export default function TeamPage() {
   const brandName = (b: string) => session.brands.find((x) => x.id === b)?.name ?? 'Brand';
   return (
     <>
-      <PageHeader title={t.name} eyebrow={<Link href="/team/teams" className="inline-flex items-center gap-1 hover:text-fg"><ArrowLeft aria-hidden className="size-3" /> Teams</Link>}
+      <PageHeader title={t.name} eyebrow={<Link href={th("/team/teams")} className="inline-flex items-center gap-1 hover:text-fg"><ArrowLeft aria-hidden className="size-3" /> Teams</Link>}
         meta={t.publishing ? 'Publishing team' : undefined}
         actions={<>
           {t.can_manage_members ? <Button variant="primary" icon={<UserPlus aria-hidden className="size-4" />} onClick={() => setAdding(true)}>Add member</Button> : null}
@@ -53,7 +54,7 @@ export default function TeamPage() {
             {t.members.map((m) => (
               <li key={m.user_id} className="flex items-center gap-3 px-4 py-2.5">
                 <Avatar m={m} />
-                <Link href={`/team/members/${m.user_id}`} className="min-w-0 flex-1 truncate hover:underline">{m.name || m.email}</Link>
+                <Link href={th(`/team/members/${m.user_id}`)} className="min-w-0 flex-1 truncate hover:underline">{m.name || m.email}</Link>
                 {m.status !== 'active' ? <StatusBadge status={m.status} /> : null}
                 {t.can_edit ? (
                   <Tooltip content={m.is_manager ? 'Manager — click to remove' : 'Make manager'}>
@@ -102,7 +103,7 @@ export default function TeamPage() {
       <AddMemberDialog open={adding} onOpenChange={setAdding} teamId={id} canAppoint={t.can_edit} onDone={(r) => setData(r)} />
       <TeamGrantDialog open={granting} onOpenChange={setGranting} teamId={id} onDone={() => void refetch()} />
       <ConfirmDialog open={archiving} onOpenChange={setArchiving} title={`Archive ${t.name}?`} confirmLabel="Archive" confirmVariant="danger"
-        onConfirm={async () => { await api.patch(`/api/teams/${id}`, { archived: true }); toast.success('Archived'); window.location.assign('/team/teams'); }}>
+        onConfirm={async () => { await api.patch(`/api/teams/${id}`, { archived: true }); toast.success('Archived'); window.location.assign(th('/team/teams')); }}>
         <p className="text-[13px] text-muted">Members lose this team’s access now. Their scheduled posts are held for adoption.</p>
       </ConfirmDialog>
     </>

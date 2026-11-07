@@ -15,6 +15,7 @@ import {
   type Actor, type Ctx, type SessionRecord,
 } from '@social-lite/services';
 import { assertExpectedWorkspace } from '@social-lite/services/workspaces';
+import { loadOperatorRole, type PlatformCtx } from '@social-lite/services/admin/platform';
 
 const MAX_JSON_BYTES = 256 * 1024;
 
@@ -150,4 +151,39 @@ export async function parseJson<T>(req: NextRequest, schema: ZodType<T>): Promis
 
 export function idempotencyKey(req: NextRequest): string | null {
   return req.headers.get('idempotency-key');
+}
+
+// ------------------------------------------------------------------ V3.1 Admin: platform scope
+export interface PlatformRouteArgs<P> { req: NextRequest; params: P; p: PlatformCtx; session: SessionRecord; correlationId: string }
+
+/**
+ * Platform-operator routes. Same session + CSRF + origin checks as route(); authority is the platform_operators row,
+ * re-read from the database on every request (never the browser, never a workspace grant). Non-operators get 404 so the
+ * platform surface isn't discoverable.
+ */
+export function platformRoute<P = Record<string, string>>(handler: (a: PlatformRouteArgs<P>) => Promise<Response | unknown>) {
+  return async (req: NextRequest, segment: { params: Promise<P> }): Promise<Response> => {
+    const correlationId = req.headers.get('x-correlation-id')?.slice(0, 64) || randomUUID();
+    try {
+      const resolved = await currentSession();
+      if (!resolved) throw new AppError('unauthenticated', 'Please sign in again');
+      if (MUTATING.has(req.method)) {
+        if (!originAllowed(req)) throw new AppError('csrf_failed', 'Request origin not allowed');
+        if (!csrfMatches(resolved.session.csrfToken, req.headers.get('x-csrf-token'))) {
+          throw new AppError('csrf_failed', 'Your session token is out of date. Reload the page and try again.');
+        }
+      }
+      const role = await loadOperatorRole(resolved.actor.userId);
+      if (!role) throw new AppError('not_found', 'Not found');
+      const p: PlatformCtx = { actor: resolved.actor, role, assurance: { mfaVerified: resolved.session.mfaVerified, authTime: resolved.session.authTime ?? null }, correlationId };
+      return toResponse(await handler({ req, params: await segment.params, p, session: resolved.session, correlationId }), correlationId);
+    } catch (err) {
+      return errorResponse(err, correlationId);
+    }
+  };
+}
+
+/** Query string → plain object (for zod-parsed list filters). */
+export function queryOf(req: NextRequest): Record<string, string> {
+  return Object.fromEntries(req.nextUrl.searchParams.entries());
 }

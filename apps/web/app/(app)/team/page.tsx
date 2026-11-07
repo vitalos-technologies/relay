@@ -11,9 +11,10 @@ import { api } from '@/lib/client/api';
 import {
   Badge, Banner, Button, Card, EmptyState, ErrorState, Input, LinkButton, PageHeader, Select, SkeletonRows, Table, Td, Th, THead, Tooltip, Tr, useToast,
 } from '@/components/ui';
-import { Avatar, GrantChip, StatusBadge, TeamNav, V2_ROLE_LABEL, type MemberView } from '@/components/team/shared';
+import { Avatar, GrantChip, StatusBadge, TeamNav, V2_ROLE_LABEL, type MemberView, useTeamHref } from '@/components/team/shared';
 
 export default function MembersPage() {
+  const th = useTeamHref();
   const { canV2, session, refresh } = useSession();
   const toast = useToast();
   const [params, setParams] = useQueryState();
@@ -52,7 +53,7 @@ export default function MembersPage() {
   return (
     <>
       <PageHeader title="Team" meta={data ? `v${data.policy_version}` : undefined}
-        actions={canV2('members.invite') ? <LinkButton href="/team/invitations?new=1" variant="primary" icon={<UserPlus aria-hidden className="size-4" />}>Invite</LinkButton> : null} />
+        actions={canV2('members.invite') ? <LinkButton href={th("/team/invitations?new=1")} variant="primary" icon={<UserPlus aria-hidden className="size-4" />}>Invite</LinkButton> : null} />
       <TeamNav />
       {transfer ? (
         <Banner tone="warn" className="mb-6" title={`${transfer.from_email} wants you to become the owner`}
@@ -89,7 +90,7 @@ export default function MembersPage() {
                 {data.members.map((m) => (
                   <Tr key={m.user_id}>
                     <Td>
-                      <Link href={`/team/members/${m.user_id}`} className="flex items-center gap-3 hover:underline">
+                      <Link href={th(`/team/members/${m.user_id}`)} className="flex items-center gap-3 hover:underline">
                         <Avatar m={m} />
                         <span className="min-w-0">
                           <span className="block truncate font-medium">{m.name || m.email}{m.user_id === session.user.id ? <span className="text-muted"> (you)</span> : null}</span>
@@ -102,7 +103,7 @@ export default function MembersPage() {
                     <Td><span className="text-[13px] text-muted">{m.teams.map((t) => t.name + (t.is_manager ? ' ★' : '')).join(', ') || '—'}</span></Td>
                     <Td><StatusBadge status={m.status} /></Td>
                     <Td><span className="text-[13px] text-muted">{m.last_sign_in_at ? fmtRelative(m.last_sign_in_at) : 'Never'}</span></Td>
-                    <Td><Link href={`/team/members/${m.user_id}`} aria-label={`Open ${m.email}`} className="text-muted hover:text-fg"><ChevronRight aria-hidden className="size-4" /></Link></Td>
+                    <Td><Link href={th(`/team/members/${m.user_id}`)} aria-label={`Open ${m.email}`} className="text-muted hover:text-fg"><ChevronRight aria-hidden className="size-4" /></Link></Td>
                   </Tr>
                 ))}
               </tbody>
@@ -111,7 +112,7 @@ export default function MembersPage() {
           <ul className="divide-y divide-border md:hidden">
             {data.members.map((m) => (
               <li key={m.user_id}>
-                <Link href={`/team/members/${m.user_id}`} className="flex items-start gap-3 px-4 py-3">
+                <Link href={th(`/team/members/${m.user_id}`)} className="flex items-start gap-3 px-4 py-3">
                   <Avatar m={m} />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2"><span className="truncate font-medium">{m.name || m.email}</span><StatusBadge status={m.status} /></span>

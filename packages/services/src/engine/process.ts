@@ -33,7 +33,7 @@ export interface EngineDeps {
 }
 
 interface GateRow {
-  ws_paused: boolean; brand_paused: boolean; conn_paused: boolean; conn_status: string; conn_disconnected: boolean;
+  ws_paused: boolean; ws_suspended: boolean; brand_paused: boolean; conn_paused: boolean; conn_status: string; conn_disconnected: boolean;
   conn_account: string; conn_is_mock: boolean; schedule_status: string; schedule_generation: number; post_generation: number;
   approval_required: boolean; approved: boolean; publish_before: Date; state: string;
 }
@@ -62,7 +62,7 @@ type GateResult = { ok: true } | { ok: false; state: 'paused' | 'blocked' | 'can
 
 async function gate(db: Queryable, d: ClaimedDelivery): Promise<GateResult> {
   const g = await one<GateRow>(db,
-    `SELECT w.publishing_paused ws_paused, b.publishing_paused brand_paused, c.paused conn_paused, c.status conn_status,
+    `SELECT w.publishing_paused ws_paused, (w.state <> 'active') ws_suspended, b.publishing_paused brand_paused, c.paused conn_paused, c.status conn_status,
             (c.disconnected_at IS NOT NULL) conn_disconnected, c.provider_account_id conn_account, c.is_mock conn_is_mock,
             s.status schedule_status, s.generation schedule_generation, p.schedule_generation post_generation,
             b.approval_required,
@@ -77,6 +77,8 @@ async function gate(db: Queryable, d: ClaimedDelivery): Promise<GateResult> {
   if (g.publish_before.getTime() <= Date.now()) {
     return { ok: false, state: 'expired', code: 'deadline_passed', message: 'Missed: the publish-before deadline passed. Review and reschedule if still relevant.' };
   }
+  // V3.1 Admin: a platform-suspended workspace holds (paused) until reactivated; reactivation resumes it.
+  if (g.ws_suspended) return { ok: false, state: 'paused', code: 'paused', message: 'This workspace is suspended by the platform. Nothing was sent.' };
   if (g.ws_paused || g.brand_paused || g.conn_paused) {
     return { ok: false, state: 'paused', code: 'paused', message: `Publishing is paused for this ${g.ws_paused ? 'workspace' : g.brand_paused ? 'brand' : 'account'}.` };
   }

@@ -1,4 +1,5 @@
 'use client';
+import { useAreaHref } from '@/lib/client/hooks';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
@@ -187,8 +188,9 @@ export default function ApprovalDetailPage() {
 }
 
 function BackLink() {
+  const area = useAreaHref();
   return (
-    <Link href="/approvals" className="mb-4 inline-flex items-center gap-1.5 text-[13px] text-muted hover:text-fg">
+    <Link href={area('/approvals', '/admin/approvals')} className="mb-4 inline-flex items-center gap-1.5 text-[13px] text-muted hover:text-fg">
       <ArrowLeft aria-hidden className="size-4" /> Approvals
     </Link>
   );

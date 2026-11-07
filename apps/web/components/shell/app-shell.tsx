@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Suspense, useEffect, useState, type ReactNode } from 'react';
 import {
-  Activity, CalendarDays, ChartColumn, CheckCheck, Ellipsis, Flag, FolderOpen, LayoutDashboard, Plug, Settings, ShieldCheck, SquarePen, Users, Wrench,
+  Activity, CalendarDays, PanelsTopLeft, ChartColumn, CheckCheck, Ellipsis, Flag, FolderOpen, LayoutDashboard, Plug, Settings, ShieldCheck, SquarePen, Users, Wrench,
   type LucideIcon,
 } from 'lucide-react';
 import type { Action, Permission } from '@social-lite/core';
@@ -45,6 +45,7 @@ export const NAV: NavItem[] = [
   { href: '/settings', label: 'Settings', icon: Settings, also: ['/security', '/mcp/settings'] },
 ];
 const ADMIN_NAV: NavItem[] = [
+  { href: '/admin', label: 'Admin console', icon: PanelsTopLeft, v2: ['workspace.read'] },
   { href: '/setup', label: 'Setup', icon: Wrench, perm: 'setup.manage' },
   { href: '/operations', label: 'Operations', icon: Activity, perm: 'diagnostics.read' },
   { href: '/activity', label: 'Activity', icon: ShieldCheck, perm: 'workspace.settings' },
@@ -81,7 +82,7 @@ function ShellInner({ children }: { children: ReactNode }) {
   const withBrand = useHrefWithBrand();
   const approvals = useApprovalsCount(true);
   const visible = NAV.filter((n) => (!n.perm || can(n.perm)) && (!n.v2 || n.v2.some((p) => canV2(p))));
-  const admin = ADMIN_NAV.filter((n) => !n.perm || can(n.perm));
+  const admin = ADMIN_NAV.filter((n) => (!n.perm || can(n.perm)) && (!n.v2 || n.v2.some((p) => canV2(p))));
   const mobilePrimary = visible.filter((n) => n.mobile);
   const mobileMore = visible.filter((n) => !n.mobile);
 

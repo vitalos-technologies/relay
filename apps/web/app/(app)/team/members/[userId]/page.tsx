@@ -14,7 +14,7 @@ import {
   Badge, Banner, Button, Card, CardHeader, ConfirmDialog, Dialog, ErrorNotice, ErrorState, Facts, Field, IconButton, Input, PageHeader, Select,
   SkeletonRows, Tooltip, useToast,
 } from '@/components/ui';
-import { GRANT_ROLES, GrantChip, ROLE_HINT, StatusBadge, TeamNav, V2_ROLE_LABEL, type MemberView } from '@/components/team/shared';
+import { GRANT_ROLES, GrantChip, ROLE_HINT, StatusBadge, TeamNav, V2_ROLE_LABEL, type MemberView, useTeamHref } from '@/components/team/shared';
 
 interface Source { grant_id: string; role: string; via: 'direct' | 'team'; team_name: string | null; expires_at: string | null }
 interface PermRow { permission: string; allowed: boolean; reason: string; sources: Source[] }
@@ -38,6 +38,7 @@ const ACTION_GROUPS: Array<[string, string[]]> = [
 ];
 
 export default function MemberPage() {
+  const th = useTeamHref();
   const { userId } = useParams<{ userId: string }>();
   const router = useRouter();
   const { session, canV2 } = useSession();
@@ -76,7 +77,7 @@ export default function MemberPage() {
     if (confirm === 'remove') {
       await apiFetch(`/api/members/${userId}`, { method: 'DELETE', body: { reassign_to: reassignTo || null, reason: reason || null } });
       toast.success('Removed');
-      router.push('/team');
+      router.push(th('/team'));
       return;
     }
     toast.success(confirm === 'suspend' ? 'Suspended' : confirm === 'reactivate' ? 'Reactivated' : 'Transfer sent — they must accept');
@@ -89,7 +90,7 @@ export default function MemberPage() {
 
   return (
     <>
-      <PageHeader title={m.name || m.email} eyebrow={<Link href="/team" className="inline-flex items-center gap-1 hover:text-fg"><ArrowLeft aria-hidden className="size-3" /> Team</Link>}
+      <PageHeader title={m.name || m.email} eyebrow={<Link href={th("/team")} className="inline-flex items-center gap-1 hover:text-fg"><ArrowLeft aria-hidden className="size-3" /> Team</Link>}
         meta={<StatusBadge status={m.status} />}
         actions={manage ? (
           <>
@@ -127,7 +128,7 @@ export default function MemberPage() {
               {viaTeams.map((g) => (
                 <li key={`${g.id}-t`} className="flex items-center gap-2 py-2">
                   <GrantChip g={g} />
-                  <Link href={`/team/teams/${g.team_id}`} className="min-w-0 flex-1 truncate text-[12px] text-muted hover:underline">via {g.team_name}</Link>
+                  <Link href={th(`/team/teams/${g.team_id}`)} className="min-w-0 flex-1 truncate text-[12px] text-muted hover:underline">via {g.team_name}</Link>
                 </li>
               ))}
               {!m.grants.length ? <li className="py-3 text-[13px] text-muted">No access</li> : null}
@@ -153,7 +154,7 @@ export default function MemberPage() {
           <Card className="p-4">
             <Facts items={[
               ['Email', m.email],
-              ['Teams', m.teams.length ? m.teams.map((t) => <Link key={t.id} href={`/team/teams/${t.id}`} className="mr-2 hover:underline">{t.name}{t.is_manager ? ' ★' : ''}</Link>) : '—'],
+              ['Teams', m.teams.length ? m.teams.map((t) => <Link key={t.id} href={th(`/team/teams/${t.id}`)} className="mr-2 hover:underline">{t.name}{t.is_manager ? ' ★' : ''}</Link>) : '—'],
               ['Joined', fmtRelative(m.joined_at)],
               ['Last sign-in', m.last_sign_in_at ? fmtRelative(m.last_sign_in_at) : 'Never'],
               ...(m.access_expires_at ? [['Access ends', new Date(m.access_expires_at).toLocaleString()] as [string, string]] : []),

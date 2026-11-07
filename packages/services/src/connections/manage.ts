@@ -216,7 +216,9 @@ export async function applyHealth(connectionId: string, h: ConnectionHealth, act
     const caps = getAdapter(cur.provider).capabilities(toPublishConnection(cur));
     const row = await one<ConnectionRow>(tx,
       `UPDATE connections SET status=$2, health_detail=$3, health_checked_at=$4, capabilities=$5, metadata = metadata || $6::jsonb,
-              display_name=coalesce($7, display_name), username=coalesce($8, username), updated_at=now()
+              -- Simulated destinations keep the name they were created with (the fake provider's profile name is not theirs).
+              display_name=CASE WHEN is_mock THEN display_name ELSE coalesce($7, display_name) END,
+              username=CASE WHEN is_mock THEN username ELSE coalesce($8, username) END, updated_at=now()
         WHERE id=$1 RETURNING *`,
       [connectionId, h.status, JSON.stringify(healthDetail(h)), h.checkedAt, JSON.stringify(caps), JSON.stringify(meta), displayName, username]);
     const was = DISPATCHABLE_CONNECTION_STATUSES.has(cur.status);

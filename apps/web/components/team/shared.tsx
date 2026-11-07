@@ -69,10 +69,21 @@ const SECTIONS: Array<{ href: string; label: string; perm?: Permission }> = [
   { href: '/team/held', label: 'Held posts', perm: 'content.read' },
 ];
 
+/**
+ * V3.1 Admin: the Team pages are also mounted inside the admin app (/admin/people/**). Links stay in whichever app
+ * the page is shown in.
+ */
+export function useTeamHref(): (path: string) => string {
+  const pathname = usePathname();
+  const admin = pathname.startsWith('/admin');
+  return (path: string) => (admin ? path.replace(/^\/team/, '/admin/people') : path);
+}
+
 export function TeamNav() {
   const pathname = usePathname();
   const { canV2 } = useSession();
   const items = SECTIONS.filter((s) => !s.perm || canV2(s.perm));
+  if (pathname.startsWith('/admin')) return null; // the admin sidebar lists the same sections
   return (
     <nav aria-label="Team sections" className="-mt-4 mb-6 flex gap-1 overflow-x-auto border-b border-border">
       {items.map((s) => {
