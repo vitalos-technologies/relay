@@ -72,6 +72,7 @@ export const MCP_TOOLS: McpToolInfo[] = [
   { name: 'get_delivery_status', group: 'publish', scopes: ['social.read'], readOnly: true, destructive: false, idempotent: true },
   { name: 'cancel_schedule', group: 'recover', scopes: ['publishing.schedule', 'drafts.write'], readOnly: false, destructive: true, idempotent: true },
   { name: 'pause_brand', group: 'recover', scopes: ['publishing.schedule'], readOnly: false, destructive: true, idempotent: true },
+  { name: 'analytics_overview', group: 'analyse', scopes: ['analytics.read'], readOnly: true, destructive: false, idempotent: true },
   { name: 'query_analytics', group: 'analyse', scopes: ['analytics.read'], readOnly: true, destructive: false, idempotent: true },
   { name: 'get_metric_definitions', group: 'analyse', scopes: ['analytics.read'], readOnly: true, destructive: false, idempotent: true },
   { name: 'get_data_coverage', group: 'analyse', scopes: ['analytics.read'], readOnly: true, destructive: false, idempotent: true },

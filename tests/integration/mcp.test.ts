@@ -333,6 +333,18 @@ describe('MCP drafts and review', () => {
     expect((done.post_ids as string[]).length).toBe(1);
   });
 
+  it('analytics_overview uses the analytics query service: explicit coverage, live data only, brand scope enforced', async () => {
+    const { client, ws, brandA } = await world();
+    const r = ok(await call(client, 'analytics_overview', { workspace_id: ws, brand_id: brandA }));
+    expect(Array.isArray(r.kpis)).toBe(true);
+    expect(r.kpis.length).toBeLessThanOrEqual(4);
+    expect(r.meta).toBeTruthy();
+    expect(r.data_health).toBeTruthy();
+    const other = await createWorkspace('Other');
+    const foreign = await createBrand(other, 'Foreign');
+    expect(err(await call(client, 'analytics_overview', { workspace_id: ws, brand_id: foreign })).code).toMatch(/not_found|forbidden/);
+  });
+
   it('paginates with bounded page sizes and bounded calendar ranges', async () => {
     const { client, ws, brandA, conns } = await world();
     for (let i = 0; i < 3; i++) await draft(client, ws, brandA, [conns.facebook], `Post ${i}`);

@@ -83,6 +83,7 @@ All take explicit ids (`workspace_id` from `list_workspaces` + brand/post/schedu
 | get_delivery_status | workspace_id, post_id | per-destination state (simulated labelled) |
 | cancel_schedule | workspace_id, schedule_id, idempotency_key | schedule + honest in-flight message |
 | pause_brand | workspace_id, brand_id, reason?, idempotency_key | paused (resume only in Relay) |
+| analytics_overview | workspace_id, brand_id?, network?, from?, to? (local dates), timezone?, dataset? (live/simulated) | meta, ≤4 KPIs vs previous period, trend, channels, top content, insights, data health (same service as the Analytics page) |
 | query_analytics | workspace_id, brand_id?, provider?, from?, to?, cursor?, limit | per-post metrics: name, label, unit, period, source, caveats |
 | get_metric_definitions | — | metric dictionary per network |
 | get_data_coverage | workspace_id, brand_id? | per destination: supported, posts with metrics, freshness |

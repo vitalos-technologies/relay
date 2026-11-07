@@ -25,6 +25,8 @@ import { cancelSchedule, submitForReview } from '../posts/scheduling.js';
 import { postDeliveries } from '../engine/manual.js';
 import { planner } from '../readmodels.js';
 import { listAnalytics } from '../analytics/index.js';
+import { overview as analyticsOverview } from '../analytics/query.js';
+import { filtersFromQuery } from '../analytics/api.js';
 import { createIntegrationDraft } from '../integrations/drafts.js';
 import { brandConnections, capabilitiesFor } from '../posts/shared.js';
 import { MCP_LIMITS } from './config.js';
@@ -625,6 +627,29 @@ export function registerTools(server: McpServer, hooks: ToolHooks = {}): void {
   });
 
   // ---------------- Analyse
+  register(server, hooks, {
+    name: 'analytics_overview', title: 'Analytics overview',
+    description: 'Period KPIs (vs previous period), trend, channel comparison, top content and data health for a brand or the workspace. Same query service and coverage rules as the Analytics page: unreported metrics are explicit statuses, never zeros; live data never includes simulated or demo rows.',
+    input: { workspace_id: workspaceId, brand_id: uuid('Brand id').optional(), network: z.enum(PROVIDERS as unknown as [Provider, ...Provider[]]).optional(),
+      from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe('Local date YYYY-MM-DD (default: 28 days ago)'), to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe('Local date YYYY-MM-DD (default: today)'),
+      timezone: z.string().max(64).optional().describe('IANA zone; defaults to the brand timezone'), dataset: z.enum(['live', 'simulated']).optional() },
+    output: { kpis: z.array(z.unknown()), data_health: z.unknown() },
+    async run(a, call) {
+      const s = await call.scope(a.workspace_id);
+      requireScope(s, 'analytics.read');
+      if (a.brand_id) await assertBrand(s.ctx, a.brand_id);
+      const q = new URLSearchParams();
+      if (a.brand_id) q.set('brand', a.brand_id);
+      if (a.network) q.set('network', a.network);
+      if (a.from) q.set('from', a.from);
+      if (a.to) q.set('to', a.to);
+      if (a.timezone) q.set('tz', a.timezone);
+      q.set('dataset', a.dataset ?? 'live');
+      const r = await analyticsOverview(s.ctx, await filtersFromQuery(s.ctx, q));
+      return { meta: r.meta, kpis: r.kpis, trend: r.trend, channels: r.channels, top_content: r.top_content.slice(0, 10), insights: r.insights, data_health: r.data_health, content_notice: UNTRUSTED };
+    },
+  });
+
   register(server, hooks, {
     name: 'query_analytics', title: 'Query analytics',
     description: 'Per-post metrics for published deliveries: provider-native metric names with labels, units, periods, source (provider or simulated) and caveats. Unsupported or unreported metrics are absent, never zero.',
