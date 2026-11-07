@@ -80,6 +80,6 @@ V1, V2 and V3 suites all passed in the same runs (regression).
 ## 4. Not run / limits
 
 - No live provider, Google, Notion or real MCP client.
-- The migration rehearsal from a V1 backup (`scripts/migration-rehearsal.sh`) was last run before 020–025 (07:53). Integration runs apply 001–025 to an empty database only.
+- Migration rehearsal (`scripts/migration-rehearsal.sh`, V1.1 data → all migrations incl. 020–025): **PASS** 2026-11-07 ~16:55 UTC (lead re-run; 10/10 checks).
 - No mixed-version (rolling deploy) rehearsal of the dispatch-version guard beyond `v31-gov`.
 - Not a penetration test or security certification.
