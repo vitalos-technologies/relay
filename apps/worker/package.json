@@ -12,6 +12,7 @@
     "esbuild": "0.28.2"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "1.6.0",
     "@aws-sdk/client-s3": "3.1163.0",
     "@aws-sdk/s3-presigned-post": "3.1163.0",
     "@aws-sdk/s3-request-presigner": "3.1163.0",
