@@ -111,6 +111,11 @@ export async function handleOAuthCallback(p: { provider: string; params: URLSear
     log.warn('oauth_code_exchange_failed', { provider, err: { name: (err as Error).name, message: (err as Error).message } });
     return fail('token_exchange_failed');
   }
+  // Meta: record the app-scoped user id so deauthorize / data-deletion callbacks can find this grant.
+  if (provider === 'facebook' || provider === 'instagram') {
+    const metaUserId = await fetchMetaUserId(actx, tokens.accessToken, cfg.apiVersion);
+    if (metaUserId) tokens = { ...tokens, raw: { ...(tokens.raw ?? {}), meta_user_id: metaUserId } };
+  }
   let candidates: DestinationCandidate[];
   try {
     candidates = await connector.listDestinations(actx, tokens);
@@ -198,7 +203,10 @@ export async function selectConnectionFlow(ctx: Ctx, flowId: string, body: unkno
   const finalized: FinalizedDestination[] = [];
   for (const c of chosen) {
     try {
-      finalized.push(await connector.finalize(actx, secret.tokens, c));
+      const fin = await connector.finalize(actx, secret.tokens, c);
+      const metaUserId = secret.tokens.raw?.meta_user_id;
+      if (typeof metaUserId === 'string') fin.metadata = { ...fin.metadata, meta_user_id: metaUserId };
+      finalized.push(fin);
     } catch (err) {
       log.warn('oauth_finalize_failed', { provider: f.provider, err: { name: (err as Error).name, message: (err as Error).message } });
       throw new AppError('provider_error', `Could not finish connecting ${c.displayName}. Start the connection again.`);
@@ -224,4 +232,16 @@ export async function selectConnectionFlow(ctx: Ctx, flowId: string, body: unkno
     return out;
   });
   return { items: rows.map(toConnectionJson) };
+}
+
+/** GET /me?fields=id with the user token (Authorization header; never in a logged URL). Best effort. */
+async function fetchMetaUserId(actx: Awaited<ReturnType<typeof setupContext>>, accessToken: string, version?: string): Promise<string | null> {
+  try {
+    const r = await actx.transport.send({ method: 'GET', url: `https://graph.facebook.com/${version ?? 'v26.0'}/me?fields=id`, headers: { authorization: `Bearer ${accessToken}` }, op: 'meta.me', timeoutMs: 10_000 });
+    if (r.status !== 200) return null;
+    const id = (JSON.parse(r.body) as { id?: unknown }).id;
+    return typeof id === 'string' && /^\d{1,32}$/.test(id) ? id : null;
+  } catch {
+    return null;
+  }
 }
