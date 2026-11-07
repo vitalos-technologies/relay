@@ -2,6 +2,7 @@
 // lets the owner enter provider/AI/TipSignal keys (stored in app_settings; secrets encrypted).
 // Secrets are WRITE-ONLY: responses carry is_set/source, never values. Env values take precedence
 // and are read-only (source 'env').
+import { BRAND } from '@social-lite/core';
 import { AppError, notFound } from '@social-lite/core';
 import { getPool, maybeOne, withTx, type Queryable } from '@social-lite/db';
 import { audit } from './audit.js';
@@ -53,7 +54,7 @@ const ENV_GROUPS: Array<{ id: string; title: string; items: EnvItemDef[] }> = [
   { id: 'email', title: 'Email', items: [
     { key: 'SMTP_URL', label: 'SMTP URL', secret: true, required: true, hint: 'smtp(s)://user:pass@host:port — invitations and critical alerts.',
       warn: (v) => (v && /localhost:1025|127\.0\.0\.1:1025/.test(v) ? 'Points at local email capture (Mailpit)' : undefined) },
-    { key: 'EMAIL_FROM', label: 'From address', secret: false, defaultValue: 'Social Lite <no-reply@social-lite.invalid>', hint: 'Sender shown on outgoing email.' },
+    { key: 'EMAIL_FROM', label: 'From address', secret: false, defaultValue: BRAND.defaultEmailFrom, hint: 'Sender shown on outgoing email.' },
   ] },
 ];
 

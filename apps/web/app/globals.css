@@ -5,8 +5,8 @@
    forced dark) or when the user picks it explicitly via [data-theme="light"]. */
 :root {
   color-scheme: dark;
-  --bg: #0d0e10;
-  --surface: #15171a;
+  --bg: #0e1013;
+  --surface: #15181c;
   --raised: #1c1f23;
   --sunken: #101114;
   --border: #2a2e34;
@@ -15,12 +15,15 @@
   --muted: #9aa1a9;
   --subtle: #757d87;
 
-  --accent: #c8f25a;          /* signal lime: primary action fill, selection */
-  --accent-hover: #d6f77f;
-  --on-accent: #0d0e10;
-  --accent-text: #c8f25a;     /* accent used as text/icon on --bg */
-  --accent-soft: rgba(200, 242, 90, 0.12);
-  --focus: #c8f25a;
+  --accent: #fd6701;          /* Relay orange: primary action fill, selection */
+  --accent-hover: #fe7a1f;
+  --on-accent: #121416;       /* ink on orange: 6.7:1 */
+  --accent-text: #ff8a3d;     /* accent as text/icon on dark --bg: ≥ 7:1 */
+  --accent-soft: rgba(253, 103, 1, 0.14);
+  --focus: #ff8a3d;
+  --brand-red: #fe4114;
+  --brand-amber: #fda602;
+  --brand-gradient: linear-gradient(135deg, #fd8221 0%, #f13e1f 100%);
 
   --success: #5fd49a;
   --success-soft: rgba(95, 212, 154, 0.12);
@@ -49,12 +52,12 @@
     --text: #111316;
     --muted: #535b65;
     --subtle: #6b737d;
-    --accent: #c8f25a;
-    --accent-hover: #bde845;
-    --on-accent: #0d0e10;
-    --accent-text: #3f5a00;
-    --accent-soft: rgba(63, 90, 0, 0.1);
-    --focus: #3f5a00;
+    --accent: #fd6701;
+    --accent-hover: #e85d00;
+    --on-accent: #121416;
+    --accent-text: #b23a00;     /* darker orange for small text on white: 6.5:1 */
+    --accent-soft: rgba(253, 103, 1, 0.1);
+    --focus: #c2410c;
     --success: #12733f;
     --success-soft: rgba(18, 115, 63, 0.1);
     --warn: #8a5400;
@@ -80,12 +83,12 @@
   --text: #111316;
   --muted: #535b65;
   --subtle: #6b737d;
-  --accent: #c8f25a;
-  --accent-hover: #bde845;
-  --on-accent: #0d0e10;
-  --accent-text: #3f5a00;
-  --accent-soft: rgba(63, 90, 0, 0.1);
-  --focus: #3f5a00;
+  --accent: #fd6701;
+  --accent-hover: #e85d00;
+  --on-accent: #121416;
+  --accent-text: #b23a00;   /* darker orange for small text on white: 6.5:1 */
+  --accent-soft: rgba(253, 103, 1, 0.1);
+  --focus: #c2410c;
   --success: #12733f;
   --success-soft: rgba(18, 115, 63, 0.1);
   --warn: #8a5400;
@@ -123,7 +126,7 @@
   --color-info: var(--info);
   --color-info-soft: var(--info-soft);
   --color-neutral-soft: var(--neutral-soft);
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
 }
 
@@ -140,7 +143,7 @@ body {
   font-family: var(--font-sans);
   font-size: 14px;
   line-height: 1.5;
-  font-feature-settings: "ss01", "cv11";
+  font-feature-settings: "cv11", "ss03";
   -webkit-font-smoothing: antialiased;
   background: var(--bg);
 }

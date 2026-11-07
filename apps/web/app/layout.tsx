@@ -1,19 +1,30 @@
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
-import { GeistSans } from 'geist/font/sans';
+import localFont from 'next/font/local';
 import { GeistMono } from 'geist/font/mono';
+import { BRAND } from '@social-lite/core';
+
+// Inter (brand typeface), self-hosted variable font — no network fetch at build time.
+const inter = localFont({
+  src: [
+    { path: '../node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2', weight: '100 900', style: 'normal' },
+    { path: '../node_modules/@fontsource-variable/inter/files/inter-latin-ext-wght-normal.woff2', weight: '100 900', style: 'normal' },
+  ],
+  variable: '--font-inter',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
-  title: { default: 'Social Lite', template: '%s · Social Lite' },
-  description: 'Plan, approve and publish to Instagram, Facebook, Telegram and X.',
+  title: { default: BRAND.name, template: `%s · ${BRAND.name}` },
+  description: BRAND.tagline,
 };
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   themeColor: [
-    { media: '(prefers-color-scheme: dark)', color: '#0D0E10' },
+    { media: '(prefers-color-scheme: dark)', color: '#0E1013' },
     { media: '(prefers-color-scheme: light)', color: '#F5F6F7' },
   ],
 };
@@ -23,7 +34,7 @@ const THEME_BOOT = `try{var t=localStorage.getItem('sl-theme');if(t==='light'||t
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en-GB" className={`${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
+    <html lang="en-GB" className={`${inter.variable} ${GeistMono.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
       </head>

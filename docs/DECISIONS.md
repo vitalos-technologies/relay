@@ -19,3 +19,5 @@
 | D15 | CSV export neutralises formula injection (`= + - @` prefixed) | Exports are opened in spreadsheets |
 | D16 | TypeScript 5.9, Vitest 3.2, Next 16, pg-boss 12 pinned | Supported stable lines; avoided brand-new majors (TS 7, Vitest 5) for a one-day build |
 | D17 | Default workspace/brand timezone Europe/London; browser zone never used to interpret input | SC-01..03 |
+| D18 | Product renamed **Relay** ("Create. Coordinate. Publish.") per the client brand kit (2026-11-07). User-facing strings come from `packages/core/src/brand.ts`; internal identifiers (`@social-lite/*` packages, DB/cookie/realm names, test domains) unchanged to avoid churn | One source of truth for naming; zero data migration |
+| D19 | Brand palette replaces lime: Orange `#FD6701` primary (ink `#121416` text, 6.7:1), Red `#FE4114`, Amber `#FDA602`, Ink `#121416`, Mist `#EBEDEE`; logo gradient `#FD8221→#F13E1F`; light-theme accent text `#B23A00`. Typeface Inter (self-hosted variable). R mark redrawn as SVG from the kit raster | Colours sampled from the kit; accessible text/fill pairings; replace the SVG with the designer's master vector when supplied |

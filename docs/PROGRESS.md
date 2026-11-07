@@ -8,6 +8,10 @@
 
 4. **Complete documentation + in-app Help Centre** — QUEUED after V3. Full brief: `docs/queue/04_DOCUMENTATION_PROMPT.md`.
 
+## Brand (2026-11-07)
+
+Product is now **Relay** (brand kit: docs/brand/relay-brand-kit.webp; decisions D18–D19). Tokens/mark/Inter applied. V3 design system MUST use the Relay palette (orange/red/amber on ink) instead of the V3 spec's lime, plus the kit's icon style (outlined orange icons in dark rounded tiles). Docs/Help Centre use the name Relay.
+
 ## V2 state
 
 - Done: migration 009 (teams, scoped grants, restrictions, membership status, policy versions, session assurance, service accounts/API key tables, V1 backfill + review items); `core/authz.ts` (presets, precedence, delegation); `services/authz.ts` (`authorize()`); `tenancy.ts` enforcement (declared permissions re-checked per touched brand); `v2Ctx` test helper; docs V2_THREAT_MODEL, PERMISSIONS_MATRIX.

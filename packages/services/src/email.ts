@@ -1,4 +1,5 @@
 // Outbound email over SMTP (SMTP_URL). Never log recipients' tokens or message bodies.
+import { BRAND } from '@social-lite/core';
 import nodemailer, { type Transporter } from 'nodemailer';
 import { config } from './config.js';
 import { log } from './log.js';
@@ -53,17 +54,17 @@ export async function verifySmtp(timeoutMs = 5000): Promise<{ ok: boolean; detai
 const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 
 export function invitationEmail(p: { to: string; workspaceName: string; inviterEmail: string; role: string; acceptUrl: string; expiresAt: Date }): MailMessage {
-  const subject = `You're invited to ${p.workspaceName} on Social Lite`;
+  const subject = `You're invited to ${p.workspaceName} on ${BRAND.name}`;
   const expires = p.expiresAt.toUTCString();
   const text = [
-    `${p.inviterEmail} invited you to join "${p.workspaceName}" on Social Lite as ${p.role}.`,
+    `${p.inviterEmail} invited you to join "${p.workspaceName}" on ${BRAND.name} as ${p.role}.`,
     '',
     `Accept the invitation: ${p.acceptUrl}`,
     '',
     `Sign in with this email address (${p.to}). The invitation expires ${expires} and can be used once.`,
     'If you were not expecting this, you can ignore this email.',
   ].join('\n');
-  const html = `<p>${escapeHtml(p.inviterEmail)} invited you to join <strong>${escapeHtml(p.workspaceName)}</strong> on Social Lite as ${escapeHtml(p.role)}.</p>
+  const html = `<p>${escapeHtml(p.inviterEmail)} invited you to join <strong>${escapeHtml(p.workspaceName)}</strong> on ${BRAND.name} as ${escapeHtml(p.role)}.</p>
 <p><a href="${escapeHtml(p.acceptUrl)}">Accept the invitation</a></p>
 <p>Sign in with this email address (${escapeHtml(p.to)}). The invitation expires ${escapeHtml(expires)} and can be used once.</p>
 <p>If you were not expecting this, you can ignore this email.</p>`;

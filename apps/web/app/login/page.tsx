@@ -1,3 +1,5 @@
+import { RelayWordmark } from '@/components/brand/relay-mark';
+import { BRAND } from '@social-lite/core';
 import type { Metadata } from 'next';
 import { ArrowRight, ShieldCheck } from 'lucide-react';
 import { safeReturnTo } from '@/lib/client/api';
@@ -14,6 +16,10 @@ const ERRORS: Record<string, string> = {
   invite_expired: 'Invitation expired. Ask for a new one.',
   oidc_error: 'Identity provider error. Try again.',
   session_expired: 'Session ended. Sign in again.',
+  session_mismatch: 'Session changed. Sign in again.',
+  account_mismatch: 'You verified as a different account.',
+  step_up_not_fresh: 'Verification was not fresh. Try again.',
+  idp_error: 'Sign-in cancelled or refused.',
 };
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -27,11 +33,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   return (
     <main className="relative flex min-h-dvh items-center justify-center overflow-hidden px-4 py-10">
       <div className="relative w-full max-w-[400px]">
-        <div className="mb-8 flex items-center gap-2.5">
-          <span aria-hidden className="inline-flex size-9 items-center justify-center rounded-xl border border-border bg-raised">
-            <span className="size-3 rounded-full bg-accent" />
-          </span>
-          <span className="text-lg font-semibold tracking-[-0.01em]">Social Lite</span>
+        <div className="mb-8 flex flex-col gap-2">
+          <RelayWordmark size={34} />
+          <p className="text-sm text-muted">{BRAND.tagline}</p>
         </div>
 
         <div className="rounded-2xl border border-border bg-surface p-6 sm:p-8">

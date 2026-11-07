@@ -1,4 +1,5 @@
 // Central configuration. Production fails closed on unsafe or missing settings.
+import { BRAND } from '@social-lite/core';
 import { z } from 'zod';
 
 const bool = z.enum(['true', 'false', '1', '0']).transform((v) => v === 'true' || v === '1');
@@ -25,7 +26,7 @@ const schema = z.object({
   S3_SECRET_ACCESS_KEY: z.string().optional(),
   S3_FORCE_PATH_STYLE: bool.default(true),
   SMTP_URL: z.string().optional(),
-  EMAIL_FROM: z.string().default('Social Lite <no-reply@social-lite.invalid>'),
+  EMAIL_FROM: z.string().default(BRAND.defaultEmailFrom),
   // Mock provider transport is a development/demo feature. Forbidden in production.
   ENABLE_MOCK_PROVIDERS: bool.default(false),
   // Provider app configuration (may also be set via the protected setup page).

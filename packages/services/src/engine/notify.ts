@@ -1,10 +1,16 @@
 // Notifications derived from outbox events. Deduplicated per user + key so one broken token
 // cannot produce hundreds of messages (spec §14 alert dedupe). Critical items are emailed once.
+import { BRAND } from '@social-lite/core';
 import { PROVIDER_LABEL, type Provider } from '@social-lite/core';
 import { getPool, many, maybeOne, type Queryable } from '@social-lite/db';
 import { config } from '../config.js';
 import { sendMail } from '../email.js';
 import { log } from '../log.js';
+import { onApprovalDecided, onApprovalRequested } from '../collab/inbox.js';
+import { onCommentCreated } from '../collab/comments.js';
+import { onAssignmentChanged } from '../collab/planning.js';
+import { onReviewShared } from '../collab/review.js';
+import { routeOperationalEmail } from '../collab/notifications.js';
 
 type Severity = 'info' | 'warning' | 'critical';
 
@@ -30,14 +36,9 @@ export async function notify(db: Queryable, p: {
        ON CONFLICT (user_id, dedupe_key) DO UPDATE SET occurrences = notifications.occurrences + 1, last_seen_at = now(), read_at = NULL
        RETURNING id, emailed_at, (xmax = 0) AS inserted`,
       [p.workspaceId, userId, p.severity, p.kind, p.title, p.body ?? null, p.referenceType ?? null, p.referenceId ?? null, p.dedupeKey]);
-    if (r && p.email && p.severity === 'critical' && !r.emailed_at) {
-      const u = await maybeOne<{ email: string }>(db, `SELECT email FROM users WHERE id=$1`, [userId]);
-      if (u) {
-        const link = `${config().APP_BASE_URL}${p.referenceType === 'post' ? `/posts/${p.referenceId}` : p.referenceType === 'connection' ? '/accounts' : '/'}`;
-        const sent = await sendMail({ to: u.email, subject: `[Social Lite] ${p.title}`, text: `${p.title}\n\n${p.body ?? ''}\n\nOpen: ${link}\n` }).catch(() => false);
-        if (sent) await db.query(`UPDATE notifications SET emailed_at=now() WHERE id=$1`, [r.id]);
-      }
-    }
+    // V2 (collab/notifications.ts): per-user preferences (in-app/email/digest) and quiet hours decide delivery;
+    // V1 emails only critical alerts. Email content is minimal and the recipient is re-checked at send.
+    if (r) await routeOperationalEmail(db, { notificationId: r.id, workspaceId: p.workspaceId, userId, kind: p.kind, alreadyEmailed: !!r.emailed_at || !(p.email && p.severity === 'critical') });
   }
 }
 
@@ -83,23 +84,22 @@ export async function handleEvent(evt: { event_type: string; workspace_id: strin
       });
       return;
     }
-    case 'approval.requested': {
-      const approvers = await many<{ user_id: string }>(db,
-        `SELECT m.user_id FROM memberships m WHERE m.workspace_id=$1 AND m.removed_at IS NULL AND m.role IN ('owner','admin','approver')
-           AND (NOT m.brand_restricted OR m.role IN ('owner','admin') OR EXISTS (SELECT 1 FROM membership_brand_grants g WHERE g.workspace_id=m.workspace_id AND g.user_id=m.user_id AND g.brand_id=$2))`,
-        [evt.workspace_id, evt.payload.brandId]);
-      await notify(db, { workspaceId: evt.workspace_id, userIds: approvers.map((a) => a.user_id), severity: 'info', kind: 'approval.requested',
-        title: 'A post is waiting for your review', referenceType: 'approval', referenceId: evt.aggregate_id, dedupeKey: `approval:${evt.aggregate_id}` });
+    case 'approval.requested':
+      // V2: everyone eligible for the CURRENT stage (policy roles/teams/guests/SoD), entitled at send time.
+      await onApprovalRequested(db, { workspace_id: evt.workspace_id, aggregate_id: evt.aggregate_id, payload: evt.payload });
       return;
-    }
-    case 'approval.decided': {
-      const a = await maybeOne<{ requested_by: string; decision: string; reason: string | null; post_id: string }>(db, `SELECT requested_by, decision, reason, post_id FROM approvals WHERE id=$1`, [evt.aggregate_id]);
-      if (!a?.requested_by) return;
-      await notify(db, { workspaceId: evt.workspace_id, userIds: [a.requested_by], severity: a.decision === 'rejected' ? 'warning' : 'info', kind: `approval.${a.decision}`,
-        title: a.decision === 'rejected' ? 'Your post was rejected' : 'Your post was approved', body: a.reason ?? undefined,
-        referenceType: 'post', referenceId: a.post_id, dedupeKey: `approval:${evt.aggregate_id}:${a.decision}` });
+    case 'approval.decided':
+      await onApprovalDecided(db, { workspace_id: evt.workspace_id, aggregate_id: evt.aggregate_id });
       return;
-    }
+    case 'comment.created':
+      await onCommentCreated(db, evt.aggregate_id);
+      return;
+    case 'assignment.changed':
+      await onAssignmentChanged(db, { workspace_id: evt.workspace_id, aggregate_id: evt.aggregate_id, payload: evt.payload });
+      return;
+    case 'review.shared':
+      await onReviewShared(db, { workspace_id: evt.workspace_id, aggregate_id: evt.aggregate_id, payload: evt.payload });
+      return;
     case 'notification.created': {
       if (evt.payload.kind === 'budget_threshold') {
         await notify(db, { workspaceId: evt.workspace_id, userIds: await recipients(db, evt.workspace_id), severity: Number(evt.payload.percent) >= 100 ? 'critical' : 'warning',

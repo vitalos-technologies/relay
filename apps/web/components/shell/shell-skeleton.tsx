@@ -2,7 +2,7 @@ import { Skeleton } from '@/components/ui';
 
 export function ShellSkeleton() {
   return (
-    <div className="min-h-dvh md:grid md:grid-cols-[224px_minmax(0,1fr)]" role="status" aria-label="Loading Social Lite">
+    <div className="min-h-dvh md:grid md:grid-cols-[224px_minmax(0,1fr)]" role="status" aria-label="Loading Relay">
       <aside className="hidden h-dvh flex-col gap-3 border-r border-border bg-surface p-4 md:flex">
         <Skeleton className="h-7 w-32" />
         <Skeleton className="mt-3 h-11 w-full" />
