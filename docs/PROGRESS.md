@@ -29,3 +29,11 @@ Product is now **Relay** (brand kit: docs/brand/relay-brand-kit.webp; decisions 
 ## Environment recovery
 
 Docker stops on container restart: if `/var/run/docker.pid` points at a non-dockerd PID remove only that file, start `dockerd`, then `docker compose -f infra/compose.yaml up -d --wait`. App: `./scripts/dev.sh --detach`.
+
+## V2 integration checklist (lead, when streams finish)
+
+- Reset dev DB + re-seed: stream test fixtures leaked into the demo workspace ("Health FB e63a", "Affected launch e63a"); tests must use per-run test DBs only.
+- Demo identities: Keycloak issuer replaced Dex → existing dev users are bound to the Dex issuer (`account_conflict` on sign-in). Fresh seed with `oidc_issuer='pending'` users fixes dev; document for real deployments (no re-binding by email).
+- Health centre lists overdue "scheduled" items when the worker is down — label overdue explicitly.
+- Sweep remaining user-facing "Social Lite" strings (e.g. scripts/dev.sh banner) → Relay (V3.1 also requires this).
+- Run full suite + E2E (Keycloak TOTP sign-in) + migration rehearsal with migrations 010–014.
