@@ -3,7 +3,7 @@
 // and processing never regresses delivery state (terminal states are never changed by a webhook).
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { AppError } from '@social-lite/core';
-import { maybeOne } from '@social-lite/db';
+import { maybeOne, withTx, type Queryable } from '@social-lite/db';
 import { getPool } from '@social-lite/db';
 import { getSetting } from './settings.js';
 import { writeOutbox } from './outbox.js';
@@ -65,4 +65,61 @@ function parse(raw: string): Record<string, unknown> {
     if (v && typeof v === 'object') return v as Record<string, unknown>;
   } catch { /* fallthrough */ }
   throw new AppError('validation_failed', 'Body must be JSON');
+}
+
+// ---------------------------------------------------------------- processing (worker)
+// Forward-only: a webhook may move Unknown/Processing → Published when it identifies OUR post.
+// It never regresses a state, never marks anything failed, and ignores everything else.
+
+const norm = (s: string) => s.replace(/\s+/g, ' ').trim().slice(0, 200);
+
+async function confirm(db: Queryable, deliveryId: string, providerId: string, note: string): Promise<boolean> {
+  const r = await db.query(
+    `UPDATE deliveries SET state='published', needs_reconcile=false, lease_owner=NULL, lease_expires_at=NULL,
+            provider_ids=(SELECT array_agg(DISTINCT x) FROM unnest(provider_ids || ARRAY[$2]::text[]) x),
+            published_at=coalesce(published_at, now()), last_error_code=NULL, last_error_message=$3, updated_at=now()
+      WHERE id=$1 AND state IN ('unknown','processing') RETURNING workspace_id, schedule_id, post_id`, [deliveryId, providerId, note]);
+  const row = r.rows[0] as { workspace_id: string; schedule_id: string; post_id: string } | undefined;
+  if (!row) return false;
+  await writeOutbox(db, { workspaceId: row.workspace_id, aggregateType: 'delivery', aggregateId: deliveryId, eventType: 'delivery.state_changed', payload: { state: 'published', postId: row.post_id, scheduleId: row.schedule_id } });
+  await db.query(`UPDATE schedules SET status='completed' WHERE id=$1 AND status='active'
+                   AND NOT EXISTS (SELECT 1 FROM deliveries WHERE schedule_id=$1 AND state NOT IN ('published','failed','cancelled','expired'))`, [row.schedule_id]);
+  return true;
+}
+
+export async function processWebhookReceipt(receiptId: string): Promise<{ confirmed: number; state: 'processed' | 'ignored' }> {
+  const db = getPool();
+  const rec = await maybeOne<{ provider: string; body: unknown; processing_state: string }>(db, `SELECT provider, body, processing_state FROM webhook_receipts WHERE id=$1`, [receiptId]);
+  if (!rec || rec.processing_state !== 'pending' || !rec.body || typeof rec.body !== 'object') return { confirmed: 0, state: 'ignored' };
+  const body = rec.body as Record<string, unknown>;
+  let confirmed = 0;
+  if (rec.provider === 'meta') {
+    const ids = new Set<string>();
+    for (const e of (Array.isArray(body.entry) ? body.entry : []) as Array<{ changes?: Array<{ value?: Record<string, unknown> }> }>) {
+      for (const c of e.changes ?? []) {
+        for (const k of ['post_id', 'media_id', 'id']) { const v = c.value?.[k]; if (typeof v === 'string' && /^[\d_]{1,64}$/.test(v)) ids.add(v); }
+      }
+    }
+    for (const id of ids) {
+      const rows = await db.query<{ id: string }>(`SELECT id FROM deliveries WHERE provider IN ('facebook','instagram') AND NOT is_mock AND state IN ('unknown','processing') AND $1 = ANY(provider_ids) LIMIT 5`, [id]);
+      for (const d of rows.rows) if (await withTx((tx) => confirm(tx, d.id, id, 'Confirmed by a verified Meta webhook.'), db)) confirmed++;
+    }
+  } else if (rec.provider === 'telegram') {
+    const post = (body.channel_post ?? null) as { chat?: { id?: number }; message_id?: number; text?: string; caption?: string; date?: number } | null;
+    if (post?.chat?.id !== undefined && typeof post.message_id === 'number') {
+      const text = norm(post.text ?? post.caption ?? '');
+      const at = new Date((post.date ?? 0) * 1000);
+      const cands = await db.query<{ id: string; rendered_text: string; link: string | null }>(
+        `SELECT d.id, v.rendered_text, v.link FROM deliveries d JOIN connections c ON c.id=d.connection_id JOIN variants v ON v.id=d.variant_id
+          WHERE d.provider='telegram' AND NOT d.is_mock AND d.state='unknown' AND c.provider_account_id=$1
+            AND $2::timestamptz BETWEEN coalesce(d.unknown_since, d.due_at) - interval '15 minutes' AND coalesce(d.unknown_since, now()) + interval '15 minutes'`,
+        [String(post.chat.id), at]);
+      // Only an unambiguous single text match resolves an Unknown result.
+      const matches = cands.rows.filter((c) => { const mine = norm(c.rendered_text).slice(0, 120); return mine.length > 0 && text.startsWith(mine); });
+      if (matches.length === 1 && await withTx((tx) => confirm(tx, matches[0]!.id, String(post.message_id!), 'Confirmed by the Telegram channel update.'), db)) confirmed++;
+    }
+  }
+  const state = confirmed ? 'processed' : 'ignored';
+  await db.query(`UPDATE webhook_receipts SET processing_state=$2, processed_at=now() WHERE id=$1`, [receiptId, state]);
+  return { confirmed, state };
 }

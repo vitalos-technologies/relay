@@ -94,6 +94,11 @@ async function main(): Promise<void> {
     }),
     every('reconcile', 15_000, async () => { if (await dispatchEnabled()) { for (let i = 0; i < 10 && (await reconcileOne(deps, WORKER_ID)); i++) { /* continue */ } } }),
     every('health', 10 * 60_000, () => runHealthChecks(25)),
+    // V1.1 analytics: daily provider metrics refresh (claims per delivery; X reads are budget-metered).
+    every('metrics', 60 * 60_000, async () => {
+      const { liveAnalyticsDeps, runDailyMetricsRefresh } = await import('@social-lite/services/analytics/index');
+      await runDailyMetricsRefresh(await liveAnalyticsDeps(), { limit: 200 });
+    }),
     every('retention', 60 * 60_000, async () => {
       await pool.query(`UPDATE webhook_receipts SET body=NULL WHERE body IS NOT NULL AND received_at < now() - interval '7 days'`);
       await pool.query(`DELETE FROM idempotency_keys WHERE expires_at < now()`);

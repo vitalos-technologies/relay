@@ -49,6 +49,11 @@ const DELIVERY_MESSAGES: Partial<Record<string, { severity: Severity; title: (p:
 };
 
 export async function handleEvent(evt: { event_type: string; workspace_id: string | null; aggregate_id: string; payload: Record<string, unknown> }, db: Queryable = getPool()): Promise<void> {
+  if (evt.event_type === 'webhook.received') {
+    const { processWebhookReceipt } = await import('../webhooks.js');
+    await processWebhookReceipt(evt.aggregate_id);
+    return;
+  }
   if (!evt.workspace_id) return;
   switch (evt.event_type) {
     case 'delivery.state_changed': {
