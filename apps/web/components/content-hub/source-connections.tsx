@@ -97,7 +97,8 @@ function SourceBlock({ status, connections, onChanged }: { status: ContentHubSou
 }
 
 /** Settings content for Google Drive & Docs + Notion sources. */
-export function SourceConnectionsSettings() {
+/** Settings → Connections → Google Drive and Docs / Notion. `source` shows one provider's page; omitted shows both. */
+export function SourceConnectionsSettings({ source }: { source?: 'google' | 'notion' } = {}) {
   const [params] = useQueryState();
   const status = useApi<ContentHubSourceStatus[]>('/api/content-hub/status');
   const conns = useApi<ContentConnectionDto[]>('/api/content-hub/connections');
@@ -109,7 +110,7 @@ export function SourceConnectionsSettings() {
       {error ? <Banner tone="danger" title={ERRORS[error] ?? 'The connection could not be completed.'} /> : null}
       {params.get('connected') ? <Banner tone="success" title="Connected" /> : null}
       <p className="text-[13px] text-muted">Relay only reads items you pick. Imports are private copies; source sharing is never changed.</p>
-      {status.data.map((s) => <SourceBlock key={s.source} status={s} connections={conns.data!.filter((c) => c.source === s.source)} onChanged={() => void conns.refetch()} />)}
+      {status.data.filter((s) => !source || s.source === source).map((s) => <SourceBlock key={s.source} status={s} connections={conns.data!.filter((c) => c.source === s.source)} onChanged={() => void conns.refetch()} />)}
     </div>
   );
 }

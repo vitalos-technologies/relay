@@ -208,7 +208,7 @@ async function summariesFor(db: Queryable, posts: PostRow[]) {
   });
 }
 
-export async function listPosts(ctx: Ctx, brandId: string, q: { q?: string; tag?: string; cursor?: string; limit?: number; archived?: boolean }) {
+export async function listPosts(ctx: Ctx, brandId: string, q: { q?: string; tag?: string; cursor?: string; limit?: number; archived?: boolean; status?: string }) {
   const db = getPool();
   await assertBrand(ctx, brandId, db);
   const limit = Math.min(Math.max(q.limit ?? 30, 1), 100);
@@ -216,6 +216,11 @@ export async function listPosts(ctx: Ctx, brandId: string, q: { q?: string; tag?
   let where = `workspace_id=$1 AND brand_id=$2 AND deleted_at IS NULL AND archived_at IS ${q.archived ? 'NOT ' : ''}NULL`;
   if (q.q) { params.push(`%${q.q.slice(0, 100)}%`); where += ` AND (title ILIKE $${params.length} OR draft->>'baseText' ILIKE $${params.length})`; }
   if (q.tag) { params.push(q.tag); where += ` AND $${params.length} = ANY(tags)`; }
+  // status=draft: never scheduled or submitted (same rule as the summary's 'draft' status).
+  if (q.status) {
+    if (q.status !== 'draft') throw new AppError('validation_failed', 'Unsupported status filter', { status: 'Use draft' });
+    where += ` AND NOT EXISTS (SELECT 1 FROM schedules s WHERE s.post_id=posts.id)`;
+  }
   if (q.cursor) {
     const [ts, id] = Buffer.from(q.cursor, 'base64url').toString().split('|');
     params.push(ts, id); where += ` AND (updated_at, id) < ($${params.length - 1}::timestamptz, $${params.length}::uuid)`;

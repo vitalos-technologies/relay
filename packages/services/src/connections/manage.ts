@@ -34,25 +34,38 @@ export interface ProviderStatusJson {
   required_scopes: string[]; mock_available: boolean; notes: string;
 }
 
+/** Which settings each OAuth provider needs (keys as in settings.ts; secrets are never returned). */
+const PROVIDER_KEYS: Partial<Record<Provider, { id: string; secret?: string; note: string }>> = {
+  facebook: { id: 'META_APP_ID', secret: 'META_APP_SECRET', note: 'Needs a Meta app with Facebook Login for Business; register this callback URL as a Valid OAuth Redirect URI.' },
+  instagram: { id: 'META_APP_ID', secret: 'META_APP_SECRET', note: 'Needs a Meta app with Facebook Login for Business; register this callback URL as a Valid OAuth Redirect URI.' },
+  x: { id: 'X_CLIENT_ID', note: 'Needs an X developer app with OAuth 2.0 enabled (Web App, Read and write), this callback URL registered, and pay-per-use credits. Set X_CLIENT_SECRET for confidential clients. Each post, media upload and read is billed by X.' },
+  tiktok: { id: 'TIKTOK_CLIENT_KEY', secret: 'TIKTOK_CLIENT_SECRET', note: 'Needs a TikTok developer app with Login Kit and Content Posting API; unaudited apps post privately (see Setup → TikTok).' },
+  youtube: { id: 'GOOGLE_CLIENT_ID', secret: 'GOOGLE_CLIENT_SECRET', note: 'Needs a Google Cloud OAuth client with the YouTube Data API enabled; register this callback URL.' },
+  linkedin: { id: 'LINKEDIN_CLIENT_ID', secret: 'LINKEDIN_CLIENT_SECRET', note: 'Needs a LinkedIn app with Share on LinkedIn; organization posting needs Community Management API approval.' },
+  threads: { id: 'THREADS_APP_ID', secret: 'THREADS_APP_SECRET', note: 'Needs a Meta app with the Threads use case; register this callback URL.' },
+  pinterest: { id: 'PINTEREST_APP_ID', secret: 'PINTEREST_APP_SECRET', note: 'Needs a Pinterest app; trial access keeps Pins visible only to you until Pinterest approves standard access.' },
+};
+
 export async function listProviderStatus(_ctx: Ctx): Promise<{ items: ProviderStatusJson[] }> {
   const mock = mockProvidersEnabled();
   const items: ProviderStatusJson[] = [];
   for (const provider of PROVIDERS) {
-    if (provider === 'telegram') {
+    if (provider === 'telegram' || provider === 'bluesky') {
       items.push({
         provider, configured: true, missing: [], callback_url: null, required_scopes: [], mock_available: mock,
-        notes: 'No app setup needed. Create a bot with @BotFather, add it to your channel as an administrator with "Post Messages", then connect with its token.',
+        notes: provider === 'telegram'
+          ? 'No app setup needed. Create a bot with @BotFather, add it to your channel as an administrator with "Post Messages", then connect with its token.'
+          : 'No app setup needed. Connect with the account handle and an app password (Bluesky → Settings → Privacy and security → App passwords).',
       });
       continue;
     }
+    const keys = PROVIDER_KEYS[provider];
     const cfg = await providerAppConfig(provider);
     const connector = oauthConnectorFor(provider);
     const missing: string[] = [];
-    if (provider === 'x') {
-      if (!cfg.clientId) missing.push('X_CLIENT_ID');
-    } else {
-      if (!cfg.clientId) missing.push('META_APP_ID');
-      if (!cfg.clientSecret) missing.push('META_APP_SECRET');
+    if (keys) {
+      if (!cfg.clientId) missing.push(keys.id);
+      if (keys.secret && !cfg.clientSecret) missing.push(keys.secret);
     }
     items.push({
       provider,
@@ -61,9 +74,7 @@ export async function listProviderStatus(_ctx: Ctx): Promise<{ items: ProviderSt
       callback_url: oauthRedirectUri(provider),
       required_scopes: connector ? [...connector.requiredScopes] : [],
       mock_available: mock,
-      notes: provider === 'x'
-        ? 'Needs an X developer app with OAuth 2.0 enabled (Web App, Read and write), this callback URL registered, and pay-per-use credits. Set X_CLIENT_SECRET for confidential clients. Each post, media upload and read is billed by X.'
-        : 'Needs a Meta app with Facebook Login for Business; register this callback URL as a Valid OAuth Redirect URI.',
+      notes: keys?.note ?? '',
     });
   }
   return { items };

@@ -9,7 +9,7 @@ const body = z.object({ title: z.string().max(200).optional(), template_id: z.st
 
 export const GET = route<{ id: string }>(async ({ req, ctx, params }) => {
   const q = req.nextUrl.searchParams;
-  return listPosts(ctx, params.id, { q: q.get('q') ?? undefined, tag: q.get('tag') ?? undefined, cursor: q.get('cursor') ?? undefined, limit: Number(q.get('limit')) || undefined, archived: q.get('archived') === '1' });
+  return listPosts(ctx, params.id, { q: q.get('q') ?? undefined, tag: q.get('tag') ?? undefined, cursor: q.get('cursor') ?? undefined, limit: Number(q.get('limit')) || undefined, archived: q.get('archived') === '1', status: q.get('status') ?? undefined });
 });
 export const POST = route<{ id: string }>(async ({ req, ctx, params }) => {
   const r = await createPost(ctx, params.id, await parseJson(req, body), idempotencyKey(req));
