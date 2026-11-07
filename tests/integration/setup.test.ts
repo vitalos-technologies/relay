@@ -7,7 +7,7 @@ import { getSetting } from '../../packages/services/src/settings.js';
 import { ensureBucket } from '../../packages/services/src/storage.js';
 import { addMember, closeTestPool, createUser, ctxFor, tenant, testPool } from './helpers.js';
 
-const KEYS = ['META_APP_ID', 'META_APP_SECRET', 'ANTHROPIC_API_KEY', 'OIDC_ISSUER', 'TELEGRAM_WEBHOOK_SECRET'];
+const KEYS = ['META_APP_ID', 'META_APP_SECRET', 'ANTHROPIC_API_KEY', 'OIDC_ISSUER', 'TELEGRAM_WEBHOOK_SECRET', 'GOOGLE_CONTENT_CLIENT_SECRET', 'NOTION_CLIENT_SECRET', 'NOTION_INTERNAL_TOKEN'];
 const saved = Object.fromEntries(KEYS.map((k) => [k, process.env[k]]));
 let t: Awaited<ReturnType<typeof tenant>>;
 
@@ -28,9 +28,13 @@ describe('setup', () => {
   it('reports grouped readiness and never returns secret values', async () => {
     delete process.env.META_APP_ID; delete process.env.META_APP_SECRET; delete process.env.ANTHROPIC_API_KEY;
     process.env.TELEGRAM_WEBHOOK_SECRET = 'env-telegram-secret-value-123';
+    // V3 Content Hub secrets (Google Drive & Docs, Notion) are write-only too.
+    process.env.GOOGLE_CONTENT_CLIENT_SECRET = 'env-google-content-secret-456';
+    process.env.NOTION_CLIENT_SECRET = 'env-notion-client-secret-789';
+    process.env.NOTION_INTERNAL_TOKEN = 'ntn_envinternaltokenvalue0123456789';
     resetConfigCache();
     const { groups } = await getSetup(t.ownerCtx);
-    expect(groups.map((g) => g.id)).toEqual(['core', 'identity', 'storage', 'email', 'meta', 'telegram', 'x', 'tiktok', 'youtube', 'linkedin', 'threads', 'pinterest', 'ai', 'tipsignal']);
+    expect(groups.map((g) => g.id)).toEqual(['core', 'identity', 'storage', 'email', 'meta', 'telegram', 'x', 'tiktok', 'youtube', 'linkedin', 'threads', 'pinterest', 'google_content', 'notion', 'ai', 'tipsignal']);
     const all = groups.flatMap((g) => g.items);
     const item = (k: string) => all.find((i) => i.key === k)!;
     expect(item('APP_BASE_URL')).toMatchObject({ source: 'env', is_set: true, value: 'http://localhost:3000', editable: false });
@@ -39,6 +43,10 @@ describe('setup', () => {
     expect(item('TELEGRAM_WEBHOOK_SECRET')).toMatchObject({ source: 'env', is_set: true, editable: false });
     expect(item('META_APP_SECRET')).toMatchObject({ source: null, is_set: false, editable: true, secret: true });
     expect(JSON.stringify(groups)).not.toContain('env-telegram-secret-value-123');
+    for (const v of ['env-google-content-secret-456', 'env-notion-client-secret-789', 'ntn_envinternaltokenvalue0123456789']) expect(JSON.stringify(groups)).not.toContain(v);
+    expect(item('NOTION_CLIENT_SECRET')).toMatchObject({ source: 'env', is_set: true, secret: true, editable: false });
+    expect(item('NOTION_CLIENT_SECRET').value).toBeUndefined();
+    expect(item('GOOGLE_CONTENT_CLIENT_SECRET').value).toBeUndefined();
     expect(JSON.stringify(groups)).not.toContain(process.env.KEY_ENCRYPTION_KEYS!.split(':')[1]);
     expect(groups.find((g) => g.id === 'meta')!.ready).toBe(false);
 
@@ -48,11 +56,15 @@ describe('setup', () => {
     expect(put.value).toBeUndefined();
     expect(await putSetup(t.ownerCtx, 'META_APP_ID', '1234567890')).toMatchObject({ value: '1234567890', source: 'setup' });
     expect(await getSetting('META_APP_SECRET')).toBe(secret);
+    const webhookSecret = 'notion-webhook-verification-secret-xyz';
+    expect((await putSetup(t.ownerCtx, 'NOTION_WEBHOOK_VERIFICATION_TOKEN', webhookSecret)).value).toBeUndefined();
     const after = await getSetup(t.ownerCtx);
     expect(JSON.stringify(after)).not.toContain(secret);
+    expect(JSON.stringify(after)).not.toContain(webhookSecret);
     expect(after.groups.find((g) => g.id === 'meta')!.ready).toBe(true);
     const audit = await testPool().query<{ diff: unknown }>(`SELECT diff FROM audit_events WHERE workspace_id=$1 AND action='setup.updated'`, [t.workspaceId]);
-    expect(audit.rowCount).toBe(2);
+    expect(audit.rowCount).toBe(3);
+    expect(JSON.stringify(audit.rows)).not.toContain(webhookSecret);
     expect(JSON.stringify(audit.rows)).not.toContain(secret);
 
     // Clearing works; invalid values and env-provided/env-only keys are refused.

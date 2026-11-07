@@ -7,6 +7,7 @@ import { api } from '@/lib/client/api';
 import { useSession } from '@/lib/client/session';
 import { useApi } from '@/lib/client/use-api';
 import { CsvImportDialog } from '@/components/import/csv-import-dialog';
+import { SourceImportButton } from '@/components/content-hub/source-import-button';
 import { useBrandFilter } from '@/lib/client/hooks';
 import { fmtRelative, postTitle } from '@/lib/client/format';
 import type { Page, PostDetail, PostSummary, Template } from '@/lib/client/types';
@@ -89,6 +90,7 @@ export default function ComposePage() {
                 Create draft <ArrowRight aria-hidden className="size-4" />
               </Button>
               <CsvImportDialog brandId={brandId} />
+              <SourceImportButton brandId={brandId} />
             </div>
           </div>
         </Card>

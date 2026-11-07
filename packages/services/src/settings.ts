@@ -16,6 +16,9 @@ export const SETTING_KEYS = [
   'LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET', 'LINKEDIN_API_VERSION', 'LINKEDIN_ORGANIZATIONS',
   'THREADS_APP_ID', 'THREADS_APP_SECRET',
   'PINTEREST_APP_ID', 'PINTEREST_APP_SECRET', 'PINTEREST_ACCESS_TIER',
+  // V3 Content Hub (docs/V3_CONTENT_INTEGRATIONS.md): Google Drive/Docs content connection (separate from YouTube) + Notion.
+  'GOOGLE_CONTENT_CLIENT_ID', 'GOOGLE_CONTENT_CLIENT_SECRET', 'GOOGLE_PICKER_API_KEY', 'GOOGLE_PICKER_APP_ID',
+  'NOTION_CLIENT_ID', 'NOTION_CLIENT_SECRET', 'NOTION_INTERNAL_TOKEN', 'NOTION_WEBHOOK_VERIFICATION_TOKEN',
 ] as const;
 export type SettingKey = (typeof SETTING_KEYS)[number];
 
@@ -23,7 +26,7 @@ export interface SettingDef {
   key: SettingKey;
   label: string;
   secret: boolean;
-  group: 'meta' | 'x' | 'telegram' | 'ai' | 'tipsignal' | 'tiktok' | 'youtube' | 'linkedin' | 'threads' | 'pinterest';
+  group: 'meta' | 'x' | 'telegram' | 'ai' | 'tipsignal' | 'tiktok' | 'youtube' | 'linkedin' | 'threads' | 'pinterest' | 'google_content' | 'notion';
   hint: string;
   /** Validates a value entered on the setup page. Returns an error message or null. */
   validate?: (v: string) => string | null;
@@ -67,6 +70,16 @@ export const SETTING_DEFS: Record<SettingKey, SettingDef> = {
   THREADS_APP_SECRET: { key: 'THREADS_APP_SECRET', label: 'Threads app secret', secret: true, group: 'threads', hint: 'Threads app secret. Stored encrypted; never shown again.', validate: noWhitespace },
   PINTEREST_APP_ID: { key: 'PINTEREST_APP_ID', label: 'Pinterest app ID', secret: false, group: 'pinterest', hint: `developers.pinterest.com → My apps. ${cb('pinterest')}`, validate: (v) => (/^\d{3,25}$/.test(v) ? null : 'Pinterest app IDs are numeric'), docsUrl: 'https://developers.pinterest.com/apps/' },
   PINTEREST_APP_SECRET: { key: 'PINTEREST_APP_SECRET', label: 'Pinterest app secret key', secret: true, group: 'pinterest', hint: 'Stored encrypted; never shown again.', validate: noWhitespace },
+  // ---- V3 Content Hub
+  GOOGLE_CONTENT_CLIENT_ID: { key: 'GOOGLE_CONTENT_CLIENT_ID', label: 'Google OAuth client ID (Drive & Docs)', secret: false, group: 'google_content', hint: `Optional dedicated Web client for the Drive/Docs content connection (falls back to the YouTube client). Enable Google Drive API, Google Docs API and Google Picker API. Redirect URI: <APP_BASE_URL>/api/content-hub/oauth/google/callback. Scope requested: drive.file only.`,
+    validate: (v) => (/^[\w-]+\.apps\.googleusercontent\.com$/.test(v) ? null : 'Google client IDs end with .apps.googleusercontent.com'), docsUrl: 'https://console.cloud.google.com/apis/credentials' },
+  GOOGLE_CONTENT_CLIENT_SECRET: { key: 'GOOGLE_CONTENT_CLIENT_SECRET', label: 'Google OAuth client secret (Drive & Docs)', secret: true, group: 'google_content', hint: 'Stored encrypted; never shown again.', validate: noWhitespace },
+  GOOGLE_PICKER_API_KEY: { key: 'GOOGLE_PICKER_API_KEY', label: 'Google Picker API key', secret: false, group: 'google_content', hint: 'Browser API key (restrict to your app origin and the Picker API). Used only by the file picker in the browser.', validate: noWhitespace },
+  GOOGLE_PICKER_APP_ID: { key: 'GOOGLE_PICKER_APP_ID', label: 'Google Cloud project number (Picker app ID)', secret: false, group: 'google_content', hint: 'Project number of the Cloud project that owns the OAuth client (Picker setAppId).', validate: (v) => (/^\d{6,20}$/.test(v) ? null : 'Use the numeric project number') },
+  NOTION_CLIENT_ID: { key: 'NOTION_CLIENT_ID', label: 'Notion OAuth client ID', secret: false, group: 'notion', hint: 'Public connection → OAuth client ID. Redirect URI: <APP_BASE_URL>/api/content-hub/oauth/notion/callback. Capabilities: read content (+ update/insert content only if you use writeback/exports).', validate: noWhitespace, docsUrl: 'https://www.notion.so/profile/integrations' },
+  NOTION_CLIENT_SECRET: { key: 'NOTION_CLIENT_SECRET', label: 'Notion OAuth client secret', secret: true, group: 'notion', hint: 'Stored encrypted; never shown again.', validate: noWhitespace },
+  NOTION_INTERNAL_TOKEN: { key: 'NOTION_INTERNAL_TOKEN', label: 'Notion internal token (test installs)', secret: true, group: 'notion', hint: 'Internal connection token for a single internal test workspace only. Not available in production; use public OAuth for customers.', validate: (v) => (/^(secret_|ntn_)[A-Za-z0-9]{20,}$/.test(v) ? null : 'Notion internal tokens start with ntn_ or secret_') },
+  NOTION_WEBHOOK_VERIFICATION_TOKEN: { key: 'NOTION_WEBHOOK_VERIFICATION_TOKEN', label: 'Notion webhook verification token', secret: true, group: 'notion', hint: 'Optional. The verification_token Notion sent to <APP_BASE_URL>/api/webhooks/notion; used to verify X-Notion-Signature.', validate: (v) => (v.length >= 16 ? null : 'Use the full token') },
   PINTEREST_ACCESS_TIER: { key: 'PINTEREST_ACCESS_TIER', label: 'Pinterest access tier', secret: false, group: 'pinterest', hint: 'trial (default: Pins visible only to you) or standard (after Pinterest approved the upgrade).', validate: (v) => (/^(trial|standard)$/.test(v) ? null : 'Use trial or standard') },
 };
 

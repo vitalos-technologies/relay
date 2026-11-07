@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Archive, CircleCheck, FileText, Hourglass, ImageOff, Images, OctagonX, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { Archive, CircleCheck, FileText, FolderInput, Hourglass, ImageOff, Images, OctagonX, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { api, isApiError } from '@/lib/client/api';
 import { useSession } from '@/lib/client/session';
 import { useApi } from '@/lib/client/use-api';
@@ -12,12 +12,13 @@ import {
   PageHeader, Pagination, Select, Skeleton, Tabs, TabsContent, TabsList, TabsTrigger, Textarea, useToast,
 } from '@/components/ui';
 import { UploadDropzone } from '@/components/library/upload-dropzone';
+import { ContentHubPanel } from '@/components/content-hub/content-hub-panel';
 
 export default function LibraryPage() {
   const { session } = useSession();
   const [brandFilter] = useBrandFilter();
   const [params, setParams] = useQueryState();
-  const tab = params.get('tab') === 'templates' ? 'templates' : 'assets';
+  const tab = params.get('tab') === 'templates' ? 'templates' : params.get('tab') === 'sources' ? 'sources' : 'assets';
   const [localBrand, setLocalBrand] = useState(session.brands[0]?.id ?? '');
   const brandId = brandFilter || localBrand;
 
@@ -47,9 +48,11 @@ export default function LibraryPage() {
         <TabsList label="Library sections">
           <TabsTrigger value="assets"><Images aria-hidden className="size-4" /> Media</TabsTrigger>
           <TabsTrigger value="templates"><FileText aria-hidden className="size-4" /> Templates</TabsTrigger>
+          <TabsTrigger value="sources"><FolderInput aria-hidden className="size-4" /> Sources</TabsTrigger>
         </TabsList>
         <TabsContent value="assets">{brandId ? <AssetsTab brandId={brandId} key={brandId} /> : null}</TabsContent>
         <TabsContent value="templates">{brandId ? <TemplatesTab brandId={brandId} key={brandId} /> : null}</TabsContent>
+        <TabsContent value="sources">{brandId ? <ContentHubPanel brandId={brandId} key={brandId} /> : null}</TabsContent>
       </Tabs>
     </>
   );

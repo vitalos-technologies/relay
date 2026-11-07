@@ -68,6 +68,9 @@ const PROVIDER_GROUPS: Array<{ id: string; title: string; group: string }> = [
   { id: 'linkedin', title: 'LinkedIn', group: 'linkedin' },
   { id: 'threads', title: 'Threads', group: 'threads' },
   { id: 'pinterest', title: 'Pinterest', group: 'pinterest' },
+  // V3 Content Hub sources (not social destinations).
+  { id: 'google_content', title: 'Google Drive & Docs', group: 'google_content' },
+  { id: 'notion', title: 'Notion', group: 'notion' },
   { id: 'ai', title: 'AI assistance', group: 'ai' },
   { id: 'tipsignal', title: 'TipSignal', group: 'tipsignal' },
 ];
