@@ -55,6 +55,16 @@ export function setCsrfRefresher(fn: (() => Promise<string | null>) | null) {
 // Idempotency keys kept per (method, path, body) until the action reaches a definitive outcome,
 // so a retry of the *same* user action reuses its key and a changed request gets a new one.
 const pendingKeys = new Map<string, string>();
+export function clearPendingKeys() {
+  pendingKeys.clear();
+}
+
+// The workspace this tab rendered. Sent as X-Workspace-Id so the server can refuse requests from a tab
+// that is still showing another workspace (it is never authority; see workspace-sync.ts).
+let expectedWorkspace: string | null = null;
+export function setExpectedWorkspace(id: string | null) {
+  expectedWorkspace = id;
+}
 
 export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -81,6 +91,17 @@ export function withQuery(path: string, query?: RequestOptions['query']): string
 function newKey(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
   return `k-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+/** Re-verify at the identity provider (password + second factor) and come back here. */
+export function stepUpHref(returnTo?: string): string {
+  const here = returnTo ?? (typeof window === 'undefined' ? '/' : window.location.pathname + window.location.search);
+  return `/api/auth/step-up?returnTo=${encodeURIComponent(here)}`;
+}
+
+export function redirectToStepUp() {
+  if (typeof window === 'undefined') return;
+  window.location.assign(stepUpHref());
 }
 
 export function redirectToLogin() {
@@ -133,6 +154,7 @@ export async function apiFetch<T>(path: string, opts: RequestOptions = {}): Prom
     if (bodyJson !== undefined) headers['Content-Type'] = 'application/json';
     if (mutating && csrfToken) headers['X-CSRF-Token'] = csrfToken;
     if (idemKey) headers['Idempotency-Key'] = idemKey;
+    if (expectedWorkspace && !url.startsWith('/api/session')) headers['X-Workspace-Id'] = expectedWorkspace;
     return fetch(url, { method, headers, body: bodyJson, credentials: 'same-origin', signal: opts.signal, cache: 'no-store' });
   };
 
@@ -170,9 +192,19 @@ export async function apiFetch<T>(path: string, opts: RequestOptions = {}): Prom
   }
 
   const err = await parseError(res);
+  // Workspace switched in another tab: drop everything and reload into the active workspace.
+  if (err.code === 'conflict' && err.details?.reason === 'workspace_changed' && typeof window !== 'undefined') {
+    pendingKeys.clear();
+    expectedWorkspace = null;
+    window.location.replace('/');
+  }
   // Definitive outcomes clear the key; transient ones keep it so a retry is deduplicated server-side.
   if (keyId && !err.isTransient) pendingKeys.delete(keyId);
-  if (res.status === 401 && opts.redirectOn401 !== false) redirectToLogin();
+  // Sensitive action needs fresh authentication (401 step_up_required) or a verified second factor
+  // (403 mfa_required): send the user to verify at the identity provider, then back to this page.
+  if (err.code === 'step_up_required' && opts.redirectOn401 !== false) redirectToStepUp();
+  else if (err.code === 'mfa_required' && mutating && opts.redirectOn401 !== false) redirectToStepUp();
+  else if (res.status === 401 && opts.redirectOn401 !== false) redirectToLogin();
   throw err;
 }
 

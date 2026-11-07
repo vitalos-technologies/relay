@@ -1,6 +1,7 @@
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
+import { headers } from 'next/headers';
 import localFont from 'next/font/local';
 import { GeistMono } from 'geist/font/mono';
 import { BRAND } from '@social-lite/core';
@@ -32,11 +33,13 @@ export const viewport: Viewport = {
 // Applies the saved theme choice before first paint (no flash). Static string, no user input.
 const THEME_BOOT = `try{var t=localStorage.getItem('sl-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}`;
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  // Per-request CSP nonce from proxy.ts (pages are rendered dynamically so every response gets a fresh nonce).
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
   return (
     <html lang="en-GB" className={`${inter.variable} ${GeistMono.variable}`} suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
       </head>
       <body className="bg-bg text-fg antialiased">{children}</body>
     </html>

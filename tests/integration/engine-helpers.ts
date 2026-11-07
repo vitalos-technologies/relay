@@ -18,6 +18,11 @@ export const CAPS: Record<Provider, ChannelCapabilities> = {
   facebook: { ...base, provider: 'facebook', formats: ['text', 'image'], constraints: { maxTextLength: 60000, maxCaptionLength: 60000, textCounting: 'codepoints', requiresMedia: false, supportsTextOnly: true, supportsLink: true, supportsButtons: false, maxButtons: 0, maxImages: 1, imageMimes: ['image/jpeg', 'image/png'], maxImageBytes: 10 << 20 } },
   telegram: { ...base, provider: 'telegram', formats: ['text', 'image'], canReconcile: false, constraints: { maxTextLength: 4096, maxCaptionLength: 1024, textCounting: 'utf16', requiresMedia: false, supportsTextOnly: true, supportsLink: true, supportsButtons: true, maxButtons: 8, maxImages: 1, imageMimes: ['image/jpeg', 'image/png'], maxImageBytes: 10 << 20 } },
   x: { ...base, provider: 'x', formats: ['text', 'image'], constraints: { maxTextLength: 280, maxCaptionLength: 280, textCounting: 'x_weighted', requiresMedia: false, supportsTextOnly: true, supportsLink: true, supportsButtons: false, maxButtons: 0, maxImages: 1, imageMimes: ['image/jpeg', 'image/png'], maxImageBytes: 5 << 20 } },
+  // V3 providers (not seeded by default; present so the map covers every Provider).
+  ...Object.fromEntries((['tiktok', 'youtube', 'linkedin', 'threads', 'pinterest', 'bluesky'] as const).map((p) => [p, {
+    ...base, provider: p, formats: ['text', 'image'],
+    constraints: { maxTextLength: 300, maxCaptionLength: 300, textCounting: 'codepoints', requiresMedia: false, supportsTextOnly: true, supportsLink: true, supportsButtons: false, maxButtons: 0, maxImages: 1, imageMimes: ['image/jpeg', 'image/png'], maxImageBytes: 5 << 20 },
+  } satisfies ChannelCapabilities])) as Record<'tiktok' | 'youtube' | 'linkedin' | 'threads' | 'pinterest' | 'bluesky', ChannelCapabilities>,
 };
 
 export async function seedConnections(workspaceId: string, brandId: string): Promise<Record<Provider, string>> {

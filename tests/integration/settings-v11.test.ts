@@ -5,7 +5,7 @@ import {
 } from '@social-lite/services/integrations/index';
 import { checkAndConsumeBudget } from '@social-lite/services';
 import { withTx } from '@social-lite/db';
-import { addMember, closeTestPool, createUser, ctxFor, tenant, testPool } from './helpers.js';
+import { addMember, closeTestPool, createBrand, createUser, ctxFor, tenant, testPool, v2Ctx } from './helpers.js';
 
 afterAll(async () => {
   await testPool().query(`DELETE FROM integration_bindings WHERE kind='tipsignal'`);
@@ -21,40 +21,52 @@ async function withMembers() {
   return { t, admin, editor, viewer, adminCtx: ctxFor(admin.id, t.workspaceId, 'admin'), editorCtx: ctxFor(editor.id, t.workspaceId, 'editor') };
 }
 
-describe('TipSignal binding', () => {
-  it('owner binds/unbinds; non-owners denied; secret status only; audited', async () => {
-    const { t, editor, viewer, adminCtx, editorCtx } = await withMembers();
+describe('TipSignal binding (V2: service-account principal)', () => {
+  it('owner binds/unbinds; non-owners denied; secret status only; binding = integration grant on one brand; audited', async () => {
+    const { t, editor, adminCtx, editorCtx } = await withMembers();
+    const owner = await v2Ctx(t.owner.id, t.workspaceId);
     await expect(getTipsignalBinding(adminCtx)).rejects.toMatchObject({ code: 'forbidden' });
-    await expect(setTipsignalBinding(adminCtx, { brand_id: t.brandId, acting_user_id: editor.id })).rejects.toMatchObject({ code: 'forbidden' });
-    await expect(setTipsignalBinding(editorCtx, { brand_id: t.brandId, acting_user_id: editor.id })).rejects.toMatchObject({ code: 'forbidden' });
-    const empty = await getTipsignalBinding(t.ownerCtx);
+    await expect(setTipsignalBinding(adminCtx, { brand_id: t.brandId })).rejects.toMatchObject({ code: 'forbidden' });
+    await expect(setTipsignalBinding(editorCtx, { brand_id: t.brandId })).rejects.toMatchObject({ code: 'forbidden' });
+    // Owner without verified MFA: security.manage is sensitive.
+    await expect(setTipsignalBinding(await v2Ctx(t.owner.id, t.workspaceId, { mfaVerified: false }), { brand_id: t.brandId })).rejects.toMatchObject({ code: 'mfa_required' });
+    const empty = await getTipsignalBinding(owner);
     expect(empty.binding).toBeNull();
     expect(Object.keys(empty.signing_secret).sort()).toEqual(['is_set', 'source']);
     expect(JSON.stringify(empty)).not.toMatch(/value_secret|ciphertext/);
-    await expect(setTipsignalBinding(t.ownerCtx, { brand_id: t.brandId, acting_user_id: viewer.id })).rejects.toMatchObject({ code: 'validation_failed' });
-    const bound = await setTipsignalBinding(t.ownerCtx, { brand_id: t.brandId, acting_user_id: editor.id });
-    expect(bound.binding).toMatchObject({ brand_id: t.brandId, acting_user_id: editor.id, acting_email: editor.email });
-    const rebound = await setTipsignalBinding(t.ownerCtx, { brand_id: t.brandId, acting_user_id: t.owner.id });
-    expect(rebound.binding?.acting_user_id).toBe(t.owner.id);
-    const un = await deleteTipsignalBinding(t.ownerCtx);
+    const bound = await setTipsignalBinding(owner, { brand_id: t.brandId });
+    expect(bound.binding).toMatchObject({ brand_id: t.brandId, service_account: { name: 'TipSignal', owner_user_id: t.owner.id, active: true, permissions: ['Create drafts'] } });
+    const saId = bound.binding!.service_account.id;
+    const grants = await testPool().query(`SELECT role, scope_type, brand_id FROM scoped_role_grants WHERE service_account_id=$1 AND revoked_at IS NULL`, [saId]);
+    expect(grants.rows).toEqual([{ role: 'integration', scope_type: 'brand', brand_id: t.brandId }]);
+    const brand2 = await createBrand(t.workspaceId, 'Second');
+    const rebound = await setTipsignalBinding(owner, { brand_id: brand2, owner_user_id: editor.id });
+    expect(rebound.binding).toMatchObject({ brand_id: brand2, service_account: { id: saId, owner_user_id: editor.id } });
+    const g2 = await testPool().query(`SELECT brand_id FROM scoped_role_grants WHERE service_account_id=$1 AND revoked_at IS NULL`, [saId]);
+    expect(g2.rows).toEqual([{ brand_id: brand2 }]); // the old brand grant is revoked
+    const un = await deleteTipsignalBinding(owner);
     expect(un.binding).toBeNull();
-    await expect(deleteTipsignalBinding(t.ownerCtx)).rejects.toMatchObject({ code: 'not_found' });
+    const sa = await testPool().query(`SELECT disabled_at FROM service_accounts WHERE id=$1`, [saId]);
+    expect(sa.rows[0].disabled_at).not.toBeNull();
+    await expect(deleteTipsignalBinding(owner)).rejects.toMatchObject({ code: 'not_found' });
     const a = await testPool().query(`SELECT action FROM audit_events WHERE workspace_id=$1 AND resource_type='integration_binding' ORDER BY id`, [t.workspaceId]);
     expect(a.rows.map((r) => r.action)).toEqual(['integration.tipsignal.bound', 'integration.tipsignal.rebound', 'integration.tipsignal.unbound']);
   });
 
-  it('cross-tenant brand/member is 404; a binding owned by another workspace is a conflict and stays invisible', async () => {
+  it('cross-tenant brand/owner is 404; a binding owned by another workspace is a conflict and stays invisible', async () => {
     const a = await withMembers();
     const b = await withMembers();
-    await expect(setTipsignalBinding(a.t.ownerCtx, { brand_id: b.t.brandId, acting_user_id: a.editor.id })).rejects.toMatchObject({ code: 'not_found' });
-    await expect(setTipsignalBinding(a.t.ownerCtx, { brand_id: a.t.brandId, acting_user_id: b.editor.id })).rejects.toMatchObject({ code: 'not_found' });
-    await setTipsignalBinding(a.t.ownerCtx, { brand_id: a.t.brandId, acting_user_id: a.editor.id });
-    const view = await getTipsignalBinding(b.t.ownerCtx);
+    const aOwner = await v2Ctx(a.t.owner.id, a.t.workspaceId);
+    const bOwner = await v2Ctx(b.t.owner.id, b.t.workspaceId);
+    await expect(setTipsignalBinding(aOwner, { brand_id: b.t.brandId })).rejects.toMatchObject({ code: 'not_found' });
+    await expect(setTipsignalBinding(aOwner, { brand_id: a.t.brandId, owner_user_id: b.editor.id })).rejects.toMatchObject({ code: 'not_found' });
+    await setTipsignalBinding(aOwner, { brand_id: a.t.brandId });
+    const view = await getTipsignalBinding(bOwner);
     expect(view.binding).toBeNull();
     expect(view.bound_elsewhere).toBe(true);
     expect(JSON.stringify(view)).not.toContain(a.t.brandId);
-    await expect(setTipsignalBinding(b.t.ownerCtx, { brand_id: b.t.brandId, acting_user_id: b.editor.id })).rejects.toMatchObject({ code: 'conflict' });
-    await expect(deleteTipsignalBinding(b.t.ownerCtx)).rejects.toMatchObject({ code: 'not_found' });
+    await expect(setTipsignalBinding(bOwner, { brand_id: b.t.brandId })).rejects.toMatchObject({ code: 'conflict' });
+    await expect(deleteTipsignalBinding(bOwner)).rejects.toMatchObject({ code: 'not_found' });
   });
 });
 
@@ -64,7 +76,9 @@ describe('workspace budgets', () => {
     await expect(getWorkspaceLimits(editorCtx)).rejects.toMatchObject({ code: 'forbidden' });
     const initial = await getWorkspaceLimits(adminCtx);
     expect(initial.can_edit).toBe(false);
-    expect(initial.items.map((i) => [i.key, i.cap, i.used])).toEqual([['x_monthly_writes', null, 0], ['x_monthly_reads', null, 0], ['ai_monthly_tokens', null, 0]]);
+    // V2 (stream D): storage and export budgets join the V1.1 meters.
+    expect(initial.items.map((i) => [i.key, i.cap, i.used])).toEqual([['x_monthly_writes', null, 0], ['x_monthly_reads', null, 0], ['ai_monthly_tokens', null, 0],
+      ['storage_bytes', null, 0], ['monthly_exports', null, 0]]);
     await expect(updateWorkspaceLimits(adminCtx, { x_monthly_reads: 10 })).rejects.toMatchObject({ code: 'forbidden' });
     await expect(updateWorkspaceLimits(t.ownerCtx, { x_monthly_reads: -1 })).rejects.toThrow();
     await expect(updateWorkspaceLimits(t.ownerCtx, { unknown_key: 1 })).rejects.toThrow();

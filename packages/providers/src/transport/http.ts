@@ -15,14 +15,28 @@ export const PROVIDER_HOSTS = new Set([
   'upload.twitter.com',
   'x.com',
   'twitter.com',
+  // V3 (docs/providers/<provider>.md). Upload hosts come from provider responses and are still allow-listed.
+  'open.tiktokapis.com', 'open-upload.tiktokapis.com',
+  'www.googleapis.com', 'oauth2.googleapis.com', 'youtubeanalytics.googleapis.com',
+  'api.linkedin.com', 'www.linkedin.com',
+  'graph.threads.com', 'graph.threads.net',
+  'api.pinterest.com', 'pinterest-media-upload.s3-accelerate.amazonaws.com',
+  'bsky.social', 'public.api.bsky.app',
 ]);
+
+/** V3: host suffixes (Bluesky-hosted PDS instances, e.g. morel.us-east.host.bsky.network). */
+export const PROVIDER_HOST_SUFFIXES = ['.host.bsky.network'];
+
+function hostAllowed(host: string, allow: Set<string>, suffixes: readonly string[]): boolean {
+  return allow.has(host) || suffixes.some((s) => host.endsWith(s) && host.length > s.length);
+}
 
 const PRE_CONNECT_CODES = new Set(['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'UND_ERR_CONNECT_TIMEOUT', 'ENETUNREACH', 'EHOSTUNREACH']);
 
 export function redactProviderUrl(url: string): string {
   return url
     .replace(/\/bot\d+:[A-Za-z0-9_-]+/g, '/bot<redacted>')
-    .replace(/([?&](?:access_token|client_secret|code|refresh_token|input_token|appsecret_proof|fb_exchange_token)=)[^&#]*/gi, '$1<redacted>');
+    .replace(/([?&](?:access_token|client_secret|code|refresh_token|input_token|appsecret_proof|fb_exchange_token|upload_token|ut|sau|x-amz-signature|x-amz-security-token)=)[^&#]*/gi, '$1<redacted>');
 }
 
 export interface HttpTransportOptions {
@@ -43,7 +57,7 @@ export class HttpTransport implements Transport {
 
   async send(req: HttpRequest): Promise<HttpResponse> {
     const u = new URL(req.url);
-    if (u.protocol !== 'https:' || !this.allow.has(u.hostname)) {
+    if (u.protocol !== 'https:' || !hostAllowed(u.hostname, this.allow, this.opts.allowHosts ? [] : PROVIDER_HOST_SUFFIXES)) {
       throw new TransportError(`host not allowed: ${u.hostname}`, 'connect', false);
     }
     const started = Date.now();
@@ -53,7 +67,7 @@ export class HttpTransport implements Transport {
       const res = await fetch(req.url, {
         method: req.method,
         headers: req.headers,
-        body: req.body,
+        body: req.body as RequestInit['body'], // string | FormData | Uint8Array (V3 binary uploads)
         signal: ac.signal,
         redirect: 'manual', // never follow redirects to unvetted hosts
       });

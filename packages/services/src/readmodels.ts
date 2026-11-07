@@ -1,5 +1,5 @@
 // Read models: history (DE-04), CSV export, planner (bounded UTC range), home dashboard, operations.
-import { AppError, aggregateStatus, can, forbidden, type DeliveryState, type Provider } from '@social-lite/core';
+import { AppError, aggregateStatus, type DeliveryState, type Provider } from '@social-lite/core';
 import { getPool, many, maybeOne, one } from '@social-lite/db';
 import type { Ctx } from './context.js';
 import { DELIVERY_SELECT, deliveryJson, type DeliveryRow } from './posts/serialize.js';
@@ -165,7 +165,7 @@ export async function dashboard(ctx: Ctx, q: { brand_id?: string }) {
 
 /** Operational facts only — real counts with periods and denominators (spec §17). */
 export async function ops(ctx: Ctx) {
-  if (!can(ctx.access.role, 'diagnostics.read')) throw forbidden();
+  requireAction(ctx, 'diagnostics.read');
   const db = getPool();
   const ws = ctx.access.workspaceId;
   const counts = await many<{ state: string; is_mock: boolean; n: number }>(db,
@@ -183,7 +183,7 @@ export async function ops(ctx: Ctx) {
         WHERE d.workspace_id=$1 AND a.attempt_number=1 AND a.kind='automatic' AND a.started_at > now() - interval '7 days') x`, [ws]);
   const flag = await maybeOne<{ value: unknown }>(db, `SELECT value FROM system_flags WHERE key='dispatch_enabled'`);
   const circuits = await many<Record<string, unknown>>(db, `SELECT provider, state, failure_count, opened_until FROM provider_circuits`);
-  const usage = await many<{ meter: string; period: string; used: string }>(db, `SELECT meter, period, used FROM usage_counters WHERE workspace_id=$1 ORDER BY period DESC, meter`, [ws]);
+  const usage = await many<{ meter: string; period: string; used: string }>(db, `SELECT meter, period, used FROM usage_counters WHERE workspace_id=$1 AND team_id IS NULL ORDER BY period DESC, meter`, [ws]);
   const sum = (pred: (r: { state: string; is_mock: boolean }) => boolean) => counts.filter(pred).reduce((a, r) => a + r.n, 0);
   const finished = (mock: boolean) => sum((r) => r.is_mock === mock && ['published', 'failed', 'expired', 'unknown', 'blocked'].includes(r.state));
   const published = (mock: boolean) => sum((r) => r.is_mock === mock && r.state === 'published');

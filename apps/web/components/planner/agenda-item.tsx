@@ -23,12 +23,22 @@ export function AgendaItem({ item, brandName, actions, href }: { item: PlannerIt
         <div className="mt-1 flex min-w-0 items-center gap-2 text-xs text-muted">
           {brandName ? <span className="min-w-0 truncate">{brandName}</span> : null}
           <DestinationDots destinations={item.destinations} />
+          <OwnerMeta item={item} />
         </div>
       </div>
       <span className="hidden shrink-0 sm:block"><PostStatusBadge status={item.status} simulated={allMock} size="sm" /></span>
       {actions}
     </div>
   );
+}
+
+/** Calendar ownership: team · assignee · review stage (text, never colour alone). */
+export function OwnerMeta({ item }: { item: PlannerItem }) {
+  const parts = [item.team?.name, item.assignee ? (item.assignee.name || item.assignee.email) : null,
+    item.review && item.review.decision === 'pending' ? `Review ${item.review.stage_count > 1 ? `${item.review.stage}/${item.review.stage_count}` : 'pending'}` : null,
+    item.campaign?.name].filter(Boolean);
+  if (!parts.length) return null;
+  return <span className="min-w-0 truncate text-subtle">{parts.join(' · ')}</span>;
 }
 
 const DOT: Record<string, string> = {

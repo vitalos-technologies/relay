@@ -8,7 +8,7 @@ const T: Record<DeliveryState, DeliveryState[]> = {
   scheduled: ['preparing', 'blocked', 'paused', 'cancelled', 'expired', 'failed'],
   preparing: ['publishing', 'retry_wait', 'scheduled', 'processing', 'blocked', 'paused', 'cancelled', 'expired', 'failed'],
   publishing: ['published', 'processing', 'unknown', 'retry_wait', 'failed', 'blocked'],
-  processing: ['published', 'unknown', 'failed', 'processing'],
+  processing: ['published', 'unknown', 'failed', 'processing', 'cancelled' /* V3: provider-held release cancelled on pause */],
   retry_wait: ['scheduled', 'preparing', 'failed', 'expired', 'cancelled', 'paused', 'blocked'],
   blocked: ['scheduled', 'cancelled', 'expired', 'failed'],
   paused: ['scheduled', 'cancelled', 'expired'],

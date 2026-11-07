@@ -1,13 +1,18 @@
 'use client';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { Action } from '@social-lite/core';
-import { ApiError, apiFetch, setCsrfRefresher, setCsrfToken } from './api';
+import type { Action, Permission } from '@social-lite/core';
+import { ApiError, apiFetch, setCsrfRefresher, setCsrfToken, setExpectedWorkspace } from './api';
+import { onWorkspaceChangedElsewhere } from './workspace-sync';
 import type { SessionInfo } from './types';
 
 interface SessionContextValue {
   session: SessionInfo;
   refresh: () => Promise<SessionInfo | null>;
   can: (a: Action) => boolean;
+  /** V2 permission held on some scope (UI convenience; the server re-checks every request). */
+  canV2: (p: Permission) => boolean;
+  /** V2 permission on a specific brand. */
+  canOn: (brandId: string, p: Permission) => boolean;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -35,6 +40,7 @@ export function SessionProvider({
     try {
       const s = await apiFetch<SessionInfo>('/api/session');
       setCsrfToken(s.csrf_token);
+      setExpectedWorkspace(s.workspace?.id ?? null);
       setState({ kind: 'ready', session: s });
       return s;
     } catch (e) {
@@ -53,6 +59,9 @@ export function SessionProvider({
   }, [refresh]);
 
   const ready = state.kind === 'ready' ? state.session : null;
+  // Another tab switched workspace: this tab's data belongs to the old one — reload.
+  const activeId = ready?.workspace?.id ?? null;
+  useEffect(() => (activeId ? onWorkspaceChangedElsewhere(activeId, () => window.location.replace('/')) : undefined), [activeId]);
   useEffect(() => {
     if (ready && requireWorkspace && !ready.workspace && !window.location.pathname.startsWith('/onboarding')) {
       window.location.replace('/onboarding');
@@ -61,7 +70,11 @@ export function SessionProvider({
 
   const value = useMemo<SessionContextValue | null>(() => {
     if (!ready) return null;
-    return { session: ready, refresh, can: (a: Action) => ready.permissions?.[a] === true };
+    return {
+      session: ready, refresh, can: (a: Action) => ready.permissions?.[a] === true,
+      canV2: (p: Permission) => ready.v2?.permissions?.[p] === true,
+      canOn: (brandId: string, p: Permission) => ready.v2?.brands?.[brandId]?.includes(p) === true,
+    };
   }, [ready, refresh]);
 
   if (state.kind === 'error') return <>{renderError(state.error, () => { setState({ kind: 'loading' }); void refresh(); })}</>;

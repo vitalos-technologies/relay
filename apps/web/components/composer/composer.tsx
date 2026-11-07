@@ -23,6 +23,8 @@ import { DeliveriesPanel } from './deliveries-panel';
 import { AiAssist } from '@/components/ai/assist';
 import { VariantCrops } from '@/components/crops/variant-crops';
 import { QueueButton } from '@/components/slots/queue-button';
+import { CollabPanel } from '@/components/collab/collab-panel';
+import { conflictCopyFor, rememberConflictCopy } from '@/components/collab/conflict-copy';
 
 type SaveState = 'saved' | 'dirty' | 'saving' | 'failed' | 'conflict';
 interface ConflictDetails { version?: number; updated_by?: string; updated_at?: string }
@@ -83,6 +85,9 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
   const [saveError, setSaveError] = useState<unknown>(null);
   const [conflict, setConflict] = useState<ConflictDetails | null>(null);
   const [conflictOpen, setConflictOpen] = useState(false);
+  // V2: a rejected concurrent save is kept server-side as a conflict copy (History tab) — both versions recoverable.
+  const [conflictCopy, setConflictCopy] = useState<string | null>(() => conflictCopyFor(post.id));
+  const [collabTab, setCollabTab] = useState(() => (conflictCopyFor(post.id) ? 'history' : 'comments'));
   const dirty = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inflight = useRef<Promise<boolean> | null>(null);
@@ -135,6 +140,8 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
         dirty.current = true;
         if (isApiError(e) && e.code === 'version_conflict') {
           const cur = (e.details?.current ?? {}) as ConflictDetails;
+          const copyId = typeof e.details?.conflict_copy_id === 'string' ? e.details.conflict_copy_id : null;
+          if (copyId) { rememberConflictCopy(post.id, copyId); setConflictCopy(copyId); }
           setConflict(cur);
           setConflictOpen(true);
           setSaveState('conflict');
@@ -453,6 +460,9 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
               <div className="px-4 pb-4"><VariantPreview variant={previewVariant} connection={previewConn} assets={assets} /></div>
             </Card>
           ) : null}
+          <CollabPanel postId={post.id} brandId={post.brand_id} tz={tz} currentText={draft.baseText} version={version} canEdit={!readOnly}
+            tab={collabTab} onTab={setCollabTab} highlightVersion={conflictCopy}
+            onRestored={async () => { rememberConflictCopy(post.id, null); dirty.current = false; await reload(); }} />
         </aside>
       </div>
 
@@ -530,6 +540,7 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
         details={conflict}
         onReload={async () => { dirty.current = false; await reload(); }}
         onKeepCopy={keepCopy}
+        keptInHistory={!!conflictCopy}
       />
       <ConfirmDialog
         open={!!pendingRemove}

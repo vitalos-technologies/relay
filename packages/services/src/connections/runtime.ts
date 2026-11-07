@@ -9,8 +9,8 @@ import { log } from '../log.js';
 import { DbMockStore } from '../mock-store.js';
 import { getSetting } from '../settings.js';
 
-export type OAuthProvider = 'facebook' | 'instagram' | 'x';
-export const OAUTH_PROVIDERS: readonly OAuthProvider[] = ['facebook', 'instagram', 'x'];
+export type OAuthProvider = 'facebook' | 'instagram' | 'x' | 'tiktok' | 'youtube' | 'linkedin' | 'threads' | 'pinterest';
+export const OAUTH_PROVIDERS: readonly OAuthProvider[] = ['facebook', 'instagram', 'x', 'tiktok', 'youtube', 'linkedin', 'threads', 'pinterest'];
 export const isOAuthProvider = (p: string): p is OAuthProvider => (OAUTH_PROVIDERS as readonly string[]).includes(p);
 
 export function oauthRedirectUri(provider: Provider): string {
@@ -29,6 +29,25 @@ export async function providerAppConfig(provider: Provider): Promise<ProviderApp
   }
   if (provider === 'x') {
     return { clientId: await getSetting('X_CLIENT_ID'), clientSecret: await getSetting('X_CLIENT_SECRET'), redirectUri: oauthRedirectUri('x') };
+  }
+  // ---- V3 providers (Bluesky: per-connection app password, no app config)
+  if (provider === 'tiktok') {
+    return { clientId: await getSetting('TIKTOK_CLIENT_KEY'), clientSecret: await getSetting('TIKTOK_CLIENT_SECRET'), redirectUri: oauthRedirectUri('tiktok'),
+      features: { tiktok_direct_post_audited: (await getSetting('TIKTOK_DIRECT_POST_AUDITED')) === 'true' } };
+  }
+  if (provider === 'youtube') {
+    return { clientId: await getSetting('GOOGLE_CLIENT_ID'), clientSecret: await getSetting('GOOGLE_CLIENT_SECRET'), redirectUri: oauthRedirectUri('youtube') };
+  }
+  if (provider === 'linkedin') {
+    return { clientId: await getSetting('LINKEDIN_CLIENT_ID'), clientSecret: await getSetting('LINKEDIN_CLIENT_SECRET'), redirectUri: oauthRedirectUri('linkedin'),
+      apiVersion: await getSetting('LINKEDIN_API_VERSION'), features: { linkedin_organizations: (await getSetting('LINKEDIN_ORGANIZATIONS')) === 'true' } };
+  }
+  if (provider === 'threads') {
+    return { clientId: await getSetting('THREADS_APP_ID'), clientSecret: await getSetting('THREADS_APP_SECRET'), redirectUri: oauthRedirectUri('threads') };
+  }
+  if (provider === 'pinterest') {
+    return { clientId: await getSetting('PINTEREST_APP_ID'), clientSecret: await getSetting('PINTEREST_APP_SECRET'), redirectUri: oauthRedirectUri('pinterest'),
+      features: { pinterest_access_tier: (await getSetting('PINTEREST_ACCESS_TIER')) === 'standard' ? 'standard' : 'trial' } };
   }
   return {};
 }

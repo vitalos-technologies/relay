@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { LogOut, Monitor, Moon, Sun } from 'lucide-react';
+import { LogOut, Monitor, Moon, ShieldCheck, Sun } from 'lucide-react';
 import { api } from '@/lib/client/api';
 import { useSession } from '@/lib/client/session';
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuRadioGroup, MenuRadioItem, MenuSeparator, MenuTrigger, useToast } from '@/components/ui';
@@ -31,13 +31,16 @@ export function UserMenu({ compact }: { compact?: boolean }) {
   const initials = (u.name || u.email).split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((s) => s[0]?.toUpperCase()).join('');
 
   const signOut = async () => {
+    let next = '/login';
     try {
-      await api.post('/api/auth/logout', {});
+      const r = await api.post<{ logout_url?: string | null }>('/api/auth/logout', {});
+      // Also end the identity-provider session (RP-initiated logout); it returns to /login.
+      if (r?.logout_url) next = r.logout_url;
     } catch (e) {
       toast.error(e, 'Sign out failed');
       return;
     }
-    window.location.assign('/login');
+    window.location.assign(next);
   };
 
   return (
@@ -67,6 +70,7 @@ export function UserMenu({ compact }: { compact?: boolean }) {
           <MenuRadioItem value="light" icon={<Sun aria-hidden />}>Light</MenuRadioItem>
         </MenuRadioGroup>
         <MenuSeparator />
+        <MenuItem icon={<ShieldCheck aria-hidden />} onSelect={() => window.location.assign('/security')}>Security</MenuItem>
         <MenuItem icon={<LogOut aria-hidden />} onSelect={() => void signOut()}>Sign out</MenuItem>
       </MenuContent>
     </Menu>

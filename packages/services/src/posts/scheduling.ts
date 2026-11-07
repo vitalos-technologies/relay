@@ -1,19 +1,21 @@
 // Scheduling, publish-now, submit-for-review, approval, cancellation and rescheduling.
 // One transaction writes schedule + deliveries + outbox (durable publishing algorithm steps 1-3).
 import {
-  AppError, canSchedule, can, isCancellable, notFound, resolveVariants, resolveWallTimeWithOffset, isValidTimeZone,
+  AppError, isCancellable, notFound, resolveVariants, resolveWallTimeWithOffset, isValidTimeZone,
   scheduleRequestSchema, type ScheduleRequest, type ResolvedVariant,
 } from '@social-lite/core';
 import { getPool, many, maybeOne, one, withTx, type Queryable } from '@social-lite/db';
 import type { Ctx } from '../context.js';
 import { audit } from '../audit.js';
 import { writeOutbox } from '../outbox.js';
-import { assertBrand, assertUuid, brandAllowed, requireAction, type BrandRow } from '../tenancy.js';
+import { assertBrand, assertUuid, authorizeCtx, brandAllowed, requireAction, type BrandRow } from '../tenancy.js';
+import { recordPublicationAuthority } from '../engine/authority.js';
 import { beginIdempotent, completeIdempotent } from '../idempotency.js';
 import { assetsByIds } from '../media/assets.js';
 import { brandConnections, contentHash, scheduleFingerprint, type ConnectionRow } from './shared.js';
 import { loadPost, validateDraft, deliveriesForSchedule, type PostRow } from './service.js';
 import { approvalJson, deliveryJson, scheduleJson, type ApprovalRow, type ScheduleRow } from './serialize.js';
+import { approvalRequiredFor, createReviewRequest, recordApproval, recordRejection, type ReviewRequestRow } from './approval-policy.js';
 
 const PAST_TOLERANCE_MS = 60_000;
 
@@ -117,13 +119,17 @@ async function createScheduleTx(ctx: Ctx, postId: string, rawReq: unknown, idemK
     if (post.version !== req.expected_version) {
       throw new AppError('version_conflict', 'This post changed since you opened it. Review the latest version, then try again.', undefined, { current: { version: post.version } });
     }
+    // V2: the brand's approval POLICY (approval-policy.ts) decides whether review is required.
+    const reviewRequired = await approvalRequiredFor(tx, ctx.access.workspaceId, post.brand_id);
     if (mode === 'submit') {
-      requireAction(ctx, 'drafts.edit');
-      if (!brand.approval_required) throw new AppError('invalid_state', 'This brand does not require approval. Schedule it directly.');
+      requireAction(ctx, 'drafts.edit', { brandId: post.brand_id });
+      if (!reviewRequired) throw new AppError('invalid_state', 'This brand does not require approval. Schedule it directly.');
     } else {
-      if (brand.approval_required) throw new AppError('invalid_state', 'This brand requires approval: submit for review instead.', undefined, { reason: 'approval_required' });
-      const sc = canSchedule({ role: ctx.access.role, editorsCanPublish: brand.editors_can_publish, approvalRequired: false, contentApproved: false });
-      if (!sc.allowed) throw new AppError('forbidden', sc.reason ?? 'You cannot schedule posts');
+      if (reviewRequired) throw new AppError('invalid_state', 'This brand requires approval: submit for review instead.', undefined, { reason: 'approval_required' });
+      // V2: scheduling/publishing come from publisher/brand_manager (or admin/owner) grants on this brand.
+      // brands.editors_can_publish no longer grants anything (listed for review by migration 009).
+      requireAction(ctx, 'content.schedule', { brandId: post.brand_id, message: 'You cannot schedule posts for this brand' });
+      if (mode === 'immediate' && ctx.access.authz) requireAction(ctx, 'content.publish', { brandId: post.brand_id, message: 'You cannot publish posts for this brand' });
     }
     const ids = [...new Set(req.connection_ids)];
     const conns = await brandConnections(tx, ctx.access.workspaceId, post.brand_id, true);
@@ -146,13 +152,14 @@ async function createScheduleTx(ctx: Ctx, postId: string, rawReq: unknown, idemK
     schedule.revision_number = snap.revisionNumber;
     let approval: ApprovalRow | null = null;
     if (mode === 'submit') {
-      approval = await one<ApprovalRow>(tx,
-        `INSERT INTO approvals(workspace_id, brand_id, post_id, revision_id, schedule_id, schedule_generation, fingerprint, requested_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-        [ctx.access.workspaceId, post.brand_id, post.id, snap.revisionId, schedule.id, schedule.generation, fingerprint, ctx.actor.userId]);
+      const request = await createReviewRequest(tx, ctx, { postId: post.id, brandId: post.brand_id, revisionId: snap.revisionId, scheduleId: schedule.id, scheduleGeneration: schedule.generation, fingerprint });
+      approval = await one<ApprovalRow>(tx, `SELECT * FROM approvals WHERE id=$1`, [request.id]);
       await writeOutbox(tx, { workspaceId: ctx.access.workspaceId, aggregateType: 'approval', aggregateId: approval.id, eventType: 'approval.requested', payload: { postId: post.id, brandId: post.brand_id } });
     } else {
       await insertDeliveries(tx, ctx, schedule, snap.variants, conns);
+      // V2: record publication authority (revalidated by the worker at dispatch).
+      await recordPublicationAuthority(tx, ctx, { scheduleId: schedule.id, postId: post.id, brandId: post.brand_id, revisionId: snap.revisionId, connectionIds: ids,
+        basis: 'scheduler', permission: mode === 'immediate' ? 'content.publish' : 'content.schedule' });
       await writeOutbox(tx, { workspaceId: ctx.access.workspaceId, aggregateType: 'schedule', aggregateId: schedule.id, eventType: 'schedule.created' });
     }
     await audit(tx, { workspaceId: ctx.access.workspaceId, brandId: post.brand_id, actorUserId: ctx.actor.userId, action: `schedule.${mode === 'submit' ? 'submitted' : mode === 'immediate' ? 'publish_now' : 'created'}`,
@@ -183,8 +190,24 @@ async function loadApproval(tx: Queryable, ctx: Ctx, id: string, lock = false): 
 
 export async function approve(ctx: Ctx, approvalId: string, expectedFingerprint: string) {
   requireAction(ctx, 'approvals.decide');
-  return withTx(async (tx) => {
-    const a = await loadApproval(tx, ctx, approvalId, true);
+  return decideApproval(ctx, (tx) => loadApproval(tx, ctx, approvalId, true), expectedFingerprint);
+}
+
+/** Load an approval by id within the caller's workspace (after the caller's own access check). */
+async function reloadApproval(tx: Queryable, ctx: Ctx, id: string): Promise<ApprovalRow> {
+  return one<ApprovalRow>(tx,
+    `SELECT a.*, ru.email AS requested_by_email, rv.email AS reviewer_email FROM approvals a
+       LEFT JOIN users ru ON ru.id=a.requested_by LEFT JOIN users rv ON rv.id=a.reviewer_id WHERE a.id=$1 AND a.workspace_id=$2`, [id, ctx.access.workspaceId]);
+}
+
+/**
+ * Approve (shared by the approvals inbox and the guest review portal, which loads the request through its share).
+ * V2: records this reviewer's decision for the current stage; the schedule activates only when every stage has
+ * its quorum of distinct, currently eligible people. Stale requests are invalidated and the error thrown after commit.
+ */
+export async function decideApproval(ctx: Ctx, load: (tx: Queryable) => Promise<ApprovalRow>, expectedFingerprint: string) {
+  const out = await withTx(async (tx) => {
+    const a = await load(tx);
     if (a.decision !== 'pending') throw new AppError('invalid_state', a.decision === 'invalidated' ? 'This request was invalidated because the post changed. Review the new submission.' : `This request was already ${a.decision}.`);
     if (a.fingerprint !== expectedFingerprint) throw new AppError('conflict', 'The submission changed while you were reviewing. Reload to review the current version.');
     const s = await one<ScheduleRow & { brand_id: string }>(tx, `SELECT * FROM schedules WHERE id=$1 FOR UPDATE`, [a.schedule_id]);
@@ -198,33 +221,54 @@ export async function approve(ctx: Ctx, approvalId: string, expectedFingerprint:
     } else if (publishBefore.getTime() <= now.getTime()) {
       throw new AppError('invalid_state', 'The scheduled time and its publish-before deadline have passed. Reject and ask for a new time.');
     }
-    await tx.query(`UPDATE approvals SET decision='approved', reviewer_id=$2, decided_at=now() WHERE id=$1`, [a.id, ctx.actor.userId]);
+    const decision = await recordApproval(tx, ctx, a as unknown as ReviewRequestRow);
+    if (decision.kind === 'error') return { error: decision.error };
+    if (decision.kind === 'recorded') {
+      return { result: { approval: approvalJson(await reloadApproval(tx, ctx, a.id)), schedule: scheduleJson(s), deliveries: [] as ReturnType<typeof deliveryJson>[], stage: decision.stage } };
+    }
+    const approverIds = [...new Set(decision.stages.flatMap((st) => st.approver_ids))];
+    await tx.query(`UPDATE approvals SET decision='approved', reviewer_id=$2, decided_at=now(), current_stage=stage_count WHERE id=$1`, [a.id, ctx.actor.userId]);
     const updated = await one<ScheduleRow & { brand_id: string }>(tx,
       `UPDATE schedules SET status='active', due_at=$2, publish_before=$3 WHERE id=$1 RETURNING *`, [s.id, dueAt, publishBefore]);
     const variants = await many<{ id: string; connection_id: string }>(tx, `SELECT id, connection_id FROM variants WHERE revision_id=$1`, [s.revision_id]);
     const conns = await brandConnections(tx, ctx.access.workspaceId, a.brand_id, true);
     await insertDeliveries(tx, ctx, updated, variants.map((v) => ({ id: v.id, connectionId: v.connection_id })), conns);
+    // V2: activation by approval — the approvers (not the draft author) are revalidated at dispatch.
+    await recordPublicationAuthority(tx, ctx, { scheduleId: s.id, postId: a.post_id, brandId: a.brand_id, revisionId: s.revision_id,
+      connectionIds: variants.map((v) => v.connection_id), basis: 'approval', principalUserId: (a as ApprovalRow & { requested_by?: string | null }).requested_by ?? null,
+      permission: 'content.submit', approvalIds: [a.id], approverUserIds: approverIds.length ? approverIds : [ctx.actor.userId] });
     await writeOutbox(tx, { workspaceId: ctx.access.workspaceId, aggregateType: 'approval', aggregateId: a.id, eventType: 'approval.decided', payload: { decision: 'approved', postId: a.post_id } });
     await audit(tx, { workspaceId: ctx.access.workspaceId, brandId: a.brand_id, actorUserId: ctx.actor.userId, action: 'approval.approved', resourceType: 'approval', resourceId: a.id,
       diff: { revision_id: a.revision_id, fingerprint: a.fingerprint, self_approved: (a as ApprovalRow & { requested_by?: string }).requested_by === ctx.actor.userId }, correlationId: ctx.correlationId });
-    const fresh = await loadApproval(tx, ctx, a.id);
-    return { approval: approvalJson(fresh), schedule: scheduleJson(updated), deliveries: (await deliveriesForSchedule(tx, s.id)).map((d) => deliveryJson(d)) };
+    const fresh = await reloadApproval(tx, ctx, a.id);
+    return { result: { approval: approvalJson(fresh), schedule: scheduleJson(updated), deliveries: (await deliveriesForSchedule(tx, s.id)).map((d) => deliveryJson(d)), stage: null as number | null } };
   });
+  if ('error' in out) throw out.error;
+  return out.result;
 }
 
 export async function reject(ctx: Ctx, approvalId: string, reason: string) {
   requireAction(ctx, 'approvals.decide');
+  return decideRejection(ctx, (tx) => loadApproval(tx, ctx, approvalId, true), reason);
+}
+
+/** Reject (shared by the inbox and the guest review portal). Only an eligible reviewer of the current stage may reject. */
+export async function decideRejection(ctx: Ctx, load: (tx: Queryable) => Promise<ApprovalRow>, reason: string) {
   const r = (reason ?? '').trim();
   if (!r) throw new AppError('validation_failed', 'A reason is required when rejecting', { reason: 'Required' });
-  return withTx(async (tx) => {
-    const a = await loadApproval(tx, ctx, approvalId, true);
+  const out = await withTx(async (tx) => {
+    const a = await load(tx);
     if (a.decision !== 'pending') throw new AppError('invalid_state', `This request was already ${a.decision}.`);
+    const err = await recordRejection(tx, ctx, a as unknown as ReviewRequestRow, r);
+    if (err) return { error: err };
     await tx.query(`UPDATE approvals SET decision='rejected', reviewer_id=$2, decided_at=now(), reason=$3 WHERE id=$1`, [a.id, ctx.actor.userId, r.slice(0, 2000)]);
     await tx.query(`UPDATE schedules SET status='rejected' WHERE id=$1 AND status='pending_approval'`, [a.schedule_id]);
     await writeOutbox(tx, { workspaceId: ctx.access.workspaceId, aggregateType: 'approval', aggregateId: a.id, eventType: 'approval.decided', payload: { decision: 'rejected', postId: a.post_id } });
     await audit(tx, { workspaceId: ctx.access.workspaceId, brandId: a.brand_id, actorUserId: ctx.actor.userId, action: 'approval.rejected', resourceType: 'approval', resourceId: a.id, diff: { reason: r.slice(0, 200) }, correlationId: ctx.correlationId });
-    return { approval: approvalJson(await loadApproval(tx, ctx, a.id)) };
+    return { result: { approval: approvalJson(await reloadApproval(tx, ctx, a.id)) } };
   });
+  if ('error' in out) throw out.error;
+  return out.result;
 }
 
 export async function listApprovals(ctx: Ctx, status: 'pending' | 'decided' = 'pending') {
@@ -274,13 +318,13 @@ export async function approvalDetail(ctx: Ctx, approvalId: string) {
       base_text: prev ? { before: prev.base_text, after: rev.base_text } : null,
       changed_destinations: prev ? variants.map((v) => v.connection_id).filter((id) => !(prev.conns ?? []).includes(id)) : [],
     },
-    can_decide: can(ctx.access.role, 'approvals.decide') && a.decision === 'pending',
+    can_decide: authorizeCtx(ctx, 'content.approve', { brandId: a.brand_id }).allowed && a.decision === 'pending',
   };
 }
 
 // ------------------------------------------------------------------ cancel / reschedule
 function canManageSchedule(ctx: Ctx, brand: BrandRow): boolean {
-  return can(ctx.access.role, 'schedule.publish') || ctx.access.role === 'approver' || (ctx.access.role === 'editor' && brand.editors_can_publish);
+  return authorizeCtx(ctx, 'content.schedule', { brandId: brand.id }).allowed;
 }
 
 export async function cancelSchedule(ctx: Ctx, scheduleId: string) {
@@ -289,7 +333,7 @@ export async function cancelSchedule(ctx: Ctx, scheduleId: string) {
     const s = await maybeOne<ScheduleRow & { brand_id: string; workspace_id: string }>(tx, `SELECT * FROM schedules WHERE id=$1 AND workspace_id=$2 FOR UPDATE`, [scheduleId, ctx.access.workspaceId]);
     if (!s || !brandAllowed(ctx, s.brand_id)) throw notFound('Schedule');
     const brand = await assertBrand(ctx, s.brand_id, tx);
-    const isRequester = s.status === 'pending_approval' && can(ctx.access.role, 'drafts.edit');
+    const isRequester = s.status === 'pending_approval' && authorizeCtx(ctx, 'drafts.edit', { brandId: s.brand_id }).allowed;
     if (!canManageSchedule(ctx, brand) && !isRequester) throw new AppError('forbidden', 'You cannot cancel this schedule');
     if (!['active', 'pending_approval'].includes(s.status)) throw new AppError('invalid_state', `This schedule is already ${s.status}.`);
     await tx.query(`UPDATE schedules SET status='cancelled', cancelled_at=now(), cancelled_by=$2 WHERE id=$1`, [s.id, ctx.actor.userId]);
@@ -330,9 +374,9 @@ export async function reschedule(ctx: Ctx, scheduleId: string, input: { input_lo
       throw new AppError('conflict', 'This schedule changed since you loaded it. Reload and try again.');
     }
     if (!['active', 'pending_approval'].includes(s.status)) throw new AppError('invalid_state', `This schedule is ${s.status} and cannot be moved.`);
-    const needsApproval = brand.approval_required;
+    const needsApproval = await approvalRequiredFor(tx, ctx.access.workspaceId, s.brand_id);
     if (!needsApproval && !canManageSchedule(ctx, brand)) throw new AppError('forbidden', 'You cannot reschedule posts for this brand');
-    if (needsApproval && !can(ctx.access.role, 'drafts.edit') && !can(ctx.access.role, 'approvals.decide')) throw new AppError('forbidden', 'You cannot reschedule posts for this brand');
+    if (needsApproval && !authorizeCtx(ctx, 'drafts.edit', { brandId: s.brand_id }).allowed && !authorizeCtx(ctx, 'approvals.decide', { brandId: s.brand_id }).allowed) throw new AppError('forbidden', 'You cannot reschedule posts for this brand');
     const started = await one<{ n: number }>(tx, `SELECT count(*)::int n FROM deliveries WHERE schedule_id=$1 AND state NOT IN ('scheduled','retry_wait','blocked','paused','cancelled')`, [s.id]);
     if (started.n > 0) throw new AppError('invalid_state', 'Publishing has already started for at least one destination. Cancel remaining destinations instead.');
     const time = resolveScheduleTime({ input_local_time: input.input_local_time, timezone: input.timezone ?? s.input_timezone, offset: input.offset,
@@ -349,12 +393,14 @@ export async function reschedule(ctx: Ctx, scheduleId: string, input: { input_lo
         needsApproval ? 'pending_approval' : 'active', fingerprint, ctx.actor.userId]);
     let approval: ApprovalRow | null = null;
     if (needsApproval) {
-      approval = await one<ApprovalRow>(tx,
-        `INSERT INTO approvals(workspace_id, brand_id, post_id, revision_id, schedule_id, schedule_generation, fingerprint, requested_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-        [ctx.access.workspaceId, s.brand_id, post.id, s.revision_id, schedule.id, schedule.generation, fingerprint, ctx.actor.userId]);
+      const request = await createReviewRequest(tx, ctx, { postId: post.id, brandId: s.brand_id, revisionId: s.revision_id, scheduleId: schedule.id, scheduleGeneration: schedule.generation, fingerprint });
+      approval = await one<ApprovalRow>(tx, `SELECT * FROM approvals WHERE id=$1`, [request.id]);
+      await writeOutbox(tx, { workspaceId: ctx.access.workspaceId, aggregateType: 'approval', aggregateId: approval.id, eventType: 'approval.requested', payload: { postId: post.id, brandId: s.brand_id } });
     } else {
       const conns = await brandConnections(tx, ctx.access.workspaceId, s.brand_id, true);
       await insertDeliveries(tx, ctx, schedule, variants.map((v) => ({ id: v.id, connectionId: v.connection_id })), conns);
+      await recordPublicationAuthority(tx, ctx, { scheduleId: schedule.id, postId: post.id, brandId: s.brand_id, revisionId: s.revision_id, connectionIds: ids,
+        basis: 'scheduler', permission: 'content.schedule' });
     }
     await audit(tx, { workspaceId: ctx.access.workspaceId, brandId: s.brand_id, actorUserId: ctx.actor.userId, action: 'schedule.rescheduled', resourceType: 'schedule', resourceId: schedule.id,
       diff: { from: s.due_at.toISOString(), to: time.dueAt.toISOString(), generation: schedule.generation, approval_required: needsApproval }, correlationId: ctx.correlationId });

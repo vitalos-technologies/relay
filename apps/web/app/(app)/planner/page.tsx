@@ -14,7 +14,7 @@ import {
   Banner, Button, cn, EmptyState, ErrorState, IconButton, InfoTip, LinkButton, Menu, MenuContent, MenuItem, MenuTrigger, PageHeader,
   POST_STATUS_LABEL, Segmented, Select, SkeletonRows, useToast,
 } from '@/components/ui';
-import { AgendaItem, DestinationDots } from '@/components/planner/agenda-item';
+import { AgendaItem, DestinationDots, OwnerMeta } from '@/components/planner/agenda-item';
 import { RescheduleDialog, type RescheduleResult } from '@/components/planner/reschedule-dialog';
 
 type View = 'week' | 'month' | 'agenda';
@@ -68,6 +68,7 @@ export default function PlannerPage() {
   const anchor = /^\d{4}-\d{2}-\d{2}$/.test(params.get('date') ?? '') ? params.get('date')! : today;
   const connectionFilter = params.get('account') ?? '';
   const statusFilter = params.get('status') ?? '';
+  const ownerFilter = params.get('owner') ?? '';
 
   // Visible range in the view zone
   const range = useMemo(() => {
@@ -94,7 +95,7 @@ export default function PlannerPage() {
 
   const byDay = useMemo(() => {
     const m = new Map<string, PlannerItem[]>();
-    for (const i of data?.items ?? []) {
+    for (const i of (data?.items ?? []).filter((x) => !ownerFilter || (ownerFilter === `team:${x.team?.id}`) || (ownerFilter === `user:${x.assignee?.id}`))) {
       const k = localDateKey(i.due_at, viewTz);
       const arr = m.get(k) ?? [];
       arr.push(i);
@@ -102,7 +103,16 @@ export default function PlannerPage() {
     }
     for (const arr of m.values()) arr.sort((a, b) => a.due_at.localeCompare(b.due_at));
     return m;
-  }, [data, viewTz]);
+  }, [data, viewTz, ownerFilter]);
+  // V2 calendar ownership filter options (teams/assignees present in the visible, already-scoped items).
+  const owners = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const i of data?.items ?? []) {
+      if (i.team) m.set(`team:${i.team.id}`, `Team · ${i.team.name ?? ''}`);
+      if (i.assignee) m.set(`user:${i.assignee.id}`, i.assignee.name || i.assignee.email || 'Someone');
+    }
+    return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [data]);
 
   const brandName = (id: string) => session.brands.find((b) => b.id === id)?.name ?? '';
   const mayReschedule = can('drafts.edit') || can('schedule.publish');
@@ -221,6 +231,15 @@ export default function PlannerPage() {
             </Select>
             {!brand ? <span id="pl-account-hint" className="sr-only">Pick a brand first.</span> : null}
           </div>
+          {owners.length || ownerFilter ? (
+            <div className="w-[170px]">
+              <label className="sr-only" htmlFor="pl-owner">Owner</label>
+              <Select id="pl-owner" value={ownerFilter} onChange={(e) => setParams({ owner: e.target.value })}>
+                <option value="">All owners</option>
+                {owners.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+              </Select>
+            </div>
+          ) : null}
           <div className="w-[170px]">
             <label className="sr-only" htmlFor="pl-status">Status</label>
             <Select id="pl-status" value={statusFilter} onChange={(e) => setParams({ status: e.target.value })}>
@@ -402,7 +421,7 @@ function CalendarItem({ item, draggable, menu, compact }: { item: PlannerItem; d
         </Link>
         <span className="-mr-1 -mt-0.5 opacity-70 group-hover:opacity-100 group-focus-within:opacity-100">{menu}</span>
       </div>
-      {!compact ? <div className="mt-1"><DestinationDots destinations={item.destinations} /></div> : null}
+      {!compact ? <div className="mt-1 flex min-w-0 items-center gap-1.5"><DestinationDots destinations={item.destinations} /><OwnerMeta item={item} /></div> : null}
     </div>
   );
 }

@@ -1,6 +1,10 @@
 // Shared domain types. Pure: no IO. Used by web, worker, services and providers.
 
-export const PROVIDERS = ['instagram', 'facebook', 'telegram', 'x'] as const;
+export const PROVIDERS = [
+  'instagram', 'facebook', 'telegram', 'x',
+  // V3 (additive)
+  'tiktok', 'youtube', 'linkedin', 'threads', 'pinterest', 'bluesky',
+] as const;
 export type Provider = (typeof PROVIDERS)[number];
 
 export const PROVIDER_LABEL: Record<Provider, string> = {
@@ -8,6 +12,12 @@ export const PROVIDER_LABEL: Record<Provider, string> = {
   facebook: 'Facebook',
   telegram: 'Telegram',
   x: 'X',
+  tiktok: 'TikTok',
+  youtube: 'YouTube',
+  linkedin: 'LinkedIn',
+  threads: 'Threads',
+  pinterest: 'Pinterest',
+  bluesky: 'Bluesky',
 };
 
 export const ROLES = ['owner', 'admin', 'editor', 'approver', 'viewer'] as const;
@@ -85,7 +95,8 @@ export interface ChannelConstraints {
   maxTextLength: number;
   /** Max caption length when media is attached. */
   maxCaptionLength: number;
-  textCounting: 'utf16' | 'codepoints' | 'x_weighted';
+  /** 'graphemes' (V3): user-perceived characters (Bluesky 300 graphemes). */
+  textCounting: 'utf16' | 'codepoints' | 'x_weighted' | 'graphemes';
   requiresMedia: boolean;
   supportsTextOnly: boolean;
   supportsLink: boolean;
@@ -144,6 +155,15 @@ export interface ChannelCapabilities {
   constraints: ChannelConstraints;
   constraintsVersion: string;
   checkedAt: string; // ISO
+  // ---- V3 (optional, additive): independently modelled capabilities.
+  /** How publication happens: automated API post, delivery to the creator's drafts/inbox, or manual handoff only. */
+  publishMode?: 'direct' | 'draft_handoff' | 'manual';
+  /** The provider can hold a scheduled release itself (YouTube publishAt) AND the app can cancel it. */
+  nativeScheduling?: boolean;
+  /** Access/eligibility limits that apply to this destination (audit, trial tier, account type). */
+  eligibility?: { status: 'eligible' | 'restricted' | 'awaiting_approval' | 'unsupported'; message: string };
+  /** Provider-specific fields the composer must collect (variant.options.<provider>.<key>). */
+  requiredOptions?: string[];
 }
 
 export type PostAggregateStatus =
@@ -153,7 +173,8 @@ export type PostAggregateStatus =
 export interface ValidationIssue {
   connectionId?: string;
   provider?: Provider;
-  field: 'text' | 'media' | 'link' | 'buttons' | 'schedule' | 'destination' | 'approval';
+  /** 'options' (V3): a required provider-specific field (e.g. TikTok privacy level, YouTube title). */
+  field: 'text' | 'media' | 'link' | 'buttons' | 'schedule' | 'destination' | 'approval' | 'options';
   code: string;
   message: string; // exact, user-facing fix
 }

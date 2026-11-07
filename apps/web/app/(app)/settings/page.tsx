@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { Building, CalendarClock, Gauge, OctagonPause, Play, Plug, Plus, Tag, Users } from 'lucide-react';
+import { BellRing, Bot, Building, CalendarClock, Gauge, OctagonPause, Play, Plug, Plus, Tag, Users } from 'lucide-react';
 import { useSession } from '@/lib/client/session';
 import { useBrandFilter, useQueryState } from '@/lib/client/hooks';
 import { useApi } from '@/lib/client/use-api';
@@ -15,9 +15,13 @@ import { TeamTab } from '@/components/settings/team-tab';
 import { SlotsSettings } from '@/components/slots/slots-settings';
 import { IntegrationsSettings } from '@/components/integrations/integrations-settings';
 import { BudgetsSettings } from '@/components/integrations/budgets-settings';
+import { ServiceAccountsSettings } from '@/components/settings/service-accounts';
+import { ApprovalPolicyCard } from '@/components/collab/approval-policy-card';
+import { NotificationPrefs } from '@/components/collab/notification-prefs';
+import { BrandProductSettings } from '@/components/product/brand-product-settings';
 
 export default function SettingsPage() {
-  const { can } = useSession();
+  const { can, canV2 } = useSession();
   const [params, setParams] = useQueryState();
   const tab = params.get('tab') ?? 'workspace';
   return (
@@ -29,15 +33,19 @@ export default function SettingsPage() {
           <TabsTrigger value="brand"><Tag aria-hidden className="size-4" /> Brand</TabsTrigger>
           <TabsTrigger value="team"><Users aria-hidden className="size-4" /> Team</TabsTrigger>
           <TabsTrigger value="slots"><CalendarClock aria-hidden className="size-4" /> Slots</TabsTrigger>
+          <TabsTrigger value="notifications"><BellRing aria-hidden className="size-4" /> Notifications</TabsTrigger>
           {can('workspace.settings') ? <TabsTrigger value="budgets"><Gauge aria-hidden className="size-4" /> Budgets</TabsTrigger> : null}
           {can('setup.manage') ? <TabsTrigger value="integrations"><Plug aria-hidden className="size-4" /> Integrations</TabsTrigger> : null}
+          {canV2('service_accounts.manage') ? <TabsTrigger value="service-accounts"><Bot aria-hidden className="size-4" /> Service accounts</TabsTrigger> : null}
         </TabsList>
         <TabsContent value="workspace"><WorkspaceTab /></TabsContent>
         <TabsContent value="brand"><BrandTab /></TabsContent>
         <TabsContent value="team"><TeamTab /></TabsContent>
         <TabsContent value="slots"><SlotsSettings /></TabsContent>
+        <TabsContent value="notifications"><NotificationPrefs /></TabsContent>
         <TabsContent value="budgets"><BudgetsSettings /></TabsContent>
         <TabsContent value="integrations"><IntegrationsSettings /></TabsContent>
+        <TabsContent value="service-accounts"><ServiceAccountsSettings /></TabsContent>
       </Tabs>
     </>
   );
@@ -129,6 +137,7 @@ function BrandTab() {
       {!session.brands.length ? (
         <EmptyState icon={<Building aria-hidden />} title="No brands yet" action={can('brands.manage') ? <Button variant="primary" onClick={() => setCreateOpen(true)}>Create brand</Button> : null} />
       ) : selected ? <BrandForm key={selected} brandId={selected} /> : null}
+      {selected ? <BrandProductSettings key={`p-${selected}`} brandId={selected} /> : null}
       <CreateBrandDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={async (b) => { await refresh(); setSelected(b.id); }} />
     </div>
   );
@@ -169,7 +178,7 @@ function BrandForm({ brandId }: { brandId: string }) {
     setSaveErr(null);
     try {
       const b = await api.patch<Brand>(`/api/brands/${brandId}`, {
-        name: f.name.trim(), timezone: f.timezone, approval_required: f.approval_required, editors_can_publish: f.editors_can_publish,
+        name: f.name.trim(), timezone: f.timezone, editors_can_publish: f.editors_can_publish,
         default_deadline_minutes: dl,
         voice: {
           tone: f.tone.trim() || undefined, terminology: list(f.terminology), prohibited: list(f.prohibited),
@@ -204,7 +213,6 @@ function BrandForm({ brandId }: { brandId: string }) {
             </Select>
           </Field>
           <div className="sm:col-span-2 flex flex-col gap-4">
-            <Switch checked={f.approval_required} onCheckedChange={(v) => set({ approval_required: v })} disabled={!editable} label="Require approval" description="Any change needs re-approval." />
             <Switch checked={f.editors_can_publish} onCheckedChange={(v) => set({ editors_can_publish: v })} disabled={!editable} label="Editors can publish" description="Off: editors submit for review." />
           </div>
           <Field label="Deadline (minutes)" info="If a post can’t send within this window it expires instead of posting late." error={dlBad ? 'Whole number, 1–10080.' : fe?.default_deadline_minutes}>
@@ -212,6 +220,7 @@ function BrandForm({ brandId }: { brandId: string }) {
           </Field>
         </div>
       </Card>
+      <ApprovalPolicyCard brandId={brandId} />
       <Card>
         <CardHeader title="Voice" />
         <div className="grid grid-cols-1 gap-6 p-4 sm:grid-cols-2">

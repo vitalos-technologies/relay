@@ -5,7 +5,8 @@
 //    touches, so a brand-scoped grant on Brand A can never authorize work on Brand B.
 // Cross-tenant/unauthorized lookups return not_found (no existence leakage).
 import {
-  AppError, LEGACY_ACTION_MAP, PERMISSIONS, can as legacyCan, forbidden, notFound, type Action, type Assurance, type Permission, type Role,
+  AppError, LEGACY_ACTION_MAP, PERMISSIONS, PRESET_PERMISSIONS, can as legacyCan, forbidden, notFound, type Action, type Assurance, type Permission, type Role,
+  type RolePreset,
 } from '@social-lite/core';
 import { getPool, maybeOne, type Queryable } from '@social-lite/db';
 import type { Ctx, WorkspaceAccess } from './context.js';
@@ -42,9 +43,11 @@ export function authorizeCtx(ctx: Ctx, action: Action | Permission, resource: { 
   const perm = toPermission(action);
   const a = ctx.access.authz;
   if (!a) {
-    // Legacy test contexts without V2 state: V1 role matrix (never used by real requests).
+    // Legacy test contexts without V2 state: V1 role matrix (never used by real requests). Permissions with no
+    // V1 action fall back to the V2 preset of the same name (V1 roles are V2 presets; same as the 009 backfill).
     const legacy = (Object.entries(LEGACY_ACTION_MAP).find(([, p]) => p === perm)?.[0] ?? null) as Action | null;
-    const ok = legacy ? legacyCan(ctx.access.role, legacy) && (!resource.brandId || brandAllowedLegacy(ctx, resource.brandId)) : false;
+    const roleOk = legacy ? legacyCan(ctx.access.role, legacy) : (PRESET_PERMISSIONS[ctx.access.role as RolePreset] ?? []).includes(perm);
+    const ok = roleOk && (!resource.brandId || brandAllowedLegacy(ctx, resource.brandId));
     return { allowed: ok, reason: ok ? 'granted' : 'no_grant', sources: [], policyVersion: 0 };
   }
   return authorize(a, perm, resource, opts);

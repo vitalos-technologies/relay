@@ -1,15 +1,16 @@
 // Posts: mutable versioned working draft + immutable revisions/variants (CO-01..CO-08).
 import {
-  AppError, EMPTY_DRAFT, aggregateStatus, canSchedule, can, draftContentSchema, mergeResults, notFound, resolveVariants,
+  AppError, EMPTY_DRAFT, aggregateStatus, draftContentSchema, mergeResults, notFound, resolveVariants,
   validateVariant, measure, composeTextWithLink, type DeliveryState, type DraftContent, type ValidationResult,
 } from '@social-lite/core';
 import { getPool, many, maybeOne, one, withTx, type Queryable } from '@social-lite/db';
 import type { Ctx } from '../context.js';
 import { audit } from '../audit.js';
-import { assertBrand, assertUuid, brandAllowed, brandFilter, requireAction, type BrandRow } from '../tenancy.js';
+import { assertBrand, assertUuid, authorizeCtx, brandAllowed, brandFilter, requireAction, type BrandRow } from '../tenancy.js';
 import { beginIdempotent, completeIdempotent } from '../idempotency.js';
 import { brandConnections, capabilitiesFor, contentHash, excerpt, mediaFacts, type ConnectionRow } from './shared.js';
 import { assetsByIds } from '../media/assets.js';
+import { recordVersion, saveConflictCopy } from './versions.js';
 import { cropAwareMediaFacts } from '../crops/index.js';
 import { approvalJson, connectionJson, deliveryJson, DELIVERY_SELECT, scheduleJson, type ApprovalRow, type DeliveryRow, type ScheduleRow } from './serialize.js';
 
@@ -69,6 +70,7 @@ export async function createPost(ctx: Ctx, brandId: string, input: { title?: str
     const post = await one<{ id: string }>(tx,
       `INSERT INTO posts(workspace_id, brand_id, created_by, updated_by, title, draft) VALUES ($1,$2,$3,$3,$4,$5) RETURNING id`,
       [ctx.access.workspaceId, brandId, ctx.actor.userId, input.title?.slice(0, 200) ?? null, JSON.stringify(draft)]);
+    await recordVersion(tx, ctx, { postId: post.id, version: 1, baseVersion: 1, kind: 'created', title: input.title?.slice(0, 200) ?? null, draft });
     await audit(tx, { workspaceId: ctx.access.workspaceId, brandId, actorUserId: ctx.actor.userId, action: 'post.created', resourceType: 'post', resourceId: post.id, correlationId: ctx.correlationId });
     const body = { id: post.id };
     await completeIdempotent(tx, { workspaceId: ctx.access.workspaceId, action: 'post.create', key: idemKey!, status: 200, body });
@@ -76,8 +78,23 @@ export async function createPost(ctx: Ctx, brandId: string, input: { title?: str
   });
 }
 
-export async function updateDraft(ctx: Ctx, postId: string, input: { expected_version: number; draft?: unknown; title?: string | null; tags?: string[] }) {
+export async function updateDraft(ctx: Ctx, postId: string, input: { expected_version: number; draft?: unknown; title?: string | null; tags?: string[] },
+  opts: { kind?: 'saved' | 'restored'; restoredFrom?: string } = {}) {
   requireAction(ctx, 'drafts.edit');
+  try {
+    return await updateDraftTx(ctx, postId, input, opts);
+  } catch (err) {
+    // V2 (§12 case 11): a stale save is kept as a recoverable conflict copy — neither editor loses work.
+    if (err instanceof AppError && err.code === 'version_conflict' && input.draft !== undefined) {
+      const copy = await saveConflictCopy(ctx, postId, input).catch(() => null);
+      if (copy) throw new AppError(err.code, `${err.message}. Your version was kept in History.`, err.fieldErrors, { ...err.details, conflict_copy_id: copy.id });
+    }
+    throw err;
+  }
+}
+
+async function updateDraftTx(ctx: Ctx, postId: string, input: { expected_version: number; draft?: unknown; title?: string | null; tags?: string[] },
+  opts: { kind?: 'saved' | 'restored'; restoredFrom?: string }) {
   return withTx(async (tx) => {
     const post = await loadPost(ctx, postId, tx, true);
     if (post.archived_at) throw new AppError('invalid_state', 'This post is archived');
@@ -93,6 +110,8 @@ export async function updateDraft(ctx: Ctx, postId: string, input: { expected_ve
       `UPDATE posts SET draft=$2, title=coalesce($3, title), tags=coalesce($4, tags), version=version+1, updated_at=now(), updated_by=$5
         WHERE id=$1 RETURNING version, updated_at`,
       [post.id, JSON.stringify(draft), input.title === undefined ? null : (input.title ?? ''), input.tags ?? null, ctx.actor.userId]);
+    await recordVersion(tx, ctx, { postId: post.id, version: r.version, baseVersion: post.version, kind: opts.kind ?? 'saved',
+      title: input.title === undefined ? post.title : (input.title ?? ''), draft, restoredFrom: opts.restoredFrom ?? null });
     // AP-02: a content change invalidates any pending approval for this post.
     if (input.draft !== undefined) await invalidatePendingApprovalIfChanged(tx, ctx, post, draft);
     return { version: r.version, updated_at: r.updated_at.toISOString() };
@@ -230,8 +249,10 @@ export async function getPostDetail(ctx: Ctx, postId: string) {
   const deliveries = sched ? await deliveriesForSchedule(db, sched.id) : [];
   const [summary] = await summariesFor(db, [post]);
   const updatedBy = await maybeOne<{ email: string }>(db, `SELECT email FROM users WHERE id=$1`, [post.updated_by]);
-  const isApproved = approval?.decision === 'approved' && sched?.status === 'active';
-  const sc = canSchedule({ role: ctx.access.role, editorsCanPublish: brand.editors_can_publish, approvalRequired: brand.approval_required, contentApproved: isApproved });
+  // V2 flags from the central policy on this brand (UI convenience only; every action re-checks server-side).
+  const may = (p: Parameters<typeof authorizeCtx>[1]) => authorizeCtx(ctx, p, { brandId: post.brand_id }).allowed;
+  const maySchedule = may('content.schedule');
+  const mayPublish = maySchedule && (!ctx.access.authz || may('content.publish'));
   const live = sched && ['active', 'pending_approval'].includes(sched.status);
   const scheduleBlockedByApproval = brand.approval_required;
   return {
@@ -244,12 +265,12 @@ export async function getPostDetail(ctx: Ctx, postId: string) {
     approval: approval ? approvalJson(approval) : null,
     deliveries: deliveries.map((d) => deliveryJson(d)),
     can: {
-      edit: can(ctx.access.role, 'drafts.edit') && !post.archived_at,
-      schedule: sc.allowed && !scheduleBlockedByApproval && !post.archived_at,
-      schedule_reason: scheduleBlockedByApproval ? 'This brand requires approval: submit for review.' : sc.reason,
-      submit: can(ctx.access.role, 'drafts.edit') && brand.approval_required && !post.archived_at,
-      publish_now: sc.allowed && !scheduleBlockedByApproval && !post.archived_at,
-      cancel: !!live && (can(ctx.access.role, 'schedule.publish') || ctx.access.role === 'approver' || (ctx.access.role === 'editor' && brand.editors_can_publish)),
+      edit: may('drafts.edit') && !post.archived_at,
+      schedule: maySchedule && !scheduleBlockedByApproval && !post.archived_at,
+      schedule_reason: scheduleBlockedByApproval ? 'This brand requires approval: submit for review.' : maySchedule ? undefined : 'Scheduling needs a publisher role on this brand. Submit for review or ask a publisher.',
+      submit: may('drafts.edit') && brand.approval_required && !post.archived_at,
+      publish_now: mayPublish && !scheduleBlockedByApproval && !post.archived_at,
+      cancel: !!live && (maySchedule || (sched?.status === 'pending_approval' && may('drafts.edit'))),
     },
   };
 }

@@ -4,6 +4,7 @@ import { AppError } from '@social-lite/core';
 import { getPool, many, maybeOne, type Queryable } from '@social-lite/db';
 import type { Ctx } from './context.js';
 import { assertUuid, requireAction } from './tenancy.js';
+import { filterReadable } from './collab/notifications.js';
 
 export interface AuditEventDto {
   id: string; action: string; resource_type: string; resource_id: string | null; brand_id: string | null;
@@ -47,16 +48,19 @@ export interface NotificationDto {
 
 export async function listNotifications(ctx: Ctx, q: { unread?: boolean; limit?: number | null } = {}, db: Queryable = getPool()): Promise<{ items: NotificationDto[]; unread_count: number }> {
   const limit = Math.min(Math.max(q.limit ?? 50, 1), 100);
+  // V2 (collab/notifications.ts): in-app only, and the recipient must STILL be entitled to the referenced
+  // resource (access may have changed since the notification was created) — re-checked on every read.
   const rows = await many<{ id: string; severity: NotificationDto['severity']; kind: string; title: string; body: string | null; reference_type: string | null;
-    reference_id: string | null; occurrences: number; created_at: Date; last_seen_at: Date; read_at: Date | null }>(db,
-    `SELECT id, severity, kind, title, body, reference_type, reference_id, occurrences, created_at, last_seen_at, read_at
-       FROM notifications WHERE workspace_id=$1 AND user_id=$2 AND ($3::boolean IS NOT TRUE OR read_at IS NULL)
+    reference_id: string | null; occurrences: number; created_at: Date; last_seen_at: Date; read_at: Date | null; brand_id: string | null; required_permission: string | null }>(db,
+    `SELECT id, severity, kind, title, body, reference_type, reference_id, occurrences, created_at, last_seen_at, read_at, brand_id, required_permission
+       FROM notifications WHERE workspace_id=$1 AND user_id=$2 AND in_app AND ($3::boolean IS NOT TRUE OR read_at IS NULL)
       ORDER BY last_seen_at DESC, id DESC LIMIT $4`, [ctx.access.workspaceId, ctx.actor.userId, q.unread ?? false, limit]);
-  const c = await maybeOne<{ n: number }>(db,
-    `SELECT count(*)::int AS n FROM notifications WHERE workspace_id=$1 AND user_id=$2 AND read_at IS NULL`, [ctx.access.workspaceId, ctx.actor.userId]);
+  const visible = await filterReadable(ctx, rows, db);
+  const unread = await many<{ id: string; brand_id: string | null; required_permission: string | null }>(db,
+    `SELECT id, brand_id, required_permission FROM notifications WHERE workspace_id=$1 AND user_id=$2 AND in_app AND read_at IS NULL LIMIT 500`, [ctx.access.workspaceId, ctx.actor.userId]);
   return {
-    items: rows.map((r) => ({ ...r, created_at: r.created_at.toISOString(), last_seen_at: r.last_seen_at.toISOString(), read_at: r.read_at?.toISOString() ?? null })),
-    unread_count: c?.n ?? 0,
+    items: visible.map(({ brand_id: _b, required_permission: _p, ...r }) => ({ ...r, created_at: r.created_at.toISOString(), last_seen_at: r.last_seen_at.toISOString(), read_at: r.read_at?.toISOString() ?? null })),
+    unread_count: (await filterReadable(ctx, unread, db)).length,
   };
 }
 

@@ -1,6 +1,6 @@
 // Client-side mirrors of the HTTP contract in docs/API.md. Types only; no runtime.
 import type {
-  Action, ChannelCapabilities, ConnectionStatus, DeliveryState, DraftContent, PostAggregateStatus,
+  Action, ChannelCapabilities, ConnectionStatus, DeliveryState, DraftContent, Permission, PostAggregateStatus,
   Provider, ResolvedVariant, Role, ValidationIssue,
 } from '@social-lite/core';
 
@@ -9,10 +9,13 @@ export type { Action, ConnectionStatus, DeliveryState, DraftContent, PostAggrega
 export interface SessionInfo {
   user: { id: string; email: string; name: string | null };
   csrf_token: string;
-  workspace: { id: string; name: string; role: Role; is_demo: boolean; timezone: string; publishing_paused: boolean } | null;
+  workspace: { id: string; name: string; role: Role; is_demo: boolean; timezone: string; publishing_paused: boolean; primary_role?: string } | null;
   workspaces: Array<{ id: string; name: string; role: Role; is_demo: boolean }>;
   brands: SessionBrand[];
   permissions: Record<Action, boolean>;
+  /** V2 flags (stream B): permission held anywhere, per-brand permissions, policy version. */
+  v2?: { permissions: Partial<Record<Permission, boolean>>; brands: Record<string, Permission[]>; policy_version: number; mfa_verified: boolean;
+    pending_ownership_transfer: { id: string; from_email: string } | null };
   mock_providers_enabled: boolean;
   app_env: 'development' | 'test' | 'production';
   /** Present in the implementation: whether this user may create a workspace (POST /api/workspaces). */
@@ -136,6 +139,10 @@ export interface PlannerItem {
   schedule_id: string; post_id: string; brand_id: string; title: string | null; excerpt: string; due_at: string;
   input_timezone: string; input_local_time: string | null; status: PostAggregateStatus; schedule_status: Schedule['status'];
   destinations: Array<{ connection_id: string; provider: Provider; is_mock: boolean; state: DeliveryState }>;
+  /** V2 calendar ownership (stream C) — only for brands already in scope. */
+  campaign?: { id: string; name: string | null } | null; team?: { id: string; name: string | null } | null;
+  assignee?: { id: string; email: string | null; name: string | null } | null;
+  review?: { id: string; decision: string; stage: number; stage_count: number } | null;
 }
 
 /** Contract names ApprovalSummary without fields; everything beyond Approval is optional and rendered defensively. */

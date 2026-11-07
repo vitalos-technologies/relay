@@ -6,14 +6,15 @@ import {
 } from '@social-lite/services';
 import { createBrand as createBrandSvc, getBrand, listBrands, setBrandPaused, updateBrand } from '../../packages/services/src/brands.js';
 import { createUploadIntent, listAssets } from '../../packages/services/src/media/assets.js';
-import { removeMember, updateMember } from '../../packages/services/src/members.js';
+import { updateMember } from '../../packages/services/src/members.js';
+import { acceptOwnershipTransfer, proposeOwnershipTransfer, removeMember } from '../../packages/services/src/lifecycle.js';
 import { archiveTemplate, createTemplate, listTemplates, updateTemplate } from '../../packages/services/src/templates.js';
 import { listAudit } from '../../packages/services/src/audit-read.js';
 import {
   canCreateWorkspace, createWorkspace as createWorkspaceSvc, sessionInfo, setWorkspacePaused, switchWorkspace, updateWorkspace,
 } from '../../packages/services/src/workspaces.js';
 import { createSession } from '../../packages/services/src/auth/session.js';
-import { addMember, closeTestPool, createBrand, createUser, ctxFor, tenant, testPool } from './helpers.js';
+import { addMember, closeTestPool, createBrand, createUser, ctxFor, tenant, testPool, v2Ctx } from './helpers.js';
 
 const NF = { code: 'not_found' };
 const FORBIDDEN = { code: 'forbidden' };
@@ -120,23 +121,26 @@ describe('roles', () => {
     expect((await listBrands(ctx)).length).toBeGreaterThan(0);
   });
 
-  it('admins cannot demote or remove an owner; owners can; the last owner is protected', async () => {
+  it('admins cannot demote or remove an owner; ownership moves only by transfer; the last owner is protected (V2)', async () => {
     const t = await tenant();
     const admin = await createUser();
     const editor = await createUser();
     await addMember(t.workspaceId, admin.id, 'admin');
     await addMember(t.workspaceId, editor.id, 'editor');
-    const adminCtx = ctxFor(admin.id, t.workspaceId, 'admin');
-    await expect(updateMember(adminCtx, t.owner.id, { role: 'viewer' })).rejects.toMatchObject(FORBIDDEN);
-    await expect(removeMember(adminCtx, t.owner.id)).rejects.toMatchObject(FORBIDDEN);
-    await expect(updateMember(adminCtx, editor.id, { role: 'owner' })).rejects.toMatchObject(FORBIDDEN);
+    const adminCtx = () => v2Ctx(admin.id, t.workspaceId);
+    await expect(updateMember(await adminCtx(), t.owner.id, { role: 'viewer' })).rejects.toMatchObject(FORBIDDEN);
+    await expect(removeMember(await adminCtx(), t.owner.id)).rejects.toMatchObject(FORBIDDEN);
+    // Ownership is never granted by a role change (only the two-step transfer flow).
+    await expect(updateMember(await adminCtx(), editor.id, { role: 'owner' })).rejects.toMatchObject({ code: 'validation_failed' });
     // Admin may change non-owners.
-    expect((await updateMember(adminCtx, editor.id, { role: 'approver' })).role).toBe('approver');
-    // The sole owner cannot demote themselves.
-    await expect(updateMember(t.ownerCtx, t.owner.id, { role: 'admin' })).rejects.toMatchObject({ code: 'invalid_state' });
-    // Owner can promote another owner, after which demotion is allowed.
-    await updateMember(t.ownerCtx, admin.id, { role: 'owner' });
-    expect((await updateMember(t.ownerCtx, t.owner.id, { role: 'admin' })).role).toBe('admin');
+    expect((await updateMember(await adminCtx(), editor.id, { role: 'approver' })).role).toBe('approver');
+    // The sole owner cannot leave / be removed.
+    await expect(removeMember(await v2Ctx(t.owner.id, t.workspaceId), t.owner.id)).rejects.toMatchObject({ code: 'invalid_state' });
+    // Transfer: owner proposes (fresh auth), the admin accepts; the previous owner stays as admin.
+    const tr = await proposeOwnershipTransfer(await v2Ctx(t.owner.id, t.workspaceId), { to_user_id: admin.id });
+    await acceptOwnershipTransfer(await adminCtx(), tr.id);
+    expect(await loadAccess(admin.id, t.workspaceId, testPool())).toMatchObject({ role: 'owner' });
+    expect(await loadAccess(t.owner.id, t.workspaceId, testPool())).toMatchObject({ role: 'admin' });
   });
 
   it('emergency pause by an approver pauses waiting deliveries in the same transaction and resumes them', async () => {

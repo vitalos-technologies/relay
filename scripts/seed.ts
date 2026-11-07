@@ -1,6 +1,6 @@
 // Seed SYNTHETIC demo data for local development/review. Never runs in production.
 //  - Demo workspace with two clearly labelled demo brands and simulated (mock_) destinations
-//  - Pre-provisioned users matching the local Dex identities (bound on first verified login)
+//  - Pre-provisioned users matching the local Keycloak identities (bound on first verified login)
 //  - A real image uploaded through the same upload-intent → validation pipeline
 //  - Sample drafts, a scheduled post and recent simulated results
 // A second "Other Workspace" exists only to demonstrate tenant isolation.
@@ -12,6 +12,7 @@ import { config, createPost, publishNow, schedulePost, type Ctx } from '@social-
 import { connectMock } from '@social-lite/services/connections/index';
 import { completeUpload, createUploadIntent } from '@social-lite/services/media/index';
 import { ensureBucket } from '@social-lite/services/storage';
+import { seedV2OtherOrg, seedV2Tenancy } from './seed-v2-tenancy.js';
 
 const cfg = config();
 if (cfg.APP_ENV === 'production') throw new Error('Refusing to seed demo data in production');
@@ -79,6 +80,8 @@ async function main() {
   const brandA = await one<{ id: string }>(db, `INSERT INTO brands(workspace_id, name, is_demo, voice) VALUES ($1,'Vitalos (demo)',true,$2) RETURNING id`,
     [ws.id, JSON.stringify({ tone: 'Calm, practical, evidence-led', hashtags: ['#Vitalos'], default_cta: 'Learn more' })]);
   const brandB = await one<{ id: string }>(db, `INSERT INTO brands(workspace_id, name, is_demo, approval_required) VALUES ($1,'TipSignal (demo)',true,true) RETURNING id`, [ws.id]);
+  // V2 (stream B): scoped grants, teams, guests, team manager — before any work is scheduled.
+  await seedV2Tenancy(db, { ws: ws.id, brandA: brandA.id, brandB: brandB.id, ownerId: ids.owner! });
 
   const owner = ctx(ids.owner!, ws.id, 'owner');
   const conns: Record<string, Record<Provider, string>> = {};
@@ -116,13 +119,20 @@ async function main() {
   // 5) TipSignal brand requires approval: a draft awaiting review is created by the editor in the UI flow; here a draft only.
   await createPost(ctx(ids.editor!, ws.id, 'editor'), brandB.id, { title: 'Draft: weekend preview', draft: draft('Weekend preview: fixtures and form guide. Probabilities are not promises.', imgB, brandB.id) }, randomUUID());
 
-  // TipSignal (demo) receives signed source events as drafts (V1.1). Drafts are attributed to the editor.
-  await db.query(`INSERT INTO integration_bindings(kind, workspace_id, brand_id, acting_user_id) VALUES ('tipsignal',$1,$2,$3) ON CONFLICT (kind) DO NOTHING`, [ws.id, brandB.id, ids.editor]);
+  // TipSignal (demo) receives signed source events as drafts (V1.1). V2: drafts are created by a service account
+  // holding only an `integration` grant (content.create_draft) on the TipSignal brand; the owner is its named owner.
+  const tipsignalSa = await one<{ id: string }>(db, `INSERT INTO service_accounts(workspace_id, name, owner_user_id, purpose, created_by, description)
+    VALUES ($1,'TipSignal',$2,'tipsignal',$2,'Creates drafts from signed TipSignal events') RETURNING id`, [ws.id, ids.owner]);
+  await db.query(`INSERT INTO scoped_role_grants(workspace_id, principal_type, service_account_id, role, scope_type, brand_id, granted_by, source)
+    VALUES ($1,'service_account',$2,'integration','brand',$3,$4,'seed')`, [ws.id, tipsignalSa.id, brandB.id, ids.owner]);
+  await db.query(`INSERT INTO integration_bindings(kind, workspace_id, brand_id, service_account_id) VALUES ('tipsignal',$1,$2,$3) ON CONFLICT (kind) DO NOTHING`, [ws.id, brandB.id, tipsignalSa.id]);
 
   // Isolation demo tenant
   const other = await one<{ id: string }>(db, `INSERT INTO workspaces(name, is_demo) VALUES ('Other Workspace', true) RETURNING id`);
   await db.query(`INSERT INTO memberships(workspace_id, user_id, role) VALUES ($1,$2,'owner')`, [other.id, outsider]);
   await db.query(`INSERT INTO brands(workspace_id, name, is_demo) VALUES ($1,'Other Brand (demo)',true)`, [other.id]);
+
+  await seedV2OtherOrg(db, { other: other.id, outsider, ownerId: ids.owner! });
 
   console.log(JSON.stringify({ msg: 'seeded', workspaceId: ws.id, brands: [brandA.id, brandB.id], note: 'Start the worker to deliver the simulated publish-now posts.' }));
 }

@@ -3,6 +3,7 @@
 import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import {
+  PROVIDER_LABEL,
   AppError, DISPATCHABLE_CONNECTION_STATUSES, PROVIDERS, TransportError, invalidState,
   type ConnectionHealth, type ConnectionStatus, type Provider,
 } from '@social-lite/core';
@@ -24,7 +25,7 @@ import {
   type ConnectionJson, type ConnectionRow,
 } from './store.js';
 
-const PROVIDER_NAME: Record<Provider, string> = { facebook: 'Facebook', instagram: 'Instagram', telegram: 'Telegram', x: 'X' };
+const PROVIDER_NAME: Record<Provider, string> = PROVIDER_LABEL; // V3: covers every provider
 
 // ------------------------------------------------------------------ provider status
 export interface ProviderStatusJson {

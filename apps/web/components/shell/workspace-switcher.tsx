@@ -2,8 +2,10 @@
 import { useState } from 'react';
 import { Check, ChevronsUpDown, FlaskConical } from 'lucide-react';
 import { api } from '@/lib/client/api';
+import { enterWorkspace } from '@/lib/client/workspace-sync';
 import { useSession } from '@/lib/client/session';
 import { ROLE_LABEL } from '@/lib/client/format';
+import { V2_ROLE_LABEL } from '@/components/team/shared';
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger, useToast } from '@/components/ui';
 
 export function WorkspaceSwitcher() {
@@ -18,7 +20,8 @@ export function WorkspaceSwitcher() {
     setBusy(true);
     try {
       await api.post('/api/session/workspace', { workspace_id: id });
-      window.location.assign('/');
+      // Drop every cache from the previous workspace (memory, storage, other tabs), then hard-reload.
+      enterWorkspace(id);
     } catch (e) {
       toast.error(e, 'Could not switch workspace');
       setBusy(false);
@@ -39,7 +42,7 @@ export function WorkspaceSwitcher() {
           </span>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[13px] font-medium">{ws.name}</span>
-            <span className="block truncate text-[11px] text-muted">{ROLE_LABEL[ws.role]}{ws.is_demo ? ' · Demo' : ''}</span>
+            <span className="block truncate text-[11px] text-muted">{(ws.primary_role && V2_ROLE_LABEL[ws.primary_role]) || ROLE_LABEL[ws.role]}{ws.is_demo ? ' · Demo' : ''}</span>
           </span>
           <ChevronsUpDown aria-hidden className="size-4 text-muted" />
         </button>

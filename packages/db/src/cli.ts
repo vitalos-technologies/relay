@@ -2,7 +2,11 @@ import { createPool } from './pool.js';
 import { migrate, resetDatabase } from './migrate.js';
 
 const cmd = process.argv[2];
-const pool = createPool(undefined, 2);
+// Migrations run as the migrator role (DDL); reset needs the schema owner. Both fall back to DATABASE_URL.
+const url = cmd === 'reset'
+  ? process.env.DATABASE_ADMIN_URL ?? process.env.MIGRATOR_DATABASE_URL ?? process.env.DATABASE_URL
+  : process.env.MIGRATOR_DATABASE_URL ?? process.env.DATABASE_URL;
+const pool = createPool(url, 2);
 try {
   if (cmd === 'migrate') {
     const r = await migrate(pool);

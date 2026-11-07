@@ -15,6 +15,17 @@ export async function onScopePaused(db: Queryable, scope: { workspaceId: string;
       WHERE workspace_id=$1 AND state IN ('scheduled','retry_wait')
         AND ($2::uuid IS NULL OR brand_id=$2) AND ($3::uuid IS NULL OR connection_id=$3)`,
     [scope.workspaceId, scope.brandId ?? null, scope.connectionId ?? null]);
+  // V3: provider-held releases (scheduling_owner='provider', e.g. YouTube publishAt) are already at the provider;
+  // poll them now so the worker attempts remote cancellation (engine/remote-schedule.ts) and reports residual risk.
+  const held = await db.query<{ id: string }>(
+    `UPDATE deliveries SET next_attempt_at=now(), updated_at=now()
+      WHERE workspace_id=$1 AND state='processing' AND (scheduling_owner='provider' OR preparation->'data' ? 'remoteSchedule')
+        AND ($2::uuid IS NULL OR brand_id=$2) AND ($3::uuid IS NULL OR connection_id=$3)
+      RETURNING id`,
+    [scope.workspaceId, scope.brandId ?? null, scope.connectionId ?? null]);
+  for (const row of held.rows) {
+    await writeOutbox(db, { workspaceId: scope.workspaceId, aggregateType: 'delivery', aggregateId: row.id, eventType: 'delivery.due' });
+  }
   return r.rowCount ?? 0;
 }
 
@@ -64,7 +75,8 @@ export async function onConnectionRestored(db: Queryable, connectionId: string):
       WHERE connection_id=$1 AND state='blocked' AND publish_before <= now()`, [connectionId]);
   const restored = await db.query(
     `UPDATE deliveries SET state='scheduled', blocked_reason=NULL, next_attempt_at=greatest(next_attempt_at, now()), updated_at=now()
-      WHERE connection_id=$1 AND state='blocked' RETURNING id, workspace_id`, [connectionId]);
+      WHERE connection_id=$1 AND state='blocked' AND coalesce(last_error_code, '') <> 'authority_hold' RETURNING id, workspace_id`, [connectionId]);
+  // (authority_hold: released only by adoption — engine/authority.ts — never by a reconnect)
   for (const row of restored.rows as Array<{ id: string; workspace_id: string }>) {
     await writeOutbox(db, { workspaceId: row.workspace_id, aggregateType: 'delivery', aggregateId: row.id, eventType: 'delivery.due' });
   }

@@ -1,10 +1,10 @@
 // User-initiated delivery actions: safe retry and manual resolution of Unknown results (DE-02, §11).
-import { AppError, can, notFound } from '@social-lite/core';
+import { AppError, notFound } from '@social-lite/core';
 import { getPool, many, maybeOne, one, withTx } from '@social-lite/db';
 import type { Ctx } from '../context.js';
 import { audit } from '../audit.js';
 import { writeOutbox } from '../outbox.js';
-import { assertBrand, assertUuid, brandAllowed } from '../tenancy.js';
+import { assertBrand, assertUuid, authorizeCtx, brandAllowed } from '../tenancy.js';
 import { DELIVERY_SELECT, deliveryJson, type DeliveryRow } from '../posts/serialize.js';
 import { completeScheduleIfDone } from './process.js';
 
@@ -16,8 +16,9 @@ async function loadDelivery(ctx: Ctx, id: string, lock = false) {
   return d;
 }
 
-function mayPublish(ctx: Ctx, editorsCanPublish: boolean): boolean {
-  return can(ctx.access.role, 'schedule.publish') || ctx.access.role === 'approver' || (ctx.access.role === 'editor' && editorsCanPublish);
+/** V2: retry/resolve need publishing.retry on the brand (publisher, brand_manager, admin, owner). */
+function mayPublish(ctx: Ctx, brandId: string): boolean {
+  return authorizeCtx(ctx, 'publishing.retry', { brandId }).allowed;
 }
 
 export async function attemptsFor(deliveryId: string) {
@@ -37,9 +38,12 @@ export async function retryDelivery(ctx: Ctx, deliveryId: string, opts: { acknow
   return withTx(async (tx) => {
     const d0 = await loadDelivery(ctx, deliveryId);
     const brand = await assertBrand(ctx, d0.brand_id, tx);
-    if (!mayPublish(ctx, brand.editors_can_publish)) throw new AppError('forbidden', 'You cannot retry publications for this brand');
+    if (!mayPublish(ctx, brand.id)) throw new AppError('forbidden', 'You cannot retry publications for this brand');
     const d = await one<DeliveryRow & { lease_owner: string | null }>(tx, `SELECT d.*, NULL::text AS display_name FROM deliveries d WHERE d.id=$1 FOR UPDATE`, [deliveryId]);
     if (d.state === 'published') throw new AppError('invalid_state', 'This destination is already published; it will not be sent again.');
+    if (d.state === 'blocked' && (d as { last_error_code?: string | null }).last_error_code === 'authority_hold') {
+      throw new AppError('invalid_state', 'This publication is held because its scheduler lost publishing rights. Adopt it from the adoption queue instead.', undefined, { reason: 'authority_hold' });
+    }
     if (d.state === 'unknown' && !opts.acknowledge_duplicate_risk) {
       throw new AppError('invalid_state', 'The previous attempt may already have been published. Confirm you accept the risk of a duplicate post, or check the channel and resolve it instead.', undefined, { reason: 'duplicate_risk_ack_required' });
     }
@@ -85,7 +89,7 @@ export async function resolveDelivery(ctx: Ctx, deliveryId: string, input: { out
   return withTx(async (tx) => {
     const d0 = await loadDelivery(ctx, deliveryId);
     const brand = await assertBrand(ctx, d0.brand_id, tx);
-    if (!mayPublish(ctx, brand.editors_can_publish)) throw new AppError('forbidden', 'You cannot resolve publications for this brand');
+    if (!mayPublish(ctx, brand.id)) throw new AppError('forbidden', 'You cannot resolve publications for this brand');
     const d = await one<{ state: string; lease_owner: string | null; workspace_id: string; schedule_id: string; post_id: string; brand_id: string }>(tx, `SELECT * FROM deliveries WHERE id=$1 FOR UPDATE`, [deliveryId]);
     if (d.state !== 'unknown') throw new AppError('invalid_state', 'Only results that are Unknown can be resolved manually.');
     if (d.lease_owner) throw new AppError('invalid_state', 'An automatic check is running. Try again in a minute.');

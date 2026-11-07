@@ -11,7 +11,8 @@ export type OutboxEventType =
   | 'invitation.created'        // send invite email
   | 'webhook.received'
   | 'tipsignal.event_received'
-  | 'notification.created';     // email delivery for critical notifications
+  | 'notification.created'      // email delivery for critical notifications
+  | 'comment.created' | 'assignment.changed' | 'review.shared';  // V2 collaboration (collab/**)
 
 export async function writeOutbox(
   db: Queryable,

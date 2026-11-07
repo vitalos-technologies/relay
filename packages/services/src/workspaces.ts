@@ -1,5 +1,5 @@
 // Session info, workspace switching/settings/pause and first-run workspace creation.
-import { AppError, can, isValidTimeZone, notFound, type Action, type Role } from '@social-lite/core';
+import { AppError, LEGACY_ACTION_MAP, PERMISSIONS, can, isValidTimeZone, notFound, type Action, type Permission, type Role } from '@social-lite/core';
 import { getPool, many, maybeOne, withTx, type Queryable } from '@social-lite/db';
 import { audit } from './audit.js';
 import { setActiveWorkspace, type SessionRecord } from './auth/session.js';
@@ -8,6 +8,8 @@ import { config, mockProvidersEnabled } from './config.js';
 import type { Actor, Ctx } from './context.js';
 import { onScopePaused, onScopeResumed } from './engine/hooks.js';
 import { isUuid, loadAccess, requireAction } from './tenancy.js';
+import { authorize, hasAnywhere } from './authz.js';
+import type { WorkspaceAccess } from './context.js';
 
 const ALL_ACTIONS = {
   'workspace.manage_ownership': true, 'workspace.delete': true, 'workspace.settings': true,
@@ -18,8 +20,38 @@ const ALL_ACTIONS = {
 } satisfies Record<Action, true>;
 export const ACTIONS = Object.keys(ALL_ACTIONS) as Action[];
 
+/** V1 role matrix (legacy helper; real sessions use permissionsForAccess). */
 export function permissionsFor(role: Role | null): Record<Action, boolean> {
   return Object.fromEntries(ACTIONS.map((a) => [a, role ? can(role, a) : false])) as Record<Action, boolean>;
+}
+
+/**
+ * Legacy UI flags computed from the V2 policy: each V1 action maps to its V2 permission and is true when
+ * the member holds it on SOME scope (MFA/step-up are enforced per request, so they do not hide buttons).
+ */
+export function permissionsForAccess(access: WorkspaceAccess | null): Record<Action, boolean> {
+  const a = access?.authz;
+  return Object.fromEntries(ACTIONS.map((x) => [x, !!a && hasAnywhere(a, LEGACY_ACTION_MAP[x]!)])) as Record<Action, boolean>;
+}
+
+const ROLE_ORDER = ['owner', 'admin', 'brand_manager', 'publisher', 'approver', 'editor', 'team_manager', 'analyst', 'viewer', 'exporter', 'guest'];
+/** Highest V2 preset the member currently holds (display only). */
+export function primaryRole(access: WorkspaceAccess | null): string | undefined {
+  const now = Date.now();
+  const roles = new Set<string>((access?.authz?.subject.grants ?? []).filter((g) => !g.expiresAt || new Date(g.expiresAt).getTime() > now).map((g) => g.role));
+  return ROLE_ORDER.find((r) => roles.has(r));
+}
+
+/** V2 flags: permission held anywhere, and the permissions held per visible brand. */
+export function v2PermissionsForAccess(access: WorkspaceAccess | null, brandIds: string[] = access?.brandIds ?? []): { permissions: Record<Permission, boolean>; brands: Record<string, Permission[]> } {
+  const a = access?.authz;
+  const permissions = Object.fromEntries(PERMISSIONS.map((p) => [p, !!a && hasAnywhere(a, p)])) as Record<Permission, boolean>;
+  const brands: Record<string, Permission[]> = {};
+  if (a) {
+    const noAssurance = { ...a, subject: { ...a.subject, assurance: null } };
+    for (const b of brandIds) brands[b] = PERMISSIONS.filter((p) => authorize(noAssurance, p, { brandId: b }).allowed);
+  }
+  return { permissions, brands };
 }
 
 export interface WorkspaceDto {
@@ -40,10 +72,15 @@ export const workspaceDto = (w: WorkspaceRow): WorkspaceDto => ({
 export interface SessionInfo {
   user: { id: string; email: string; name: string | null };
   csrf_token: string;
-  workspace: { id: string; name: string; role: Role; is_demo: boolean; timezone: string; publishing_paused: boolean } | null;
+  workspace: { id: string; name: string; role: Role; is_demo: boolean; timezone: string; publishing_paused: boolean;
+    /** V2: highest preset held (direct or via team), for display. */ primary_role?: string } | null;
   workspaces: Array<{ id: string; name: string; role: Role; is_demo: boolean }>;
   brands: Array<{ id: string; name: string; timezone: string; publishing_paused: boolean; approval_required: boolean; is_demo: boolean }>;
+  /** Legacy (V1 action) flags, computed from V2 grants. */
   permissions: Record<Action, boolean>;
+  /** V2 permission flags (held on some scope) + per-brand permissions; policy version they were computed at. */
+  v2: { permissions: Record<Permission, boolean>; brands: Record<string, Permission[]>; policy_version: number; mfa_verified: boolean;
+    pending_ownership_transfer: { id: string; from_email: string } | null };
   mock_providers_enabled: boolean;
   app_env: 'development' | 'test' | 'production';
   /** First-run: true when this user may create a workspace (POST /api/workspaces). */
@@ -63,7 +100,7 @@ export async function sessionInfo(session: SessionRecord, actor: Actor, db: Quer
   const workspaces = await many<{ id: string; name: string; role: Role; is_demo: boolean; timezone: string; publishing_paused: boolean }>(db,
     `SELECT w.id, w.name, m.role, w.is_demo, w.timezone, w.publishing_paused
        FROM memberships m JOIN workspaces w ON w.id = m.workspace_id
-      WHERE m.user_id=$1 AND m.removed_at IS NULL AND w.state='active' ORDER BY w.name, w.id`, [actor.userId]);
+      WHERE m.user_id=$1 AND m.removed_at IS NULL AND m.status='active' AND w.state='active' ORDER BY w.name, w.id`, [actor.userId]);
   let active = workspaces.find((w) => w.id === session.activeWorkspaceId) ?? null;
   if (!active && workspaces.length) {
     active = workspaces[0]!;
@@ -71,8 +108,9 @@ export async function sessionInfo(session: SessionRecord, actor: Actor, db: Quer
   }
   let brands: BrandDto[] = [];
   let role: Role | null = null;
+  let access: WorkspaceAccess | null = null;
   if (active) {
-    const access = await loadAccess(actor.userId, active.id, db);
+    access = await loadAccess(actor.userId, active.id, db, { mfaVerified: !!session.mfaVerified, authTime: session.authTime?.toISOString() ?? null });
     role = access?.role ?? null;
     if (access) {
       brands = (await many<Parameters<typeof brandDto>[0]>(db,
@@ -83,16 +121,25 @@ export async function sessionInfo(session: SessionRecord, actor: Actor, db: Quer
   return {
     user: { id: actor.userId, email: actor.email, name: actor.name },
     csrf_token: session.csrfToken,
-    workspace: active && role ? { id: active.id, name: active.name, role, is_demo: active.is_demo, timezone: active.timezone, publishing_paused: active.publishing_paused } : null,
+    workspace: active && role ? { id: active.id, name: active.name, role, is_demo: active.is_demo, timezone: active.timezone, publishing_paused: active.publishing_paused,
+      primary_role: primaryRole(access) } : null,
     workspaces: workspaces.map((w) => ({ id: w.id, name: w.name, role: w.role, is_demo: w.is_demo })),
     brands: brands.map((b) => ({ id: b.id, name: b.name, timezone: b.timezone, publishing_paused: b.publishing_paused, approval_required: b.approval_required, is_demo: b.is_demo })),
-    permissions: permissionsFor(role),
+    permissions: permissionsForAccess(access),
+    v2: { ...v2PermissionsForAccess(access, brands.map((b) => b.id)), policy_version: access?.authz?.policyVersion ?? 0, mfa_verified: !!session.mfaVerified,
+      pending_ownership_transfer: access ? await maybeOne<{ id: string; from_email: string }>(db,
+        `SELECT t.id, u.email AS from_email FROM ownership_transfers t JOIN users u ON u.id=t.from_user_id
+          WHERE t.workspace_id=$1 AND t.to_user_id=$2 AND t.status='pending' AND t.expires_at > now() LIMIT 1`, [active!.id, actor.userId]) : null },
     mock_providers_enabled: mockProvidersEnabled(),
     app_env: config().APP_ENV,
     can_create_workspace: workspaces.length === 0 ? await canCreateWorkspace(actor.userId, db) : false,
   };
 }
 
+/**
+ * Switch the session's active workspace. Authority is the membership re-checked here (a client-supplied
+ * workspace id is never proof). The client must drop every cached response on switch (lib/client).
+ */
 export async function switchWorkspace(session: SessionRecord, actor: Actor, workspaceId: string, db: Queryable = getPool()): Promise<SessionInfo> {
   const access = isUuid(workspaceId) ? await loadAccess(actor.userId, workspaceId, db) : null;
   if (!access) throw notFound('Workspace');
@@ -175,6 +222,9 @@ export async function createWorkspace(session: SessionRecord, actor: Actor, inpu
     const w = (await maybeOne<WorkspaceRow>(tx,
       `INSERT INTO workspaces(name, timezone, is_demo) VALUES ($1,$2,false) RETURNING *`, [name, tz]))!;
     await tx.query(`INSERT INTO memberships(workspace_id, user_id, role) VALUES ($1,$2,'owner')`, [w.id, actor.userId]);
+    // V2: authority is the scoped owner grant (memberships.role is only a legacy summary).
+    await tx.query(`INSERT INTO scoped_role_grants(workspace_id, principal_type, user_id, role, scope_type, granted_by, source) VALUES ($1,'user',$2,'owner','workspace',$2,'workspace_created')`, [w.id, actor.userId]);
+    await tx.query(`INSERT INTO membership_status_history(workspace_id, user_id, from_status, to_status, actor_user_id, reason) VALUES ($1,$2,NULL,'active',$2,'workspace_created')`, [w.id, actor.userId]);
     const b = (await maybeOne<Parameters<typeof brandDto>[0]>(tx,
       `INSERT INTO brands(workspace_id, name, timezone) VALUES ($1,$2,$3) RETURNING *, 0 AS connection_count`, [w.id, brandName, tz]))!;
     await setActiveWorkspace(tx, session.id, w.id);
@@ -182,4 +232,15 @@ export async function createWorkspace(session: SessionRecord, actor: Actor, inpu
       diff: { name, timezone: tz, brand_id: b.id }, correlationId });
     return { workspace: workspaceDto(w), brand: brandDto(b) };
   });
+}
+
+/**
+ * A tab that still shows workspace A must not receive workspace B data after a switch in another tab:
+ * the client sends the workspace it rendered (X-Workspace-Id); a mismatch is refused so the tab reloads.
+ * The header is never authority — it can only cause a refusal.
+ */
+export function assertExpectedWorkspace(activeWorkspaceId: string | null, header: string | null | undefined): void {
+  if (header && activeWorkspaceId && header !== activeWorkspaceId) {
+    throw new AppError('conflict', 'You switched workspace in another tab. Reload to continue.', undefined, { reason: 'workspace_changed', active_workspace_id: activeWorkspaceId });
+  }
 }

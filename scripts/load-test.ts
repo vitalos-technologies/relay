@@ -1,6 +1,12 @@
 // Load test (spec §3/§18): N deliveries due in the same minute across M simulated destinations,
 // processed by the REAL worker. Measures dispatch start latency and completion. Never uses real networks.
 // Usage: MOCK_PROVIDER_LATENCY_MS=250 (for the worker) then: pnpm tsx scripts/load-test.ts [jobs=100] [destinations=25]
+//
+// V2 fairness mode (stream D): two workspaces — a bulk campaign (A) and a small one (B) — on a DISPOSABLE
+// database, processed by in-process worker slots running the real claim + engine code with simulated
+// providers, once with plain due-time ordering (baseline) and once with fair dispatch. Writes
+// evidence/v2/fairness.json.
+// Usage: pnpm tsx --env-file=.env scripts/load-test.ts --fairness [bulkJobs=360] [otherJobs=30] [slots=8]
 import { randomUUID } from 'node:crypto';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { closePool, getPool, one } from '@social-lite/db';
@@ -9,10 +15,12 @@ import { config, createPost, schedulePost, type Ctx } from '@social-lite/service
 import { toLocalInput } from '@social-lite/core';
 import { connectMock } from '@social-lite/services/connections/index';
 
-const JOBS = Number(process.argv[2] ?? 100);
-const DESTS = Number(process.argv[3] ?? 25);
+const FAIRNESS = process.argv.includes('--fairness');
+const ARGS = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+const JOBS = Number(ARGS[0] ?? 100);
+const DESTS = Number(ARGS[1] ?? 25);
 if (config().APP_ENV === 'production') throw new Error('never in production');
-const db = getPool();
+const db = FAIRNESS ? (undefined as unknown as ReturnType<typeof getPool>) : getPool();
 
 async function main() {
   const owner = await one<{ id: string }>(db, `INSERT INTO users(oidc_issuer, oidc_subject, email, name) VALUES ('pending',$1,$2,'Load test') RETURNING id`, [`lt:${randomUUID()}`, `load-${randomUUID().slice(0, 8)}@loadtest.social-lite.test`]);
@@ -59,4 +67,9 @@ async function main() {
   writeFileSync(`evidence/load/load-${JOBS}-${Date.now()}.json`, JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result, null, 2));
 }
-main().then(closePool).catch(async (e) => { console.error(e); await closePool(); process.exit(1); });
+if (FAIRNESS) {
+  import('./load-test-fairness.js').then((m) => m.runFairness({ bulkJobs: Number(ARGS[0] ?? 360), otherJobs: Number(ARGS[1] ?? 30), slots: Number(ARGS[2] ?? 8) })).then(() => process.exit(0))
+    .catch((e) => { console.error(e); process.exit(1); });
+} else {
+  main().then(closePool).catch(async (e) => { console.error(e); await closePool(); process.exit(1); });
+}

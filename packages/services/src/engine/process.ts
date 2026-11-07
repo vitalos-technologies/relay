@@ -12,6 +12,9 @@ import { fencedUpdate, heartbeat, type ClaimedDelivery } from './claim.js';
 import { checkAndConsumeBudget, budgetMeterFor } from './budget.js';
 import { recordCircuit } from './circuit.js';
 import { cropsFromOptions, type CropSpec } from '../crops/index.js';
+import { approvalGate } from '../posts/approval-policy.js';
+import { AUTHORITY_HOLD, checkPublicationAuthority } from './authority.js';
+import { ensureRemoteSchedule, onPausedRemoteSchedule, releasePending, remoteScheduleOf } from './remote-schedule.js';
 
 /** Thrown by EngineDeps.getCredentials when the connection cannot be used (revoked, refresh failed). */
 export class CredentialsUnavailable extends Error {
@@ -63,9 +66,13 @@ async function gate(db: Queryable, d: ClaimedDelivery): Promise<GateResult> {
   if (g.conn_is_mock !== d.is_mock || (d.is_mock && !g.conn_account.startsWith('mock_'))) {
     return { ok: false, state: 'blocked', code: 'identity_mismatch', message: 'The destination identity changed. Review and reschedule.' };
   }
-  if (g.approval_required && !g.approved) {
-    return { ok: false, state: 'blocked', code: 'approval_missing', message: 'Approval is required and was not granted for this exact version and time.' };
-  }
+  // V2 approval policy (posts/approval-policy.ts): policy generation, binding and every stage's quorum of
+  // currently eligible distinct approvers are re-evaluated here; anything else HOLDS the delivery.
+  const ap = await approvalGate(db, d);
+  if (!ap.ok) return { ok: false, state: 'blocked', code: ap.code, message: ap.message };
+  // V2 publication authority (engine/authority.ts): scheduler/approvers revalidated; failure HOLDS (fails closed).
+  const auth = await checkPublicationAuthority(db, d);
+  if (!auth.ok) return { ok: false, state: 'blocked', code: AUTHORITY_HOLD, message: auth.message };
   return { ok: true };
 }
 
@@ -231,7 +238,7 @@ export async function processDelivery(deps: EngineDeps, d: ClaimedDelivery, pool
       if (!g2.ok) return { ok: false as const, lost: false as const, g: g2 };
       const meter = budgetMeterFor(d.provider, d.is_mock);
       if (meter) {
-        const b = await checkAndConsumeBudget(tx, d.workspace_id, meter, 1);
+        const b = await checkAndConsumeBudget(tx, d.workspace_id, meter, 1, { deliveryId: d.id });
         if (!b.ok) return { ok: false as const, lost: false as const, budget: b.message };
       }
       await fencedUpdate(tx, d, `state='publishing', phase='sending', preparation=$4::jsonb`, [JSON.stringify(checkpoint)]);
@@ -296,6 +303,22 @@ async function applyPublishOutcome(pool: Pool, d: ClaimedDelivery, out: PublishO
 
 /** Processing state: ask the provider (read-only) whether asynchronous publication finished. */
 async function pollProcessing(deps: EngineDeps, d: ClaimedDelivery, pool: Pool): Promise<string> {
+  // V3: provider-held release (scheduling owner = provider, e.g. YouTube publishAt). Pause attempts remote
+  // cancellation; an unconfirmed cancellation keeps the delivery visible with the residual risk.
+  const rs = remoteScheduleOf(d.preparation);
+  if (rs) {
+    await ensureRemoteSchedule(pool, d.id, rs);
+    const paused = await onPausedRemoteSchedule(deps, d, pool, rs);
+    if (paused?.kind === 'cancelled') {
+      await settle(pool, d, { state: 'cancelled', code: 'remote_schedule_cancelled', message: `Paused: ${paused.message}`, attemptOutcome: 'gated', extraWhere: `AND state='processing'` });
+      return 'cancelled';
+    }
+    if (paused && paused.kind !== 'too_late') {
+      await settle(pool, d, { state: 'processing', phase: 'awaiting_provider', code: 'remote_schedule_uncertain', message: `Paused, but the provider may still publish: ${paused.message}`,
+        nextAttemptAt: new Date(Date.now() + 5 * 60_000), attemptOutcome: 'processing', extraWhere: `AND state='processing'` });
+      return 'processing';
+    }
+  }
   let r: ReconcileOutcome;
   try {
     const creds = await deps.getCredentials(d.connection_id);
@@ -314,7 +337,7 @@ async function pollProcessing(deps: EngineDeps, d: ClaimedDelivery, pool: Pool):
     return 'published';
   }
   if (r.kind === 'processing') {
-    const tooLong = Date.now() - d.due_at.getTime() > 2 * 60 * 60_000;
+    const tooLong = Date.now() - d.due_at.getTime() > 2 * 60 * 60_000 && !releasePending(rs);
     if (!tooLong) {
       await settle(pool, d, { state: 'processing', phase: 'awaiting_provider', code: null, message: 'Still processing at the provider.', nextAttemptAt: new Date(Date.now() + r.checkAfterMs), attemptOutcome: 'processing', extraWhere: extra });
       return 'processing';

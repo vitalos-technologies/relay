@@ -15,6 +15,7 @@ import { fileTypeFromBuffer } from 'file-type';
 import sharp, { type Sharp } from 'sharp';
 import { getPool, maybeOne, withTx, type Pool } from '@social-lite/db';
 import { audit } from '../audit.js';
+import { settleByRef } from '../product/budgets.js';
 import { log } from '../log.js';
 import { bucket, deleteObject, headObject, putObject, s3 } from '../storage.js';
 import { derivativeKey } from './assets.js';
@@ -98,6 +99,7 @@ async function reject(pool: Pool, a: VideoAssetRow, code: string, reason: string
     await tx.query(
       `UPDATE assets SET status='rejected', rejection_reason=$3, bytes=coalesce($4, bytes), validated_at=now(), processing_started_at=NULL
         WHERE id=$1 AND workspace_id=$2 AND status='quarantined'`, [a.id, a.workspace_id, reason, bytes]);
+    await settleByRef(a.workspace_id, `asset:${a.id}`, null, tx); // release the storage reservation
     await audit(tx, { workspaceId: a.workspace_id, brandId: a.brand_id, actorService: 'worker', action: 'asset.rejected',
       resourceType: 'asset', resourceId: a.id, diff: { code, kind: 'video' } });
   }, pool);
@@ -193,6 +195,7 @@ export async function processVideoAsset(workspaceId: string, assetId: string, po
           WHERE id=$1 AND workspace_id=$2 AND status='quarantined'`,
         [a.id, a.workspace_id, sniffed, bytes, facts.width, facts.height, await sha256File(src), facts.durationMs, facts.videoCodec, facts.audioCodec, facts.frameRate]);
       if (!r.rowCount) return false;
+      await settleByRef(a.workspace_id, `asset:${a.id}`, bytes, tx); // storage budget: actual bytes
       await audit(tx, { workspaceId: a.workspace_id, brandId: a.brand_id, actorService: 'worker', action: 'asset.ready', resourceType: 'asset', resourceId: a.id,
         diff: { kind: 'video', mime: sniffed, bytes, width: facts.width, height: facts.height, duration_ms: facts.durationMs, transcoded } });
       return true;

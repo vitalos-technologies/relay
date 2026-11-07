@@ -21,3 +21,5 @@ export {
   toConnectionJson, toPublishConnection, effectiveStatus, loadConnection, upsertConnectionFromDestination,
   type ConnectionJson, type ConnectionRow as ConnectionStoreRow,
 } from './store.js';
+// V3: Bluesky (AT Protocol app password).
+export { connectBluesky, blueskyConnectSchema } from './bluesky.js';

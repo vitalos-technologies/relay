@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { Ellipsis, FlaskConical, Pause, Play, Plug, Plus, RefreshCw, Unplug } from 'lucide-react';
+import { Ellipsis, FlaskConical, HeartPulse, Pause, Play, Plug, Plus, RefreshCw, Unplug } from 'lucide-react';
 import { PROVIDERS, PROVIDER_LABEL, type Provider } from '@social-lite/core';
 import { api, isApiError } from '@/lib/client/api';
 import { useSession } from '@/lib/client/session';
@@ -10,7 +10,7 @@ import { connectionFix } from '@/lib/client/connection-fix';
 import { fmtRelative, plural } from '@/lib/client/format';
 import type { Connection, MockScenario, ProviderStatus, SessionBrand } from '@/lib/client/types';
 import {
-  Banner, Button, Card, ConfirmDialog, ConnectionStatusBadge, EmptyState, ErrorState, IconButton, Menu, MenuContent, MenuItem,
+  Banner, Button, Card, ConfirmDialog, ConnectionStatusBadge, EmptyState, ErrorState, IconButton, LinkButton, Menu, MenuContent, MenuItem,
   MenuLabel, MenuSeparator, MenuTrigger, PageHeader, PlatformIcon, Select, SimulatedBadge, SkeletonRows, TimeWithZone, useToast,
 } from '@/components/ui';
 import { MOCK_SCENARIOS, MOCK_SCENARIO_LABEL, MockDialog, NotConfiguredDialog, TelegramDialog } from '@/components/accounts/connect-dialogs';
@@ -43,7 +43,7 @@ export default function AccountsPage() {
 
   return (
     <>
-      <PageHeader title="Accounts" />
+      <PageHeader title="Accounts" actions={<LinkButton href={brand ? `/accounts/health?brand=${brand}` : '/accounts/health'} icon={<HeartPulse aria-hidden className="size-4" />}>Health</LinkButton>} />
       {err ? (
         <Banner tone="danger" role="alert" className="mb-6" title="Couldn’t connect" actions={<Button size="sm" variant="ghost" onClick={() => setParams({ error: null })}>Dismiss</Button>}>
           {CALLBACK_ERRORS[err] ?? 'Something went wrong.'} <span className="font-mono text-[11px] text-subtle">({err})</span>

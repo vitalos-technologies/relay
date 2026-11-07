@@ -30,7 +30,7 @@ describe('setup', () => {
     process.env.TELEGRAM_WEBHOOK_SECRET = 'env-telegram-secret-value-123';
     resetConfigCache();
     const { groups } = await getSetup(t.ownerCtx);
-    expect(groups.map((g) => g.id)).toEqual(['core', 'identity', 'storage', 'email', 'meta', 'telegram', 'x', 'ai', 'tipsignal']);
+    expect(groups.map((g) => g.id)).toEqual(['core', 'identity', 'storage', 'email', 'meta', 'telegram', 'x', 'tiktok', 'youtube', 'linkedin', 'threads', 'pinterest', 'ai', 'tipsignal']);
     const all = groups.flatMap((g) => g.items);
     const item = (k: string) => all.find((i) => i.key === k)!;
     expect(item('APP_BASE_URL')).toMatchObject({ source: 'env', is_set: true, value: 'http://localhost:3000', editable: false });

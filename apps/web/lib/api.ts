@@ -14,6 +14,7 @@ import {
   SESSION_COOKIE, config, csrfMatches, loadAccess, log, resolveSession,
   type Actor, type Ctx, type SessionRecord,
 } from '@social-lite/services';
+import { assertExpectedWorkspace } from '@social-lite/services/workspaces';
 
 const MAX_JSON_BYTES = 256 * 1024;
 
@@ -107,6 +108,8 @@ export function route<P = Record<string, string>>(handler: Handler<P>, opts: Rou
         return toResponse(await handler({ req, params: await segment.params, ctx, session: resolved.session, correlationId }), correlationId);
       }
       if (!workspaceId) throw new AppError('forbidden', 'You are not a member of any workspace yet');
+      // A tab rendered for another workspace (switched elsewhere) must reload, never mix data (header is not authority).
+      assertExpectedWorkspace(workspaceId, req.headers.get('x-workspace-id'));
       const access = await loadAccess(resolved.actor.userId, workspaceId, undefined,
         { mfaVerified: resolved.session.mfaVerified, authTime: resolved.session.authTime?.toISOString() ?? null });
       if (!access) throw new AppError('forbidden', 'You no longer have access to this workspace');

@@ -6,6 +6,7 @@ import { audit } from './audit.js';
 import type { Ctx } from './context.js';
 import { onScopePaused, onScopeResumed } from './engine/hooks.js';
 import { assertBrand, brandFilter, requireAction, type BrandRow } from './tenancy.js';
+import { setApprovalRequiredCompat } from './posts/approval-policy.js';
 
 export interface BrandVoice {
   tone?: string; terminology?: string[]; prohibited?: string[]; default_cta?: string; hashtags?: string[]; footer?: string;
@@ -98,6 +99,11 @@ export async function updateBrand(ctx: Ctx, brandId: string, patch: BrandPatch):
   await withTx(async (tx) => {
     const before = await assertBrand(ctx, brandId, tx);
     if (before.archived_at) throw notFound('Brand');
+    // V2: approval_required is derived from the approval policy; the switch maps onto a policy change
+    // (disabling = weakening => brands.manage + step-up, audited, voids open requests, releases nothing).
+    if (patch.approval_required !== undefined && patch.approval_required !== before.approval_required) {
+      await setApprovalRequiredCompat(tx, ctx, brandId, patch.approval_required);
+    }
     if (name && name.toLowerCase() !== before.name.toLowerCase()) {
       const exists = await maybeOne<{ id: string }>(tx,
         `SELECT id FROM brands WHERE workspace_id=$1 AND lower(name)=lower($2) AND archived_at IS NULL AND id<>$3`, [ctx.access.workspaceId, name, brandId]);

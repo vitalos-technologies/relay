@@ -11,12 +11,12 @@
 //
 // An occurrence is occupied when it has a live reservation whose schedule is still live
 // (active / pending_approval / completed) OR when any live schedule of the brand is due at that exact instant.
-import { AppError, canSchedule, can, isValidTimeZone, notFound } from '@social-lite/core';
+import { AppError, isValidTimeZone, notFound } from '@social-lite/core';
 import { getPool, many, maybeOne, one, type PoolClient, type Queryable } from '@social-lite/db';
 import { z } from 'zod';
 import type { Ctx } from '../context.js';
 import { audit } from '../audit.js';
-import { assertBrand, assertUuid, brandAllowed, requireAction } from '../tenancy.js';
+import { assertBrand, assertUuid, authorizeCtx, brandAllowed, requireAction } from '../tenancy.js';
 import { beginIdempotent, completeIdempotent } from '../idempotency.js';
 import { loadPost } from '../posts/service.js';
 import { schedulePost, submitForReview } from '../posts/scheduling.js';
@@ -229,11 +229,9 @@ export async function queuePost(ctx: Ctx, raw: unknown, idemKey: string | null, 
   const req = queueRequestSchema.parse(raw);
   const post = await loadPost(ctx, req.post_id);
   const brand = await assertBrand(ctx, post.brand_id);
-  if (brand.approval_required) requireAction(ctx, 'drafts.edit');
-  else {
-    const sc = canSchedule({ role: ctx.access.role, editorsCanPublish: brand.editors_can_publish, approvalRequired: false, contentApproved: false });
-    if (!sc.allowed) throw new AppError('forbidden', sc.reason ?? 'You cannot schedule posts');
-  }
+  // V2: queueing schedules, so it needs content.schedule on the brand (publisher/brand_manager/admin/owner).
+  if (brand.approval_required) requireAction(ctx, 'drafts.edit', { brandId: brand.id });
+  else requireAction(ctx, 'content.schedule', { brandId: brand.id, message: 'You cannot schedule posts for this brand' });
   if (req.slot_id) await loadSlot(ctx, req.slot_id);
   if (!idemKey || idemKey.length < 8 || idemKey.length > 190) throw new AppError('validation_failed', 'An Idempotency-Key header (8-190 characters) is required for this request');
 
@@ -301,5 +299,5 @@ export async function queueView(ctx: Ctx, brandId: string, days = 14) {
       taken_by: holder ? { post_id: holder.post_id, title: holder.title, status: r ? r.schedule_status : (other as { status: string }).status } : null };
   }));
   items.sort((a, b) => (a.at ?? `${a.local}:00.000Z`).localeCompare(b.at ?? `${b.local}:00.000Z`));
-  return { items, can_queue: can(ctx.access.role, 'drafts.edit') };
+  return { items, can_queue: authorizeCtx(ctx, 'drafts.edit', { brandId }).allowed };
 }

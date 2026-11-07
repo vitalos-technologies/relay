@@ -53,6 +53,7 @@ const UNIT: Record<ChannelConstraints['textCounting'], string> = {
   utf16: 'characters (UTF-16 units; most emoji count as 2)',
   codepoints: 'characters (Unicode code points)',
   x_weighted: 'X weighted characters (each link counts as 23; emoji and CJK count as 2)',
+  graphemes: 'characters (graphemes; an emoji counts as 1)',
 };
 
 const TASK: Record<AiTask, string> = {

@@ -5,7 +5,7 @@ import type { AppError } from '@social-lite/core';
 import { cancelSchedule, createPost, updateDraft } from '@social-lite/services';
 import { createSlot, deleteSlot, listSlots, occurrencesAfter, queuePost, queueView, updateSlot } from '@social-lite/services/slots/index';
 import { updateBrand } from '@social-lite/services/brands';
-import { addMember, closeTestPool, createUser, ctxFor, tenant, testPool } from './helpers.js';
+import { addMember, closeTestPool, createUser, ctxFor, grant, tenant, testPool, v2Ctx } from './helpers.js';
 import { seedConnections } from './engine-helpers.js';
 
 afterAll(closeTestPool);
@@ -112,10 +112,12 @@ describe('add to queue', () => {
   });
 
   it('two users queueing simultaneously never take the same occurrence', async () => {
-    const { t, conns } = await setup({ editorsCanPublish: true });
+    // V2: scheduling comes from a publisher grant (editors_can_publish no longer grants anything).
+    const { t, conns } = await setup();
     const editor = await createUser();
     await addMember(t.workspaceId, editor.id, 'editor');
-    const eCtx = ctxFor(editor.id, t.workspaceId, 'editor');
+    await grant(t.workspaceId, editor.id, 'publisher');
+    const eCtx = await v2Ctx(editor.id, t.workspaceId);
     const slot = await createSlot(t.ownerCtx, t.brandId, { weekdays: [1, 2, 3, 4, 5, 6, 7], local_time: '08:00', connection_ids: [conns.facebook] });
     const posts = await Promise.all(Array.from({ length: 6 }, (_, i) => textPost(t, conns.facebook, i % 2 ? eCtx : t.ownerCtx)));
     const results = await Promise.all(posts.map((p, i) => queuePost(i % 2 ? eCtx : t.ownerCtx, { post_id: p, expected_version: 1 }, randomUUID())));

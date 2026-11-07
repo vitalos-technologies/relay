@@ -5,7 +5,6 @@ import { useState } from 'react';
 import { ArrowLeft, Check, ExternalLink, X } from 'lucide-react';
 import { PROVIDER_LABEL } from '@social-lite/core';
 import { api } from '@/lib/client/api';
-import { useSession } from '@/lib/client/session';
 import { useApi } from '@/lib/client/use-api';
 import { diffWords } from '@/lib/client/diff';
 import { outgoingText } from '@/lib/client/variants';
@@ -15,12 +14,18 @@ import {
   SimulatedBadge, Skeleton, Textarea, TimeWithZone, ToneIcon, useToast,
 } from '@/components/ui';
 import { VariantPreview } from '@/components/composer/preview';
+import { StageProgressList } from '@/components/collab/stage-progress';
+import { CommentsPanel } from '@/components/collab/comments-panel';
+import { ReviewShares } from '@/components/collab/review-shares';
+import { ReviewAssignment } from '@/components/collab/review-assignment';
+import { INELIGIBLE, type ReviewState } from '@/components/collab/types';
+
+type DetailV2 = ApprovalDetail & { review: ReviewState; can_decide: boolean; can_assign: boolean; can_share: boolean; brand_id: string };
 
 export default function ApprovalDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { can } = useSession();
   const toast = useToast();
-  const { data, error, loading, refetch } = useApi<ApprovalDetail>(`/api/approvals/${id}`);
+  const { data, error, loading, refetch } = useApi<DetailV2>(`/api/approvals/${id}`);
   const [approveOpen, setApproveOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
 
@@ -36,7 +41,9 @@ export default function ApprovalDetailPage() {
 
   const s = data.schedule;
   const pending = data.decision === 'pending';
-  const mayDecide = can('approvals.decide') && pending;
+  // V2: the server evaluates the caller's eligibility for the CURRENT stage (roles/teams/quorum/separation of duties).
+  const mayDecide = data.can_decide && pending;
+  const r = data.review;
   const assetMap = new Map<string, Asset>(data.variants.flatMap((v) => v.assets.map((a) => [a.id, a] as [string, Asset])));
   const changed = new Set(data.diff.changed_destinations);
   const bt = data.diff.base_text;
@@ -109,6 +116,31 @@ export default function ApprovalDetailPage() {
         </div>
 
         <aside className="flex flex-col gap-6">
+          <Card aria-labelledby="h-review">
+            <CardHeader id="h-review" title="Review" actions={r.separation_of_duties ? <Badge tone="neutral">Independent</Badge> : null} />
+            <div className="flex flex-col gap-3 px-4 pb-4">
+              <StageProgressList stages={r.stages} current={r.current_stage} />
+              {pending && !data.can_decide && r.me.reason ? <p className="text-xs text-muted">{INELIGIBLE[r.me.reason] ?? 'Not your review'}</p> : null}
+              {r.decisions.length ? (
+                <ul className="flex flex-col gap-1 border-t border-border pt-3 text-xs" aria-label="Decisions">
+                  {r.decisions.map((d, i) => (
+                    <li key={i} className="flex items-center gap-2">
+                      <ToneIcon tone={d.decision === 'approved' ? 'success' : 'danger'} className="size-3.5" />
+                      <span className="min-w-0 flex-1 truncate">{d.by}{d.as_guest ? ' (client)' : ''}</span>
+                      <span className="text-subtle">S{d.stage}{d.decision === 'approved' && !d.counted ? ' · not counted' : ''}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          </Card>
+          {pending && data.can_assign ? (
+            <Card aria-labelledby="h-assign"><CardHeader id="h-assign" title="Assignment" /><div className="px-4 pb-4"><ReviewAssignment approvalId={data.id} brandId={data.brand.id} assignee={r.assignee} dueAt={r.due_at} tz={s.input_timezone} onSaved={refetch} /></div></Card>
+          ) : null}
+          {data.can_share ? (
+            <Card aria-labelledby="h-share"><CardHeader id="h-share" title="Client review" /><div className="px-4 pb-4"><ReviewShares postId={data.post_id} /></div></Card>
+          ) : null}
+          <Card aria-labelledby="h-comments"><CardHeader id="h-comments" title="Comments" /><div className="px-4 pb-4"><CommentsPanel postId={data.post_id} approvalId={data.id} /></div></Card>
           <Card aria-labelledby="h-when">
             <CardHeader id="h-when" title="Schedule" />
             <div className="px-4 pb-4">

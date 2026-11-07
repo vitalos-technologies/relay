@@ -72,4 +72,5 @@ export const UNIT_LABEL: Record<ChannelConstraints['textCounting'], string> = {
   utf16: 'UTF-16 units',
   codepoints: 'characters',
   x_weighted: 'X-weighted (links = 23)',
+  graphemes: 'characters',
 };

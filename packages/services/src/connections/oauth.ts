@@ -8,13 +8,14 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import {
-  AppError, can, notFound,
+  AppError, PROVIDER_LABEL, notFound,
   type DestinationCandidate, type FinalizedDestination, type OAuthConnector, type OAuthTokenSet, type Provider,
 } from '@social-lite/core';
 import { getOAuthConnector } from '@social-lite/providers';
 import { getPool, many, maybeOne, one, withTx } from '@social-lite/db';
 import type { Ctx } from '../context.js';
 import { assertBrand, assertUuid, brandAllowed, loadAccess, requireAction } from '../tenancy.js';
+import { authorize } from '../authz.js';
 import { credentialAad, decryptSecret, encryptSecret, pkceAad, type EncryptedBlob } from '../crypto.js';
 import { audit } from '../audit.js';
 import { log } from '../log.js';
@@ -41,11 +42,11 @@ export async function startOAuth(
 ): Promise<{ authorization_url: string }> {
   requireAction(ctx, 'connections.manage', 'Only owners and admins can connect accounts.');
   await assertBrand(ctx, brandId);
-  if (!isOAuthProvider(provider)) throw new AppError('validation_failed', 'Use facebook, instagram or x here. Telegram connects with a bot token.', { provider: 'Unsupported provider' });
+  if (!isOAuthProvider(provider)) throw new AppError('validation_failed', 'This provider does not use an OAuth redirect. Telegram connects with a bot token, Bluesky with an app password.', { provider: 'Unsupported provider' });
   const connector = oauthConnectorFor(provider);
   const cfg = await providerAppConfig(provider);
   if (!connector || !connector.isConfigured(cfg)) {
-    throw new AppError('provider_not_configured', `${provider === 'x' ? 'X' : 'Meta'} is not configured yet. An owner can add the app credentials on the Setup page.`, undefined, { provider });
+    throw new AppError('provider_not_configured', `${provider === 'facebook' || provider === 'instagram' ? 'Meta' : PROVIDER_LABEL[provider]} is not configured yet. An owner can add the app credentials on the Setup page.`, undefined, { provider });
   }
   const state = randomBytes(32).toString('base64url');
   const verifier = connector.usesPkce ? randomBytes(48).toString('base64url') : null;
@@ -94,7 +95,9 @@ export async function handleOAuthCallback(p: { provider: string; params: URLSear
 
   // The initiating user must still be allowed to manage connections for this brand.
   const access = await loadAccess(row.user_id, row.workspace_id);
-  if (!access || !can(access.role, 'connections.manage') || (access.brandIds !== null && !access.brandIds.includes(row.brand_id))) return fail('forbidden');
+  if (!access || (access.brandIds !== null && !access.brandIds.includes(row.brand_id))) return fail('forbidden');
+  // Grants/membership re-checked now; session assurance (MFA) was enforced when the flow started (startOAuth).
+  if (!access.authz || !authorize({ ...access.authz, subject: { ...access.authz.subject, assurance: null } }, 'connections.manage', { brandId: row.brand_id }).allowed) return fail('forbidden');
   const brand = await maybeOne(getPool(), `SELECT 1 FROM brands WHERE id=$1 AND workspace_id=$2 AND archived_at IS NULL`, [row.brand_id, row.workspace_id]);
   if (!brand) return fail('forbidden');
 

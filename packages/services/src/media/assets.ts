@@ -3,10 +3,11 @@
 import { AppError, forbidden, notFound, type MediaFacts, type PublishMedia } from '@social-lite/core';
 import { getPool, many, maybeOne, withTx, type Queryable } from '@social-lite/db';
 import { audit } from '../audit.js';
+import { reserveUsage, settleByRef } from '../product/budgets.js';
 import { config } from '../config.js';
 import type { Ctx } from '../context.js';
 import { log } from '../log.js';
-import { assertBrand, assertUuid, brandAllowed, brandFilter, isUuid, requireAction } from '../tenancy.js';
+import { assertBrand, assertUuid, authorizeCtx, brandAllowed, brandFilter, isUuid, requireAction } from '../tenancy.js';
 import {
   deleteObject, ensureBucket, getObjectBytes, headObject, ObjectTooLargeError, presignUpload, putObject, signedGetUrl,
 } from '../storage.js';
@@ -117,6 +118,8 @@ export async function createUploadIntent(ctx: Ctx, input: UploadIntentInput): Pr
   const row = await withTx(async (tx) => {
     const id = (await maybeOne<{ id: string }>(tx, `SELECT gen_random_uuid() AS id`))!.id;
     const key = originalKey(ctx.access.workspaceId, brand.id, id);
+    // V2 budgets: reserve the declared size on the workspace/team storage budget (settled on completion).
+    await reserveUsage({ workspaceId: ctx.access.workspaceId, meter: 'storage.bytes', amount: input.bytes, userId: ctx.actor.userId, ref: `asset:${id}`, ttlSeconds: 24 * 3600 }, tx);
     await tx.query(
       `INSERT INTO assets(id, workspace_id, brand_id, uploaded_by, object_key, original_filename, declared_mime, declared_bytes, status, media_kind)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending_upload',$9)`,
@@ -140,6 +143,7 @@ async function markRejected(ctx: Ctx, row: AssetRow, reason: string, code: strin
       `UPDATE assets SET status='rejected', rejection_reason=$3, mime=coalesce($4, mime), bytes=coalesce($5, bytes), validated_at=now()
         WHERE id=$1 AND workspace_id=$2 AND status='quarantined'`,
       [row.id, ctx.access.workspaceId, reason, facts.mime ?? null, facts.bytes ?? null]);
+    await settleByRef(ctx.access.workspaceId, `asset:${row.id}`, null, tx); // release the storage reservation
     await audit(tx, { workspaceId: ctx.access.workspaceId, brandId: row.brand_id, actorUserId: ctx.actor.userId, action: 'asset.rejected',
       resourceType: 'asset', resourceId: row.id, diff: { code }, correlationId: ctx.correlationId });
   });
@@ -154,7 +158,7 @@ async function markRejected(ctx: Ctx, row: AssetRow, reason: string, code: strin
 export async function completeUpload(ctx: Ctx, assetId: string): Promise<AssetDto> {
   requireAction(ctx, 'assets.upload');
   const existing = await loadAsset(ctx, assetId);
-  if (existing.uploaded_by !== ctx.actor.userId && ctx.access.role !== 'owner' && ctx.access.role !== 'admin') {
+  if (existing.uploaded_by !== ctx.actor.userId && !authorizeCtx(ctx, 'assets.manage', { brandId: existing.brand_id }).allowed) {
     throw forbidden('Only the person who uploaded this file can complete it');
   }
   if (existing.status === 'ready' || existing.status === 'rejected' || existing.status === 'archived') return getAsset(ctx, assetId);
@@ -212,6 +216,7 @@ export async function completeUpload(ctx: Ctx, assetId: string): Promise<AssetDt
       `UPDATE assets SET status='ready', rejection_reason=NULL, mime=$3, bytes=$4, width=$5, height=$6, checksum_sha256=$7, validated_at=now()
         WHERE id=$1 AND workspace_id=$2 AND status='quarantined'`,
       [claimed.id, ctx.access.workspaceId, result.mime, result.bytes, result.width, result.height, result.sha256]);
+    await settleByRef(ctx.access.workspaceId, `asset:${claimed.id}`, result.bytes, tx); // storage budget: actual bytes
     await audit(tx, { workspaceId: ctx.access.workspaceId, brandId: claimed.brand_id, actorUserId: ctx.actor.userId, action: 'asset.ready',
       resourceType: 'asset', resourceId: claimed.id, diff: { mime: result.mime, bytes: result.bytes, width: result.width, height: result.height }, correlationId: ctx.correlationId });
   });

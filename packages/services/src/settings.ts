@@ -10,6 +10,12 @@ export const SETTING_KEYS = [
   'META_APP_ID', 'META_APP_SECRET', 'META_GRAPH_VERSION',
   'X_CLIENT_ID', 'X_CLIENT_SECRET',
   'TELEGRAM_WEBHOOK_SECRET', 'TIPSIGNAL_SIGNING_SECRET', 'ANTHROPIC_API_KEY',
+  // V3 social providers (docs/providers/<provider>.md). Bluesky needs none (app password per connection).
+  'TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET', 'TIKTOK_DIRECT_POST_AUDITED',
+  'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET',
+  'LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET', 'LINKEDIN_API_VERSION', 'LINKEDIN_ORGANIZATIONS',
+  'THREADS_APP_ID', 'THREADS_APP_SECRET',
+  'PINTEREST_APP_ID', 'PINTEREST_APP_SECRET', 'PINTEREST_ACCESS_TIER',
 ] as const;
 export type SettingKey = (typeof SETTING_KEYS)[number];
 
@@ -17,7 +23,7 @@ export interface SettingDef {
   key: SettingKey;
   label: string;
   secret: boolean;
-  group: 'meta' | 'x' | 'telegram' | 'ai' | 'tipsignal';
+  group: 'meta' | 'x' | 'telegram' | 'ai' | 'tipsignal' | 'tiktok' | 'youtube' | 'linkedin' | 'threads' | 'pinterest';
   hint: string;
   /** Validates a value entered on the setup page. Returns an error message or null. */
   validate?: (v: string) => string | null;
@@ -25,6 +31,8 @@ export interface SettingDef {
 }
 
 const noWhitespace = (v: string) => (/\s/.test(v) ? 'Must not contain spaces' : null);
+const bool = (v: string) => (/^(true|false)$/.test(v) ? null : 'Use true or false');
+const cb = (p: string) => `Redirect URI: <APP_BASE_URL>/api/oauth/${p}/callback.`;
 
 export const SETTING_DEFS: Record<SettingKey, SettingDef> = {
   META_APP_ID: { key: 'META_APP_ID', label: 'Meta app ID', secret: false, group: 'meta', hint: 'Numeric App ID from developers.facebook.com → your app → Settings → Basic.',
@@ -44,6 +52,22 @@ export const SETTING_DEFS: Record<SettingKey, SettingDef> = {
   ANTHROPIC_API_KEY: { key: 'ANTHROPIC_API_KEY', label: 'Anthropic API key', secret: true, group: 'ai',
     hint: 'Enables AI-assisted drafting. Stored encrypted; never shown again.', validate: (v) => (/^sk-ant-[A-Za-z0-9_-]{10,}$/.test(v) ? null : 'Anthropic API keys start with sk-ant-'),
     docsUrl: 'https://console.anthropic.com/settings/keys' },
+  // ---- V3 social providers
+  TIKTOK_CLIENT_KEY: { key: 'TIKTOK_CLIENT_KEY', label: 'TikTok client key', secret: false, group: 'tiktok', hint: `TikTok for Developers → your app → Credentials (Login Kit + Content Posting API). ${cb('tiktok')}`, validate: noWhitespace, docsUrl: 'https://developers.tiktok.com/apps/' },
+  TIKTOK_CLIENT_SECRET: { key: 'TIKTOK_CLIENT_SECRET', label: 'TikTok client secret', secret: true, group: 'tiktok', hint: 'Stored encrypted; never shown again.', validate: noWhitespace },
+  TIKTOK_DIRECT_POST_AUDITED: { key: 'TIKTOK_DIRECT_POST_AUDITED', label: 'TikTok Direct Post audit passed', secret: false, group: 'tiktok', hint: 'Set to true only after TikTok approved the Direct Post audit. Unaudited clients can only post SELF_ONLY to private accounts.', validate: bool },
+  GOOGLE_CLIENT_ID: { key: 'GOOGLE_CLIENT_ID', label: 'Google OAuth client ID (YouTube)', secret: false, group: 'youtube', hint: `Google Cloud → APIs & Services → Credentials → OAuth client (Web application) with YouTube Data API v3 and YouTube Analytics API enabled. ${cb('youtube')}`,
+    validate: (v) => (/^[\w-]+\.apps\.googleusercontent\.com$/.test(v) ? null : 'Google client IDs end with .apps.googleusercontent.com'), docsUrl: 'https://console.cloud.google.com/apis/credentials' },
+  GOOGLE_CLIENT_SECRET: { key: 'GOOGLE_CLIENT_SECRET', label: 'Google OAuth client secret', secret: true, group: 'youtube', hint: 'Stored encrypted; never shown again.', validate: noWhitespace },
+  LINKEDIN_CLIENT_ID: { key: 'LINKEDIN_CLIENT_ID', label: 'LinkedIn client ID', secret: false, group: 'linkedin', hint: `LinkedIn Developer Portal → your app → Auth (products: Share on LinkedIn, Sign In with LinkedIn using OpenID Connect). ${cb('linkedin')}`, validate: noWhitespace, docsUrl: 'https://www.linkedin.com/developers/apps' },
+  LINKEDIN_CLIENT_SECRET: { key: 'LINKEDIN_CLIENT_SECRET', label: 'LinkedIn client secret', secret: true, group: 'linkedin', hint: 'Stored encrypted; never shown again.', validate: noWhitespace },
+  LINKEDIN_API_VERSION: { key: 'LINKEDIN_API_VERSION', label: 'LinkedIn API version', secret: false, group: 'linkedin', hint: 'LinkedIn-Version header (YYYYMM). Default 202610.', validate: (v) => (/^\d{6}$/.test(v) ? null : 'Use the form 202610') },
+  LINKEDIN_ORGANIZATIONS: { key: 'LINKEDIN_ORGANIZATIONS', label: 'LinkedIn organization posting', secret: false, group: 'linkedin', hint: 'Set to true only when the app is approved for the Community Management API (organization scopes).', validate: bool },
+  THREADS_APP_ID: { key: 'THREADS_APP_ID', label: 'Threads app ID', secret: false, group: 'threads', hint: `Meta App Dashboard → Threads use case → Threads app ID (not the Facebook app ID). ${cb('threads')}`, validate: (v) => (/^\d{5,25}$/.test(v) ? null : 'Threads app IDs are numeric'), docsUrl: 'https://developers.facebook.com/apps/' },
+  THREADS_APP_SECRET: { key: 'THREADS_APP_SECRET', label: 'Threads app secret', secret: true, group: 'threads', hint: 'Threads app secret. Stored encrypted; never shown again.', validate: noWhitespace },
+  PINTEREST_APP_ID: { key: 'PINTEREST_APP_ID', label: 'Pinterest app ID', secret: false, group: 'pinterest', hint: `developers.pinterest.com → My apps. ${cb('pinterest')}`, validate: (v) => (/^\d{3,25}$/.test(v) ? null : 'Pinterest app IDs are numeric'), docsUrl: 'https://developers.pinterest.com/apps/' },
+  PINTEREST_APP_SECRET: { key: 'PINTEREST_APP_SECRET', label: 'Pinterest app secret key', secret: true, group: 'pinterest', hint: 'Stored encrypted; never shown again.', validate: noWhitespace },
+  PINTEREST_ACCESS_TIER: { key: 'PINTEREST_ACCESS_TIER', label: 'Pinterest access tier', secret: false, group: 'pinterest', hint: 'trial (default: Pins visible only to you) or standard (after Pinterest approved the upgrade).', validate: (v) => (/^(trial|standard)$/.test(v) ? null : 'Use trial or standard') },
 };
 
 export function isSettingKey(k: string): k is SettingKey {

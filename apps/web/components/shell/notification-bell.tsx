@@ -13,6 +13,7 @@ function hrefFor(n: AppNotification): string | null {
   switch (n.reference_type) {
     case 'post': return n.reference_id ? `/posts/${n.reference_id}` : null;
     case 'approval': return n.reference_id ? `/approvals/${n.reference_id}` : null;
+    case 'review': return n.reference_id ? `/review/${n.reference_id}` : null; // guest portal; the page re-checks the share
     case 'connection': return '/accounts';
     case 'delivery': return '/history';
     default: return null;

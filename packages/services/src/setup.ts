@@ -62,6 +62,12 @@ const PROVIDER_GROUPS: Array<{ id: string; title: string; group: string }> = [
   { id: 'meta', title: 'Meta (Facebook & Instagram)', group: 'meta' },
   { id: 'telegram', title: 'Telegram', group: 'telegram' },
   { id: 'x', title: 'X', group: 'x' },
+  // V3 social providers (Bluesky connects per account with an app password — no server setting).
+  { id: 'tiktok', title: 'TikTok', group: 'tiktok' },
+  { id: 'youtube', title: 'YouTube (Google)', group: 'youtube' },
+  { id: 'linkedin', title: 'LinkedIn', group: 'linkedin' },
+  { id: 'threads', title: 'Threads', group: 'threads' },
+  { id: 'pinterest', title: 'Pinterest', group: 'pinterest' },
   { id: 'ai', title: 'AI assistance', group: 'ai' },
   { id: 'tipsignal', title: 'TipSignal', group: 'tipsignal' },
 ];

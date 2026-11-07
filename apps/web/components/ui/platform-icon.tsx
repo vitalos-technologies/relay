@@ -1,4 +1,4 @@
-import { siFacebook, siInstagram, siTelegram, siX } from 'simple-icons';
+import { siBluesky, siFacebook, siInstagram, siPinterest, siTelegram, siThreads, siTiktok, siX, siYoutube } from 'simple-icons';
 import { PROVIDER_LABEL, type Provider } from '@social-lite/core';
 import { cn } from './cn';
 
@@ -7,6 +7,13 @@ const ICONS: Record<Provider, { path: string; bg: string }> = {
   facebook: { path: siFacebook.path, bg: `#${siFacebook.hex}` },
   telegram: { path: siTelegram.path, bg: `#${siTelegram.hex}` },
   x: { path: siX.path, bg: '#000000' },
+  tiktok: { path: siTiktok.path, bg: '#000000' },
+  youtube: { path: siYoutube.path, bg: `#${siYoutube.hex}` },
+  // LinkedIn is not in simple-icons: neutral briefcase glyph; the accessible label still names LinkedIn.
+  linkedin: { path: 'M9 3h6a2 2 0 0 1 2 2v2h3a1 1 0 0 1 1 1v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a1 1 0 0 1 1-1h3V5a2 2 0 0 1 2-2Zm0 4h6V5H9v2Z', bg: '#52525B' },
+  threads: { path: siThreads.path, bg: '#000000' },
+  pinterest: { path: siPinterest.path, bg: `#${siPinterest.hex}` },
+  bluesky: { path: siBluesky.path, bg: `#${siBluesky.hex}` },
 };
 
 const SIZES = { xs: 'size-5 rounded-[5px] [&>svg]:size-3', sm: 'size-7 rounded-md [&>svg]:size-[15px]', md: 'size-9 rounded-lg [&>svg]:size-[18px]', lg: 'size-10 rounded-[10px] [&>svg]:size-5' };
@@ -23,7 +30,7 @@ export function PlatformIcon({ provider, size = 'md', decorative, className }: {
       aria-label={decorative ? undefined : PROVIDER_LABEL[provider]}
       aria-hidden={decorative || undefined}
       title={decorative ? undefined : PROVIDER_LABEL[provider]}
-      className={cn('inline-flex shrink-0 items-center justify-center text-white shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset]', SIZES[size], provider === 'x' && 'ring-1 ring-[var(--border-strong)]', className)}
+      className={cn('inline-flex shrink-0 items-center justify-center text-white shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset]', SIZES[size], (provider === 'x' || provider === 'tiktok' || provider === 'threads') && 'ring-1 ring-[var(--border-strong)]', className)}
       style={{ background: i.bg }}
     >
       <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false">

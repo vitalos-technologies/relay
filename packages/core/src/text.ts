@@ -20,8 +20,23 @@ export function xWeightedLength(s: string): number {
   return r.weightedLength;
 }
 
-export function measure(s: string, unit: 'utf16' | 'codepoints' | 'x_weighted'): number {
+let segmenter: Intl.Segmenter | null = null;
+/** User-perceived characters (extended grapheme clusters), e.g. Bluesky's 300-grapheme limit (V3). */
+export function graphemeLength(s: string): number {
+  segmenter ??= new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+  let n = 0;
+  for (const _ of segmenter.segment(s)) n++;
+  return n;
+}
+
+/** UTF-8 byte length (V3: Bluesky facets / 3000-byte limit, YouTube description bytes). */
+export function utf8Length(s: string): number {
+  return new TextEncoder().encode(s).byteLength;
+}
+
+export function measure(s: string, unit: 'utf16' | 'codepoints' | 'x_weighted' | 'graphemes'): number {
   if (unit === 'x_weighted') return xWeightedLength(s);
+  if (unit === 'graphemes') return graphemeLength(s);
   if (unit === 'codepoints') return codePointLength(s);
   return utf16Length(s);
 }

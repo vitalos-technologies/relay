@@ -3,9 +3,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Suspense, useState, type ReactNode } from 'react';
 import {
-  Activity, CalendarDays, ChartColumn, CheckCheck, Ellipsis, FileClock, House, Images, Plug, Settings, SquarePen, Wrench, type LucideIcon,
+  Activity, CalendarDays, ChartColumn, CheckCheck, Ellipsis, FileClock, House, Images, Plug, Settings, ShieldCheck, SquarePen, Users, Wrench, type LucideIcon,
 } from 'lucide-react';
-import type { Action } from '@social-lite/core';
+import type { Action, Permission } from '@social-lite/core';
 import { useSession } from '@/lib/client/session';
 import { useApi } from '@/lib/client/use-api';
 import { useHrefWithBrand } from '@/lib/client/hooks';
@@ -19,7 +19,7 @@ import { UserMenu } from './user-menu';
 import { ShellBanners } from './shell-banners';
 import { Logo } from './logo';
 
-interface NavItem { href: string; label: string; icon: LucideIcon; perm?: Action; badge?: 'approvals'; mobile?: boolean }
+interface NavItem { href: string; label: string; icon: LucideIcon; perm?: Action; badge?: 'approvals'; mobile?: boolean; /** V2: shown if any held */ v2?: Permission[] }
 
 const NAV: NavItem[] = [
   { href: '/', label: 'Home', icon: House, mobile: true },
@@ -30,11 +30,13 @@ const NAV: NavItem[] = [
   { href: '/history', label: 'History', icon: FileClock, perm: 'history.read' },
   { href: '/analytics', label: 'Analytics', icon: ChartColumn, perm: 'history.read' },
   { href: '/accounts', label: 'Accounts', icon: Plug },
+  { href: '/team', label: 'Team', icon: Users, v2: ['members.read', 'teams.read'] },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 const ADMIN_NAV: NavItem[] = [
   { href: '/setup', label: 'Setup', icon: Wrench, perm: 'setup.manage' },
   { href: '/operations', label: 'Operations', icon: Activity, perm: 'diagnostics.read' },
+  { href: '/activity', label: 'Activity', icon: ShieldCheck, perm: 'workspace.settings' },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -58,11 +60,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 }
 
 function ShellInner({ children }: { children: ReactNode }) {
-  const { can } = useSession();
+  const { can, canV2 } = useSession();
   const pathname = usePathname();
   const withBrand = useHrefWithBrand();
   const approvals = useApprovalsCount(true);
-  const visible = NAV.filter((n) => !n.perm || can(n.perm));
+  const visible = NAV.filter((n) => (!n.perm || can(n.perm)) && (!n.v2 || n.v2.some((p) => canV2(p))));
   const admin = ADMIN_NAV.filter((n) => !n.perm || can(n.perm));
   const mobilePrimary = visible.filter((n) => n.mobile);
   const mobileMore = [...visible.filter((n) => !n.mobile), ...admin];

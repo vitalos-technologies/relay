@@ -144,10 +144,13 @@ export function evaluate(subject: Subject, perm: Permission, resource: Resource,
   return { allowed: true, reason: 'granted', sources };
 }
 
-/** Brands on which the subject holds ANY permission (for list filtering). null = all brands (workspace grant). */
+/**
+ * Brands on which the subject holds ANY permission (for list filtering). null = all brands (workspace grant).
+ * Guest grants never make a brand visible: guests reach only explicitly shared review requests (review portal).
+ */
 export function visibleBrands(subject: Subject, now = new Date()): string[] | null {
   if (subject.status !== 'active') return [];
-  const live = subject.grants.filter((g) => active(g.expiresAt, now) && g.role !== 'exporter' && g.role !== 'team_manager');
+  const live = subject.grants.filter((g) => active(g.expiresAt, now) && g.role !== 'exporter' && g.role !== 'team_manager' && g.role !== 'guest');
   if (live.some((g) => g.scopeType === 'workspace')) return null;
   return [...new Set(live.map((g) => g.brandId!).filter(Boolean))];
 }

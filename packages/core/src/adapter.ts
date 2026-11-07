@@ -7,8 +7,8 @@ export interface HttpRequest {
   method: 'GET' | 'POST' | 'DELETE' | 'PUT';
   url: string;
   headers?: Record<string, string>;
-  /** string (JSON / urlencoded) or FormData (multipart). */
-  body?: string | FormData;
+  /** string (JSON / urlencoded), FormData (multipart) or raw bytes (V3 chunked/binary uploads). */
+  body?: string | FormData | Uint8Array;
   timeoutMs?: number;
   /** Logical operation label for logs/metrics, e.g. 'telegram.sendPhoto'. */
   op: string;
@@ -62,7 +62,21 @@ export type ProviderCredentials =
       expiresAt?: string | null;    // ISO
       scope?: string;
     }
-  | { kind: 'mock'; token: string };
+  | { kind: 'mock'; token: string }
+  | {
+      /** V3 Bluesky: AT Protocol app-password session (the app password is kept to re-create expired sessions). */
+      kind: 'atproto_app_password';
+      identifier: string;
+      appPassword: string;
+      did: string;
+      /** Entryway / service used for createSession (e.g. https://bsky.social). */
+      service: string;
+      /** The account's PDS (from the DID document). */
+      pdsUrl: string;
+      accessJwt?: string | null;
+      refreshJwt?: string | null;
+      accessExpiresAt?: string | null;
+    };
 
 // ------------------------------------------------------------------ publishing
 export interface PublishMedia {
@@ -185,7 +199,21 @@ export interface PublishingAdapter {
   health(ctx: AdapterContext, connection: PublishConnection, credentials: ProviderCredentials): Promise<ConnectionHealth>;
   /** Refresh rotating credentials. Callers serialize per connection. */
   refreshCredentials?(ctx: AdapterContext, credentials: ProviderCredentials): Promise<{ credentials: ProviderCredentials; expiresAt: string | null; scopes?: string[] }>;
+  /**
+   * V3: cancel a provider-native scheduled release (scheduling owner = provider, e.g. YouTube publishAt).
+   * Must report residual risk honestly: 'uncertain' when cancellation could not be confirmed.
+   */
+  cancelRemoteSchedule?(ctx: AdapterContext, ref: AttemptReference): Promise<RemoteScheduleCancelOutcome>;
 }
+
+/** V3: result of cancelling a provider-native schedule. */
+export type RemoteScheduleCancelOutcome =
+  | { kind: 'cancelled'; message: string }
+  /** The scheduled time already passed / the content is already public. */
+  | { kind: 'too_late'; message: string }
+  /** Could not confirm: the scheduled publication may still happen (residual risk shown to the user). */
+  | { kind: 'uncertain'; message: string; scheduledFor?: string | null }
+  | { kind: 'unsupported'; message: string };
 
 // ------------------------------------------------------------------ connection setup
 export interface ProviderAppConfig {
@@ -197,6 +225,8 @@ export interface ProviderAppConfig {
   apiVersion?: string;
   /** Override base URLs (tests / regional endpoints). */
   baseUrls?: Record<string, string>;
+  /** V3: operator feature flags (e.g. LinkedIn organization access, Pinterest access tier). */
+  features?: Record<string, string | boolean>;
 }
 
 export interface OAuthTokenSet {

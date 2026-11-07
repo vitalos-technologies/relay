@@ -2,13 +2,14 @@
 // writes a draft. Authorization: drafts.edit on the post's brand, rechecked after generation.
 // Safety: the model sees only post text, brand voice, destination limits and validated source text;
 // no tools, no credentials, no asset bytes. Logs carry IDs and token counts, never content.
-import { AppError, PROVIDER_LABEL, can, forbidden, notFound, resolveVariants, type DraftContent } from '@social-lite/core';
+import { AppError, PROVIDER_LABEL, forbidden, notFound, resolveVariants, type DraftContent } from '@social-lite/core';
 import { getPool, maybeOne, type Queryable } from '@social-lite/db';
 import { config } from '../config.js';
 import type { Ctx } from '../context.js';
 import { log } from '../log.js';
 import { settingSource, getSetting } from '../settings.js';
-import { assertBrand, loadAccess, requireAction } from '../tenancy.js';
+import { assertBrand, authorizeCtx, loadAccess, requireAction } from '../tenancy.js';
+import { canAnywhere } from '../access.js';
 import { loadPost, type PostRow } from '../posts/service.js';
 import { brandConnections, capabilitiesFor, type ConnectionRow } from '../posts/shared.js';
 import type { BrandVoice } from '../brands.js';
@@ -54,7 +55,7 @@ export async function aiStatus(ctx: Ctx, db: Queryable = getPool()): Promise<AiS
   return {
     configured, reason: configured ? null : NOT_CONFIGURED, fixture,
     model: fixture ? 'test-fixture' : config().AI_MODEL,
-    can_use: configured && can(ctx.access.role, 'drafts.edit'),
+    can_use: configured && canAnywhere(ctx, 'content.edit'),
     period: u.period, used: u.used, cap: u.cap, remaining: u.remaining,
   };
 }
@@ -193,7 +194,7 @@ export async function suggestForPost(ctx: Ctx, postId: string, rawInput: unknown
   const promptInput: PromptInput = { task: input.task, voice, tone: input.tone, targets, source };
   const prompt = buildUserPrompt(promptInput);
   const model = config().AI_MODEL;
-  const reservation = await reserveTokens(ctx.access.workspaceId, AI_MAX_OUTPUT_TOKENS + estimateInputTokens(SYSTEM_PROMPT, prompt));
+  const reservation = await reserveTokens(ctx.access.workspaceId, AI_MAX_OUTPUT_TOKENS + estimateInputTokens(SYSTEM_PROMPT, prompt), { userId: ctx.actor.userId, ref: `ai:${ctx.correlationId.slice(0, 64)}` });
   const base = { brandId: post.brand_id, postId: post.id, userId: ctx.actor.userId, task: input.task, correlationId: ctx.correlationId };
 
   let result;
@@ -214,8 +215,9 @@ export async function suggestForPost(ctx: Ctx, postId: string, rawInput: unknown
 
   // Recheck authorization after generation (membership/role/brand grant may have changed meanwhile).
   const access = await loadAccess(ctx.actor.userId, ctx.access.workspaceId, db);
-  if (!access || !can(access.role, 'drafts.edit')) throw forbidden();
+  if (!access) throw forbidden();
   if (access.brandIds !== null && !access.brandIds.includes(post.brand_id)) throw notFound('Post');
+  if (!authorizeCtx({ ...ctx, access }, 'content.edit', { brandId: post.brand_id }).allowed) throw forbidden();
 
   if (status === 'refused') throw new AppError('provider_error', 'The AI declined to make suggestions for this post.');
   if (!result.output) throw new AppError('provider_error', 'The AI response was incomplete. Try again.');

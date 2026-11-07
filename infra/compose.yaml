@@ -32,18 +32,28 @@ services:
       timeout: 3s
       retries: 40
 
-  # Standards-based OIDC provider with disposable local users (development only).
+  # Keycloak: standards-based OIDC provider for local development (disposable identities, realm
+  # infra/keycloak/social-lite-realm.json imported on first start). TOTP, passkeys (WebAuthn), recovery codes,
+  # LoA step-up (acr "password"=1, "mfa"=2), amr, back-channel logout. Admin console: http://localhost:5556/admin
+  # (admin / socialite-kc-admin-local-only). Re-import after editing the realm: up -d --force-recreate oidc
   oidc:
-    image: dexidp/dex:v2.41.1
-    command: ["dex", "serve", "/etc/dex/config.yaml"]
+    image: keycloak/keycloak:26.4
+    command: ["start-dev", "--import-realm", "--http-port=5556", "--hostname=http://localhost:5556", "--health-enabled=true"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: socialite-kc-admin-local-only
+      KC_LOG_LEVEL: info
     ports: ["127.0.0.1:5556:5556"]
+    # Back-channel logout calls the app on the host (http://host.docker.internal:3000/api/auth/backchannel-logout).
+    extra_hosts: ["host.docker.internal:host-gateway"]
     volumes:
-      - ./dex/config.yaml:/etc/dex/config.yaml:ro
+      - ./keycloak/social-lite-realm.json:/opt/keycloak/data/import/social-lite-realm.json:ro
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:5556/dex/.well-known/openid-configuration || exit 1"]
-      interval: 2s
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      interval: 3s
       timeout: 3s
-      retries: 30
+      retries: 60
+      start_period: 10s
 
   # Local email capture. UI: http://localhost:8025
   mail:

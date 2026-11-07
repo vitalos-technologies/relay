@@ -9,6 +9,12 @@ import type { AdapterContext, Provider, ProviderCredentials, PublishConnection }
 import { facebookMetricsFetcher, instagramMetricsFetcher } from './meta/metrics.js';
 import { telegramMetricsFetcher } from './telegram/metrics.js';
 import { xMetricsFetcher } from './x/metrics.js';
+import { tiktokMetricsFetcher } from './tiktok/metrics.js';
+import { youtubeMetricsFetcher } from './youtube/metrics.js';
+import { linkedinMetricsFetcher } from './linkedin/metrics.js';
+import { threadsMetricsFetcher } from './threads/metrics.js';
+import { pinterestMetricsFetcher } from './pinterest/metrics.js';
+import { blueskyMetricsFetcher } from './bluesky/metrics.js';
 
 export const METRICS_RESEARCHED_ON = '2026-11-07';
 
@@ -56,6 +62,13 @@ const FETCHERS: Record<Provider, MetricsFetcher> = {
   instagram: instagramMetricsFetcher,
   telegram: telegramMetricsFetcher,
   x: xMetricsFetcher,
+  // V3 (research 2026-11-07; sources in each <provider>/metrics.ts and docs/providers/<provider>.md)
+  tiktok: tiktokMetricsFetcher,
+  youtube: youtubeMetricsFetcher,
+  linkedin: linkedinMetricsFetcher,
+  threads: threadsMetricsFetcher,
+  pinterest: pinterestMetricsFetcher,
+  bluesky: blueskyMetricsFetcher,
 };
 
 export function metricsFetcherFor(provider: Provider): MetricsFetcher {
@@ -85,6 +98,41 @@ export const METRIC_LABELS: Record<string, string> = {
   reply_count: 'Replies',
   quote_count: 'Quotes',
   bookmark_count: 'Bookmarks',
+  // V3: TikTok video query
+  view_count: 'Views',
+  comment_count: 'Comments',
+  share_count: 'Shares',
+  // YouTube Analytics
+  estimatedMinutesWatched: 'Watch time (min)',
+  averageViewDuration: 'Avg view duration (s)',
+  subscribersGained: 'Subscribers gained',
+  // LinkedIn (organization share statistics / member post analytics)
+  impressionCount: 'Impressions',
+  uniqueImpressionsCount: 'Unique impressions',
+  clickCount: 'Clicks',
+  likeCount: 'Likes',
+  commentCount: 'Comments',
+  shareCount: 'Reposts',
+  IMPRESSION: 'Impressions',
+  MEMBERS_REACHED: 'Members reached',
+  REACTION: 'Reactions',
+  COMMENT: 'Comments',
+  RESHARE: 'Reposts',
+  // Threads insights
+  replies: 'Replies',
+  reposts: 'Reposts',
+  quotes: 'Quotes',
+  // Pinterest Pin analytics
+  SAVE: 'Saves',
+  PIN_CLICK: 'Pin clicks',
+  OUTBOUND_CLICK: 'Outbound clicks',
+  TOTAL_COMMENTS: 'Comments',
+  TOTAL_REACTIONS: 'Reactions',
+  // Bluesky post counts
+  repostCount: 'Reposts',
+  replyCount: 'Replies',
+  quoteCount: 'Quotes',
+  bookmarkCount: 'Bookmarks',
 };
 
 /**
@@ -110,7 +158,7 @@ export function simulatedMetrics(provider: Provider, objectId: string, published
       add(name, views * frac(11, 0.01), 'love');
       continue;
     }
-    const isAudience = /^(views|reach|impression_count|post_media_view|post_total_media_view_unique)$/.test(name);
+    const isAudience = /^(views|reach|impression_count|post_media_view|post_total_media_view_unique|view_count|impressionCount|uniqueImpressionsCount|IMPRESSION|MEMBERS_REACHED)$/.test(name);
     add(name, isAudience ? views * (name === 'reach' || name.endsWith('_unique') ? 0.7 : 1) : views * frac(i + 2, 0.06));
   }
   return { kind: 'ok', points, unavailable: [] };

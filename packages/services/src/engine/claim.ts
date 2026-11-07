@@ -2,6 +2,7 @@
 import type { DeliveryState, Provider } from '@social-lite/core';
 import { getPool, many, maybeOne, withTx, type Pool, type Queryable } from '@social-lite/db';
 import { writeOutbox } from '../outbox.js';
+import { selectFairCandidate } from './fairness.js';
 
 export const LEASE_MS = 90_000;
 
@@ -26,23 +27,13 @@ const CLAIM_RETURNING = `id, workspace_id, brand_id, post_id, schedule_id, gener
 /**
  * Claim the next due delivery (or a specific one). Eligible: Scheduled/RetryWait due now, or Processing due a status check.
  * Per-connection serialization: skips connections with another live lease, throttled connections and open provider circuits.
+ * V2: per-workspace concurrency cap and fair ordering across workspaces (see fairness.ts).
  * The claim increments the fencing token; every later write must match it.
  */
 export async function claimDelivery(workerId: string, opts: { deliveryId?: string } = {}, db = getPool()): Promise<ClaimedDelivery | null> {
   return withTx(async (tx) => {
-    const cand = await maybeOne<{ id: string; state: DeliveryState }>(tx,
-      `SELECT d.id, d.state FROM deliveries d
-         JOIN connections c ON c.id = d.connection_id
-         LEFT JOIN provider_circuits pc ON pc.provider = d.provider
-        WHERE d.state IN ('scheduled','retry_wait','processing') AND d.next_attempt_at <= now()
-          AND (d.lease_owner IS NULL OR d.lease_expires_at < now() AND d.phase = 'awaiting_provider')
-          AND ($1::uuid IS NULL OR d.id = $1)
-          AND (c.throttled_until IS NULL OR c.throttled_until <= now() OR d.state = 'processing')
-          AND (pc.opened_until IS NULL OR pc.opened_until <= now())
-          AND NOT EXISTS (SELECT 1 FROM deliveries x WHERE x.connection_id = d.connection_id AND x.id <> d.id
-                            AND x.lease_owner IS NOT NULL AND x.lease_expires_at > now() AND x.phase IN ('preparing','sending'))
-        ORDER BY d.next_attempt_at, d.id
-        LIMIT 1 FOR UPDATE OF d SKIP LOCKED`, [opts.deliveryId ?? null]);
+    // V2 fairness: per-workspace concurrency cap + fair ordering across workspaces (engine/fairness.ts).
+    const cand = await selectFairCandidate(tx, opts.deliveryId ?? null);
     if (!cand) return null;
     const isPoll = cand.state === 'processing';
     const row = await maybeOne<ClaimedDelivery>(tx,

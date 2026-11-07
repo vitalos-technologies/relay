@@ -1,5 +1,8 @@
 // TipSignal source integration (V1.1, optional). Signed, timestamped, schema-versioned events create
-// DRAFTS (never posts) for the single configured brand. Exact facts (teams, kick-off, market, probability,
+// DRAFTS (never posts) for the single configured brand.
+// V2: drafts are created by the binding's SERVICE ACCOUNT (integration grant = content.create_draft on that one
+// brand), not by a human acting member. The tenant/brand come from the registered binding, never the payload;
+// the HMAC signature + timestamp window + event_id dedupe are unchanged. Exact facts (teams, kick-off, market, probability,
 // result) come only from validated input; copy and graphics are deterministic templates — no AI, no
 // image generation. Deduplicated on event_id so retries never create duplicate drafts.
 import { createHmac, timingSafeEqual } from 'node:crypto';
@@ -7,14 +10,10 @@ import sharp from 'sharp';
 import { z } from 'zod';
 import { AppError, formatInZone, zoneAbbreviation } from '@social-lite/core';
 import { getPool, maybeOne } from '@social-lite/db';
-import type { Ctx } from './context.js';
 import { getSetting } from './settings.js';
-import { loadAccess } from './tenancy.js';
-import { createPost } from './posts/service.js';
-import { completeUpload, createUploadIntent } from './media/index.js';
-import { putObject } from './storage.js';
-import { brandConnections } from './posts/shared.js';
 import { audit } from './audit.js';
+import { serviceAccountCtx, serviceActor } from './service-accounts.js';
+import { createIntegrationDraft } from './integrations/drafts.js';
 
 const MAX_SKEW_S = 300;
 
@@ -98,8 +97,9 @@ export async function receiveTipsignal(raw: string, signature: string | null, no
   if (!parsed.success) throw new AppError('validation_failed', 'Event does not match schema v1 (destination overrides and unknown fields are rejected)');
   const e = parsed.data;
   const db = getPool();
-  const binding = await maybeOne<{ workspace_id: string; brand_id: string; acting_user_id: string; timezone: string }>(db,
-    `SELECT ib.workspace_id, ib.brand_id, ib.acting_user_id, b.timezone FROM integration_bindings ib JOIN brands b ON b.id=ib.brand_id WHERE ib.kind='tipsignal'`);
+  const binding = await maybeOne<{ workspace_id: string; brand_id: string; service_account_id: string; timezone: string }>(db,
+    `SELECT ib.workspace_id, ib.brand_id, ib.service_account_id, b.timezone FROM integration_bindings ib JOIN brands b ON b.id=ib.brand_id AND b.workspace_id=ib.workspace_id
+      WHERE ib.kind='tipsignal'`);
   if (!binding) throw new AppError('provider_not_configured', 'No brand is bound to TipSignal');
 
   // Dedupe first: a retried event returns the original outcome.
@@ -118,22 +118,24 @@ export async function receiveTipsignal(raw: string, signature: string | null, no
   if (e.type === 'picks.ready' && new Date(e.data.fixture.kickoff_at).getTime() <= now) return reject('Kick-off has passed; picks expire before kick-off.');
   if (e.type === 'results.settled' && new Date(e.data.settled_at).getTime() > now) return reject('Settlement time is in the future; results need verified settlement.');
 
-  const access = await loadAccess(binding.acting_user_id, binding.workspace_id);
-  if (!access) return reject('The configured acting member no longer has access.');
-  const ctx: Ctx = { actor: { userId: binding.acting_user_id, email: 'tipsignal-integration', name: 'TipSignal', sessionId: 'integration' }, access: { ...access, brandIds: null }, correlationId: `tipsignal:${e.event_id}` };
-  // Graphic through the normal media pipeline (validation + derivatives), then a draft for every ready destination.
-  const png = await renderCard(e, binding.timezone);
-  const intent = await createUploadIntent(ctx, { brand_id: binding.brand_id, filename: `tipsignal-${e.data.record_id}.png`, content_type: 'image/png', bytes: png.length });
-  await putObject(intent.upload.fields.key!, png, 'image/png');
-  const asset = await completeUpload(ctx, intent.asset_id);
-  const conns = (await brandConnections(db, binding.workspace_id, binding.brand_id)).filter((c) => ['ready', 'expiring'].includes(c.status));
-  const post = await createPost(ctx, binding.brand_id, {
-    title: `${e.type === 'picks.ready' ? 'Pick' : 'Result'}: ${e.data.fixture.home} v ${e.data.fixture.away}`,
-    draft: { baseText: draftText(e, binding.timezone), baseLink: null, baseAssetIds: asset.status === 'ready' ? [asset.id] : [],
-      variants: conns.map((c) => ({ connectionId: c.id, inheritText: true, inheritMedia: true })) },
-  }, `tipsignal-${e.event_id}`);
-  await db.query(`UPDATE posts SET source=$2, tags=$3 WHERE id=$1`, [post.id, JSON.stringify({ kind: 'tipsignal', event_id: e.event_id, record_id: e.data.record_id, source_url: e.data.source_url, type: e.type }), ['tipsignal', e.type]]);
+  // The service account must still be active and hold content.create_draft on the bound brand (real policy path).
+  let post: { id: string };
+  try {
+    const ctx = await serviceAccountCtx({ serviceAccountId: binding.service_account_id, workspaceId: binding.workspace_id, name: 'TipSignal' }, `tipsignal:${e.event_id}`, db);
+    const png = await renderCard(e, binding.timezone);
+    post = await createIntegrationDraft(ctx, binding.service_account_id, binding.brand_id, {
+      title: `${e.type === 'picks.ready' ? 'Pick' : 'Result'}: ${e.data.fixture.home} v ${e.data.fixture.away}`,
+      text: draftText(e, binding.timezone),
+      image: { bytes: png, filename: `tipsignal-${e.data.record_id}.png`, mime: 'image/png' },
+      source: { kind: 'tipsignal', event_id: e.event_id, record_id: e.data.record_id, source_url: e.data.source_url, type: e.type },
+      tags: ['tipsignal', e.type],
+    });
+  } catch (err) {
+    const code = (err as { code?: string }).code;
+    if (code === 'unauthenticated' || code === 'forbidden' || code === 'not_found' || code === 'mfa_required') return reject('The TipSignal service account is disabled or no longer allowed to create drafts on this brand.');
+    throw err;
+  }
   await db.query(`UPDATE source_events SET status='draft_created', post_id=$2 WHERE id=$1`, [ins.id, post.id]);
-  await audit(db, { workspaceId: binding.workspace_id, brandId: binding.brand_id, actorService: 'tipsignal', action: 'source_event.draft_created', resourceType: 'post', resourceId: post.id, diff: { event_id: e.event_id, type: e.type } });
+  await audit(db, { workspaceId: binding.workspace_id, brandId: binding.brand_id, actorService: serviceActor(binding.service_account_id), action: 'source_event.draft_created', resourceType: 'post', resourceId: post.id, diff: { event_id: e.event_id, type: e.type } });
   return { status: 201, body: { status: 'draft_created', post_id: post.id } };
 }

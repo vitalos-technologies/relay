@@ -9,6 +9,7 @@ import type { Approval, Asset, Connection, Delivery, PostDetail, Schedule } from
 import { Banner, Button, Dialog, ErrorNotice, Field, Input, PlatformIcon, RadioGroup, SimulatedBadge } from '@/components/ui';
 
 import { ScheduleTimeField, ambiguityFromError, wallTimeReady, type WallTimeValue } from '@/components/schedule/schedule-time-field';
+import { useReadinessGate } from '@/components/product/readiness-panel';
 
 type Flush = () => Promise<number | null>;
 
@@ -103,7 +104,10 @@ export function ScheduleDialog({
     }
   };
 
-  const reason = !connectionIds.length ? 'Pick a destination.' : !wallTimeReady(value) ? 'Pick a future time.' : deadlineBad ? 'Deadline: 1–10080 min.' : null;
+  // V2 readiness preflight (stream D): failures and unacknowledged duplicates block the action.
+  const gate = useReadinessGate({ open, postId: post.id, prepare: flush,
+    body: { mode: 'schedule', connection_ids: connectionIds, input_local_time: value.local, timezone: value.tz, offset: value.offset ?? null, deadline_minutes: deadlineBad ? null : dl } });
+  const reason = !connectionIds.length ? 'Pick a destination.' : !wallTimeReady(value) ? 'Pick a future time.' : deadlineBad ? 'Deadline: 1–10080 min.' : gate.blockReason;
   const hasExisting = post.current_schedule && (post.current_schedule.status === 'active' || post.current_schedule.status === 'pending_approval');
 
   return (
@@ -127,6 +131,7 @@ export function ScheduleDialog({
           <Input type="number" inputMode="numeric" min={1} max={10080} value={deadline} onChange={(e) => setDeadline(e.target.value)} className="max-w-[160px]" />
         </Field>
         <DestinationSummary connections={destinations} />
+        {gate.panel}
         {post.brand.approval_required ? <Banner tone="info" title="Needs approval before sending" /> : null}
         {hasExisting ? <Banner tone="info" title="Replaces current schedule; re-approval needed" /> : null}
         <IssueList issues={issues} connections={post.connections} />
@@ -183,7 +188,9 @@ export function SubmitDialog({
       setBusy(false);
     }
   };
-  const reason = !connectionIds.length ? 'Pick a destination.' : mode === 'time' && !wallTimeReady(value) ? 'Pick a future time.' : null;
+  const gate = useReadinessGate({ open, postId: post.id, prepare: flush,
+    body: mode === 'time' ? { mode: 'submit', connection_ids: connectionIds, input_local_time: value.local, timezone: value.tz, offset: value.offset ?? null } : { mode: 'submit', connection_ids: connectionIds } });
+  const reason = !connectionIds.length ? 'Pick a destination.' : mode === 'time' && !wallTimeReady(value) ? 'Pick a future time.' : gate.blockReason;
 
   return (
     <Dialog
@@ -212,6 +219,7 @@ export function SubmitDialog({
         />
         {mode === 'time' ? <ScheduleTimeField value={value} onChange={(v) => { setValue(v); setError(null); }} preferredZones={zonesFor(post, workspaceTz)} serverAmbiguity={serverAmb} /> : null}
         <DestinationSummary connections={post.connections.filter((c) => connectionIds.includes(c.id))} />
+        {gate.panel}
         <p className="text-xs text-muted">Editing later withdraws it from review.</p>
         <IssueList issues={issues} connections={post.connections} />
         {error && !issues.length && !serverAmb ? <ErrorNotice error={error} /> : null}
@@ -261,6 +269,7 @@ export function PublishNowDialog({
   };
 
   const label = realCount === 0 ? `Simulate (${mockCount})` : mockCount ? `Publish ${realCount} + simulate ${mockCount}` : `Publish to ${realCount}`;
+  const gate = useReadinessGate({ open, postId: post.id, prepare: flush, body: { mode: 'publish', connection_ids: variants.map((v) => v.connectionId) } });
 
   return (
     <Dialog
@@ -273,12 +282,13 @@ export function PublishNowDialog({
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-          <Button variant="primary" onClick={submit} loading={busy} disabledReason={!variants.length ? 'Pick a destination.' : null}>{label}</Button>
+          <Button variant="primary" onClick={submit} loading={busy} disabledReason={!variants.length ? 'Pick a destination.' : gate.blockReason}>{label}</Button>
         </>
       }
     >
       <div className="flex flex-col gap-4">
         {post.brand.approval_required ? <Banner tone="info" title="Unapproved versions wait for approval" /> : null}
+        {gate.panel}
         <ol className="flex flex-col divide-y divide-border">
           {variants.map((v) => {
             const c = post.connections.find((x) => x.id === v.connectionId);
@@ -327,11 +337,13 @@ export function PublishNowDialog({
 
 // ------------------------------------------------------------------ Version conflict
 export function ConflictDialog({
-  open, onOpenChange, details, onReload, onKeepCopy,
+  open, onOpenChange, details, onReload, onKeepCopy, keptInHistory,
 }: {
   open: boolean; onOpenChange: (o: boolean) => void;
   details: { version?: number; updated_by?: string; updated_at?: string } | null;
   onReload: () => Promise<void> | void; onKeepCopy: () => Promise<void>;
+  /** V2: the server kept the rejected edit as a conflict copy (History) — nothing is lost either way. */
+  keptInHistory?: boolean;
 }) {
   const [busy, setBusy] = useState<'reload' | 'copy' | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -354,11 +366,11 @@ export function ConflictDialog({
       onOpenChange={onOpenChange}
       busy={!!busy}
       title="Edited elsewhere"
-      description="Your edits weren’t saved. Nothing was overwritten."
+      description={keptInHistory ? 'Nothing was overwritten. Your version is kept in History.' : 'Your edits weren’t saved. Nothing was overwritten.'}
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={!!busy}>Later</Button>
-          <Button variant="secondary" onClick={() => run('copy')} loading={busy === 'copy'} disabled={!!busy && busy !== 'copy'}>Save mine as copy</Button>
+          {keptInHistory ? null : <Button variant="secondary" onClick={() => run('copy')} loading={busy === 'copy'} disabled={!!busy && busy !== 'copy'}>Save mine as copy</Button>}
           <Button variant="primary" onClick={() => run('reload')} loading={busy === 'reload'} disabled={!!busy && busy !== 'reload'}>Load theirs</Button>
         </>
       }
@@ -369,7 +381,7 @@ export function ConflictDialog({
           {details?.updated_by ? <> by <strong className="font-medium">{details.updated_by}</strong></> : null}
           {details?.updated_at ? <> on {fmtDateTime(details.updated_at, 'UTC')} UTC</> : null}.
         </p>
-        <p className="text-muted">Loading theirs discards your unsaved edits.</p>
+        <p className="text-muted">{keptInHistory ? 'Load theirs, then compare or restore yours from History.' : 'Loading theirs discards your unsaved edits.'}</p>
         {error ? <ErrorNotice error={error} /> : null}
       </div>
     </Dialog>

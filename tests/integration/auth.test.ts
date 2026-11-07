@@ -1,29 +1,26 @@
-// Full OIDC login flow against the local Dex provider (real HTTP), driven programmatically:
-// startLogin() → Dex /auth → local login form → callback params → completeLogin().
+// Full OIDC login flow against the local Keycloak realm (real HTTP), driven programmatically:
+// startLogin() → Keycloak /auth → login form(s) → callback params → completeLogin().
+// Also: assurance (acr/amr/auth_time) from the verified ID token, step-up bound to the current session,
+// token rotation, subject-mismatch refusal and back-channel logout against the real IdP.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { resetConfigCache, resolveSession, type EncryptedBlob } from '@social-lite/services';
 import { createInvitation } from '../../packages/services/src/auth/invitations.js';
-import { completeLogin, safeReturnTo, startLogin } from '../../packages/services/src/auth/oidc.js';
-import { sha256 } from '../../packages/services/src/auth/session.js';
+import { completeLogin, safeReturnTo, startLogin, startStepUp } from '../../packages/services/src/auth/oidc.js';
+import { sha256, type SessionRecord } from '../../packages/services/src/auth/session.js';
 import { LoginError } from '../../packages/services/src/auth/users.js';
+import { resetIdpAdminCache } from '../../packages/services/src/auth/idp-admin.js';
 import { closeTestPool, tenant, testPool } from './helpers.js';
+import { KC_ISSUER, KcBrowser, OIDC_ENV } from './keycloak.js';
 
-const DEX = 'http://localhost:5556/dex';
-const PASSWORD = 'socialite-demo';
-const OIDC_ENV = {
-  OIDC_ISSUER: DEX,
-  OIDC_CLIENT_ID: 'social-lite-local',
-  OIDC_CLIENT_SECRET: 'social-lite-local-client-secret',
-  OIDC_ALLOW_INSECURE_HTTP: 'true',
-};
 const saved: Record<string, string | undefined> = {};
 
 beforeAll(async () => {
   testPool();
   for (const [k, v] of Object.entries(OIDC_ENV)) { saved[k] = process.env[k]; process.env[k] = v; }
   resetConfigCache();
-  // Requires the local Dex from infra/compose.yaml (fails loudly when it is not running).
-  expect((await fetch(`${DEX}/.well-known/openid-configuration`)).ok).toBe(true);
+  resetIdpAdminCache();
+  // Requires the local Keycloak from infra/compose.yaml (fails loudly when it is not running).
+  expect((await fetch(`${KC_ISSUER}/.well-known/openid-configuration`)).ok).toBe(true);
 });
 afterAll(async () => {
   for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
@@ -31,40 +28,14 @@ afterAll(async () => {
   await closeTestPool();
 });
 
-/** Drive Dex's password login and return the query string Dex sends to our callback. */
-async function dexLogin(authorizationUrl: string, email: string): Promise<URLSearchParams> {
-  let url = authorizationUrl;
-  for (let i = 0; i < 5; i++) {
-    const res = await fetch(url, { redirect: 'manual' });
-    const loc = res.headers.get('location');
-    await res.arrayBuffer();
-    if (!loc) break;
-    url = new URL(loc, url).toString();
-    if (url.includes('/auth/local/login')) break;
-  }
-  expect(url).toContain('/auth/local/login');
-  const res = await fetch(url, {
-    method: 'POST', redirect: 'manual',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ login: email, password: PASSWORD }),
-  });
-  await res.arrayBuffer();
-  let loc = res.headers.get('location');
-  expect(loc, 'Dex login should redirect').toBeTruthy();
-  // With skipApprovalScreen Dex redirects to the callback directly; follow an approval hop if present.
-  if (!loc!.startsWith('http://localhost:3000/')) {
-    const r2 = await fetch(new URL(loc!, url), { redirect: 'manual' });
-    await r2.arrayBuffer();
-    loc = r2.headers.get('location');
-  }
-  const cb = new URL(loc!);
-  expect(cb.origin + cb.pathname).toBe('http://localhost:3000/api/auth/callback');
-  return cb.searchParams;
+/** Drive Keycloak's login and return the query string it sends to our callback. */
+async function kcLogin(authorizationUrl: string, email: string, browser = new KcBrowser()): Promise<URLSearchParams> {
+  return (await browser.authorize(authorizationUrl, email)).params;
 }
 
-async function loginAs(email: string, opts: { returnTo?: string; invite?: string } = {}) {
+async function loginAs(email: string, opts: { returnTo?: string; invite?: string; browser?: KcBrowser } = {}) {
   const start = await startLogin(opts);
-  const params = await dexLogin(start.authorizationUrl, email);
+  const params = await kcLogin(start.authorizationUrl, email, opts.browser);
   return { start, params, result: await completeLogin(params, { binding: start.binding, userAgent: 'vitest', ip: '127.0.0.1' }) };
 }
 
@@ -74,11 +45,11 @@ async function loginError(p: Promise<unknown>): Promise<string> {
   return (e as LoginError).code;
 }
 
-describe('OIDC login against Dex', () => {
+describe('OIDC login against Keycloak', () => {
   it('logs in with PKCE + nonce, creates the user by (issuer, subject) and a usable session', async () => {
     const start = await startLogin({ returnTo: '/planner?view=week' });
     const authz = new URL(start.authorizationUrl);
-    expect(authz.origin + authz.pathname).toBe(`${DEX}/auth`);
+    expect(authz.origin + authz.pathname).toBe(`${KC_ISSUER}/protocol/openid-connect/auth`);
     expect(authz.searchParams.get('code_challenge_method')).toBe('S256');
     expect(authz.searchParams.get('nonce')).toBeTruthy();
     const state = authz.searchParams.get('state')!;
@@ -93,7 +64,7 @@ describe('OIDC login against Dex', () => {
     expect(ttl).toBeLessThanOrEqual(10 * 60_000);
     expect((await testPool().query(`SELECT 1 FROM oauth_states WHERE state_hash=$1`, [Buffer.from(state)])).rowCount).toBe(0);
 
-    const params = await dexLogin(start.authorizationUrl, 'owner@demo.social-lite.test');
+    const params = await kcLogin(start.authorizationUrl, 'owner@demo.social-lite.test');
     // Wrong browser binding is refused (and does not consume a usable login for an attacker).
     expect(await loginError(completeLogin(params, { binding: 'attacker-binding' }))).toBe('invalid_state');
     // The state was consumed by that attempt: single use.
@@ -103,7 +74,7 @@ describe('OIDC login against Dex', () => {
     expect(result.redirectTo).toBe('/planner?view=week');
     const user = (await testPool().query<{ oidc_issuer: string; oidc_subject: string; email_verified: boolean }>(
       `SELECT oidc_issuer, oidc_subject, email_verified FROM users WHERE id=$1`, [result.userId])).rows[0]!;
-    expect(user).toMatchObject({ oidc_issuer: DEX, email_verified: true });
+    expect(user).toMatchObject({ oidc_issuer: KC_ISSUER, email_verified: true });
     expect(user.oidc_subject).toBeTruthy();
     const resolved = await resolveSession(result.token);
     expect(resolved?.actor).toMatchObject({ userId: result.userId, email: 'owner@demo.social-lite.test' });
@@ -120,7 +91,7 @@ describe('OIDC login against Dex', () => {
     const start = await startLogin({});
     const state = new URL(start.authorizationUrl).searchParams.get('state')!;
     await testPool().query(`UPDATE oauth_states SET expires_at = now() - interval '1 second' WHERE state_hash=$1`, [sha256(state)]);
-    const params = await dexLogin(start.authorizationUrl, 'owner@demo.social-lite.test');
+    const params = await kcLogin(start.authorizationUrl, 'owner@demo.social-lite.test');
     expect(await loginError(completeLogin(params, { binding: start.binding }))).toBe('invalid_state');
   });
 
@@ -131,13 +102,13 @@ describe('OIDC login against Dex', () => {
     const { result } = await loginAs('ADMIN@demo.social-lite.test'.toLowerCase());
     expect(result.userId).toBe(pending);
     const bound = (await db.query<{ oidc_issuer: string; oidc_subject: string; name: string }>(`SELECT oidc_issuer, oidc_subject, name FROM users WHERE id=$1`, [pending])).rows[0]!;
-    expect(bound.oidc_issuer).toBe(DEX);
+    expect(bound.oidc_issuer).toBe(KC_ISSUER);
     expect(bound.name).toBe('Seeded Admin');
 
     // An already-bound account with the same email but another identity is never re-bound.
     await db.query(`INSERT INTO users(oidc_issuer, oidc_subject, email, email_verified) VALUES ('https://other-idp.example', 'someone', 'editor@demo.social-lite.test', true)`);
     const start = await startLogin({});
-    const params = await dexLogin(start.authorizationUrl, 'editor@demo.social-lite.test');
+    const params = await kcLogin(start.authorizationUrl, 'editor@demo.social-lite.test');
     expect(await loginError(completeLogin(params, { binding: start.binding }))).toBe('account_conflict');
     const still = (await db.query<{ oidc_subject: string }>(`SELECT oidc_subject FROM users WHERE email='editor@demo.social-lite.test'`)).rows[0]!;
     expect(still.oidc_subject).toBe('someone');
@@ -149,7 +120,7 @@ describe('OIDC login against Dex', () => {
     const token = decodeURIComponent(inv.body.accept_url!.split('/invite/')[1]!);
     const { result } = await loginAs('invitee@demo.social-lite.test', { invite: token, returnTo: '/' });
     expect(result.invitation).toEqual({ accepted: true, workspaceId: t.workspaceId });
-    expect(result.session.activeWorkspaceId).toBe(t.workspaceId);
+    expect((result.session as SessionRecord).activeWorkspaceId).toBe(t.workspaceId);
     const m = await testPool().query(`SELECT role FROM memberships WHERE workspace_id=$1 AND user_id=$2 AND removed_at IS NULL`, [t.workspaceId, result.userId]);
     expect(m.rows[0]?.role).toBe('editor');
     // The invite token is not stored in plaintext in the login state.
@@ -168,6 +139,91 @@ describe('OIDC login against Dex', () => {
     expect(m.rowCount).toBe(0);
     const open = await testPool().query(`SELECT accepted_at FROM invitations WHERE id=$1`, [inv.body.id]);
     expect(open.rows[0].accepted_at).toBeNull();
+  });
+});
+
+describe('assurance, step-up and session rotation (real Keycloak)', () => {
+  const asSession = (r: { session: unknown }) => r.session as SessionRecord;
+  const sessionRow = async (id: string) => (await testPool().query<{ acr: string | null; amr: string[]; mfa_verified: boolean; auth_time: Date | null; idp_session_id: string | null; idp_subject: string | null; revoked_at: Date | null }>(
+    `SELECT acr, amr, mfa_verified, auth_time, idp_session_id, idp_subject, revoked_at FROM sessions WHERE id=$1`, [id])).rows[0]!;
+
+  it('password sign-in records acr/amr/auth_time/sid from the verified ID token and asks for the second factor next', { timeout: 120_000 }, async () => {
+    const browser = new KcBrowser();
+    const { result } = await loginAs('owner@demo.social-lite.test', { browser, returnTo: '/planner' });
+    const s = await sessionRow(result.session.id);
+    expect(s).toMatchObject({ acr: 'password', amr: ['pwd'], mfa_verified: false });
+    expect(s.idp_session_id).toBeTruthy();
+    expect(s.idp_subject).toBeTruthy();
+    expect(Math.abs(s.auth_time!.getTime() - Date.now())).toBeLessThan(60_000);
+    expect(result.needsSecondFactor).toBe(true);
+
+    // Second-factor hop on the same IdP session: only the TOTP code is asked; same app session, rotated token.
+    const hop = await startStepUp(asSession(result), { returnTo: '/planner', mode: 'mfa' });
+    if ('setupRequired' in hop) throw new Error('expected a step-up');
+    expect(new URL(hop.authorizationUrl).searchParams.get('acr_values')).toBe('mfa');
+    const { params, steps } = await browser.authorize(hop.authorizationUrl, 'owner@demo.social-lite.test');
+    expect(steps).toEqual(['otp']);
+    const done = await completeLogin(params, { binding: hop.binding, currentSession: asSession(result) });
+    expect(done.purpose).toBe('step_up');
+    expect(done.redirectTo).toBe('/planner?verified=1');
+    expect(await sessionRow(result.session.id)).toMatchObject({ acr: 'mfa', amr: ['pwd', 'otp'], mfa_verified: true, revoked_at: null });
+    expect(await resolveSession(result.token)).toBeNull(); // old cookie value stops working
+    const now = await resolveSession(done.token);
+    expect(now?.session).toMatchObject({ id: result.session.id, mfaVerified: true, acr: 'mfa' });
+
+    // A user without a second factor never gets the hop.
+    const analyst = await loginAs('analyst@demo.social-lite.test');
+    expect(analyst.result.needsSecondFactor).toBe(false);
+    expect(await startStepUp(asSession(analyst.result), {})).toEqual({ setupRequired: true });
+  });
+
+  it('fresh step-up (acr_values=mfa, max_age=0) re-authenticates, refreshes auth_time and binds to the same subject + session', { timeout: 120_000 }, async () => {
+    const browser = new KcBrowser();
+    const { result } = await loginAs('admin@demo.social-lite.test', { browser });
+    await testPool().query(`UPDATE sessions SET auth_time = now() - interval '2 hours' WHERE id=$1`, [result.session.id]);
+    const before = await resolveSession(result.token);
+    const up = await startStepUp(before!.session, { returnTo: '/settings' });
+    if ('setupRequired' in up) throw new Error('expected a step-up');
+    const q = new URL(up.authorizationUrl).searchParams;
+    expect(q.get('max_age')).toBe('0');
+    expect(q.get('acr_values')).toBe('mfa');
+    const { params, steps } = await browser.authorize(up.authorizationUrl, 'admin@demo.social-lite.test');
+    expect(steps).toEqual(['password', 'otp']); // max_age=0: full re-authentication even with an IdP session
+    // Completing from another session is refused (and the state is single-use).
+    const other = await loginAs('viewer@demo.social-lite.test');
+    expect(await loginError(completeLogin(params, { binding: up.binding, currentSession: asSession(other.result) }))).toBe('session_mismatch');
+
+    const up2 = await startStepUp(before!.session, { returnTo: '/settings' });
+    if ('setupRequired' in up2) throw new Error('expected a step-up');
+    const r2 = await browser.authorize(up2.authorizationUrl, 'admin@demo.social-lite.test');
+    const done = await completeLogin(r2.params, { binding: up2.binding, currentSession: before!.session });
+    const s = await sessionRow(result.session.id);
+    expect(s.mfa_verified).toBe(true);
+    expect(Date.now() - s.auth_time!.getTime()).toBeLessThan(60_000);
+    expect((await resolveSession(done.token))?.session.authTime?.getTime()).toBe(s.auth_time!.getTime());
+  });
+
+  it('refuses a step-up completed by a different identity', { timeout: 120_000 }, async () => {
+    const analyst = await loginAs('analyst@demo.social-lite.test');
+    // Pretend the analyst has a second factor so a step-up starts, then authenticate as the publisher instead.
+    const session = { ...asSession(analyst.result), idpSubject: null };
+    const up = await startStepUp(session, {});
+    if ('setupRequired' in up) throw new Error('expected a step-up');
+    const { params } = await new KcBrowser().authorize(up.authorizationUrl, 'publisher@demo.social-lite.test');
+    expect(await loginError(completeLogin(params, { binding: up.binding, currentSession: session }))).toBe('account_mismatch');
+    expect(await sessionRow(session.id)).toMatchObject({ mfa_verified: false, acr: 'password' });
+    const audit = await testPool().query(`SELECT 1 FROM audit_events WHERE action='auth.step_up_subject_mismatch' AND resource_id=$1`, [session.id]);
+    expect(audit.rowCount).toBe(1);
+  });
+
+  it('login revokes the session cookie the browser already carried (rotation on login)', async () => {
+    const first = await loginAs('viewer@demo.social-lite.test');
+    const start = await startLogin({});
+    const params = await kcLogin(start.authorizationUrl, 'viewer@demo.social-lite.test');
+    const second = await completeLogin(params, { binding: start.binding, currentSession: asSession(first.result) });
+    expect(await resolveSession(first.result.token)).toBeNull();
+    expect((await sessionRow(first.result.session.id)).revoked_at).not.toBeNull();
+    expect(await resolveSession(second.token)).not.toBeNull();
   });
 });
 
