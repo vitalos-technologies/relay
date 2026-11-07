@@ -46,20 +46,20 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
 3. V3:
    - Providers: done.
    - Lead engine gaps: done.
-   - MCP (017) **done** (commit 864cf18). **Running:** AN analytics (015), CH content hub (016).
+   - MCP (017) and CH content hub (016) **done** (864cf18, 57e056b). **Running:** AN analytics (015).
    - Next: UX redesign (018 brief), launched when V2-A finishes. Then the V3 docs.
 4. V3.1 → 5. V3.1 Admin → 6. Collaboration → 7. **V3.5** → 8. Copy cleanup → 9. Docs + Help Centre.
 
 ## Current state (keep updated)
-- **Background agents** (a new session will NOT have them): V2-A, AN, CH.
+- **Background agents** (a new session will NOT have them): V2-A, AN.
+- **CH follow-ups:** CH's edits to `apps/web/lib/csp.ts`, `apps/web/proxy.ts`, `tests/unit/security-headers.test.ts`, `apps/web/app/(app)/settings/page.tsx` are uncommitted (mixed with A's); commit with A. MCP `import_source_to_draft` still unwired: CH imports are queued and preview-gated, so MCP needs `preview_source` + `request_import`/`get_import` tools instead of the synchronous `ports.ts` importer (V3 gap). Live Google/Notion apps + browser Picker untested (activation).
 - **MCP follow-ups:** recreate Keycloak (`docker compose -f infra/compose.yaml up -d --force-recreate oidc`) after A lands to load the `relay-mcp` client/scopes; register the CH importer in `services/mcp/ports.ts`; switch `query_analytics` to the AN query API; rebuild worker; place MCP settings in the redesigned Settings nav (now `/mcp/settings`). Real MCP clients need public HTTPS (activation checklist).
   - If they're gone, re-launch each from its progress note. Each note lists what is done and what's next:
     - `docs/v2-progress/A.md`
     - `docs/v3-progress/{analytics,content-hub,mcp}.md`
   - Stream contracts: `docs/V2_WORKSTREAMS.md`, `docs/V3_WORKSTREAMS.md`.
 - **Dev DB:**
-  - Migrations through 014, plus 019, are applied.
-  - 015–017 are NOT applied; apply them together once their streams land.
+  - Applied: through 014, plus 016, 017, 019. 015 (analytics) is NOT applied yet; apply it when AN lands.
   - Because of that, `/api/ready` reports `not_ready`.
 - **Lead work in progress:**
   - G14 runtime DB-role guard: committed (web). The two worker lines in `apps/worker/src/main.ts` (`assertRuntimeDbRole`) are uncommitted because that file also holds AN/CH/MCP edits; commit them with the stream integration.
@@ -80,7 +80,7 @@ Backup: branch `wip/streams` on GitHub is a snapshot of all uncommitted stream w
 `git status` shows files from the running streams. **Never commit or revert another stream's files mid-flight.** Commit only files you changed, by explicit path.
 - A: `apps/web/lib/csp.ts`, `infra/keycloak/*`, `tests/e2e/security.spec.ts`, `tests/integration/{auth,keycloak}*`, `scripts/{dev.sh,demo-totp.ts}`, `docs/{DECISIONS,DEPLOYMENT,OPERATIONS}.md`, `evidence/v2/security-*`.
 - AN: `packages/services/src/analytics/**`, `packages/core/src/contracts/analytics.ts`, migration 015.
-- CH: `packages/services/src/content-hub/**`, `apps/web/components/content-hub/**`, migration 016, `services/{settings,setup}.ts`.
+- CH: committed (see CH follow-ups for the 4 shared files).
 - MCP: committed. Its shared edits still uncommitted: `apps/worker/src/main.ts` (mcp-jobs loop), `infra/keycloak/social-lite-realm.json` (also A's).
 
 ## Rules (from the user; always apply)
