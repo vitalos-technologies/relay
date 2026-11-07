@@ -5,7 +5,7 @@
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
-import { api, completeKeycloak, demoBrand, type Api } from './helpers';
+import { api, completeKeycloak, demoBrand, useE2EWorkspace, type Api } from './helpers';
 
 const OUT = 'evidence/v2';
 
@@ -18,6 +18,7 @@ async function signInHere(page: Page, email: string) {
   await page.waitForURL(/localhost:5556/);
   await completeKeycloak(page, email);
   await page.waitForURL((u) => u.port === port && !u.pathname.startsWith('/login') && !u.pathname.startsWith('/api/auth'), { timeout: 45_000 });
+  await useE2EWorkspace(page);
 }
 
 const inHours = (h: number) => {
@@ -105,7 +106,7 @@ test.describe('V2 product & fairness', () => {
     await expect(page.getByText('Exports / month', { exact: true })).toBeVisible();
     await page.screenshot({ path: `${OUT}/product-budgets.png`, fullPage: true });
 
-    await page.goto('/settings?tab=brand');
+    await page.goto('/settings/operations/export'); // V3: Settings → Operations → Data export (was ?tab=brand)
     await expect(page.getByText('Client handover')).toBeVisible();
     const [zip] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export', exact: true }).click()]);
     expect(zip.suggestedFilename()).toMatch(/^handover-.*\.zip$/);

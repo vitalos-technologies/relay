@@ -19,7 +19,7 @@ export function BrandProductSettings({ brandId }: { brandId: string }) {
   );
 }
 
-function DuplicateWindow({ brandId }: { brandId: string }) {
+export function DuplicateWindow({ brandId }: { brandId: string }) {
   const toast = useToast();
   const { data, setData, error } = useApi<WindowView>(`/api/brands/${brandId}/duplicate-window`);
   const [v, setV] = useState('');
@@ -50,7 +50,7 @@ function DuplicateWindow({ brandId }: { brandId: string }) {
   );
 }
 
-function HandoverExport({ brandId }: { brandId: string }) {
+export function HandoverExport({ brandId }: { brandId: string }) {
   const { session } = useSession();
   const toast = useToast();
   const [format, setFormat] = useState<'zip' | 'json'>('zip');

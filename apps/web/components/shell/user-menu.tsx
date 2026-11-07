@@ -1,31 +1,17 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { LogOut, Monitor, Moon, ShieldCheck, Sun } from 'lucide-react';
+import { LogOut, Monitor, Moon, ShieldCheck, Sun, UserRound } from 'lucide-react';
 import { api } from '@/lib/client/api';
 import { useSession } from '@/lib/client/session';
+import { applyTheme, currentTheme, type Theme } from '@/lib/client/theme';
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuRadioGroup, MenuRadioItem, MenuSeparator, MenuTrigger, useToast } from '@/components/ui';
-
-type Theme = 'system' | 'light' | 'dark';
-
-function applyTheme(t: Theme) {
-  const el = document.documentElement;
-  if (t === 'system') el.removeAttribute('data-theme');
-  else el.setAttribute('data-theme', t);
-  try {
-    if (t === 'system') localStorage.removeItem('sl-theme');
-    else localStorage.setItem('sl-theme', t);
-  } catch {
-    /* storage unavailable */
-  }
-}
 
 export function UserMenu({ compact }: { compact?: boolean }) {
   const { session } = useSession();
   const toast = useToast();
   const [theme, setTheme] = useState<Theme>('system');
   useEffect(() => {
-    const a = document.documentElement.getAttribute('data-theme');
-    setTheme(a === 'light' || a === 'dark' ? a : 'system');
+    setTheme(currentTheme());
   }, []);
   const u = session.user;
   const initials = (u.name || u.email).split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((s) => s[0]?.toUpperCase()).join('');
@@ -70,6 +56,7 @@ export function UserMenu({ compact }: { compact?: boolean }) {
           <MenuRadioItem value="light" icon={<Sun aria-hidden />}>Light</MenuRadioItem>
         </MenuRadioGroup>
         <MenuSeparator />
+        <MenuItem icon={<UserRound aria-hidden />} onSelect={() => window.location.assign('/settings/personal/profile')}>Profile and settings</MenuItem>
         <MenuItem icon={<ShieldCheck aria-hidden />} onSelect={() => window.location.assign('/security')}>Security</MenuItem>
         <MenuItem icon={<LogOut aria-hidden />} onSelect={() => void signOut()}>Sign out</MenuItem>
       </MenuContent>

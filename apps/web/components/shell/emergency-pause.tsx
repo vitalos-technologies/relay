@@ -3,10 +3,10 @@ import { useState } from 'react';
 import { OctagonPause, Play } from 'lucide-react';
 import { api } from '@/lib/client/api';
 import { useSession } from '@/lib/client/session';
-import { Button, ConfirmDialog, Field, Textarea, useToast } from '@/components/ui';
+import { Button, ConfirmDialog, Field, IconButton, Textarea, useToast } from '@/components/ui';
 
 /** Workspace-wide emergency pause (pause.emergency). Checked at dispatch time by the worker (SC-05). */
-export function EmergencyPause({ variant = 'sidebar' }: { variant?: 'sidebar' | 'banner' }) {
+export function EmergencyPause({ variant = 'sidebar' }: { variant?: 'sidebar' | 'banner' | 'rail' }) {
   const { session, can, refresh } = useSession();
   const toast = useToast();
   const [open, setOpen] = useState(false);
@@ -23,7 +23,14 @@ export function EmergencyPause({ variant = 'sidebar' }: { variant?: 'sidebar' | 
 
   return (
     <>
-      {variant === 'sidebar' ? (
+      {variant === 'rail' ? (
+        <IconButton
+          label={paused ? 'Resume publishing' : 'Pause publishing'}
+          className={paused ? undefined : 'text-danger! hover:text-danger!'}
+          icon={paused ? <Play aria-hidden className="size-[18px]" /> : <OctagonPause aria-hidden className="size-[18px]" />}
+          onClick={() => setOpen(true)}
+        />
+      ) : variant === 'sidebar' ? (
         <Button
           variant="quiet"
           size="md"

@@ -25,7 +25,7 @@ export default function LibraryPage() {
   if (!session.brands.length) {
     return (
       <>
-        <PageHeader title="Library" />
+        <PageHeader title="Content library" />
         <EmptyState icon={<Images aria-hidden />} title="No brands yet" />
       </>
     );
@@ -34,11 +34,12 @@ export default function LibraryPage() {
   return (
     <>
       <PageHeader
-        title="Library"
+        title="Content library"
         actions={!brandFilter ? (
-          <div className="w-[220px]">
+          <div className="w-auto min-w-[180px] max-w-[360px]">
             <label htmlFor="lib-brand" className="sr-only">Brand</label>
-            <Select id="lib-brand" value={localBrand} onChange={(e) => setLocalBrand(e.target.value)}>
+            <Select id="lib-brand" value={localBrand} onChange={(e) => setLocalBrand(e.target.value)} className="[field-sizing:content] max-w-[360px]"
+              title={session.brands.find((b) => b.id === localBrand)?.name}>
               {session.brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
             </Select>
           </div>

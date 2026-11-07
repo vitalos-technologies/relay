@@ -117,7 +117,7 @@ function CreateWorkspace({ firstTime }: { firstTime: boolean }) {
         }
       }
       // With a first brand the next step is connecting accounts; otherwise create a brand.
-      window.location.assign(created?.brand?.id ? `/accounts?brand=${created.brand.id}` : '/settings?tab=brand');
+      window.location.assign(created?.brand?.id ? `/accounts?brand=${created.brand.id}` : '/settings/workspace/branding');
     } catch (err) {
       setError(err);
       setBusy(false);

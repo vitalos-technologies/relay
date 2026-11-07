@@ -90,6 +90,60 @@ export function VariantPreview({ variant, connection, assets }: { variant: Resol
         </div>
       );
       break;
+    case 'tiktok':
+      // Vertical video layout (9:16), caption over the bottom of the frame.
+      card = (
+        <div className="relative mx-auto aspect-[9/16] max-h-[460px] w-full max-w-[260px] overflow-hidden bg-black text-white">
+          {image ? <div className="absolute inset-0 flex items-center [&_img]:h-full [&_img]:max-h-none [&_img]:object-cover">{image}</div>
+            : <div className="absolute inset-0 flex items-center justify-center px-6 text-center text-xs text-white/70">TikTok requires a video or photos</div>}
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3 pt-10">
+            <p className="text-[13px] font-semibold">{handle ?? name}</p>
+            {text ? <p className="mt-1 line-clamp-3 whitespace-pre-wrap break-words text-[12px] leading-snug">{text}</p> : null}
+          </div>
+        </div>
+      );
+      break;
+    case 'youtube': {
+      const yt = (variant.options?.youtube ?? {}) as { title?: string; privacyStatus?: string };
+      card = (
+        <div>
+          {image ?? <div className="flex aspect-video items-center justify-center bg-sunken px-6 text-center text-xs text-warn">YouTube requires a video</div>}
+          <div className="p-3">
+            <p className="line-clamp-2 text-[14px] font-semibold">{yt.title || <span className="italic text-subtle">Untitled video</span>}</p>
+            <p className="mt-0.5 text-[11px] text-muted">{name}{yt.privacyStatus ? ` · ${yt.privacyStatus[0]!.toUpperCase()}${yt.privacyStatus.slice(1)}` : ''}</p>
+            {text ? <p className="mt-2 line-clamp-3 whitespace-pre-wrap break-words rounded-lg bg-sunken p-2 text-[12px] text-muted">{text}</p> : null}
+          </div>
+        </div>
+      );
+      break;
+    }
+    case 'pinterest': {
+      const pin = (variant.options?.pinterest ?? {}) as { title?: string };
+      card = (
+        <div className="p-3">
+          <div className="mx-auto max-w-[240px] overflow-hidden rounded-2xl">{image ?? <div className="flex aspect-[2/3] items-center justify-center bg-sunken px-6 text-center text-xs text-warn">Pinterest requires an image or video</div>}</div>
+          <div className="mx-auto mt-2 max-w-[240px]">
+            {pin.title ? <p className="line-clamp-2 text-[13px] font-semibold">{pin.title}</p> : null}
+            {text ? <p className="mt-0.5 line-clamp-2 text-[12px] text-muted">{text}</p> : null}
+            <p className="mt-1 text-[11px] text-subtle">{name}{variant.link ? ` · ${safeHost(variant.link)}` : ''}</p>
+          </div>
+        </div>
+      );
+      break;
+    }
+    case 'linkedin':
+    case 'threads':
+    case 'bluesky':
+      card = (
+        <div className="pb-3">
+          <Header name={name} provider={connection.provider} sub={handle ?? (connection.provider === 'linkedin' ? 'Now' : null)} />
+          <div className="px-3">{body}</div>
+          {image ? <div className="mx-3 mt-2 overflow-hidden rounded-xl border border-border">{image}</div> : null}
+          {variant.link && !image ? <p className="mx-3 mt-2 truncate rounded-lg border border-border px-3 py-2 text-[11px] text-muted">{safeHost(variant.link)}</p> : null}
+          <div className="mt-2 flex gap-8 px-3 text-muted" aria-hidden><Heart className="size-4" /><MessageCircle className="size-4" /><Repeat2 className="size-4" /></div>
+        </div>
+      );
+      break;
   }
 
   return (

@@ -15,3 +15,5 @@ export * from './menu';
 export * from './popover';
 export * from './tooltip';
 export { cn } from './cn';
+export * from './data-viz';
+export * from './layout';

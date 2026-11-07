@@ -2,7 +2,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Archive, CalendarClock, CircleCheck, CloudAlert, Copy, Ellipsis, LoaderCircle, Save, Send, SendHorizontal,
+  Archive, CalendarClock, CircleCheck, CloudAlert, Copy, Ellipsis, ListPlus, LoaderCircle, Save, Send, SendHorizontal,
 } from 'lucide-react';
 import { PROVIDER_LABEL, resolveVariants, type DraftContent, type ValidationIssue, type VariantDraft } from '@social-lite/core';
 import { api, isApiError } from '@/lib/client/api';
@@ -13,16 +13,18 @@ import { fmtTime, zoneAbbr } from '@/lib/client/format';
 import { constraintsOf, localChecks } from '@/lib/client/variants';
 import type { Asset, Connection, PostDetail, ValidateResponse } from '@/lib/client/types';
 import {
-  Banner, Button, Card, CardHeader, ConfirmDialog, EmptyState, ErrorState, IconButton, InfoTip, LinkButton, Menu, MenuContent, MenuItem,
-  MenuTrigger, PlatformIcon, PostStatusBadge, Select, Skeleton, Tabs, TabsContent, TabsList, TabsTrigger, ToneIcon, useToast,
+  Banner, Button, Card, CardHeader, cn, ConfirmDialog, EmptyState, ErrorState, IconButton, InfoTip, LinkButton, Menu, MenuContent, MenuItem,
+  MenuLabel, MenuTrigger, PlatformIcon, PostStatusBadge, Segmented, Select, Skeleton, ToneIcon, useToast,
 } from '@/components/ui';
-import { BaseEditor, DestinationPicker, VariantEditor } from './editors';
+import { BaseEditor, VariantEditor } from './editors';
+import { ContentSwitcher, DestinationSelector } from './destination-rail';
+import { ProviderOptions } from './provider-options';
 import { VariantPreview } from './preview';
 import { ConflictDialog, PublishNowDialog, ScheduleDialog, SubmitDialog } from './action-dialogs';
 import { DeliveriesPanel } from './deliveries-panel';
 import { AiAssist } from '@/components/ai/assist';
 import { VariantCrops } from '@/components/crops/variant-crops';
-import { QueueButton } from '@/components/slots/queue-button';
+import { QueueButton, useQueueAction } from '@/components/slots/queue-button';
 import { CollabPanel } from '@/components/collab/collab-panel';
 import { conflictCopyFor, rememberConflictCopy } from '@/components/collab/conflict-copy';
 
@@ -72,7 +74,10 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
   const toast = useToast();
   const online = useOnline();
   const { session, can } = useSession();
-  const readOnly = !post.can.edit;
+  // Published posts open read-only; editing them is an explicit choice (Duplicate is the default path).
+  const [editPublished, setEditPublished] = useState(false);
+  const isPublished = post.status === 'published';
+  const readOnly = !post.can.edit || (isPublished && !editPublished);
 
   // ---------------------------------------------------------------- local working state
   const [draft, setDraft] = useState<DraftContent>(() => normaliseDraft(post.draft));
@@ -109,6 +114,7 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
   }, []);
 
   const [tab, setTab] = useState<string>('base');
+  const [step, setStep] = useState<'setup' | 'write' | 'preview'>('write');
   const [previewId, setPreviewId] = useState<string>('');
   const [dialog, setDialog] = useState<null | 'schedule' | 'submit' | 'publish'>(null);
   const [pendingRemove, setPendingRemove] = useState<Connection | null>(null);
@@ -278,6 +284,7 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
     }
   };
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const queue = useQueueAction(post.id, flush, (t, b) => void afterAction(t, b));
   const keepCopy = async () => {
     const mine = latest.current;
     const p = await api.post<PostDetail>(`/api/brands/${post.brand_id}/posts`, {
@@ -304,6 +311,10 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
   const allMock = post.destinations.length > 0 && post.destinations.every((d) => d.is_mock);
   const previewConn = selectedConns.find((c) => c.id === (tab !== 'base' ? tab : previewId)) ?? selectedConns[0];
   const previewVariant = previewConn ? resolved.find((r) => r.connectionId === previewConn.id) : undefined;
+  const primaryIsSubmit = post.can.submit && !post.can.schedule;
+  const showQueue = !readOnly && can('drafts.edit') && (post.can.schedule || post.can.submit);
+  const activeConn = tab !== 'base' ? selectedConns.find((c) => c.id === tab) : undefined;
+  const activeVariant = activeConn ? draft.variants.find((x) => x.connectionId === activeConn.id) : undefined;
 
   return (
     <div className="pb-24">
@@ -313,14 +324,16 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
           <p className="mb-1 flex items-center gap-1 truncate text-xs text-subtle">{post.brand.name}<InfoTip label="About the title">Internal title — never published.</InfoTip></p>
           <h1 className="sr-only">Edit post{title.trim() ? `: ${title.trim()}` : ''}</h1>
           <label htmlFor="post-title" className="sr-only">Post title (internal)</label>
-          <input
+          <textarea
             id="post-title"
+            rows={1}
             value={title}
             readOnly={readOnly}
-            onChange={(e) => edit({ title: e.target.value })}
+            onChange={(e) => edit({ title: e.target.value.replace(/[\r\n]+/g, ' ') })}
+            onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
             placeholder="Untitled post"
             maxLength={200}
-            className="w-full rounded-md bg-transparent text-[22px] font-semibold tracking-[-0.01em] placeholder:text-subtle sm:text-[24px]"
+            className="block max-h-[2.5em] w-full resize-none overflow-hidden rounded-md bg-transparent text-[22px] font-semibold leading-[1.25] tracking-[-0.01em] [field-sizing:content] placeholder:text-subtle focus:max-h-none sm:text-[28px]"
           />
         </div>
         <div className="flex items-center gap-2">
@@ -337,89 +350,110 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
         </div>
       </div>
 
-      {readOnly ? <Banner tone="info" className="mb-6" title="View only" /> : null}
+      {readOnly ? (
+        <Banner
+          tone="info"
+          className="mb-6"
+          title={isPublished ? (allMock ? 'Delivered to simulated destinations · read only' : 'Published · read only') : 'View only'}
+          actions={<>
+            {can('drafts.edit') ? <Button size="sm" variant="secondary" icon={<Copy aria-hidden className="size-4" />} onClick={() => void duplicate()}>Duplicate</Button> : null}
+            {isPublished && post.can.edit ? <Button size="sm" variant="ghost" onClick={() => setEditPublished(true)}>Edit</Button> : null}
+          </>}
+        />
+      ) : null}
       {paused ? <Banner tone="warn" className="mb-6" title={`${session.workspace?.publishing_paused ? 'Workspace' : post.brand.name} paused — nothing will send`} /> : null}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="flex min-w-0 flex-col gap-6">
-          <Card aria-label="Content">
-            <Tabs value={tab} onValueChange={setTab}>
-              <div className="px-4 pt-2"> 
-                <TabsList label="Content per destination">
-                  <TabsTrigger value="base">Base</TabsTrigger>
-                  {selectedConns.map((c) => {
-                    const v = draft.variants.find((x) => x.connectionId === c.id);
-                    const n = issuesFor(c.id).length;
-                    return (
-                      <TabsTrigger key={c.id} value={c.id}>
-                        <PlatformIcon provider={c.provider} size="xs" decorative />
-                        <span className="max-w-[140px] truncate">{c.display_name}</span>
-                        <span className="sr-only">({PROVIDER_LABEL[c.provider]}{v && !v.inheritText ? ', custom text' : ', inherited text'})</span>
-                        {v && !v.inheritText ? <span aria-hidden className="rounded bg-raised px-1 text-[10px] text-muted">Custom</span> : null}
-                        {n ? <span className="inline-flex items-center gap-0.5 text-[11px] text-danger"><ToneIcon tone="danger" className="size-3" />{n}<span className="sr-only"> issues</span></span> : null}
-                      </TabsTrigger>
-                    );
-                  })}
-                </TabsList>
+      {/* Mobile: three steps; ≥1024 the regions sit side by side */}
+      <div className="mb-4 lg:hidden">
+        <Segmented
+          label="Composer step"
+          value={step}
+          onChange={setStep}
+          className="w-full [&>button]:flex-1 [&>button]:justify-center"
+          options={[
+            { value: 'setup', label: <>Destinations <span className="tabular text-muted">{connectionIds.length}</span></> },
+            { value: 'write', label: 'Write' },
+            { value: 'preview', label: <>Preview{issues.length ? <span className="ml-1 rounded-full bg-danger-soft px-1.5 text-[11px] text-danger tabular">{issues.length}</span> : null}</> },
+          ]}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[240px_minmax(0,1fr)] xl:grid-cols-[248px_minmax(0,1fr)_340px]">
+        {/* Region 1: content switcher + destinations */}
+        <aside className={cn('flex min-w-0 flex-col gap-4 lg:row-span-2 xl:row-span-1', step !== 'setup' && 'max-lg:hidden')} aria-label="Destinations">
+          <Card className="p-2">
+            <ContentSwitcher selected={selectedConns} variants={draft.variants} active={tab} onActive={(id) => { setTab(id); setStep('write'); }} issueCount={(id) => issuesFor(id).length} />
+          </Card>
+          <Card aria-labelledby="h-dest">
+            <CardHeader id="h-dest" className="min-h-12 pt-3" title={<>Destinations <span className="ml-1 font-normal text-muted tabular">{connectionIds.length}<span className="sr-only"> selected</span></span></>} />
+            <div className="px-2 pb-3">
+              {post.connections.length === 0 ? (
+                <EmptyState compact title="No accounts" action={can('connections.manage') ? <LinkButton href={`/accounts?brand=${post.brand_id}`} size="sm" variant="secondary">Connect</LinkButton> : null} />
+              ) : (
+                <DestinationSelector connections={post.connections} selected={connectionIds} onToggle={toggleDestination} readOnly={readOnly} />
+              )}
+            </div>
+          </Card>
+        </aside>
+
+        {/* Region 2: editor */}
+        <div className={cn('flex min-w-0 flex-col gap-6', step !== 'write' && 'max-lg:hidden')}>
+          <Card aria-label="Content" className="p-4 sm:p-5">
+            {tab === 'base' || !activeConn || !activeVariant ? (
+              <>
+                <div className="mb-4 flex items-center justify-between gap-2">
+                  <h2 className="text-[15px] font-semibold">Base content</h2>
+                  {selectedConns.length ? <span className="text-xs text-muted">Shared by {selectedConns.length === 1 ? '1 destination' : `${selectedConns.length} destinations`}</span> : null}
+                </div>
+                <BaseEditor
+                  draft={draft}
+                  onChange={(d) => edit({ draft: d })}
+                  readOnly={readOnly}
+                  brand={post.brand}
+                  assets={assets}
+                  onAssetsSeen={addAssets}
+                  maxImages={baseMax}
+                  canUpload={can('assets.upload')}
+                  checksFor={selectedConns.map((c) => ({ connection: c, check: local.get(c.id)! })).filter((x) => x.check)}
+                />
+              </>
+            ) : (
+              <div className="flex flex-col gap-6">
+                <VariantEditor
+                  draft={draft}
+                  variant={activeVariant}
+                  connection={activeConn}
+                  onChange={updateVariant}
+                  readOnly={readOnly}
+                  brandId={post.brand_id}
+                  assets={assets}
+                  onAssetsSeen={addAssets}
+                  check={local.get(activeConn.id)}
+                  canUpload={can('assets.upload')}
+                  issueCount={issuesFor(activeConn.id).length}
+                />
+                <ProviderOptions
+                  connection={activeConn}
+                  variant={activeVariant}
+                  onChange={updateVariant}
+                  readOnly={readOnly}
+                  issues={issuesFor(activeConn.id).filter((i) => i.field === 'options').map((i) => i.message)}
+                />
+                <VariantCrops draft={draft} variant={activeVariant} assets={assets} onChange={updateVariant} readOnly={readOnly} />
               </div>
-              <div className="px-4 pb-6">
-                <TabsContent value="base">
-                  <BaseEditor
-                    draft={draft}
-                    onChange={(d) => edit({ draft: d })}
-                    readOnly={readOnly}
-                    brand={post.brand}
-                    assets={assets}
-                    onAssetsSeen={addAssets}
-                    maxImages={baseMax}
-                    canUpload={can('assets.upload')}
-                    checksFor={selectedConns.map((c) => ({ connection: c, check: local.get(c.id)! })).filter((x) => x.check)}
-                  />
-                </TabsContent>
-                {selectedConns.map((c) => {
-                  const v = draft.variants.find((x) => x.connectionId === c.id);
-                  if (!v) return null;
-                  return (
-                    <TabsContent key={c.id} value={c.id}>
-                      <VariantEditor
-                        draft={draft}
-                        variant={v}
-                        connection={c}
-                        onChange={updateVariant}
-                        readOnly={readOnly}
-                        brandId={post.brand_id}
-                        assets={assets}
-                        onAssetsSeen={addAssets}
-                        check={local.get(c.id)}
-                        canUpload={can('assets.upload')}
-                      />
-                      <VariantCrops draft={draft} variant={v} assets={assets} onChange={updateVariant} readOnly={readOnly} />
-                    </TabsContent>
-                  );
-                })}
-              </div>
-            </Tabs>
+            )}
           </Card>
 
           <DeliveriesPanel post={post} onChanged={() => void refetch()} />
         </div>
 
-        <aside className="flex min-w-0 flex-col gap-6" aria-label="Destinations, checks and preview">
-          <Card aria-labelledby="h-dest">
-            <CardHeader id="h-dest" title={<>Destinations <span className="ml-1 font-normal text-muted tabular">{connectionIds.length}<span className="sr-only"> selected</span></span></>} />
-            <div className="px-2 pb-2">
-              {post.connections.length === 0 ? (
-                <EmptyState compact title="No accounts" action={can('connections.manage') ? <LinkButton href={`/accounts?brand=${post.brand_id}`} size="sm" variant="secondary">Connect</LinkButton> : null} />
-              ) : (
-                <DestinationPicker connections={post.connections} selected={connectionIds} onToggle={toggleDestination} readOnly={readOnly} />
-              )}
-            </div>
-          </Card>
-
+        {/* Region 3: readiness + live preview + collaboration */}
+        <aside className={cn('flex min-w-0 flex-col gap-6 lg:col-start-2 xl:col-start-3 xl:row-start-1', step !== 'preview' && 'max-lg:hidden')} aria-label="Checks and preview">
           <Card aria-labelledby="h-checks">
             <CardHeader
               id="h-checks"
-              title="Checks"
+              className="min-h-12 pt-3"
+              title="Readiness"
               actions={<span className="text-xs text-subtle">{validating ? 'Checking…' : serverFresh ? 'Verified' : 'Live'}</span>}
             />
             <div className="px-4 pb-4" aria-live="polite">
@@ -428,12 +462,19 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
               ) : (
                 <ul className="flex flex-col gap-3">
                   {generalIssues.map((i, n) => <IssueRow key={`g${n}`} issue={i} />)}
-                  {selectedConns.filter((c) => issuesFor(c.id).length).map((c) => (
-                    <li key={c.id}>
-                      <button type="button" onClick={() => setTab(c.id)} className="mb-1.5 flex items-center gap-2 rounded text-[13px] font-medium hover:underline">
-                        <PlatformIcon provider={c.provider} size="xs" decorative /> {c.display_name}
-                      </button>
-                      <ul className="flex flex-col gap-1.5">{issuesFor(c.id).map((i, n) => <IssueRow key={n} issue={i} />)}</ul>
+                  {groupIssues(selectedConns, issuesFor).map((g) => (
+                    <li key={g.key} className="flex items-start gap-2 text-[13px]">
+                      <ToneIcon tone="danger" className="mt-0.5" />
+                      <div className="min-w-0 flex-1">
+                        <p>{g.message}</p>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {g.conns.map((c) => (
+                            <button key={c.id} type="button" onClick={() => { setTab(c.id); setStep('write'); }} className="inline-flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-xs hover:bg-raised" aria-label={`Edit ${PROVIDER_LABEL[c.provider]} ${c.display_name}`}>
+                              <PlatformIcon provider={c.provider} size="xs" decorative className="size-4 rounded-[4px] [&>svg]:size-2.5" />{g.conns.length > 1 ? PROVIDER_LABEL[c.provider] : c.display_name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -445,17 +486,16 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
             <Card aria-labelledby="h-preview">
               <CardHeader
                 id="h-preview"
+                className="min-h-12 pt-3"
                 title="Preview"
-                actions={<>
-                  {tab === 'base' && selectedConns.length > 1 ? (
+                actions={tab === 'base' && selectedConns.length > 1 ? (
                   <div className="w-[170px]">
                     <label className="sr-only" htmlFor="preview-as">Preview destination</label>
                     <Select id="preview-as" value={previewConn.id} onChange={(e) => setPreviewId(e.target.value)}>
                       {selectedConns.map((c) => <option key={c.id} value={c.id}>{PROVIDER_LABEL[c.provider]} · {c.display_name}</option>)}
                     </Select>
                   </div>
-                  ) : null}
-                </>}
+                ) : null}
               />
               <div className="px-4 pb-4"><VariantPreview variant={previewVariant} connection={previewConn} assets={assets} /></div>
             </Card>
@@ -467,38 +507,66 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
       </div>
 
       {/* Sticky action bar */}
-      <div className="fixed inset-x-0 bottom-16 z-20 border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:bottom-0 md:left-[224px]">
-        <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-2 px-4 py-2 sm:px-6 md:px-8">
+      <div className="fixed inset-x-0 bottom-16 z-20 border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:bottom-0 md:left-[var(--rail-w)] xl:left-[var(--nav-w)]">
+        <div className="mx-auto flex max-w-[1320px] flex-wrap items-center gap-2 px-4 py-2 sm:px-6 md:px-8">
           <SaveStatus state={saveState} savedAt={savedAt} tz={tz} error={saveError} onRetry={() => void save()} onConflict={() => setConflictOpen(true)} readOnly={readOnly} />
           <span className="flex-1" />
           <AiAssist postId={post.id} draft={draft} connections={selectedConns} tab={tab} readOnly={readOnly} flush={flush} onAccept={acceptSuggestion} />
           {!readOnly ? (
-            <Button variant="ghost" size="md" icon={<Save aria-hidden className="size-4" />} onClick={() => void flush()} disabled={saveState === 'saved' || saveState === 'saving' || saveState === 'conflict'}>
-              <span className="sr-only sm:not-sr-only">Save</span><span className="sr-only"> draft now</span>
-            </Button>
+            <div className="hidden sm:block">
+              <Button variant="ghost" size="md" icon={<Save aria-hidden className="size-4" />} onClick={() => void flush()} disabled={saveState === 'saved' || saveState === 'saving' || saveState === 'conflict'}>
+                Save draft<span className="sr-only"> now</span>
+              </Button>
+            </div>
           ) : null}
-          {post.can.submit ? (
-            <Button variant={post.can.schedule ? 'secondary' : 'primary'} icon={<Send aria-hidden className="size-4" />} onClick={() => setDialog('submit')} disabledReason={blockReason}>
-              Submit<span className="sr-only"> for review</span>
-            </Button>
+          {readOnly && can('drafts.edit') ? (
+            <Button variant="secondary" icon={<Copy aria-hidden className="size-4" />} onClick={() => void duplicate()}>Duplicate</Button>
           ) : null}
-          {can('drafts.edit') || post.can.schedule ? (
-            <Button
-              variant={post.can.submit && !post.can.schedule ? 'secondary' : 'primary'}
-              icon={<CalendarClock aria-hidden className="size-4" />}
-              onClick={() => setDialog('schedule')}
-              disabledReason={!post.can.schedule ? (post.can.schedule_reason ?? 'You can’t schedule this post.') : blockReason}
-            >
-              {post.current_schedule && (post.current_schedule.status === 'active' || post.current_schedule.status === 'pending_approval') ? 'Reschedule' : 'Schedule'}
-            </Button>
+          {post.can.submit && !readOnly ? (
+            <div className={primaryIsSubmit ? 'max-sm:min-w-0 max-sm:flex-1 max-sm:[&_button]:w-full' : 'hidden sm:block'}>
+              <Button variant={post.can.schedule ? 'secondary' : 'primary'} icon={<Send aria-hidden className="size-4" />} onClick={() => setDialog('submit')} disabledReason={blockReason}>
+                Submit for review
+              </Button>
+            </div>
           ) : null}
-          {can('drafts.edit') && (post.can.schedule || post.can.submit) ? (
-            <QueueButton postId={post.id} flush={flush} disabledReason={blockReason} onDone={(t, b) => void afterAction(t, b)} />
+          {!readOnly && (can('drafts.edit') || post.can.schedule) ? (
+            <div className={primaryIsSubmit ? 'hidden sm:block' : 'max-sm:min-w-0 max-sm:flex-1 max-sm:[&_button]:w-full'}>
+              <Button
+                variant={post.can.submit && !post.can.schedule ? 'secondary' : 'primary'}
+                icon={<CalendarClock aria-hidden className="size-4" />}
+                onClick={() => setDialog('schedule')}
+                disabledReason={!post.can.schedule ? (post.can.schedule_reason ?? 'You can’t schedule this post.') : blockReason}
+              >
+                {post.current_schedule && (post.current_schedule.status === 'active' || post.current_schedule.status === 'pending_approval') ? 'Reschedule' : 'Schedule'}
+              </Button>
+            </div>
           ) : null}
-          {post.can.publish_now ? (
-            <Button variant="secondary" icon={<SendHorizontal aria-hidden className="size-4" />} onClick={() => setDialog('publish')} disabledReason={blockReason}>
-              Publish<span className="sr-only"> now</span>
-            </Button>
+          {showQueue ? (
+            <div className="hidden sm:block"><QueueButton postId={post.id} flush={flush} disabledReason={blockReason} onDone={(t, b) => void afterAction(t, b)} /></div>
+          ) : null}
+          {post.can.publish_now && !readOnly ? (
+            <div className="hidden sm:block">
+              <Button variant="secondary" icon={<SendHorizontal aria-hidden className="size-4" />} onClick={() => setDialog('publish')} disabledReason={blockReason}>
+                Publish now
+              </Button>
+            </div>
+          ) : null}
+          {/* Phones: one full-width primary action; the rest live in ⋯ */}
+          {!readOnly ? (
+            <div className="sm:hidden">
+              <Menu>
+                <MenuTrigger asChild>
+                  <IconButton label="More actions" variant="secondary" icon={<Ellipsis aria-hidden className="size-4" />} />
+                </MenuTrigger>
+                <MenuContent align="end">
+                  <MenuItem icon={<Save aria-hidden />} disabled={saveState === 'saved' || saveState === 'saving' || saveState === 'conflict'} onSelect={() => void flush()}>Save draft</MenuItem>
+                  {post.can.submit && !primaryIsSubmit ? <MenuItem icon={<Send aria-hidden />} disabled={!!blockReason} onSelect={() => setDialog('submit')}>Submit for review</MenuItem> : null}
+                  {showQueue ? <MenuItem icon={<ListPlus aria-hidden />} disabled={!!blockReason || queue.busy} onSelect={() => void queue.run()}>Add to queue</MenuItem> : null}
+                  {post.can.publish_now ? <MenuItem icon={<SendHorizontal aria-hidden />} disabled={!!blockReason} onSelect={() => setDialog('publish')}>Publish now</MenuItem> : null}
+                  {blockReason ? <MenuLabel>{blockReason}</MenuLabel> : null}
+                </MenuContent>
+              </Menu>
+            </div>
           ) : null}
         </div>
       </div>
@@ -580,6 +648,22 @@ function normaliseDraft(d: DraftContent | null | undefined): DraftContent {
     baseAssetIds: d?.baseAssetIds ?? [],
     variants: d?.variants ?? [],
   };
+}
+
+/** Same issue type on several destinations is listed once with the affected destinations. */
+function groupIssues(conns: Connection[], issuesFor: (id: string) => ValidationIssue[]) {
+  const groups = new Map<string, { key: string; message: string; conns: Connection[] }>();
+  for (const c of conns) for (const i of issuesFor(c.id)) {
+    const key = `${i.field}:${i.code}`;
+    const g = groups.get(key);
+    if (g) { if (!g.conns.includes(c)) g.conns.push(c); }
+    else groups.set(key, { key, message: i.message, conns: [c] });
+  }
+  return [...groups.values()].map((g) => ({
+    ...g,
+    // Drop the "<Network>: " prefix and capitalise when the message covers several networks.
+    message: g.conns.length > 1 ? g.message.replace(/^[A-Za-z /]+:\s*/, '').replace(/^./, (x) => x.toUpperCase()) : g.message,
+  }));
 }
 
 function IssueRow({ issue }: { issue: ValidationIssue }) {

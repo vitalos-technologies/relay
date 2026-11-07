@@ -1,12 +1,12 @@
 'use client';
 import { useState } from 'react';
-import { ImagePlus, Plus, Trash2, X } from 'lucide-react';
+import { CircleAlert, CircleCheck, ImagePlus, Plus, Trash2, X } from 'lucide-react';
 import { PROVIDER_LABEL, type DraftContent, type UrlButton, type VariantDraft } from '@social-lite/core';
 import { UNIT_LABEL, constraintsOf, type LocalCheck } from '@/lib/client/variants';
 import { connectionFix, isDispatchable } from '@/lib/client/connection-fix';
 import type { Asset, Brand, Connection } from '@/lib/client/types';
 import {
-  Banner, Button, Checkbox, cn, ConnectionStatusBadge, Field, IconButton, InfoTip, Input, PlatformIcon, RadioGroup, Segmented,
+  Badge, Banner, Button, Checkbox, cn, ConnectionStatusBadge, Field, IconButton, InfoTip, Input, PlatformIcon, RadioGroup, Segmented,
   SimulatedBadge, Textarea,
 } from '@/components/ui';
 import { MediaPicker } from './media-picker';
@@ -148,10 +148,12 @@ export function BaseEditor({
 type LinkMode = 'inherit' | 'custom' | 'none';
 
 export function VariantEditor({
-  draft, variant, connection, onChange, readOnly, brandId, assets, onAssetsSeen, check, canUpload,
+  draft, variant, connection, onChange, readOnly, brandId, assets, onAssetsSeen, check, canUpload, issueCount,
 }: {
   draft: DraftContent; variant: VariantDraft; connection: Connection; onChange: (v: VariantDraft) => void; readOnly: boolean;
   brandId: string; assets: Map<string, Asset>; onAssetsSeen: (a: Asset[]) => void; check: LocalCheck | undefined; canUpload: boolean;
+  /** This variant's validation issues (the chip reflects the variant, not the connection). */
+  issueCount?: number;
 }) {
   const [picker, setPicker] = useState(false);
   const k = constraintsOf(connection);
@@ -170,9 +172,15 @@ export function VariantEditor({
           <p className="flex items-center gap-2 truncate text-sm font-medium">{connection.display_name} {connection.is_mock ? <SimulatedBadge /> : null}</p>
           <p className="truncate text-xs text-muted">{PROVIDER_LABEL[connection.provider]}{connection.username ? ` · @${connection.username.replace(/^@/, '')}` : ''}</p>
         </div>
-        <ConnectionStatusBadge status={connection.status} label={connection.status_label} size="sm" />
+        {issueCount === undefined ? null : issueCount > 0
+          ? <Badge tone="danger" className="h-5 px-1.5 text-[11px]" icon={<CircleAlert aria-hidden className="size-3.5" />}>{issueCount} {issueCount === 1 ? 'issue' : 'issues'}</Badge>
+          : <Badge tone="success" className="h-5 px-1.5 text-[11px]" icon={<CircleCheck aria-hidden className="size-3.5" />}>Ready to send</Badge>}
       </div>
-      {!isDispatchable(connection) ? <Banner tone="warn" title="Can’t publish">{connectionFix(connection) ?? connection.health?.message}</Banner> : null}
+      {!isDispatchable(connection) ? (
+        connection.paused && (connection.status === 'ready' || connection.status === 'expiring')
+          ? <Banner tone="info" title="Destination paused — sends after it is resumed" />
+          : <Banner tone="warn" title="Can’t publish">{connectionFix(connection) ?? connection.health?.message}</Banner>
+      ) : null}
       {!k ? <p className="flex items-center gap-1 text-xs text-muted">Limits unknown<InfoTip label="About limits">Run Check on Accounts to load limits. The server still validates.</InfoTip></p> : null}
 
       <section aria-labelledby={`txt-${connection.id}`} className="flex flex-col gap-3">

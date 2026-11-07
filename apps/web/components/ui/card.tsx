@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { cn } from './cn';
 
 export function Card({ children, className, as: As = 'section', ...rest }: { children: ReactNode; className?: string; as?: 'section' | 'div' | 'article' | 'li' } & Record<string, unknown>) {
-  return <As className={cn('rounded-xl border border-border bg-surface', className)} {...rest}>{children}</As>;
+  return <As className={cn('rounded-[var(--radius-card)] border border-border bg-surface', className)} {...rest}>{children}</As>;
 }
 
 /** Card title row. No subtitles: keep headings short and put detail behind an info tooltip if it is truly needed. */
@@ -18,11 +18,11 @@ export function CardHeader({ title, actions, className, id }: { title: ReactNode
 /** Page title (one word where possible) + optional compact meta chip + actions. */
 export function PageHeader({ title, meta, actions, eyebrow }: { title: ReactNode; meta?: ReactNode; actions?: ReactNode; eyebrow?: ReactNode }) {
   return (
-    <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between md:mb-8">
       <div className="min-w-0">
         {eyebrow ? <div className="mb-1 truncate text-xs text-subtle">{eyebrow}</div> : null}
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-          <h1 className="min-w-0 break-words text-[22px] font-semibold tracking-[-0.01em] sm:text-[24px]">{title}</h1>
+          <h1 className="min-w-0 break-words text-[24px] font-semibold leading-tight tracking-[-0.02em] md:text-[28px]">{title}</h1>
           {meta ? <MetaChip>{meta}</MetaChip> : null}
         </div>
       </div>

@@ -8,7 +8,7 @@ import { ROLE_LABEL } from '@/lib/client/format';
 import { V2_ROLE_LABEL } from '@/components/team/shared';
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger, useToast } from '@/components/ui';
 
-export function WorkspaceSwitcher() {
+export function WorkspaceSwitcher({ compact }: { compact?: boolean }) {
   const { session } = useSession();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
@@ -34,17 +34,19 @@ export function WorkspaceSwitcher() {
         <button
           type="button"
           disabled={busy}
-          className="flex h-11 w-full items-center gap-2 rounded-lg px-2 text-left hover:bg-raised"
+          className={compact ? 'flex h-11 w-full items-center justify-center rounded-lg hover:bg-raised' : 'flex h-11 w-full items-center gap-2 rounded-lg px-2 text-left hover:bg-raised'}
           aria-label={`Workspace: ${ws.name}. Switch workspace`}
         >
-          <span aria-hidden className="flex size-7 shrink-0 items-center justify-center rounded-md bg-sunken text-xs font-semibold uppercase text-muted">
+          <span aria-hidden className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-tile text-xs font-semibold uppercase text-tile-fg">
             {ws.name.slice(0, 2)}
           </span>
+          {compact ? null : <>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[13px] font-medium">{ws.name}</span>
             <span className="block truncate text-[11px] text-muted">{(ws.primary_role && V2_ROLE_LABEL[ws.primary_role]) || ROLE_LABEL[ws.role]}{ws.is_demo ? ' · Demo' : ''}</span>
           </span>
           <ChevronsUpDown aria-hidden className="size-4 text-muted" />
+          </>}
         </button>
       </MenuTrigger>
       <MenuContent align="start" className="w-[260px]">

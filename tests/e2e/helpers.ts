@@ -75,6 +75,27 @@ export async function signIn(page: Page, email: string, opts: { totpKey?: Buffer
   await page.waitForURL(/localhost:5556/);
   await completeKeycloak(page, email, opts);
   await page.waitForURL((u) => u.port === '3000' && !u.pathname.startsWith('/login') && !u.pathname.startsWith('/api/auth'), { timeout: 45_000 });
+  await useE2EWorkspace(page);
+}
+
+/** Playwright works in its own workspace (scripts/seed-e2e.ts) so its fixtures never land in Demo Workspace (V3 §2.7). */
+export const E2E_WORKSPACE = process.env.E2E_WORKSPACE ?? 'E2E Workspace';
+
+/** Switch the signed-in session to the E2E workspace when the user belongs to it (others, e.g. outsider@, stay put). */
+export async function useE2EWorkspace(page: Page): Promise<void> {
+  const res = await page.request.get('/api/session');
+  if (!res.ok()) return;
+  const s = await res.json() as { csrf_token: string; workspace: { id: string } | null; workspaces: Array<{ id: string; name: string }> };
+  const target = s.workspaces?.find((w) => w.name === E2E_WORKSPACE);
+  if (!target || s.workspace?.id === target.id) return;
+  // Leave the app page first: its polling would notice the workspace change and reload itself, racing our navigation.
+  await page.goto('/api/session');
+  const r = await page.request.post('/api/session/workspace', {
+    headers: { 'content-type': 'application/json', origin: new URL(page.url()).origin, 'x-csrf-token': s.csrf_token, 'idempotency-key': randomUUID() },
+    data: JSON.stringify({ workspace_id: target.id }),
+  });
+  expect(r.status(), 'switch to the E2E workspace').toBeLessThan(300);
+  await page.goto('/');
 }
 
 export interface Api {

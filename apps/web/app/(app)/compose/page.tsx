@@ -35,7 +35,7 @@ export default function ComposePage() {
   if (!can('drafts.edit')) {
     return (
       <>
-        <PageHeader title="Compose" />
+        <PageHeader title="Create" />
         <EmptyState icon={<SquarePen aria-hidden />} title="View-only access" />
       </>
     );
@@ -43,8 +43,8 @@ export default function ComposePage() {
   if (!session.brands.length) {
     return (
       <>
-        <PageHeader title="Compose" />
-        <EmptyState icon={<SquarePen aria-hidden />} title="No brands yet" action={can('brands.manage') ? <LinkButton href="/settings?tab=brand" variant="primary">Create brand</LinkButton> : null} />
+        <PageHeader title="Create" />
+        <EmptyState icon={<SquarePen aria-hidden />} title="No brands yet" action={can('brands.manage') ? <LinkButton href="/settings/workspace/branding" variant="primary">Create brand</LinkButton> : null} />
       </>
     );
   }
@@ -66,7 +66,7 @@ export default function ComposePage() {
 
   return (
     <>
-      <PageHeader title="Compose" />
+      <PageHeader title="Create" />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Card aria-labelledby="h-new">
           <CardHeader id="h-new" title="New post" />
@@ -110,7 +110,7 @@ export default function ComposePage() {
                         <p className="text-xs text-muted">Edited {fmtRelative(p.updated_at)}</p>
                       </div>
                       {p.destinations.length ? <PlatformStack providers={p.destinations.map((d) => d.provider)} /> : null}
-                      <span className="hidden shrink-0 sm:block"><PostStatusBadge status={p.status} size="sm" /></span>
+                      <span className="hidden shrink-0 sm:block"><PostStatusBadge status={p.status} simulated={p.destinations.length > 0 && p.destinations.every((d) => d.is_mock)} size="sm" /></span>
                     </Link>
                   </li>
                 ))}

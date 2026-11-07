@@ -10,7 +10,7 @@ import { postTitle } from '@/lib/client/format';
 import type { Delivery, HistoryRow, Page } from '@/lib/client/types';
 import {
   DeliveryStateBadge, Drawer, EmptyState, ErrorState, Facts, Field, Input, LinkButton, PageHeader, Pagination, PlatformIcon, Select,
-  SimulatedBadge, SkeletonRows, Spinner, Table, Td, Th, THead, TimeWithZone, Tr,
+  FilterBar, FilterSelect, SimulatedBadge, SkeletonRows, Spinner, Table, Td, Th, THead, TimeWithZone, Tr,
 } from '@/components/ui';
 import { DeliveryCard } from '@/components/deliveries/delivery-card';
 
@@ -76,26 +76,24 @@ export default function HistoryPage() {
         ) : null}
       />
 
-      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Field label="Network">
-          <Select value={provider} onChange={(e) => setParams({ provider: e.target.value })}>
-            <option value="">All networks</option>
-            {PROVIDERS.map((p) => <option key={p} value={p}>{PROVIDER_LABEL[p]}</option>)}
-          </Select>
-        </Field>
-        <Field label="Result">
-          <Select value={state} onChange={(e) => setParams({ state: e.target.value })}>
-            <option value="">All results</option>
-            {DELIVERY_STATES.map((s) => <option key={s} value={s}>{DELIVERY_STATE_LABEL[s]}</option>)}
-          </Select>
-        </Field>
-        <Field label="From">
-          <Input type="date" value={fromDate} onChange={(e) => setParams({ from: e.target.value })} />
-        </Field>
-        <Field label="To" error={rangeBad ? '“To” is before “From”.' : null}>
-          <Input type="date" value={toDate} onChange={(e) => setParams({ to: e.target.value })} />
-        </Field>
-      </div>
+      <FilterBar>
+        <FilterSelect id="h-network" label="Network" className="w-[150px]" value={provider} onChange={(v) => setParams({ provider: v })}>
+          <option value="">All networks</option>
+          {PROVIDERS.map((p) => <option key={p} value={p}>{PROVIDER_LABEL[p]}</option>)}
+        </FilterSelect>
+        <FilterSelect id="h-state" label="Result" className="w-[150px]" value={state} onChange={(v) => setParams({ state: v })}>
+          <option value="">All results</option>
+          {DELIVERY_STATES.map((s) => <option key={s} value={s}>{DELIVERY_STATE_LABEL[s]}</option>)}
+        </FilterSelect>
+        <span className="flex items-center gap-1.5">
+          <label htmlFor="h-from" className="sr-only">From</label>
+          <input id="h-from" type="date" value={fromDate} onChange={(e) => setParams({ from: e.target.value })} className="h-9 rounded-lg border border-border bg-surface px-2 text-[13px] tabular" />
+          <span aria-hidden className="text-muted">–</span>
+          <label htmlFor="h-to" className="sr-only">To</label>
+          <input id="h-to" type="date" value={toDate} onChange={(e) => setParams({ to: e.target.value })} aria-invalid={rangeBad || undefined} className="h-9 rounded-lg border border-border bg-surface px-2 text-[13px] tabular" />
+        </span>
+        {rangeBad ? <span role="alert" className="text-xs text-danger">“To” is before “From”.</span> : null}
+      </FilterBar>
 
       {error && !data ? <ErrorState error={error} onRetry={refetch} /> : loading ? <SkeletonRows rows={6} /> : !data?.items.length ? (
         <EmptyState icon={<FileClock aria-hidden />} title={filterKey ? 'No matches' : 'No results yet'} />
@@ -128,7 +126,6 @@ export default function HistoryPage() {
                       <span className="flex items-center gap-2">
                         <PlatformIcon provider={r.provider} size="xs" />
                         <span className="max-w-[200px] truncate">{r.display_name}</span>
-                        {r.is_mock ? <SimulatedBadge className="shrink-0" /> : null}
                       </span>
                     </Td>
                     <Td><DeliveryStateBadge state={r.state} isMock={r.is_mock} overdue={r.overdue} size="sm" /></Td>

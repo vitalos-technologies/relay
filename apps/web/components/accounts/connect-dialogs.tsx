@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { ChevronRight } from 'lucide-react';
 import { PROVIDER_LABEL, type Provider } from '@social-lite/core';
 import { api, isApiError } from '@/lib/client/api';
 import { useSession } from '@/lib/client/session';
@@ -105,6 +106,85 @@ export function TelegramDialog({
           <Field label="Channel" hint="@name or -100… ID" error={fe?.channel ?? (channelBad ? 'Use @name (4+ chars) or -100… ID.' : null)}>
             <Input value={channel} onChange={(e) => setChannel(e.target.value)} placeholder="@yourchannel" autoComplete="off" spellCheck={false} />
           </Field>
+        ) : null}
+        {error && !fe ? <ErrorNotice error={error} /> : null}
+      </div>
+    </Dialog>
+  );
+}
+
+/**
+ * Bluesky (AT Protocol) with an app password: POST /api/brands/:id/connections/bluesky { handle, app_password, service? };
+ * reconnect: POST /api/connections/:id/reconnect { app_password }. The password is cleared on close and never shown again.
+ */
+export function BlueskyDialog({
+  open, onOpenChange, brandId, reconnect, onDone,
+}: { open: boolean; onOpenChange: (o: boolean) => void; brandId: string; reconnect?: Connection | null; onDone: (c: Connection) => void }) {
+  const [handle, setHandle] = useState('');
+  const [password, setPassword] = useState('');
+  const [service, setService] = useState('');
+  const [advanced, setAdvanced] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  useEffect(() => {
+    if (!open) {
+      setHandle(''); setPassword(''); setService(''); setAdvanced(false); setError(null);
+    }
+  }, [open]);
+  const serviceBad = service.trim() !== '' && !/^https:\/\/[^\s/]+/i.test(service.trim());
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const c = reconnect
+        ? await api.post<Connection>(`/api/connections/${reconnect.id}/reconnect`, { app_password: password.trim() })
+        : await api.post<Connection>(`/api/brands/${brandId}/connections/bluesky`, { handle: handle.trim().replace(/^@/, ''), app_password: password.trim(), ...(service.trim() ? { service: service.trim() } : {}) });
+      setPassword('');
+      onDone(c);
+      onOpenChange(false);
+    } catch (e) {
+      setPassword('');
+      setError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const fe = isApiError(error) ? error.fieldErrors : undefined;
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      busy={busy}
+      size="md"
+      title={reconnect ? `Reconnect ${reconnect.display_name}` : 'Connect Bluesky'}
+      footer={
+        <>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+          <Button variant="primary" onClick={submit} loading={busy} disabledReason={!reconnect && !handle.trim() ? 'Enter your handle.' : !password.trim() ? 'Enter an app password.' : serviceBad ? 'Use an https:// server address.' : null}>
+            {busy ? 'Verifying…' : reconnect ? 'Reconnect' : 'Connect'}
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        {!reconnect ? (
+          <Field label="Handle" error={fe?.handle}>
+            <Input value={handle} onChange={(e) => setHandle(e.target.value)} placeholder="name.bsky.social" autoComplete="off" spellCheck={false} />
+          </Field>
+        ) : null}
+        <Field label="App password" hint="Bluesky → Settings → Privacy and security → App passwords. Stored encrypted; never shown again." error={fe?.app_password}>
+          <Input type="password" autoComplete="new-password" spellCheck={false} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="xxxx-xxxx-xxxx-xxxx" />
+        </Field>
+        {!reconnect ? (
+          advanced ? (
+            <Field label="Self-hosted server" optional hint="Only if your account is not on bsky.social." error={fe?.service ?? (serviceBad ? 'Use an https:// address.' : null)}>
+              <Input type="url" inputMode="url" value={service} onChange={(e) => setService(e.target.value)} placeholder="https://pds.example.com" autoComplete="off" spellCheck={false} />
+            </Field>
+          ) : (
+            <button type="button" aria-expanded={false} onClick={() => setAdvanced(true)} className="inline-flex items-center gap-1 self-start rounded text-[13px] font-medium text-muted hover:text-fg">
+              <ChevronRight aria-hidden className="size-4" />Self-hosted server
+            </button>
+          )
         ) : null}
         {error && !fe ? <ErrorNotice error={error} /> : null}
       </div>

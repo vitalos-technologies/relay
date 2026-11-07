@@ -9,8 +9,8 @@ const ICONS: Record<Provider, { path: string; bg: string }> = {
   x: { path: siX.path, bg: '#000000' },
   tiktok: { path: siTiktok.path, bg: '#000000' },
   youtube: { path: siYoutube.path, bg: `#${siYoutube.hex}` },
-  // LinkedIn is not in simple-icons: neutral briefcase glyph; the accessible label still names LinkedIn.
-  linkedin: { path: 'M9 3h6a2 2 0 0 1 2 2v2h3a1 1 0 0 1 1 1v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a1 1 0 0 1 1-1h3V5a2 2 0 0 1 2-2Zm0 4h6V5H9v2Z', bg: '#52525B' },
+  // LinkedIn is not in simple-icons: a plain "in" glyph drawn here (same tile treatment as the other networks).
+  linkedin: { path: 'M4.2 9.2h3.4V20H4.2zM5.9 3.8a1.95 1.95 0 1 1 0 3.9 1.95 1.95 0 0 1 0-3.9zM9.7 9.2h3.25v1.5h.05c.45-.86 1.56-1.76 3.21-1.76 3.43 0 4.06 2.26 4.06 5.2V20h-3.38v-5.2c0-1.24-.02-2.84-1.73-2.84-1.73 0-2 1.35-2 2.75V20H9.7z', bg: '#0A66C2' },
   threads: { path: siThreads.path, bg: '#000000' },
   pinterest: { path: siPinterest.path, bg: `#${siPinterest.hex}` },
   bluesky: { path: siBluesky.path, bg: `#${siBluesky.hex}` },

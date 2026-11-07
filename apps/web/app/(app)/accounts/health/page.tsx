@@ -135,7 +135,7 @@ function FixButton({ connection, fix, onChanged }: { connection: Item['connectio
     setBusy(true);
     try { await fn(); await onChanged(); } catch (e) { toast.error(e, 'Couldn’t apply the fix'); } finally { setBusy(false); }
   };
-  if (fix.action === 'budgets') return <LinkButton size="sm" href="/settings?tab=budgets">{fix.label}</LinkButton>;
+  if (fix.action === 'budgets') return <LinkButton size="sm" href="/settings/operations/usage">{fix.label}</LinkButton>;
   if (fix.action === 'check' || fix.action === 'bot_admin') {
     return <Button size="sm" variant="secondary" loading={busy} onClick={() => run(async () => { await api.post(`/api/connections/${connection.id}/check`, {}); toast.success('Checked'); })}>{fix.action === 'check' ? fix.label : 'Check again'}</Button>;
   }

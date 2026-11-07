@@ -1,22 +1,23 @@
 @import "tailwindcss";
 
-/* ------------------------------------------------------------------ tokens
+/* ------------------------------------------------------------------ tokens (V3 design system: docs/V3_DESIGN_SYSTEM.md)
    Dark is the default. Light is used when the OS prefers it (unless the user
-   forced dark) or when the user picks it explicitly via [data-theme="light"]. */
+   forced dark) or when the user picks it explicitly via [data-theme="light"].
+   Relay palette: orange #FD6701 (primary, ink text on it), red #FE4114, amber #FDA602, ink #121416, mist #EBEDEE. */
 :root {
   color-scheme: dark;
-  --bg: #0e1013;
-  --surface: #15181c;
-  --raised: #1c1f23;
-  --sunken: #101114;
-  --border: #2a2e34;
-  --border-strong: #3a3f47;
-  --text: #edeef0;
-  --muted: #9aa1a9;
-  --subtle: #757d87;
+  --bg: #0c0e10;              /* near-black ink */
+  --surface: #141619;         /* cards, sidebar */
+  --raised: #1c1f23;          /* hover, chips, selected nav */
+  --sunken: #0f1113;          /* wells, inputs at rest */
+  --border: #262a2f;
+  --border-strong: #363b42;
+  --text: #eef0f1;
+  --muted: #a1a8b0;
+  --subtle: #7b838c;
 
   --accent: #fd6701;          /* Relay orange: primary action fill, selection */
-  --accent-hover: #fe7a1f;
+  --accent-hover: #ff7a1f;
   --on-accent: #121416;       /* ink on orange: 6.7:1 */
   --accent-text: #ff8a3d;     /* accent as text/icon on dark --bg: ≥ 7:1 */
   --accent-soft: rgba(253, 103, 1, 0.14);
@@ -24,40 +25,57 @@
   --brand-red: #fe4114;
   --brand-amber: #fda602;
   --brand-gradient: linear-gradient(135deg, #fd8221 0%, #f13e1f 100%);
+  --tile: #1f2226;            /* dark rounded tile behind orange feature/integration icons (both themes) */
+  --tile-fg: #ff8a3d;
 
   --success: #5fd49a;
   --success-soft: rgba(95, 212, 154, 0.12);
-  --warn: #f2b84b;
-  --warn-soft: rgba(242, 184, 75, 0.12);
+  --warn: #f2c14b;
+  --warn-soft: rgba(242, 193, 75, 0.12);
   --danger: #ff7a7a;
   --danger-soft: rgba(255, 122, 122, 0.12);
   --info: #8ab8ff;
   --info-soft: rgba(138, 184, 255, 0.12);
-  --neutral-soft: rgba(154, 161, 169, 0.12);
+  --neutral-soft: rgba(161, 168, 176, 0.12);
+
+  /* charts: current = orange solid, previous = neutral dashed; networks add dash patterns + labels (never colour alone) */
+  /* categorical order validated (dataviz validate_palette.js, dark surface #141619): orange, teal, amber, violet, red */
+  --chart-1: #ea6000;
+  --chart-2: #1f9fb5;
+  --chart-3: #c98500;
+  --chart-4: #9877ee;
+  --chart-5: #e23d1a;
+  --chart-prev: #7b838c;      /* previous period: neutral + dashed, not a categorical slot */
+  --chart-grid: #23272c;
 
   --overlay: rgba(5, 6, 8, 0.72);
   --shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 12px 32px rgba(0, 0, 0, 0.45);
   --radius: 10px;
+  --radius-card: 14px;
+  --nav-w: 240px;
+  --rail-w: 72px;
 }
 
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
     color-scheme: light;
-    --bg: #f5f6f7;
+    --bg: #f4f5f6;
     --surface: #ffffff;
-    --raised: #eef0f2;
-    --sunken: #eceef1;
-    --border: #d7dbe0;
-    --border-strong: #b9bfc7;
-    --text: #111316;
-    --muted: #535b65;
-    --subtle: #6b737d;
+    --raised: #ebedee;          /* Relay mist */
+    --sunken: #eef0f1;
+    --border: #dcdfe2;
+    --border-strong: #bcc2c8;
+    --text: #121416;            /* Relay ink */
+    --muted: #545c66;
+    --subtle: #69717b;
     --accent: #fd6701;
     --accent-hover: #e85d00;
     --on-accent: #121416;
     --accent-text: #b23a00;     /* darker orange for small text on white: 6.5:1 */
     --accent-soft: rgba(253, 103, 1, 0.1);
     --focus: #c2410c;
+    --tile: #121416;
+    --tile-fg: #ff8a3d;
     --success: #12733f;
     --success-soft: rgba(18, 115, 63, 0.1);
     --warn: #8a5400;
@@ -66,29 +84,38 @@
     --danger-soft: rgba(179, 38, 30, 0.08);
     --info: #1f5fbf;
     --info-soft: rgba(31, 95, 191, 0.08);
-    --neutral-soft: rgba(83, 91, 101, 0.1);
-    --overlay: rgba(17, 19, 22, 0.45);
-    --shadow: 0 1px 2px rgba(17, 19, 22, 0.06), 0 12px 32px rgba(17, 19, 22, 0.12);
+    --neutral-soft: rgba(84, 92, 102, 0.1);
+    --chart-1: #e35c00;
+    --chart-2: #00849e;
+    --chart-3: #b97800;
+    --chart-4: #6e4fd6;
+    --chart-5: #c42d0b;
+    --chart-prev: #8a929b;
+    --chart-grid: #e6e8ea;
+    --overlay: rgba(18, 20, 22, 0.45);
+    --shadow: 0 1px 2px rgba(18, 20, 22, 0.06), 0 12px 32px rgba(18, 20, 22, 0.12);
   }
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --bg: #f5f6f7;
+  --bg: #f4f5f6;
   --surface: #ffffff;
-  --raised: #eef0f2;
-  --sunken: #eceef1;
-  --border: #d7dbe0;
-  --border-strong: #b9bfc7;
-  --text: #111316;
-  --muted: #535b65;
-  --subtle: #6b737d;
+  --raised: #ebedee;          /* Relay mist */
+  --sunken: #eef0f1;
+  --border: #dcdfe2;
+  --border-strong: #bcc2c8;
+  --text: #121416;            /* Relay ink */
+  --muted: #545c66;
+  --subtle: #69717b;
   --accent: #fd6701;
   --accent-hover: #e85d00;
   --on-accent: #121416;
-  --accent-text: #b23a00;   /* darker orange for small text on white: 6.5:1 */
+  --accent-text: #b23a00;     /* darker orange for small text on white: 6.5:1 */
   --accent-soft: rgba(253, 103, 1, 0.1);
   --focus: #c2410c;
+  --tile: #121416;
+  --tile-fg: #ff8a3d;
   --success: #12733f;
   --success-soft: rgba(18, 115, 63, 0.1);
   --warn: #8a5400;
@@ -97,9 +124,16 @@
   --danger-soft: rgba(179, 38, 30, 0.08);
   --info: #1f5fbf;
   --info-soft: rgba(31, 95, 191, 0.08);
-  --neutral-soft: rgba(83, 91, 101, 0.1);
-  --overlay: rgba(17, 19, 22, 0.45);
-  --shadow: 0 1px 2px rgba(17, 19, 22, 0.06), 0 12px 32px rgba(17, 19, 22, 0.12);
+  --neutral-soft: rgba(84, 92, 102, 0.1);
+  --chart-1: #e35c00;
+  --chart-2: #00849e;
+  --chart-3: #b97800;
+  --chart-4: #6e4fd6;
+  --chart-5: #c42d0b;
+  --chart-prev: #8a929b;
+  --chart-grid: #e6e8ea;
+  --overlay: rgba(18, 20, 22, 0.45);
+  --shadow: 0 1px 2px rgba(18, 20, 22, 0.06), 0 12px 32px rgba(18, 20, 22, 0.12);
 }
 
 @theme inline {
@@ -117,6 +151,8 @@
   --color-on-accent: var(--on-accent);
   --color-accent-text: var(--accent-text);
   --color-accent-soft: var(--accent-soft);
+  --color-tile: var(--tile);
+  --color-tile-fg: var(--tile-fg);
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
   --color-warn: var(--warn);

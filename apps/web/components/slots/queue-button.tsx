@@ -6,14 +6,15 @@ import { api, isApiError } from '@/lib/client/api';
 import { fmtDateTime, zoneAbbr } from '@/lib/client/format';
 import { Button, useToast } from '@/components/ui';
 
+export const QUEUE_HINT = 'Next free slot (uses the slot’s destinations)';
+
 interface QueueResult {
   schedule: { due_at: string; input_timezone: string; status: string };
   queue: { mode: 'scheduled' | 'submitted_for_review'; skipped: Array<{ local: string }>; slot: { connection_ids: string[] } };
 }
 
-export function QueueButton({ postId, flush, disabledReason, onDone }: {
-  postId: string; flush: () => Promise<number | null>; disabledReason?: string | null; onDone: (title: string, body?: string) => void;
-}) {
+/** The queue action itself (also used from the composer's mobile ⋯ menu). */
+export function useQueueAction(postId: string, flush: () => Promise<number | null>, onDone: (title: string, body?: string) => void) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const run = async () => {
@@ -32,6 +33,13 @@ export function QueueButton({ postId, flush, disabledReason, onDone }: {
       setBusy(false);
     }
   };
+  return { run, busy };
+}
+
+export function QueueButton({ postId, flush, disabledReason, onDone }: {
+  postId: string; flush: () => Promise<number | null>; disabledReason?: string | null; onDone: (title: string, body?: string) => void;
+}) {
+  const { run, busy } = useQueueAction(postId, flush, onDone);
   return (
     <Button variant="secondary" icon={<ListPlus aria-hidden className="size-4" />} onClick={run} loading={busy} disabledReason={disabledReason}
       title="Next free slot (uses the slot’s destinations)">

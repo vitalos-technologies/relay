@@ -147,6 +147,8 @@ export interface PlannerItem {
   campaign?: { id: string; name: string | null } | null; team?: { id: string; name: string | null } | null;
   assignee?: { id: string; email: string | null; name: string | null } | null;
   review?: { id: string; decision: string; stage: number; stage_count: number } | null;
+  /** V3 UX: signed thumbnail of the first base asset (null when none / not processed). */
+  thumb_url?: string | null; media_kind?: 'image' | 'video' | null;
 }
 
 /** Contract names ApprovalSummary without fields; everything beyond Approval is optional and rendered defensively. */

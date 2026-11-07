@@ -3,6 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 // Requires the app running locally: ./scripts/dev.sh --detach
 export default defineConfig({
   testDir: 'tests/e2e',
+  globalSetup: './tests/e2e/global-setup.ts',
   timeout: 90_000,
   expect: { timeout: 20_000 },
   workers: 1,

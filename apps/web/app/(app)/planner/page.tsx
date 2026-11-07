@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState, type DragEvent } from 'react';
-import { CalendarClock, CalendarDays, ChevronLeft, ChevronRight, Copy, Ellipsis, LayoutGrid, List, Plus, SquareArrowOutUpRight, Undo2 } from 'lucide-react';
+import { CalendarClock, CalendarDays, ChevronLeft, ChevronRight, Copy, Ellipsis, FileClock, LayoutGrid, List, PanelRight, Plus, SquareArrowOutUpRight, TriangleAlert, Undo2 } from 'lucide-react';
 import { resolveWallTime, toLocalInput, type PostAggregateStatus } from '@social-lite/core';
 import { api } from '@/lib/client/api';
 import { useSession } from '@/lib/client/session';
@@ -11,11 +11,24 @@ import { useBrandFilter, useHrefWithBrand, useMediaQuery, useQueryState } from '
 import { fmtDateTime, fmtTime, localDateKey, postTitle, zoneAbbr } from '@/lib/client/format';
 import type { Connection, PlannerItem, PostDetail } from '@/lib/client/types';
 import {
-  Banner, Button, cn, EmptyState, ErrorState, IconButton, InfoTip, LinkButton, Menu, MenuContent, MenuItem, MenuTrigger, PageHeader,
-  POST_STATUS_LABEL, Segmented, Select, SkeletonRows, useToast,
+  Banner, Button, cn, EmptyState, ErrorState, FilterBar, FilterSelect, IconButton, InfoTip, LinkButton, Menu, MenuContent, MenuItem, MenuTrigger, PageHeader,
+  POST_STATUS_LABEL, Segmented, SkeletonRows, Thumb, useToast,
 } from '@/components/ui';
 import { AgendaItem, DestinationDots, OwnerMeta } from '@/components/planner/agenda-item';
 import { RescheduleDialog, type RescheduleResult } from '@/components/planner/reschedule-dialog';
+import { PostDrawer } from '@/components/planner/post-drawer';
+
+/** Same destination within 15 minutes of another post: shown as a conflict (text + icon, never colour alone). */
+function findConflicts(items: PlannerItem[]): Set<string> {
+  const out = new Set<string>();
+  const live = items.filter((i) => i.status !== 'cancelled');
+  for (let a = 0; a < live.length; a++) for (let b = a + 1; b < live.length; b++) {
+    const x = live[a]!, y = live[b]!;
+    if (Math.abs(new Date(x.due_at).getTime() - new Date(y.due_at).getTime()) > 15 * 60_000) continue;
+    if (x.destinations.some((d) => y.destinations.some((e) => e.connection_id === d.connection_id))) { out.add(x.schedule_id); out.add(y.schedule_id); }
+  }
+  return out;
+}
 
 type View = 'week' | 'month' | 'agenda';
 const DAY_MS = 86_400_000;
@@ -69,6 +82,9 @@ export default function PlannerPage() {
   const connectionFilter = params.get('account') ?? '';
   const statusFilter = params.get('status') ?? '';
   const ownerFilter = params.get('owner') ?? '';
+  const campaignFilter = params.get('campaign') ?? '';
+  const conflictOnly = params.get('conflicts') === '1';
+  const [drawer, setDrawer] = useState<PlannerItem | null>(null);
 
   // Visible range in the view zone
   const range = useMemo(() => {
@@ -90,12 +106,16 @@ export default function PlannerPage() {
   if (brand) qs.set('brand_id', brand);
   if (connectionFilter) qs.set('connection_id', connectionFilter);
   if (statusFilter) qs.set('status', statusFilter);
-  const { data, error, loading, refetch, refreshing } = useApi<{ items: PlannerItem[] }>(`/api/planner?${qs.toString()}`, { keepPrevious: true, poll: 30_000 });
+  // Bounded payload (V3.1 PERF): the visible range only, capped; the server reports `truncated` when there is more.
+  const limit = view === 'month' ? 400 : 200;
+  qs.set('limit', String(limit));
+  const { data, error, loading, refetch, refreshing } = useApi<{ items: PlannerItem[]; truncated?: boolean }>(`/api/planner?${qs.toString()}`, { keepPrevious: true, poll: 30_000 });
   const conns = useApi<{ items: Connection[] }>(brand ? `/api/brands/${brand}/connections` : null);
 
+  const conflictIds = useMemo(() => findConflicts(data?.items ?? []), [data]);
   const byDay = useMemo(() => {
     const m = new Map<string, PlannerItem[]>();
-    for (const i of (data?.items ?? []).filter((x) => !ownerFilter || (ownerFilter === `team:${x.team?.id}`) || (ownerFilter === `user:${x.assignee?.id}`))) {
+    for (const i of (data?.items ?? []).filter((x) => (!ownerFilter || (ownerFilter === `team:${x.team?.id}`) || (ownerFilter === `user:${x.assignee?.id}`)) && (!campaignFilter || x.campaign?.id === campaignFilter) && (!conflictOnly || conflictIds.has(x.schedule_id)))) {
       const k = localDateKey(i.due_at, viewTz);
       const arr = m.get(k) ?? [];
       arr.push(i);
@@ -103,7 +123,13 @@ export default function PlannerPage() {
     }
     for (const arr of m.values()) arr.sort((a, b) => a.due_at.localeCompare(b.due_at));
     return m;
-  }, [data, viewTz, ownerFilter]);
+  }, [data, viewTz, ownerFilter, campaignFilter, conflictOnly, conflictIds]);
+  const conflicts = conflictIds;
+  const campaigns = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const i of data?.items ?? []) if (i.campaign) m.set(i.campaign.id, i.campaign.name ?? 'Untitled campaign');
+    return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [data]);
   // V2 calendar ownership filter options (teams/assignees present in the visible, already-scoped items).
   const owners = useMemo(() => {
     const m = new Map<string, string>();
@@ -194,6 +220,7 @@ export default function PlannerPage() {
         <IconButton size="sm" label={`Actions for ${postTitle(i)}`} icon={<Ellipsis aria-hidden className="size-4" />} />
       </MenuTrigger>
       <MenuContent>
+        <MenuItem icon={<PanelRight aria-hidden />} onSelect={() => setDrawer(i)}>Details</MenuItem>
         <MenuItem icon={<SquareArrowOutUpRight aria-hidden />} onSelect={() => router.push(`/posts/${i.post_id}`)}>Open post</MenuItem>
         {mayReschedule ? (
           <MenuItem icon={<CalendarClock aria-hidden />} disabled={!canMove(i)} onSelect={() => setTarget({ item: i, local: null })}>
@@ -210,7 +237,10 @@ export default function PlannerPage() {
       <PageHeader
         title="Planner"
         meta={<span className="truncate">{viewTz.replace(/_/g, ' ')} · {zoneAbbr(new Date(), viewTz)}</span>}
-        actions={can('drafts.edit') && session.brands.length ? <LinkButton href={withBrand('/compose')} variant="primary" icon={<Plus aria-hidden className="size-4" />}>New post</LinkButton> : null}
+        actions={<>
+          {can('history.read') ? <LinkButton href={withBrand('/history')} variant="ghost" icon={<FileClock aria-hidden className="size-4" />}>History</LinkButton> : null}
+          {can('drafts.edit') && session.brands.length ? <LinkButton href={withBrand('/compose')} variant="primary" icon={<Plus aria-hidden className="size-4" />}>Create post</LinkButton> : null}
+        </>}
       />
 
       <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -222,45 +252,54 @@ export default function PlannerPage() {
           {view !== 'agenda' && desktop && mayReschedule ? <InfoTip label="How to reschedule">Drag a post to another day, or use its ⋯ menu.</InfoTip> : null}
           {refreshing ? <span className="text-xs text-subtle">Updating…</span> : null}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="w-[180px]">
-            <label className="sr-only" htmlFor="pl-account">Account</label>
-            <Select id="pl-account" value={connectionFilter} onChange={(e) => setParams({ account: e.target.value })} disabled={!brand} title={!brand ? 'Pick a brand first' : undefined} aria-describedby={!brand ? 'pl-account-hint' : undefined}>
-              <option value="">All accounts</option>
-              {conns.data?.items.map((c) => <option key={c.id} value={c.id}>{c.display_name}{c.is_mock ? ' (Simulated)' : ''}</option>)}
-            </Select>
-            {!brand ? <span id="pl-account-hint" className="sr-only">Pick a brand first.</span> : null}
-          </div>
-          {owners.length || ownerFilter ? (
-            <div className="w-[170px]">
-              <label className="sr-only" htmlFor="pl-owner">Owner</label>
-              <Select id="pl-owner" value={ownerFilter} onChange={(e) => setParams({ owner: e.target.value })}>
-                <option value="">All owners</option>
-                {owners.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
-              </Select>
-            </div>
-          ) : null}
-          <div className="w-[170px]">
-            <label className="sr-only" htmlFor="pl-status">Status</label>
-            <Select id="pl-status" value={statusFilter} onChange={(e) => setParams({ status: e.target.value })}>
-              <option value="">All statuses</option>
-              {(['scheduled', 'pending_approval', 'publishing', 'published', 'partial', 'needs_attention', 'failed', 'expired', 'cancelled'] as PostAggregateStatus[]).map((s) => (
-                <option key={s} value={s}>{POST_STATUS_LABEL[s]}</option>
-              ))}
-            </Select>
-          </div>
-          <Segmented
-            label="View"
-            value={view}
-            onChange={(v) => setParams({ view: v })}
-            options={[
-              { value: 'week', label: 'Week', icon: <CalendarDays aria-hidden className="size-3.5" />, disabled: !desktop },
-              { value: 'month', label: 'Month', icon: <LayoutGrid aria-hidden className="size-3.5" />, disabled: !desktop },
-              { value: 'agenda', label: 'Agenda', icon: <List aria-hidden className="size-3.5" /> },
-            ]}
-          />
-        </div>
+        <Segmented
+          label="View"
+          value={view}
+          onChange={(v) => setParams({ view: v })}
+          options={[
+            { value: 'week', label: 'Week', icon: <CalendarDays aria-hidden className="size-3.5" />, disabled: !desktop },
+            { value: 'month', label: 'Month', icon: <LayoutGrid aria-hidden className="size-3.5" />, disabled: !desktop },
+            { value: 'agenda', label: 'List', icon: <List aria-hidden className="size-3.5" /> },
+          ]}
+        />
       </div>
+
+      <FilterBar>
+        <FilterSelect id="pl-account" label="Account" className="w-[180px]" value={connectionFilter} onChange={(v) => setParams({ account: v })} disabled={!brand} title={!brand ? 'Pick a brand first' : undefined}>
+          <option value="">All accounts</option>
+          {conns.data?.items.map((c) => <option key={c.id} value={c.id}>{c.display_name}{c.is_mock ? ' (Simulated)' : ''}</option>)}
+        </FilterSelect>
+        {campaigns.length || campaignFilter ? (
+          <FilterSelect id="pl-campaign" label="Campaign" className="w-[170px]" value={campaignFilter} onChange={(v) => setParams({ campaign: v })}>
+            <option value="">All campaigns</option>
+            {campaigns.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+          </FilterSelect>
+        ) : null}
+        {owners.length || ownerFilter ? (
+          <FilterSelect id="pl-owner" label="Team or owner" className="w-[170px]" value={ownerFilter} onChange={(v) => setParams({ owner: v })}>
+            <option value="">All teams</option>
+            {owners.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+          </FilterSelect>
+        ) : null}
+        <FilterSelect id="pl-status" label="Status" className="w-[160px]" value={statusFilter} onChange={(v) => setParams({ status: v })}>
+          <option value="">All statuses</option>
+          {(['scheduled', 'pending_approval', 'publishing', 'published', 'partial', 'needs_attention', 'failed', 'expired', 'cancelled'] as PostAggregateStatus[]).map((s) => (
+            <option key={s} value={s}>{POST_STATUS_LABEL[s]}</option>
+          ))}
+        </FilterSelect>
+        {conflicts.size || conflictOnly ? (
+          <button type="button" aria-pressed={conflictOnly} onClick={() => setParams({ conflicts: conflictOnly ? null : '1' })}
+            className={cn('inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-[13px] font-medium text-warn transition-colors', conflictOnly ? 'border-[color-mix(in_srgb,var(--warn)_45%,transparent)] bg-warn-soft' : 'border-transparent hover:bg-warn-soft')}>
+            <TriangleAlert aria-hidden className="size-3.5" />{conflicts.size} in conflict{conflictOnly ? <span className="text-muted"> · show all</span> : null}
+          </button>
+        ) : null}
+      </FilterBar>
+
+      {data?.truncated ? (
+        <Banner tone="info" className="mb-4" role="status" title={`Showing the first ${data.items.length} posts`}>
+          {brand ? 'Narrow by account or status to see the rest.' : 'Pick a brand to see the rest.'}
+        </Banner>
+      ) : null}
 
       {lastMove ? (
         <Banner
@@ -279,7 +318,7 @@ export default function PlannerPage() {
       ) : loading ? (
         <SkeletonRows rows={5} />
       ) : view === 'agenda' || !desktop ? (
-        <Agenda start={range.start} days={range.days} byDay={byDay} today={today} brandName={brand ? undefined : brandName} menu={itemMenu} empty={!data?.items.length} canCreate={can('drafts.edit')} withBrand={withBrand} />
+        <Agenda start={range.start} days={range.days} byDay={byDay} today={today} brandName={brand ? undefined : brandName} menu={itemMenu} empty={!data?.items.length} canCreate={can('drafts.edit')} withBrand={withBrand} onOpen={setDrawer} />
       ) : (
         <CalendarGrid
           view={view}
@@ -292,8 +331,19 @@ export default function PlannerPage() {
           onDropDay={onDropDay}
           menu={itemMenu}
           onMore={(d) => setParams({ view: 'agenda', date: d })}
+          onOpen={setDrawer}
+          conflicts={conflicts}
+          viewTz={viewTz}
         />
       )}
+
+      <PostDrawer
+        item={drawer}
+        onOpenChange={(o) => !o && setDrawer(null)}
+        brandName={drawer && !brand ? brandName(drawer.brand_id) : undefined}
+        onReschedule={mayReschedule && drawer && canMove(drawer) ? (i) => { setDrawer(null); setTarget({ item: i, local: null }); } : undefined}
+        onDuplicate={can('drafts.edit') ? (i) => void duplicate(i) : undefined}
+      />
 
       <RescheduleDialog
         open={!!target}
@@ -311,10 +361,10 @@ export default function PlannerPage() {
 }
 
 function Agenda({
-  start, days, byDay, today, brandName, menu, empty, canCreate, withBrand,
+  start, days, byDay, today, brandName, menu, empty, canCreate, withBrand, onOpen,
 }: {
   start: string; days: number; byDay: Map<string, PlannerItem[]>; today: string; brandName?: (id: string) => string;
-  menu: (i: PlannerItem) => React.ReactNode; empty: boolean; canCreate: boolean; withBrand: (h: string) => string;
+  menu: (i: PlannerItem) => React.ReactNode; empty: boolean; canCreate: boolean; withBrand: (h: string) => string; onOpen: (i: PlannerItem) => void;
 }) {
   if (empty) {
     return (
@@ -332,7 +382,7 @@ function Agenda({
           </h3>
           <ul className="flex flex-col">
             {byDay.get(d)!.map((i) => (
-              <li key={i.schedule_id}><AgendaItem item={i} brandName={brandName?.(i.brand_id)} actions={menu(i)} /></li>
+              <li key={i.schedule_id}><AgendaItem item={i} brandName={brandName?.(i.brand_id)} actions={menu(i)} onOpen={() => onOpen(i)} /></li>
             ))}
           </ul>
         </section>
@@ -342,10 +392,11 @@ function Agenda({
 }
 
 function CalendarGrid({
-  view, start, days, anchorMonth, byDay, today, draggable, onDropDay, menu, onMore,
+  view, start, days, anchorMonth, byDay, today, draggable, onDropDay, menu, onMore, onOpen, conflicts, viewTz,
 }: {
   view: View; start: string; days: number; anchorMonth: string; byDay: Map<string, PlannerItem[]>; today: string; draggable: boolean;
   onDropDay: (day: string, e: DragEvent) => void; menu: (i: PlannerItem) => React.ReactNode; onMore: (day: string) => void;
+  onOpen: (i: PlannerItem) => void; conflicts: Set<string>; viewTz: string;
 }) {
   const [over, setOver] = useState<string | null>(null);
   const cells = Array.from({ length: days }, (_, i) => addDays(start, i));
@@ -372,7 +423,7 @@ function CalendarGrid({
                 idx % 7 !== 6 && 'border-r',
                 idx < days - 7 && 'border-b',
                 view === 'week' ? 'min-h-[420px]' : 'min-h-[120px]',
-                outside && 'bg-sunken/60',
+                outside && 'bg-sunken/70 [&>*:not(:first-child)]:opacity-55',
                 over === d && 'bg-raised outline-2 outline-dashed outline-[var(--focus)] -outline-offset-2',
               )}
             >
@@ -382,7 +433,7 @@ function CalendarGrid({
                 </span>
                 {d === today ? <span className="sr-only">Today</span> : null}
               </div>
-              {items.slice(0, max).map((i) => <CalendarItem key={i.schedule_id} item={i} draggable={draggable && canMove(i)} menu={menu(i)} compact={view === 'month'} />)}
+              {items.slice(0, max).map((i) => <CalendarItem key={i.schedule_id} item={i} draggable={draggable && canMove(i)} menu={menu(i)} compact={view === 'month'} onOpen={() => onOpen(i)} conflict={conflicts.has(i.schedule_id)} viewTz={viewTz} />)}
               {items.length > max ? (
                 <button type="button" onClick={() => onMore(d)} className="rounded px-1 text-left text-xs font-medium text-muted hover:text-fg">
                   +{items.length - max} more
@@ -396,8 +447,14 @@ function CalendarGrid({
   );
 }
 
-function CalendarItem({ item, draggable, menu, compact }: { item: PlannerItem; draggable: boolean; menu: React.ReactNode; compact: boolean }) {
+function CalendarItem({ item, draggable, menu, compact, onOpen, conflict, viewTz }: {
+  item: PlannerItem; draggable: boolean; menu: React.ReactNode; compact: boolean; onOpen: () => void; conflict: boolean; viewTz: string;
+}) {
   const due = new Date(item.due_at);
+  // Show the post's own zone only when its wall-clock time differs from the planner's zone.
+  const otherZone = fmtTime(due, item.input_timezone) !== fmtTime(due, viewTz);
+  const bad = item.status === 'needs_attention' || item.status === 'failed' || item.status === 'partial' || item.status === 'expired';
+  const allMock = item.destinations.length > 0 && item.destinations.every((d) => d.is_mock);
   return (
     <div
       draggable={draggable}
@@ -406,22 +463,35 @@ function CalendarItem({ item, draggable, menu, compact }: { item: PlannerItem; d
         e.dataTransfer.effectAllowed = 'move';
       }}
       className={cn(
-        'group relative rounded-md bg-raised px-2 py-1 text-xs hover:bg-sunken',
+        'group relative rounded-lg border border-transparent bg-raised/70 p-1.5 text-xs transition-colors hover:border-border-strong',
         draggable && 'cursor-grab active:cursor-grabbing',
-        item.status === 'needs_attention' || item.status === 'failed' || item.status === 'partial' ? 'border-l-2 border-l-[var(--warn)]' : '',
+        bad && 'border-l-2 border-l-[var(--danger)]',
+        item.status === 'pending_approval' && 'border-l-2 border-l-[var(--info)]',
+        item.status === 'cancelled' && 'opacity-60',
       )}
     >
       <div className="flex items-start gap-1">
-        <Link href={`/posts/${item.post_id}`} className="min-w-0 flex-1 rounded">
+        <button type="button" onClick={onOpen} className="min-w-0 flex-1 rounded text-left">
           <span className="block font-semibold tabular">
-            {fmtTime(due, item.input_timezone)} <span className="font-normal text-muted">{zoneAbbr(due, item.input_timezone)}</span>
+            {fmtTime(due, item.input_timezone)}{otherZone ? <span className="font-normal text-muted"> {zoneAbbr(due, item.input_timezone)}</span> : null}
           </span>
           <span className={cn('block text-fg', compact ? 'truncate' : 'line-clamp-2')}>{postTitle(item)}</span>
-          <span className="sr-only">{POST_STATUS_LABEL[item.status]}</span>
-        </Link>
+          <span className="sr-only">{item.overdue ? 'Overdue' : item.status === 'published' && allMock ? 'Simulated · delivered' : POST_STATUS_LABEL[item.status]}</span>
+        </button>
         <span className="-mr-1 -mt-0.5 opacity-70 group-hover:opacity-100 group-focus-within:opacity-100">{menu}</span>
       </div>
-      {!compact ? <div className="mt-1 flex min-w-0 items-center gap-1.5"><DestinationDots destinations={item.destinations} /><OwnerMeta item={item} /></div> : null}
+      {!compact ? (
+        <div className="mt-1.5 flex min-w-0 items-center gap-1.5">
+          {item.thumb_url ? <Thumb src={item.thumb_url} kind={item.media_kind} className="size-7 rounded-md" /> : null}
+          <DestinationDots destinations={item.destinations} />
+        </div>
+      ) : null}
+      {!compact && (item.team || item.assignee || item.campaign || item.review) ? <div className="mt-1 truncate text-[11px]"><OwnerMeta item={item} /></div> : null}
+      {conflict || item.status === 'expired' || item.overdue ? (
+        <p className={cn('mt-1 flex items-center gap-1 text-[11px] font-medium', item.status === 'expired' ? 'text-danger' : 'text-warn')}>
+          <TriangleAlert aria-hidden className="size-3" />{item.status === 'expired' ? 'Expired' : item.overdue ? 'Overdue' : 'Conflict'}
+        </p>
+      ) : null}
     </div>
   );
 }
