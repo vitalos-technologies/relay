@@ -77,7 +77,7 @@ test.describe('owner publishing journey', () => {
     const p = (await a.send('POST', `/api/brands/${brand.id}/posts`, { draft: { baseText: 'text only', baseLink: null, baseAssetIds: [], variants: [{ connectionId: ig.id, inheritText: true, inheritMedia: true }] } })).body;
     const r = await a.send('POST', `/api/posts/${p.id}/publish`, { expected_version: p.version, connection_ids: [ig.id] });
     expect(r.status).toBe(422);
-    expect(r.body.error.details.issues[0].message).toMatch(/^Instagram: an image is required/);
+    expect(r.body.error.details.issues[0].message).toMatch(/^Instagram: an image or video is required/);
   });
 });
 
