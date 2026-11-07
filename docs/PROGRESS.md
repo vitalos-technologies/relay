@@ -23,7 +23,7 @@ Product is now **Relay** (brand kit: docs/brand/relay-brand-kit.webp; decisions 
 
 ## V3 early start
 
-- V3-P providers (TikTok, YouTube, LinkedIn, Threads, Pinterest, Bluesky) running in parallel — `docs/v3-progress/providers.md`, migration 014.
+- V3-P providers DONE (adapters, connectors, fakes, metrics, 164 contract tests, docs; migration 014 applied to dev). Gaps for V3 streams: Bluesky connect route/UI; composer per-provider required fields (TikTok privacy+consent, YouTube title/privacy/madeForKids, Pinterest board, LinkedIn org); YouTube native scheduling needs early upload dispatch before publishAt; dedicated `manual_handoff` delivery state (TikTok inbox drafts currently Unknown + handoff text); self-hosted Bluesky PDS allow-list.
 - Remaining V3 streams start after V2: design system + shell/left Settings nav; analytics pipeline; Drive/Docs/Notion Content Hub; MCP server (auth via Keycloak AS).
 
 ## Environment recovery
@@ -36,4 +36,5 @@ Docker stops on container restart: if `/var/run/docker.pid` points at a non-dock
 - Demo identities: Keycloak issuer replaced Dex → existing dev users are bound to the Dex issuer (`account_conflict` on sign-in). Fresh seed with `oidc_issuer='pending'` users fixes dev; document for real deployments (no re-binding by email).
 - Health centre lists overdue "scheduled" items when the worker is down — label overdue explicitly.
 - Sweep remaining user-facing "Social Lite" strings (e.g. scripts/dev.sh banner) → Relay (V3.1 also requires this).
+- tests/integration/setup.test.ts still expects the Dex issuer (stream A to fix).
 - Run full suite + E2E (Keycloak TOTP sign-in) + migration rehearsal with migrations 010–014.
