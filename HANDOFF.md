@@ -3,7 +3,7 @@
 Last updated: 2026-11-07 07:25 UTC · Lead agent keeps this current after every milestone.
 
 ## Resume in a new session / another Claude account
-1. Get the repo. **It has no git remote yet.** To continue outside this container, push it to a GitHub repo first (ask the lead to do it once a repo exists), then clone. Working dir used here: `/home/user/social-lite`.
+1. Clone `https://github.com/vitalos-technologies/relay` (branch `main`; the lead pushes after each milestone). Working dir used here: `/home/user/social-lite`.
 2. Paste this to the new Claude session:
    > Continue building Relay. Read `HANDOFF.md`, then `docs/PROGRESS.md`, then the active brief. Work autonomously; follow the rules in HANDOFF.md.
 3. Environment: `cp .env.example .env` (fill local values; never commit secrets), then `./scripts/dev.sh --detach`. Note: `dev.sh` runs `db:migrate`, which locks migration checksums. Only run it when no stream is still editing a migration (see "Uncommitted work").
