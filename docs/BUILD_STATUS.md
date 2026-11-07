@@ -1,6 +1,6 @@
 # Build status
 
-**Phase:** MVP complete locally (simulated providers); V1.1 partially done; awaiting external activation.
+**Phase:** V1 + V1.1 complete locally (simulated providers); awaiting external activation. **Next: V2 (security and multi-team upgrade) — queued.**
 **Branch:** `main` (local repository; no remote configured).
 
 ## Resume
@@ -19,9 +19,10 @@ If the container restarted: Docker may need `rm -f /var/run/docker.pid` (only if
 - Auth (OIDC), sessions/CSRF, invitations, roles, brands, media pipeline, setup, diagnostics, ops dashboard, notifications.
 - UI: all MVP screens, simplified design pass, desktop + mobile.
 - Worker, Dockerfile (web/worker images built), CI workflow, restore drill, load test.
-- V1.1: CSV import (API + UI), TipSignal events → drafts with deterministic cards.
+- V1.1: CSV import, TipSignal → drafts with deterministic cards, AI caption assistance (Claude, draft-only, capped), carousels/albums/video/Reels, posting slots + queue, image crops, native analytics with quotas, Integrations + Budgets settings.
+- Hardening: Meta deauthorize/data-deletion callbacks, forward-only webhook application, shared Postgres rate limiting, Cloud KMS key custody, X token revoke on disconnect.
 
 ## Next
 
-1. Activation items (checklist) → live canaries.
-2. Gaps in IMPLEMENTATION_GAPS.md, starting with CSV import UI and X token revoke.
+1. V2 upgrade (queued).
+2. Activation items (checklist) → live canaries.

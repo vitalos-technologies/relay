@@ -40,11 +40,19 @@ Tests: E = `tests/integration/engine.test.ts`, C = `connections.test.ts`, M = `m
 | Outbox crash safety | outbox-dispatcher (deterministic job id) | I | I |
 | Security §14 (encryption, CSRF, sessions, SSRF, redaction) | crypto.ts, api.ts, session.ts, ssrf.ts, log.ts | A, T, K, B | LV |
 | Prod fail-closed | config.assertProductionSafe, instrumentation.ts | U + image | LV |
-| Webhooks: authenticate, dedupe, ack | webhooks.ts | I | I |
+| Webhooks: authenticate, dedupe, ack, apply forward-only | webhooks.ts | webhook-processing.test.ts | LV |
 | Ops dashboard / health / diagnostics | readmodels.ops, diagnostics.ts | B (renders) | LV |
 | Backup/restore with dispatch off | restore-drill.sh | drill | LV |
 | Load target (95% start ≤ 60 s) | worker | load test | LV (simulated) |
 | Four live platforms | adapters | K (contracts) | **AA** |
 | V1.1 CSV import | imports.ts + Compose dialog | imports.test.ts | LV |
 | V1.1 TipSignal → drafts + deterministic graphics | tipsignal.ts | tipsignal.test.ts | LV |
-| V1.1 AI rewriting, media expansion, slots, crops, analytics | – | – | X |
+| V1.1 AI caption assistance (diff acceptance, caps, fidelity) | services/ai/**, components/ai | ai-*.test.ts | LV (fixture; live AA) |
+| V1.1 Carousels/albums/multi-image/video/Reels | providers/*, media/video* | contracts + media-video tests | LV (live AA) |
+| V1.1 Posting slots + queue (DST-safe, concurrent-safe) | services/slots/** | slots tests | LV |
+| V1.1 Image crops (approval-bound) | services/crops/** | crops tests | LV |
+| V1.1 Native analytics with quotas (unavailable ≠ 0) | services/analytics, providers/*/metrics.ts | analytics tests | LV (live AA) |
+| Meta deauthorize / data deletion | meta-callbacks.ts | meta-callbacks.test.ts | LV |
+| Webhook application (forward-only) | webhooks.processWebhookReceipt | webhook-processing.test.ts | LV |
+| Shared rate limiting | ratelimit.takeShared | auth-security.test.ts | LV |
+| KMS key custody | kms.ts | kms.test.ts | LV (live AA) |

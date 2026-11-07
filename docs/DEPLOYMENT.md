@@ -15,7 +15,7 @@ CI (`.github/workflows/ci.yml`) typechecks, runs unit/contract/integration tests
 
 ## Configure
 
-Copy `.env.example` names into the secret manager. Production refuses to start unless:
+Copy `.env.example` names into the secret manager. Key custody: prefer `KMS_KEY_NAME` + `KMS_WRAPPED_KEKS` (unwrapped at boot; fail closed) over a plaintext `KEY_ENCRYPTION_KEYS`. Images include ffmpeg/ffprobe for video validation and transcoding. Production refuses to start unless:
 `APP_ENV=production`, `APP_BASE_URL=https://…`, `SESSION_SECRET`, `KEY_ENCRYPTION_KEYS` (not the dev key), a non-local `OIDC_ISSUER` + client, `S3_*` (not local defaults), `SMTP_URL` (not Mailpit), `ENABLE_MOCK_PROVIDERS=false`, `OIDC_ALLOW_INSECURE_HTTP=false`.
 Provider app settings (Meta, X, Telegram webhook secret) can be set in env or on **/setup** by the owner (stored encrypted, write-only).
 
