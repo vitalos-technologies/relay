@@ -98,6 +98,9 @@ async function main(): Promise<void> {
 
   // V3 analytics: 'analytics-sync' (per-workspace group concurrency) + 'analytics-report-export'; ids only, authority re-checked per job.
   const analytics = await import('@social-lite/services/analytics/worker');
+  // Analytics report exports to Google Docs/Drive/Notion go through the Content Hub exporter (same authority checks).
+  const { registerReportExporter } = await import('@social-lite/services/analytics/exporters');
+  registerReportExporter((await import('@social-lite/services/content-hub/exports')).contentHubExporter);
   await analytics.registerAnalyticsWorkers(boss, { workerId: WORKER_ID, track, stopping: () => stopping });
 
   const timers = [
