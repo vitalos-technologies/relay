@@ -16,6 +16,9 @@ import { log } from '../log.js';
 import { assertUuid, brandAllowed, brandFilter, requireAction } from '../tenancy.js';
 import { checkAndConsumeBudget } from '../engine/budget.js';
 import { CredentialsUnavailable } from '../engine/process.js';
+import { ingestPoints, recordCoverage, type IngestResult, type IngestTarget } from './ingest.js';
+import { nextAttemptAt } from './cadence.js';
+import type { FetchState } from './semantics.js';
 
 export const ON_DEMAND_THROTTLE_MINUTES = 15;
 export const DAILY_REFRESH_MIN_HOURS = 20;
@@ -39,7 +42,7 @@ export async function liveAnalyticsDeps(): Promise<AnalyticsDeps> {
 
 interface DeliveryRef {
   id: string; workspace_id: string; brand_id: string; connection_id: string; provider: Provider; is_mock: boolean; state: string;
-  provider_ids: string[]; published_at: Date | null;
+  provider_ids: string[]; published_at: Date | null; is_synthetic: boolean;
 }
 
 async function setState(db: Queryable, d: DeliveryRef, status: FetchStatus, message: string | null, success: boolean) {
@@ -48,32 +51,58 @@ async function setState(db: Queryable, d: DeliveryRef, status: FetchStatus, mess
     [d.id, status, message?.slice(0, 300) ?? null, success]);
 }
 
-export interface RefreshResult { deliveryId: string; status: FetchStatus; message: string | null; points: number }
+export interface RefreshResult {
+  deliveryId: string; status: FetchStatus; message: string | null; points: number;
+  /** V3 pipeline: normalized fetch state, ingestion stats and the retry-after hint (rate limits). */
+  state?: FetchState; ingest?: IngestResult; retryAfterMs?: number | null;
+}
+
+const LEGACY_TO_STATE: Record<FetchStatus, FetchState> = {
+  pending: 'fetch_failed', ok: 'ok', unsupported: 'unsupported', unavailable: 'not_found', permission_missing: 'permission_missing',
+  budget_exhausted: 'budget_exhausted', reconnect: 'reconnect_required', error: 'fetch_failed',
+};
 
 /**
  * Fetch and snapshot metrics for one published delivery. Network calls happen outside transactions.
  * `claim` (daily job) skips deliveries attempted within DAILY_REFRESH_MIN_HOURS, atomically, so concurrent
  * workers never double-fetch (and never double-bill X reads).
  */
-export async function refreshDeliveryMetrics(deliveryId: string, deps: AnalyticsDeps, opts: { claim?: boolean } = {}): Promise<RefreshResult | null> {
+export async function refreshDeliveryMetrics(deliveryId: string, deps: AnalyticsDeps, opts: { claim?: boolean; syncRunId?: string | null } = {}): Promise<RefreshResult | null> {
   const db = getPool();
   const d = await maybeOne<DeliveryRef>(db,
-    `SELECT id, workspace_id, brand_id, connection_id, provider, is_mock, state, provider_ids, published_at FROM deliveries WHERE id=$1`, [deliveryId]);
-  if (!d || d.state !== 'published') return null;
+    `SELECT d.id, d.workspace_id, d.brand_id, d.connection_id, d.provider, d.is_mock, d.state, d.provider_ids, d.published_at, c.is_synthetic
+       FROM deliveries d JOIN connections c ON c.id = d.connection_id WHERE d.id=$1`, [deliveryId]);
+  // Synthetic demo fixtures are never "refreshed" (they are not network data).
+  if (!d || d.state !== 'published' || d.is_synthetic) return null;
   await db.query(`INSERT INTO metric_fetch_state(delivery_id, workspace_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, [d.id, d.workspace_id]);
   const claimed = await maybeOne(db,
     `UPDATE metric_fetch_state SET last_attempt_at=now() WHERE delivery_id=$1
         ${opts.claim ? `AND (last_attempt_at IS NULL OR last_attempt_at < now() - interval '${DAILY_REFRESH_MIN_HOURS} hours')` : ''} RETURNING 1`, [d.id]);
   if (!claimed) return null;
-  const done = async (status: FetchStatus, message: string | null, points = 0): Promise<RefreshResult> => {
+  const target: IngestTarget = {
+    workspaceId: d.workspace_id, brandId: d.brand_id, connectionId: d.connection_id, provider: d.provider, resourceType: 'post', resourceId: d.id,
+    providerObjectId: d.provider_ids[0] ?? null, publishedAt: d.published_at, source: d.is_mock ? 'simulated' : 'provider',
+  };
+  let ingest: IngestResult | undefined;
+  let coverageOut: { reported: string[]; unavailable: Array<{ name: string; reason: string }> } = { reported: [], unavailable: [] };
+  let retryAfterMs: number | null = null;
+  const done = async (status: FetchStatus, message: string | null, points = 0, stateOverride?: FetchState): Promise<RefreshResult> => {
     await setState(db, d, status, message, status === 'ok');
-    return { deliveryId: d.id, status, message, points };
+    // V3 pipeline: per-series coverage + cadence (data_coverage). Never turns a missing metric into 0.
+    const state = stateOverride ?? LEGACY_TO_STATE[status];
+    const prev = await maybeOne<{ consecutive_failures: number }>(db,
+      `SELECT consecutive_failures FROM data_coverage WHERE workspace_id=$1 AND connection_id=$2 AND resource_type='post' AND resource_id=$3 AND metric_id='*'`,
+      [d.workspace_id, d.connection_id, d.id]);
+    const failures = state === 'ok' || state === 'provider_delayed' || state === 'unsupported' ? 0 : (prev?.consecutive_failures ?? 0) + 1;
+    const now = deps.now?.() ?? new Date();
+    await recordCoverage(db, target, { state, message, ...coverageOut }, now, nextAttemptAt(d.provider, d.published_at, now, state, failures, retryAfterMs), opts.syncRunId ?? null);
+    return { deliveryId: d.id, status, message, points, state, ingest, retryAfterMs };
   };
 
   const fetcher = deps.fetcherFor?.(d.provider) ?? metricsFetcherFor(d.provider);
   if (!fetcher.metricNames.length) return done('unsupported', `${PROVIDER_LABEL[d.provider]} does not provide post statistics.`);
   const objectId = d.provider_ids[0];
-  if (!objectId) return done('unavailable', 'No post id was recorded for this delivery.');
+  if (!objectId) return done('unavailable', 'No post id was recorded for this delivery.', 0, 'unsupported');
   const now = deps.now?.() ?? new Date();
 
   let outcome: MetricsOutcome;
@@ -99,6 +128,7 @@ export async function refreshDeliveryMetrics(deliveryId: string, deps: Analytics
 
   switch (outcome.kind) {
     case 'ok': {
+      coverageOut = { reported: outcome.points.map((p) => p.name), unavailable: outcome.unavailable };
       if (outcome.points.length) {
         await withTx(async (tx) => {
           for (const p of outcome.points) {
@@ -108,9 +138,14 @@ export async function refreshDeliveryMetrics(deliveryId: string, deps: Analytics
               [d.workspace_id, d.brand_id, d.connection_id, d.id, d.provider, objectId, p.name.slice(0, 100), p.dimension?.slice(0, 100) ?? null, p.value, p.period.slice(0, 40), p.windowEnd, now, source]);
           }
         });
+        // V3 pipeline: raw validated observations → facts → aggregates (deduplicated on the fact key).
+        ingest = await ingestPoints(target, outcome.points, now, { syncRunId: opts.syncRunId ?? null });
       }
       const missing = outcome.unavailable.map((u) => u.name);
-      if (!outcome.points.length) return done('unavailable', missing.length ? `Not reported: ${missing.join(', ')}` : 'No metrics were reported.');
+      if (!outcome.points.length) {
+        const delayed = outcome.unavailable.length > 0 && outcome.unavailable.every((u) => /delay/i.test(u.reason));
+        return done('unavailable', missing.length ? `Not reported: ${missing.join(', ')}` : 'No metrics were reported.', 0, delayed ? 'provider_delayed' : 'ok');
+      }
       return done('ok', missing.length ? `Not reported: ${missing.join(', ')}` : null, outcome.points.length);
     }
     case 'unsupported': return done('unsupported', outcome.reason);
@@ -118,7 +153,7 @@ export async function refreshDeliveryMetrics(deliveryId: string, deps: Analytics
     case 'reconnect': return done('reconnect', outcome.message);
     case 'not_found': return done('unavailable', outcome.message);
     case 'budget': return done('budget_exhausted', outcome.message);
-    case 'rate_limited': return done('error', outcome.message);
+    case 'rate_limited': retryAfterMs = outcome.retryAfterMs; return done('error', outcome.message, 0, 'rate_limited');
     case 'error': return done('error', outcome.message);
   }
 }
@@ -130,7 +165,7 @@ export async function refreshDeliveryMetrics(deliveryId: string, deps: Analytics
 export async function runDailyMetricsRefresh(deps: AnalyticsDeps, opts: { limit?: number; maxAgeDays?: number } = {}) {
   const db = getPool();
   const rows = await many<{ id: string }>(db,
-    `SELECT d.id FROM deliveries d LEFT JOIN metric_fetch_state f ON f.delivery_id=d.id
+    `SELECT d.id FROM deliveries d JOIN connections c ON c.id=d.connection_id AND NOT c.is_synthetic LEFT JOIN metric_fetch_state f ON f.delivery_id=d.id
       WHERE d.state='published' AND d.published_at > now() - make_interval(days => $1)
         AND (f.last_attempt_at IS NULL OR f.last_attempt_at < now() - interval '${DAILY_REFRESH_MIN_HOURS} hours')
         AND coalesce(f.status, 'pending') <> 'unsupported'

@@ -6,7 +6,7 @@
 import { createServer } from 'node:http';
 import { hostname } from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { closePool, getPool, maybeOne } from '@social-lite/db';
+import { assertRuntimeDbRole, closePool, getPool, maybeOne } from '@social-lite/db';
 import {
   claimDelivery, config, dispatchEnabled, log, processDelivery, reconcileOne, sweepDeadlines, sweepExpiredLeases,
 } from '@social-lite/services';
@@ -64,6 +64,8 @@ async function main(): Promise<void> {
   const pool = getPool();
   const schema = await maybeOne<{ n: number }>(pool, `SELECT count(*)::int n FROM schema_migrations`).catch(() => null);
   if (!schema) throw new Error('Database is not migrated. Run the migration job first.');
+  const dbRole = await assertRuntimeDbRole(pool, { production: cfg.APP_ENV === 'production', component: 'worker' }); // G14: fail closed in production
+  if (dbRole.problems.length) log.warn('privileged_db_role', { role: dbRole.role, problems: dbRole.problems });
   if (cfg.APP_ENV !== 'production') await ensureBucket().catch((err) => log.warn('bucket_check_failed', { err }));
 
   await pool.query(
@@ -86,6 +88,17 @@ async function main(): Promise<void> {
       await handleEvent({ event_type: job.data.eventType, aggregate_id: job.data.aggregateId, workspace_id: job.data.workspaceId, payload: job.data.payload ?? {} });
     }
   });
+  // V3 Content Hub workload queues: ids only; handlers reload rows, re-check authority, one job per workspace per class.
+  const contentHub = await import('@social-lite/services/content-hub/jobs');
+  for (const q of [contentHub.QUEUE_SOURCE_IMPORT, contentHub.QUEUE_REPORT_EXPORT, contentHub.QUEUE_WRITEBACK]) {
+    await boss.work<{ eventType: string; aggregateId: string; workspaceId: string | null }>(q, { batchSize: 1, pollingIntervalSeconds: 2 }, async (jobs) => {
+      for (const job of jobs) await track(contentHub.handleContentHubJob(job.data));
+    });
+  }
+
+  // V3 analytics: 'analytics-sync' (per-workspace group concurrency) + 'analytics-report-export'; ids only, authority re-checked per job.
+  const analytics = await import('@social-lite/services/analytics/worker');
+  await analytics.registerAnalyticsWorkers(boss, { workerId: WORKER_ID, track, stopping: () => stopping });
 
   const timers = [
     every('heartbeat', 10_000, () => pool.query(`UPDATE worker_heartbeats SET last_seen_at=now(), info = info || $2::jsonb WHERE worker_id=$1`, [WORKER_ID, JSON.stringify({ inFlight: inFlight.size, lastRun })])),
@@ -103,13 +116,19 @@ async function main(): Promise<void> {
       const { sweepExpiredReservations } = await import('@social-lite/services/product/budgets');
       await sweepExpiredReservations({ limit: 200 });
     }),
-    // V1.1 analytics: daily provider metrics refresh (claims per delivery; X reads are budget-metered).
-    every('metrics', 60 * 60_000, async () => {
-      const { liveAnalyticsDeps, runDailyMetricsRefresh } = await import('@social-lite/services/analytics/index');
-      await runDailyMetricsRefresh(await liveAnalyticsDeps(), { limit: 200 });
+    // V3 MCP: report exports started by MCP clients (leased; authority re-checked when each job runs).
+    every('mcp-jobs', 5_000, async () => {
+      const { runMcpJobs } = await import('@social-lite/services/mcp/jobs');
+      await runMcpJobs({ limit: 5 });
     }),
+    // V3 analytics (replaces the V1.1 hourly refresh): cursors → due sync jobs, queued exports, legacy backfill, retention.
+    every('analytics', 30_000, () => analytics.analyticsTick(boss)),
     // V2 collaboration: quiet-hours-deferred emails + daily digests (recipient re-checked at send).
     every('notification-emails', 60_000, () => runNotificationSweeps()),
+    // G7: revoke expired grants (already ignored at access time), audit, refresh summaries, revalidate authority.
+    every('grant-expiry', 5 * 60_000, async () => { const { sweepExpiredGrants } = await import('@social-lite/services/grant-expiry'); await sweepExpiredGrants(); }),
+    // V3 Content Hub: writeback sweep (app-owned facts only), Drive channel renewal, snapshot retention.
+    every('content-hub', 2 * 60_000, () => contentHub.runContentHubSweeps()),
     every('retention', 60 * 60_000, async () => {
       await pool.query(`UPDATE webhook_receipts SET body=NULL WHERE body IS NOT NULL AND received_at < now() - interval '7 days'`);
       await pool.query(`DELETE FROM idempotency_keys WHERE expires_at < now()`);
