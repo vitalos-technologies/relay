@@ -46,12 +46,13 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
 3. V3:
    - Providers: done.
    - Lead engine gaps: done.
-   - **Running:** AN analytics (migration 015), CH content hub (016), MCP (017).
+   - MCP (017) **done** (commit 864cf18). **Running:** AN analytics (015), CH content hub (016).
    - Next: UX redesign (018 brief), launched when V2-A finishes. Then the V3 docs.
 4. V3.1 → 5. V3.1 Admin → 6. Collaboration → 7. **V3.5** → 8. Copy cleanup → 9. Docs + Help Centre.
 
 ## Current state (keep updated)
-- **Background agents** (a new session will NOT have them): V2-A, AN, CH, MCP.
+- **Background agents** (a new session will NOT have them): V2-A, AN, CH.
+- **MCP follow-ups:** recreate Keycloak (`docker compose -f infra/compose.yaml up -d --force-recreate oidc`) after A lands to load the `relay-mcp` client/scopes; register the CH importer in `services/mcp/ports.ts`; switch `query_analytics` to the AN query API; rebuild worker; place MCP settings in the redesigned Settings nav (now `/mcp/settings`). Real MCP clients need public HTTPS (activation checklist).
   - If they're gone, re-launch each from its progress note. Each note lists what is done and what's next:
     - `docs/v2-progress/A.md`
     - `docs/v3-progress/{analytics,content-hub,mcp}.md`
@@ -79,7 +80,7 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
 - A: `apps/web/lib/csp.ts`, `infra/keycloak/*`, `tests/e2e/security.spec.ts`, `tests/integration/{auth,keycloak}*`, `scripts/{dev.sh,demo-totp.ts}`, `docs/{DECISIONS,DEPLOYMENT,OPERATIONS}.md`, `evidence/v2/security-*`.
 - AN: `packages/services/src/analytics/**`, `packages/core/src/contracts/analytics.ts`, migration 015.
 - CH: `packages/services/src/content-hub/**`, `apps/web/components/content-hub/**`, migration 016, `services/{settings,setup}.ts`.
-- MCP: `packages/services/src/mcp/**`, `apps/web/components/mcp/**`, migration 017.
+- MCP: committed. Its shared edits still uncommitted: `apps/worker/src/main.ts` (mcp-jobs loop), `infra/keycloak/social-lite-realm.json` (also A's).
 
 ## Rules (from the user; always apply)
 - **Credentials and secrets:**
