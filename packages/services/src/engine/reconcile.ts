@@ -19,7 +19,7 @@ async function claimUnknown(pool: Pool, workerId: string): Promise<UnknownRow | 
   return withTx(async (tx) => {
     const row = await maybeOne<UnknownRow>(tx,
       `UPDATE deliveries SET lease_owner=$1, lease_expires_at=now() + interval '60 seconds', fence=fence+1, updated_at=now()
-        WHERE id = (SELECT id FROM deliveries WHERE state='unknown' AND needs_reconcile AND next_attempt_at <= now()
+        WHERE id = (SELECT id FROM deliveries WHERE state IN ('unknown','handoff') AND needs_reconcile AND next_attempt_at <= now()
                       AND (lease_owner IS NULL OR lease_expires_at < now()) ORDER BY next_attempt_at LIMIT 1 FOR UPDATE SKIP LOCKED)
         RETURNING id, workspace_id, schedule_id, post_id, connection_id, provider, is_mock, variant_id, provider_ids, preparation, unknown_since, fence::text AS fence`, [workerId]);
     return row;
@@ -62,7 +62,7 @@ export async function reconcileOne(deps: EngineDeps, workerId: string, pool: Poo
   }
 
   return withTx(async (tx) => {
-    const fenced = `WHERE id=$1 AND fence=$2::bigint AND state='unknown'`;
+    const fenced = `WHERE id=$1 AND fence=$2::bigint AND state IN ('unknown','handoff')`;
     let state = 'unknown';
     if (result.kind === 'published') {
       await tx.query(`UPDATE deliveries SET state='published', ${release}, needs_reconcile=false, provider_ids=(SELECT array_agg(DISTINCT x) FROM unnest(provider_ids || $3::text[]) x),
@@ -75,6 +75,12 @@ export async function reconcileOne(deps: EngineDeps, workerId: string, pool: Poo
           last_error_message=$3, updated_at=now() ${fenced}`, [d.id, d.fence, `The provider confirmed this was not published (${result.reason}). Retrying is safe.`]);
       await end('not_published', 'not_published_confirmed', result.reason);
       state = 'failed';
+    } else if (result.kind === 'handoff') {
+      // Manual handoff: keep checking hourly (does not count toward the Unknown auto-check cap).
+      await tx.query(`UPDATE deliveries SET state='handoff', ${release}, needs_reconcile=true, next_attempt_at=now() + interval '1 hour',
+          last_error_code='manual_handoff', last_error_message=$3, updated_at=now() ${fenced}`, [d.id, d.fence, result.reason]);
+      await end('handoff', 'manual_handoff', result.reason, result.providerIds);
+      state = 'handoff';
     } else if (result.kind === 'unsupported') {
       await tx.query(`UPDATE deliveries SET ${release}, needs_reconcile=false, last_error_code='manual_review_required',
           last_error_message=$3, updated_at=now() ${fenced}`, [d.id, d.fence, `${result.reason} Check the channel and mark this result as published or not published.`]);

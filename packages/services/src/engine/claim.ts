@@ -13,6 +13,8 @@ export interface ClaimedDelivery {
   attempt_count: number; max_attempts: number; lease_owner: string; lease_expires_at: Date; fence: string;
   preparation: { step: string; data: Record<string, unknown>; expiresAt?: string | null } | null;
   provider_ids: string[]; unknown_since: Date | null;
+  /** V3: 'app' (default) or 'provider' (provider-held release, e.g. YouTube publishAt). */
+  scheduling_owner?: string | null;
 }
 
 export async function dispatchEnabled(db: Queryable = getPool()): Promise<boolean> {
@@ -22,7 +24,7 @@ export async function dispatchEnabled(db: Queryable = getPool()): Promise<boolea
 
 const CLAIM_RETURNING = `id, workspace_id, brand_id, post_id, schedule_id, generation, revision_id, variant_id, connection_id, provider, is_mock,
   state, phase, due_at, publish_before, next_attempt_at, attempt_count, max_attempts, lease_owner, lease_expires_at, fence::text AS fence,
-  preparation, provider_ids, unknown_since`;
+  preparation, provider_ids, unknown_since, scheduling_owner`;
 
 /**
  * Claim the next due delivery (or a specific one). Eligible: Scheduled/RetryWait due now, or Processing due a status check.

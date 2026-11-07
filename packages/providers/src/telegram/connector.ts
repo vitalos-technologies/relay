@@ -102,8 +102,8 @@ async function verify(ctx: AdapterContext, p: { botToken: string; channel: strin
       chat_type: chat.type,
       existing_webhook_preserved: webhookPreserved,
       webhook_note: webhookPreserved
-        ? 'This bot already has a webhook. Social Lite only sends messages and left the existing webhook unchanged.'
-        : 'Social Lite only sends messages; it does not read or change the bot\'s updates.',
+        ? 'This bot already has a webhook. Relay only sends messages and left the existing webhook unchanged.'
+        : 'Relay only sends messages; it does not read or change the bot\'s updates.',
     },
     health,
   };

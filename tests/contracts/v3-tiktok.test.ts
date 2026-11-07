@@ -188,7 +188,8 @@ describe('tiktok photo posts and inbox (draft) handoff', () => {
     const out = await tiktokAdapter.publish(s.ctx, inp, checkpoint);
     expect(out.kind).toBe('processing');
     const rec = await tiktokAdapter.reconcile(s.ctx, { deliveryId: 'd', connection: c, credentials: inp.credentials, variantText: '', providerIds: (out as { providerIds: string[] }).providerIds, checkpoint: null, sentAt: null });
-    expect(rec).toEqual({ kind: 'still_unknown', reason: TIKTOK_INBOX_HANDOFF });
+    // V3 engine: an explicit manual-handoff outcome (known state; never 'published', never ambiguous 'unknown').
+    expect(rec).toEqual({ kind: 'handoff', reason: TIKTOK_INBOX_HANDOFF, providerIds: (out as { providerIds: string[] }).providerIds.slice(0, 1) });
   });
 });
 

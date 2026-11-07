@@ -43,7 +43,7 @@ export const DISPATCHABLE_CONNECTION_STATUSES: ReadonlySet<ConnectionStatus> = n
 
 export const DELIVERY_STATES = [
   'scheduled', 'preparing', 'publishing', 'processing', 'retry_wait', 'published',
-  'failed', 'blocked', 'paused', 'cancelled', 'expired', 'unknown',
+  'failed', 'blocked', 'paused', 'cancelled', 'expired', 'unknown', 'handoff',
 ] as const;
 export type DeliveryState = (typeof DELIVERY_STATES)[number];
 

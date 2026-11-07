@@ -92,8 +92,11 @@ export function validateVariant(v: ValidateVariantInput): ValidationResult {
   const isAlbum = v.media.length > 1;
   const maxVideos = c.maxVideos ?? 0;
 
-  if (c.requiresMedia && !hasMedia) add('media', 'media_required', 'an image is required. Add an image or remove this destination.');
-  if (!hasMedia && !c.supportsTextOnly) add('media', 'text_only_unsupported', 'text-only posts are not supported. Add an image.');
+  // Name the media the destination actually accepts (YouTube/TikTok are video-only).
+  const acceptsImages = c.maxImages > 0 && c.imageMimes.length > 0;
+  const needed = acceptsImages && maxVideos > 0 ? 'an image or video' : maxVideos > 0 ? 'a video' : 'an image';
+  if (c.requiresMedia && !hasMedia) add('media', 'media_required', `${needed} is required. Add ${needed} or remove this destination.`);
+  else if (!hasMedia && !c.supportsTextOnly) add('media', 'text_only_unsupported', `text-only posts are not supported. Add ${needed}.`);
   if (videos > 0 && maxVideos <= 0) {
     add('media', 'video_unsupported', 'videos are not supported for this destination. Remove the video or deselect it.');
   } else if (videos > 0 && isAlbum && !c.albumAllowsVideo) {

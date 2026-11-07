@@ -148,7 +148,9 @@ export type PublishOutcome =
   | { kind: 'processing'; providerIds: string[]; checkAfterMs: number; checkpoint?: Checkpoint }
   | { kind: 'rejected_safe_to_retry'; code: string; message: string; retryAfterMs?: number }
   | { kind: 'permanent_failure'; code: string; message: string; blocking?: BlockingReason }
-  | { kind: 'unknown'; code: string; message: string; providerIds?: string[] };
+  | { kind: 'unknown'; code: string; message: string; providerIds?: string[] }
+  /** V3: the provider holds a draft a person must finish in the native app (manual handoff). Not published. */
+  | { kind: 'handoff'; code: string; message: string; providerIds?: string[] };
 
 export interface AttemptReference {
   deliveryId: string;
@@ -167,6 +169,7 @@ export type ReconcileOutcome =
   | { kind: 'processing'; checkAfterMs: number }
   | { kind: 'not_published'; reason: string }
   | { kind: 'still_unknown'; reason: string }
+  | { kind: 'handoff'; reason: string; providerIds?: string[] }
   | { kind: 'unsupported'; reason: string };
 
 export interface ConnectionHealth {

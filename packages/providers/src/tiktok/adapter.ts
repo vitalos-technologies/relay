@@ -319,7 +319,7 @@ async function reconcile(ctx: AdapterContext, ref: AttemptReference): Promise<Re
     case 'FAILED':
       return { kind: 'not_published', reason: `TikTok could not post this (${data.fail_reason ?? 'unknown reason'}).` };
     case 'SEND_TO_USER_INBOX':
-      return { kind: 'still_unknown', reason: TIKTOK_INBOX_HANDOFF };
+      return { kind: 'handoff', reason: TIKTOK_INBOX_HANDOFF, providerIds: [publishId] };
     case 'PROCESSING_UPLOAD':
     case 'PROCESSING_DOWNLOAD':
       return { kind: 'processing', checkAfterMs: 15_000 };
@@ -361,7 +361,7 @@ export function tiktokManualHandoff(input: Pick<PublishInput, 'variant' | 'media
     caption: input.variant.text,
     media: input.media.map((m) => ({ url: m.url, mime: m.mime })),
     openUrl: 'https://www.tiktok.com/upload',
-    instructions: 'Download the media, open the TikTok app, create the post and paste the caption. Social Lite does not publish this automatically.',
+    instructions: 'Download the media, open the TikTok app, create the post and paste the caption. Relay does not publish this automatically.',
   };
 }
 

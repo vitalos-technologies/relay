@@ -98,8 +98,9 @@ function validate(input: Pick<PublishInput, 'variant' | 'media' | 'connection'>)
   }
   if (o.schedulingOwner === 'provider') {
     const at = typeof o.publishAt === 'string' ? Date.parse(o.publishAt) : NaN;
-    if (!nativeAllowed(input.connection)) add('schedule', 'youtube_native_schedule_unavailable', 'YouTube-held scheduling needs the "manage videos" permission (to be able to cancel it on pause). Reconnect, or let Social Lite publish at the time.');
-    if (!Number.isFinite(at)) add('schedule', 'youtube_publish_at_required', 'pick the YouTube release time.');
+    if (!nativeAllowed(input.connection)) add('schedule', 'youtube_native_schedule_unavailable', 'YouTube-held scheduling needs the "manage videos" permission (to be able to cancel it on pause). Reconnect, or let Relay publish at the time.');
+    // publishAt is supplied by the engine from Relay's schedule (engine/provider-scheduling.ts); only a malformed value is an error.
+    if (o.publishAt != null && !Number.isFinite(at)) add('schedule', 'youtube_publish_at_invalid', 'the YouTube release time is not a valid date. Reschedule the post.');
     if (o.privacyStatus && o.privacyStatus !== 'public') add('schedule', 'youtube_publish_at_public_only', 'a YouTube-held release makes the video public at that time; choose Public.');
   }
   return { ok: issues.length === 0, issues };
@@ -288,7 +289,7 @@ async function cancelRemoteSchedule(ctx: AdapterContext, ref: AttemptReference):
   const id = ref.providerIds[0] ?? sessionOf(ref.checkpoint)?.videoId ?? null;
   if (!id) return { kind: 'uncertain', message: 'No YouTube video id is known for this delivery; if the upload completed, the scheduled release may still happen. Check YouTube Studio.' };
   const scopes = grantedScopes(ref.credentials);
-  if (scopes.length && !scopes.includes(YT_SCOPE_FORCE_SSL)) return { kind: 'unsupported', message: 'Social Lite lacks permission to edit this video; cancel the scheduled release in YouTube Studio.' };
+  if (scopes.length && !scopes.includes(YT_SCOPE_FORCE_SSL)) return { kind: 'unsupported', message: 'Relay lacks permission to edit this video; cancel the scheduled release in YouTube Studio.' };
   const token = oauthAccessToken(ref.credentials, 'YouTube');
   let scheduledFor: string | null = null;
   try {

@@ -11,6 +11,7 @@ export * from './mock-store.js';
 export * from './engine/hooks.js';
 export * from './engine/claim.js';
 export * from './engine/process.js';
+export * from './engine/provider-scheduling.js';
 export * from './engine/reconcile.js';
 export * from './engine/manual.js';
 export * from './engine/budget.js';

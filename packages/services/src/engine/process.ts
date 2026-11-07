@@ -11,6 +11,7 @@ import { blockDeliveriesForConnection } from './hooks.js';
 import { fencedUpdate, heartbeat, type ClaimedDelivery } from './claim.js';
 import { checkAndConsumeBudget, budgetMeterFor } from './budget.js';
 import { recordCircuit } from './circuit.js';
+import { MIN_PROVIDER_LEAD_MS, providerScheduledOptions } from './provider-scheduling.js';
 import { cropsFromOptions, type CropSpec } from '../crops/index.js';
 import { approvalGate } from '../posts/approval-policy.js';
 import { AUTHORITY_HOLD, checkPublicationAuthority } from './authority.js';
@@ -111,7 +112,7 @@ async function settle(pool: Pool, d: ClaimedDelivery, p: {
        provider_url=coalesce($10, provider_url), published_at=coalesce($11, published_at),
        preparation = CASE WHEN $12::jsonb IS NULL THEN preparation ELSE $12::jsonb END, blocked_reason=$13,
        unknown_since = CASE WHEN $4='unknown' THEN coalesce(unknown_since, now()) ELSE unknown_since END,
-       needs_reconcile = ($4='unknown')`,
+       needs_reconcile = ($4 IN ('unknown','handoff'))`,
       [p.state, p.phase ?? 'idle', p.code ?? null, p.message ?? null, p.nextAttemptAt ?? null, p.providerIds ?? null, p.url ?? null,
         p.publishedAt ?? null, p.checkpoint ? JSON.stringify(p.checkpoint) : null, p.blockedReason ?? null], p.extraWhere ?? '');
     if (!ok) return false;
@@ -182,7 +183,8 @@ async function buildInput(pool: Pool, deps: EngineDeps, d: ClaimedDelivery, cred
   return {
     deliveryId: d.id, attemptNumber: d.attempt_count, idempotencyKey: `${d.id}:${d.generation}`, connection, credentials,
     // V1.1: the format follows the media actually attached (image/album/video/reel), not the snapshot's count-only guess.
-    variant: { text: v.rendered_text, link: v.link, format: media.length ? deriveFormat(d.provider, media.map(mediaKindOf)) : v.format, buttons: v.buttons ?? [], options: v.options ?? {} }, media,
+    variant: { text: v.rendered_text, link: v.link, format: media.length ? deriveFormat(d.provider, media.map(mediaKindOf)) : v.format, buttons: v.buttons ?? [],
+      options: providerScheduledOptions(v.options ?? {}, d.scheduling_owner, d.due_at) }, media,
   };
 }
 
@@ -190,6 +192,17 @@ async function buildInput(pool: Pool, deps: EngineDeps, d: ClaimedDelivery, cred
 export async function processDelivery(deps: EngineDeps, d: ClaimedDelivery, pool: Pool = getPool()): Promise<string> {
   try {
     if (d.prior_state === 'processing') return await pollProcessing(deps, d, pool);
+    // V3: provider-held release needs lead time; otherwise fall back to app-owned publication AT the due time.
+    if (d.scheduling_owner === 'provider' && d.due_at.getTime() - Date.now() < MIN_PROVIDER_LEAD_MS) {
+      await pool.query(`UPDATE deliveries SET scheduling_owner='app', remote_schedule=jsonb_build_object('fallback', true, 'reason', 'insufficient_lead', 'at', now()) WHERE id=$1`, [d.id]);
+      d.scheduling_owner = 'app';
+      if (d.due_at.getTime() > Date.now()) {
+        await settle(pool, d, { state: 'scheduled', code: 'provider_schedule_fallback', message: 'Not enough time for a YouTube-held release; Relay will publish at the scheduled time instead.',
+          nextAttemptAt: d.due_at, attemptOutcome: 'pending' });
+        await pool.query(`UPDATE deliveries SET attempt_count=greatest(attempt_count-1,0) WHERE id=$1`, [d.id]);
+        return 'scheduled';
+      }
+    }
     const g = await gate(pool, d);
     if (!g.ok) {
       await settle(pool, d, { state: g.state, code: g.code, message: g.message, blockedReason: g.state === 'blocked' ? g.message : null, attemptOutcome: 'gated' });
@@ -292,6 +305,11 @@ async function applyPublishOutcome(pool: Pool, d: ClaimedDelivery, out: PublishO
     case 'permanent_failure':
       await handlePermanent(pool, d, out);
       return out.blocking ? 'blocked' : 'failed';
+    case 'handoff':
+      ok = await settle(pool, d, { state: 'handoff', code: out.code, message: out.message, providerIds: out.providerIds,
+        nextAttemptAt: new Date(Date.now() + 60 * 60_000), attemptOutcome: 'handoff' });
+      if (!ok && out.providerIds?.length) await recordLateResult(pool, d, out.providerIds, 'Manual handoff result after claim was lost.');
+      return 'handoff';
     case 'unknown':
       await circuit(pool, d, false);
       ok = await settle(pool, d, { state: 'unknown', code: out.code, message: `${out.message} We will check with the provider before doing anything else.`,
@@ -344,6 +362,12 @@ async function pollProcessing(deps: EngineDeps, d: ClaimedDelivery, pool: Pool):
     }
     await settle(pool, d, { state: 'unknown', code: 'processing_timeout', message: 'The provider has not finished processing after 2 hours.', nextAttemptAt: new Date(Date.now() + 300_000), attemptOutcome: 'unknown', extraWhere: extra });
     return 'unknown';
+  }
+  if (r.kind === 'handoff') {
+    // Known state (not ambiguous): a person must finish the post in the provider's app. Keep checking hourly.
+    await settle(pool, d, { state: 'handoff', code: 'manual_handoff', message: r.reason, providerIds: r.providerIds,
+      nextAttemptAt: new Date(Date.now() + 60 * 60_000), attemptOutcome: 'handoff', extraWhere: extra });
+    return 'handoff';
   }
   if (r.kind === 'not_published') {
     await settle(pool, d, { state: 'failed', code: 'provider_processing_failed', message: `The provider did not publish this post: ${r.reason}`, attemptOutcome: 'permanent', extraWhere: extra });

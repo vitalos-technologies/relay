@@ -91,7 +91,7 @@ export async function resolveDelivery(ctx: Ctx, deliveryId: string, input: { out
     const brand = await assertBrand(ctx, d0.brand_id, tx);
     if (!mayPublish(ctx, brand.id)) throw new AppError('forbidden', 'You cannot resolve publications for this brand');
     const d = await one<{ state: string; lease_owner: string | null; workspace_id: string; schedule_id: string; post_id: string; brand_id: string }>(tx, `SELECT * FROM deliveries WHERE id=$1 FOR UPDATE`, [deliveryId]);
-    if (d.state !== 'unknown') throw new AppError('invalid_state', 'Only results that are Unknown can be resolved manually.');
+    if (d.state !== 'unknown' && d.state !== 'handoff') throw new AppError('invalid_state', 'Only Unknown or Manual handoff results can be resolved manually.');
     if (d.lease_owner) throw new AppError('invalid_state', 'An automatic check is running. Try again in a minute.');
     const published = input.outcome === 'published';
     await tx.query(

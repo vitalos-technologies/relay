@@ -8,6 +8,7 @@ import { getPool, many, maybeOne, one, withTx, type Queryable } from '@social-li
 import type { Ctx } from '../context.js';
 import { audit } from '../audit.js';
 import { writeOutbox } from '../outbox.js';
+import { applyProviderSchedulingOwner } from '../engine/provider-scheduling.js';
 import { assertBrand, assertUuid, authorizeCtx, brandAllowed, requireAction, type BrandRow } from '../tenancy.js';
 import { recordPublicationAuthority } from '../engine/authority.js';
 import { beginIdempotent, completeIdempotent } from '../idempotency.js';
@@ -103,6 +104,8 @@ async function insertDeliveries(tx: Queryable, ctx: Ctx, schedule: { id: string;
         schedule.due_at, schedule.publish_before]);
     await writeOutbox(tx, { workspaceId: ctx.access.workspaceId, aggregateType: 'delivery', aggregateId: d.id, eventType: 'delivery.due', availableAt: schedule.due_at });
   }
+  // V3: YouTube-held releases are dispatched early with publishAt = due time (engine/provider-scheduling.ts).
+  await applyProviderSchedulingOwner(tx, schedule.id);
 }
 
 type Mode = 'timed' | 'immediate' | 'submit';

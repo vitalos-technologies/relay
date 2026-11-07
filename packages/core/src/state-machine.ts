@@ -7,12 +7,14 @@ const ACTIVE: DeliveryState[] = ['scheduled', 'preparing', 'publishing', 'proces
 const T: Record<DeliveryState, DeliveryState[]> = {
   scheduled: ['preparing', 'blocked', 'paused', 'cancelled', 'expired', 'failed'],
   preparing: ['publishing', 'retry_wait', 'scheduled', 'processing', 'blocked', 'paused', 'cancelled', 'expired', 'failed'],
-  publishing: ['published', 'processing', 'unknown', 'retry_wait', 'failed', 'blocked'],
-  processing: ['published', 'unknown', 'failed', 'processing', 'cancelled' /* V3: provider-held release cancelled on pause */],
+  publishing: ['published', 'processing', 'unknown', 'retry_wait', 'failed', 'blocked', 'handoff'],
+  processing: ['published', 'unknown', 'failed', 'processing', 'cancelled' /* V3: provider-held release cancelled on pause */, 'handoff'],
   retry_wait: ['scheduled', 'preparing', 'failed', 'expired', 'cancelled', 'paused', 'blocked'],
   blocked: ['scheduled', 'cancelled', 'expired', 'failed'],
   paused: ['scheduled', 'cancelled', 'expired'],
-  unknown: ['published', 'failed', 'scheduled' /* manual retry with duplicate-risk ack */],
+  unknown: ['published', 'failed', 'scheduled' /* manual retry with duplicate-risk ack */, 'handoff'],
+  // V3: draft delivered to the creator's native app; a person finishes it there (or we observe it posted).
+  handoff: ['published', 'failed', 'handoff'],
   published: [],
   failed: ['scheduled' /* manual retry */],
   cancelled: [],
@@ -43,7 +45,7 @@ export function aggregateStatus(states: DeliveryState[]): PostAggregateStatus {
   if (states.length === 0) return 'draft';
   const n = (s: DeliveryState) => states.filter((x) => x === s).length;
   const published = n('published');
-  const attention = n('unknown') + n('blocked');
+  const attention = n('unknown') + n('blocked') + n('handoff');
   const failed = n('failed') + n('expired');
   const inFlight = n('preparing') + n('publishing') + n('processing') + n('retry_wait');
   const waiting = n('scheduled') + n('paused');
@@ -61,5 +63,5 @@ export function aggregateStatus(states: DeliveryState[]): PostAggregateStatus {
 export const DELIVERY_STATE_LABEL: Record<DeliveryState, string> = {
   scheduled: 'Scheduled', preparing: 'Preparing', publishing: 'Publishing', processing: 'Processing',
   retry_wait: 'Retrying soon', published: 'Published', failed: 'Failed', blocked: 'Blocked',
-  paused: 'Paused', cancelled: 'Cancelled', expired: 'Expired', unknown: 'Unknown — needs review',
+  paused: 'Paused', cancelled: 'Cancelled', expired: 'Expired', unknown: 'Unknown — needs review', handoff: 'Manual handoff',
 };

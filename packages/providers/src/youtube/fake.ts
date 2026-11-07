@@ -37,7 +37,7 @@ export const youtubeFake: FakeHandler = async (req: HttpRequest, env: FakeEnv): 
     const resource = parseJson(body) as Upload['resource'];
     if (!Number.isFinite(total) || total <= 0 || !req.headers?.['x-upload-content-type']) return gErr(400, 'badRequest', 'X-Upload-Content-Length and X-Upload-Content-Type are required');
     if (!resource.snippet?.title) return gErr(400, 'invalidTitle', 'The request metadata specifies an invalid or empty video title.');
-    if (!resource.status?.privacyStatus) return gErr(400, 'invalidVideoMetadata', 'privacyStatus missing (Social Lite always sends it)');
+    if (!resource.status?.privacyStatus) return gErr(400, 'invalidVideoMetadata', 'privacyStatus missing (Relay always sends it)');
     if (resource.status.publishAt && resource.status.privacyStatus !== 'private') return gErr(400, 'invalidPublishAt', 'publishAt requires privacyStatus private');
     if (env.scenario === 'rate_limited_once' && await once(env, 'init')) return gErr(403, 'rateLimitExceeded', 'Rate limit exceeded');
     const id = env.newId('mock_up_');

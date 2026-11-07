@@ -62,7 +62,8 @@ describe('youtube required fields and capabilities', () => {
     expect(v(yt({ title: 'x'.repeat(101) }))).toContain('youtube_title_too_long');
     expect(v(yt(), conn(), 'a < b')).toContain('youtube_angle_brackets');
     expect(v(yt(), conn(), 'é'.repeat(2600))).toContain('too_long');
-    expect(v(yt({ privacyStatus: 'public', schedulingOwner: 'provider' }))).toContain('youtube_publish_at_required');
+    expect(v(yt({ privacyStatus: 'public', schedulingOwner: 'provider' }))).toEqual([]); // publishAt comes from Relay's schedule at dispatch
+    expect(v(yt({ privacyStatus: 'public', schedulingOwner: 'provider', publishAt: 'not a date' }))).toContain('youtube_publish_at_invalid');
     expect(v(yt({ privacyStatus: 'public', schedulingOwner: 'provider', publishAt: '2026-11-08T10:00:00Z' }))).toEqual([]);
     expect(v(yt({ privacyStatus: 'public', schedulingOwner: 'provider', publishAt: '2026-11-08T10:00:00Z' }), conn({ metadata: { native_scheduling: false } }))).toContain('youtube_native_schedule_unavailable');
     expect(youtubeAdapter.validate(inputOf(conn(), creds, { options: yt() })).issues.map((i) => i.code)).toContain('youtube_video_required');

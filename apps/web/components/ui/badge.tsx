@@ -2,8 +2,7 @@ import type { ReactNode } from 'react';
 import {
   Ban, CalendarClock, CircleCheck, CircleExclamationPoint, CircleQuestionMark, CircleX, Clock, ClockExclamationPoint,
   FlaskConical, Hourglass, Link2Off, LoaderCircle, OctagonX, Pause, RotateCcwClock, ShieldExclamationPoint, SquarePen,
-  TimerOff, TriangleExclamationPoint, Unplug, type LucideIcon,
-} from 'lucide-react';
+  TimerOff, TriangleExclamationPoint, Unplug, Hand, type LucideIcon } from 'lucide-react';
 import { CONNECTION_STATUS_LABEL, DELIVERY_STATE_LABEL, type ConnectionStatus, type DeliveryState, type PostAggregateStatus } from '@social-lite/core';
 import { cn } from './cn';
 import type { Tone } from './feedback';
@@ -47,6 +46,7 @@ const DELIVERY: Record<DeliveryState, { Icon: LucideIcon; tone: Tone; spin?: boo
   cancelled: { Icon: CircleX, tone: 'neutral' },
   expired: { Icon: TimerOff, tone: 'danger' },
   unknown: { Icon: CircleQuestionMark, tone: 'warn' },
+  handoff: { Icon: Hand, tone: 'warn' },
 };
 
 /** Delivery state with icon + text. Simulated destinations never say "Published". */
