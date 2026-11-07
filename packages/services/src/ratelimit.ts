@@ -1,8 +1,8 @@
-// In-process token-bucket rate limiter.
-// NOTE: state is per Node.js process. With N web replicas the effective limit is N× the
-// configured rate, and limits reset on restart. That is acceptable as an abuse brake for auth
-// and upload-intent endpoints; a shared store (e.g. Postgres/Redis) is needed for strict quotas.
+// Token-bucket rate limiting. enforceRateLimit uses a SHARED PostgreSQL store (one row per key,
+// updated atomically under a row lock), so limits hold across web replicas and restarts.
+// The in-process RateLimiter class remains for unit tests and as a pure algorithm reference.
 import { AppError } from '@social-lite/core';
+import { getPool, withTx } from '@social-lite/db';
 
 export interface RateLimitPolicy {
   /** Bucket size (burst). */
@@ -65,11 +65,25 @@ const shared = new RateLimiter();
 
 export function rateLimiter(): RateLimiter { return shared; }
 
-/** Throw 429 rate_limited when the key has exhausted its bucket. */
-export function enforceRateLimit(scope: keyof typeof RATE_LIMITS | string, key: string, policy?: RateLimitPolicy): void {
+/** Atomically take `cost` tokens from the shared bucket. */
+export async function takeShared(key: string, p: RateLimitPolicy, cost = 1): Promise<{ allowed: boolean; retryAfterMs: number }> {
+  return withTx(async (tx) => {
+    await tx.query(`INSERT INTO rate_limit_buckets(key, tokens) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING`, [key, p.capacity]);
+    const r = await tx.query<{ refilled: number }>(
+      `SELECT least($2::float8, tokens + extract(epoch FROM (clock_timestamp() - updated_at)) * $3::float8) AS refilled
+         FROM rate_limit_buckets WHERE key=$1 FOR UPDATE`, [key, p.capacity, p.refillPerSecond]);
+    const refilled = Number(r.rows[0]!.refilled);
+    const allowed = refilled >= cost;
+    await tx.query(`UPDATE rate_limit_buckets SET tokens=$2, updated_at=clock_timestamp() WHERE key=$1`, [key, allowed ? refilled - cost : refilled]);
+    return { allowed, retryAfterMs: allowed ? 0 : Math.ceil(((cost - refilled) / p.refillPerSecond) * 1000) };
+  }, getPool());
+}
+
+/** Throw 429 rate_limited when the key has exhausted its (shared) bucket. */
+export async function enforceRateLimit(scope: keyof typeof RATE_LIMITS | string, key: string, policy?: RateLimitPolicy): Promise<void> {
   const p = policy ?? (RATE_LIMITS as Record<string, RateLimitPolicy>)[scope];
   if (!p) throw new Error(`unknown rate limit scope ${scope}`);
-  const r = shared.take(`${scope}:${key}`, p);
+  const r = await takeShared(`${scope}:${key}`.slice(0, 300), p);
   if (!r.allowed) {
     throw new AppError('rate_limited', 'Too many requests. Please wait a moment and try again.', undefined,
       { retry_after_seconds: Math.ceil(r.retryAfterMs / 1000) });

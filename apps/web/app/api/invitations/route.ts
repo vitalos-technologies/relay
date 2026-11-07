@@ -17,7 +17,7 @@ const body = z.object({
 
 export const POST = route(async ({ req, ctx }) => {
   const input = await parseJson(req, body);
-  enforceRateLimit('invitationCreate', ctx.actor.userId);
+  await enforceRateLimit('invitationCreate', ctx.actor.userId);
   const r = await createInvitation(ctx, input, idempotencyKey(req));
   return NextResponse.json(r.body, { status: r.status, headers: { 'cache-control': 'no-store' } });
 });

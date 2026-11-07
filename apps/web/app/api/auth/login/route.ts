@@ -12,7 +12,7 @@ export const runtime = 'nodejs';
 export const GET = publicRoute(async ({ req, correlationId }) => {
   const base = config().APP_BASE_URL;
   try {
-    enforceRateLimit('authLogin', clientIp(req.headers));
+    await enforceRateLimit('authLogin', clientIp(req.headers));
     const sp = req.nextUrl.searchParams;
     const { authorizationUrl, binding } = await startLogin({ returnTo: sp.get('returnTo'), invite: sp.get('invite') });
     const res = NextResponse.redirect(authorizationUrl, 302);

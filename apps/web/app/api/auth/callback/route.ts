@@ -16,7 +16,7 @@ export const GET = publicRoute(async ({ req, correlationId }) => {
   const secure = config().APP_ENV === 'production';
   let res: NextResponse;
   try {
-    enforceRateLimit('authCallback', clientIp(req.headers));
+    await enforceRateLimit('authCallback', clientIp(req.headers));
     const ip = clientIp(req.headers);
     const result = await completeLogin(req.nextUrl.searchParams, {
       binding: req.cookies.get(LOGIN_BINDING_COOKIE)?.value, userAgent: req.headers.get('user-agent'), ip: ip === 'unknown' ? null : ip,

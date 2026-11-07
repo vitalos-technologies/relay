@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export const GET = publicRoute(async ({ req }) => {
-  enforceRateLimit('invitationPreview', clientIp(req.headers));
+  await enforceRateLimit('invitationPreview', clientIp(req.headers));
   const preview = await previewInvitation(req.nextUrl.searchParams.get('token') ?? '');
   return NextResponse.json(preview, { headers: { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } });
 });

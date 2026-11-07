@@ -132,18 +132,25 @@ describe('rate limiter (per process)', () => {
     expect([1, 2, 3, 4].map(() => rl.take('ip:1', policy).allowed)).toEqual([true, true, true, false]); // capped at capacity
   });
 
-  it('enforceRateLimit throws 429 rate_limited with retry_after', () => {
+  it('enforceRateLimit (shared Postgres store) throws 429 rate_limited with retry_after', async () => {
     const key = `test-${Math.random()}`;
     const policy = { capacity: 2, refillPerSecond: 0.01 };
-    enforceRateLimit('custom', key, policy);
-    enforceRateLimit('custom', key, policy);
+    await enforceRateLimit('custom', key, policy);
+    await enforceRateLimit('custom', key, policy);
     try {
-      enforceRateLimit('custom', key, policy);
+      await enforceRateLimit('custom', key, policy);
       expect.unreachable();
     } catch (e) {
       expect(e).toMatchObject({ code: 'rate_limited', status: 429 });
       expect((e as { details: { retry_after_seconds: number } }).details.retry_after_seconds).toBeGreaterThan(0);
     }
+  });
+
+  it('shared limiter is exact under concurrency (simulates several web replicas)', async () => {
+    const key = `conc-${Math.random()}`;
+    const policy = { capacity: 5, refillPerSecond: 0.001 };
+    const results = await Promise.allSettled(Array.from({ length: 20 }, () => enforceRateLimit('custom', key, policy)));
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(5);
   });
 
   it('derives the client IP from the first X-Forwarded-For hop', () => {

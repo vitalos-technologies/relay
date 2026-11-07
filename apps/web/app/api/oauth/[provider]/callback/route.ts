@@ -14,7 +14,7 @@ export const GET = publicRoute<{ provider: string }>(async ({ req, params, corre
   const base = config().APP_BASE_URL;
   let location: string;
   try {
-    enforceRateLimit('oauthCallback', clientIp(req.headers), { capacity: 30, refillPerSecond: 30 / 60 });
+    await enforceRateLimit('oauthCallback', clientIp(req.headers), { capacity: 30, refillPerSecond: 30 / 60 });
     const session = await currentSession();
     const r = await handleOAuthCallback({ provider: params.provider, params: req.nextUrl.searchParams, sessionUserId: session?.actor.userId ?? null });
     if (r.error) log.warn('oauth_connect_refused', { correlationId, provider: params.provider, code: r.error });

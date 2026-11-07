@@ -17,6 +17,6 @@ const body = z.object({
 
 export const POST = route(async ({ req, ctx }) => {
   const input = await parseJson(req, body);
-  enforceRateLimit('uploadIntent', ctx.actor.userId);
+  await enforceRateLimit('uploadIntent', ctx.actor.userId);
   return createUploadIntent(ctx, input);
 });

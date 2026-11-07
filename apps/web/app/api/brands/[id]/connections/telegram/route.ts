@@ -8,6 +8,6 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export const POST = route<{ id: string }>(async ({ req, ctx, params }) => {
-  enforceRateLimit('telegramConnect', `${ctx.actor.userId}:${clientIp(req.headers)}`, { capacity: 10, refillPerSecond: 10 / 600 });
+  await enforceRateLimit('telegramConnect', `${ctx.actor.userId}:${clientIp(req.headers)}`, { capacity: 10, refillPerSecond: 10 / 600 });
   return connectTelegram(ctx, params.id, await parseJson(req, telegramConnectSchema));
 });
