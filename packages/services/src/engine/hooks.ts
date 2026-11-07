@@ -75,8 +75,8 @@ export async function onConnectionRestored(db: Queryable, connectionId: string):
       WHERE connection_id=$1 AND state='blocked' AND publish_before <= now()`, [connectionId]);
   const restored = await db.query(
     `UPDATE deliveries SET state='scheduled', blocked_reason=NULL, next_attempt_at=greatest(next_attempt_at, now()), updated_at=now()
-      WHERE connection_id=$1 AND state='blocked' AND coalesce(last_error_code, '') <> 'authority_hold' RETURNING id, workspace_id`, [connectionId]);
-  // (authority_hold: released only by adoption — engine/authority.ts — never by a reconnect)
+      WHERE connection_id=$1 AND state='blocked' AND coalesce(last_error_code, '') NOT IN ('authority_hold', 'brand_rule_review') RETURNING id, workspace_id`, [connectionId]);
+  // (authority_hold: released only by adoption — engine/authority.ts; brand_rule_review: only by a review decision — never by a reconnect)
   for (const row of restored.rows as Array<{ id: string; workspace_id: string }>) {
     await writeOutbox(db, { workspaceId: row.workspace_id, aggregateType: 'delivery', aggregateId: row.id, eventType: 'delivery.due' });
   }

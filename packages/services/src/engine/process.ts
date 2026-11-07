@@ -38,6 +38,26 @@ interface GateRow {
   approval_required: boolean; approved: boolean; publish_before: Date; state: string;
 }
 
+export const BRAND_RULE_HOLD = 'brand_rule_review';
+
+async function brandRuleHold(db: Queryable, d: ClaimedDelivery): Promise<boolean> {
+  const r = await maybeOne<{ held: boolean }>(db,
+    `SELECT EXISTS (SELECT 1 FROM brand_rule_reviews WHERE post_id=$1 AND kind='schedule' AND mandatory_count > 0
+                      AND (schedule_id IS NULL OR schedule_id=$2)
+                      AND (status='open' OR (status='decided' AND decision='will_edit'))) held`, [d.post_id, d.schedule_id]);
+  return !!r?.held;
+}
+
+/** Release deliveries held by a brand-rule review once a person decided to keep the schedule (same transaction). */
+export async function releaseBrandRuleHold(db: Queryable, scheduleId: string): Promise<number> {
+  const r = await db.query<{ id: string; workspace_id: string }>(
+    `UPDATE deliveries SET state='scheduled', blocked_reason=NULL, last_error_code=NULL, last_error_message=NULL,
+            next_attempt_at=greatest(next_attempt_at, now()), updated_at=now()
+      WHERE schedule_id=$1 AND state='blocked' AND last_error_code='${'brand_rule_review'}' AND publish_before > now() RETURNING id, workspace_id`, [scheduleId]);
+  for (const row of r.rows) await writeOutbox(db, { workspaceId: row.workspace_id, aggregateType: 'delivery', aggregateId: row.id, eventType: 'delivery.due' });
+  return r.rowCount ?? 0;
+}
+
 type GateResult = { ok: true } | { ok: false; state: 'paused' | 'blocked' | 'cancelled' | 'expired'; code: string; message: string };
 
 async function gate(db: Queryable, d: ClaimedDelivery): Promise<GateResult> {
@@ -74,6 +94,11 @@ async function gate(db: Queryable, d: ClaimedDelivery): Promise<GateResult> {
   // V2 publication authority (engine/authority.ts): scheduler/approvers revalidated; failure HOLDS (fails closed).
   const auth = await checkPublicationAuthority(db, d);
   if (!auth.ok) return { ok: false, state: 'blocked', code: AUTHORITY_HOLD, message: auth.message };
+  // V3.1 brand rules (gov/brand-rules.ts): a mandatory rule changed after scheduling ⇒ HOLD until a person decides.
+  // 'keep' releases it (gov → releaseBrandRuleHold); 'will_edit' keeps it held (the edit replaces the schedule).
+  if (await brandRuleHold(db, d)) {
+    return { ok: false, state: 'blocked', code: BRAND_RULE_HOLD, message: 'A brand rule changed after this was scheduled. Review it in Brand rules; it publishes once someone keeps it.' };
+  }
   return { ok: true };
 }
 

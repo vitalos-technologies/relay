@@ -15,6 +15,7 @@ import { brandConnections } from '../posts/shared.js';
 import { cancelSchedule } from '../posts/scheduling.js';
 import { draftText, tipsignalEventSchema } from '../tipsignal.js';
 import { evaluateBrandRules, normaliseDomain, splitFindings, type AssetGovernanceFacts, type RuleInput, type TipsignalFacts, type VariantInput } from './rules-engine.js';
+import { releaseBrandRuleHold } from '../engine/process.js';
 
 export const AFFECTED_SCAN_LIMIT = 500;
 
@@ -382,6 +383,8 @@ export async function decideRuleReview(ctx: Ctx, reviewId: string, raw: unknown)
     const u = await tx.query(`UPDATE brand_rule_reviews SET status='decided', decision=$2, decided_by=$3, decided_at=now(), note=$4 WHERE id=$1 AND status='open'`,
       [r.id, input.decision, ctx.actor.userId, input.note ?? null]);
     if (!u.rowCount) throw new AppError('conflict', 'This review changed meanwhile. Reload.');
+    // Keeping the schedule releases deliveries the engine held for this review (engine/process.ts BRAND_RULE_HOLD).
+    if (input.decision === 'keep' && r.schedule_id) await releaseBrandRuleHold(tx, r.schedule_id);
     await audit(tx, { workspaceId: ctx.access.workspaceId, brandId: r.brand_id, actorUserId: ctx.actor.userId, action: 'brand_rule.review_decided', resourceType: 'post', resourceId: r.post_id,
       diff: { review_id: r.id, decision: input.decision, mandatory: r.mandatory_count, advisory: r.advisory_count, rules_version: r.rules_version, schedule_id: r.schedule_id }, correlationId: ctx.correlationId });
   });
