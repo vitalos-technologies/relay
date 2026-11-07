@@ -15,19 +15,21 @@ interface UnknownRow {
 }
 
 /** Claim one Unknown delivery due for reconciliation (lease prevents concurrent reconcilers). */
-async function claimUnknown(pool: Pool, workerId: string): Promise<UnknownRow | null> {
+async function claimUnknown(pool: Pool, workerId: string, deliveryId: string | null = null): Promise<UnknownRow | null> {
   return withTx(async (tx) => {
     const row = await maybeOne<UnknownRow>(tx,
       `UPDATE deliveries SET lease_owner=$1, lease_expires_at=now() + interval '60 seconds', fence=fence+1, updated_at=now()
         WHERE id = (SELECT id FROM deliveries WHERE state IN ('unknown','handoff') AND needs_reconcile AND next_attempt_at <= now()
-                      AND (lease_owner IS NULL OR lease_expires_at < now()) ORDER BY next_attempt_at LIMIT 1 FOR UPDATE SKIP LOCKED)
-        RETURNING id, workspace_id, schedule_id, post_id, connection_id, provider, is_mock, variant_id, provider_ids, preparation, unknown_since, fence::text AS fence`, [workerId]);
+                      AND (lease_owner IS NULL OR lease_expires_at < now()) AND ($2::uuid IS NULL OR id = $2::uuid)
+                      ORDER BY next_attempt_at LIMIT 1 FOR UPDATE SKIP LOCKED)
+        RETURNING id, workspace_id, schedule_id, post_id, connection_id, provider, is_mock, variant_id, provider_ids, preparation, unknown_since, fence::text AS fence`, [workerId, deliveryId]);
     return row;
   }, pool);
 }
 
-export async function reconcileOne(deps: EngineDeps, workerId: string, pool: Pool = getPool()): Promise<string | null> {
-  const d = await claimUnknown(pool, workerId);
+/** Reconcile the next due Unknown/handoff delivery (or only `opts.deliveryId`, used by tests and targeted checks). */
+export async function reconcileOne(deps: EngineDeps, workerId: string, pool: Pool = getPool(), opts: { deliveryId?: string } = {}): Promise<string | null> {
+  const d = await claimUnknown(pool, workerId, opts.deliveryId ?? null);
   if (!d) return null;
   const release = `lease_owner=NULL, lease_expires_at=NULL`;
   const n = await one<{ n: number }>(pool, `SELECT count(*)::int n FROM delivery_attempts WHERE delivery_id=$1 AND kind='reconcile'`, [d.id]);
