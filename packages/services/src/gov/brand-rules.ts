@@ -152,10 +152,14 @@ export async function checkPostBrandRules(ctx: Ctx, postId: string, raw: unknown
  * Server-side enforcement used by submit/schedule/publish (posts/scheduling.ts): mandatory findings refuse the
  * request with validation_failed + details.brand_rules. Advisory findings never block.
  */
-export async function enforceBrandRules(tx: Queryable, ctx: Ctx, post: PostRow, connectionIds: string[], at: Date): Promise<void> {
+/**
+ * Mandatory brand rules refuse the action. `revisionId`: check that saved revision's content (reschedule moves an
+ * existing revision, not the current draft); otherwise the post's draft for `connectionIds`.
+ */
+export async function enforceBrandRules(tx: Queryable, ctx: Ctx, post: PostRow, connectionIds: string[], at: Date, opts: { revisionId?: string } = {}): Promise<void> {
   const brand = await maybeOne<BrandRow>(tx, `SELECT * FROM brands WHERE id=$1 AND workspace_id=$2`, [post.brand_id, ctx.access.workspaceId]);
   if (!brand) throw notFound('Brand');
-  const variants = await draftVariants(tx, ctx.access.workspaceId, post, connectionIds);
+  const variants = opts.revisionId ? await revisionVariants(tx, opts.revisionId) : await draftVariants(tx, ctx.access.workspaceId, post, connectionIds);
   const { findings, version } = await evaluate(tx, ctx.access.workspaceId, brand, post, variants, at);
   const s = splitFindings(findings);
   if (s.mandatory.length) {

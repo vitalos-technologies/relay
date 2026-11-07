@@ -3,7 +3,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, describe, expect, it } from 'vitest';
 import { toLocalInput } from '@social-lite/core';
-import { claimDelivery, createPost, processDelivery, schedulePost } from '@social-lite/services';
+import { claimDelivery, createPost, processDelivery, reschedule, schedulePost } from '@social-lite/services';
 import { createBrandRule, decideRuleReview, listRuleReviews } from '@social-lite/services/gov/brand-rules';
 import { closeTestPool, tenant, testPool } from './helpers.js';
 import { scriptedWorld, seedConnections } from './engine-helpers.js';
@@ -48,5 +48,19 @@ describe('brand-rule review hold', () => {
     expect(await processDelivery(world.deps, (await claimDelivery('w', { deliveryId: keepDelivery }))!)).toBe('published');
     expect(world.publishCalls.size).toBe(1);
     expect((await state(editId)).state).toBe('blocked');
+  });
+
+  it('reschedule re-checks mandatory brand rules against the scheduled revision', async () => {
+    const t = await tenant();
+    const conns = await seedConnections(t.workspaceId, t.brandId);
+    const { id } = await createPost(t.ownerCtx, t.brandId, { draft: { baseText: 'Big deals today', baseLink: null, baseAssetIds: [], variants: [{ connectionId: conns.facebook, inheritText: true, inheritMedia: true }] } }, randomUUID());
+    await schedulePost(t.ownerCtx, id, { expected_version: 1, connection_ids: [conns.facebook], input_local_time: toLocalInput(new Date(Date.now() + 3600_000), 'Europe/London'), timezone: 'Europe/London' }, randomUUID());
+    const s = (await testPool().query<{ id: string; generation: number }>(`SELECT id, generation FROM schedules WHERE post_id=$1 AND status='active'`, [id])).rows[0]!;
+    await createBrandRule(t.ownerCtx, t.brandId, { kind: 'prohibited_phrase', value: 'deals', severity: 'mandatory' });
+    await expect(reschedule(t.ownerCtx, s.id, { input_local_time: toLocalInput(new Date(Date.now() + 7200_000), 'Europe/London'), timezone: 'Europe/London', expected_generation: s.generation }, randomUUID()))
+      .rejects.toMatchObject({ code: 'validation_failed', details: { reason: 'brand_rules' } });
+    // nothing moved: the original schedule is still the live one
+    const live = (await testPool().query(`SELECT id FROM schedules WHERE post_id=$1 AND status='active'`, [id])).rows;
+    expect(live.map((r) => r.id)).toEqual([s.id]);
   });
 });

@@ -167,7 +167,19 @@ async function postEligibility(db: Queryable, ctx: Ctx, action: string, params: 
     case 'reschedule': {
       if (p.archived_at) return no('archived', 'Archived.');
       const s = await liveSchedule(db, p.id);
-      if (!s) return no('not_scheduled', 'Not scheduled.');
+      if (!s) {
+        // Say why: already published/sent, cancelled, or never scheduled (a draft).
+        const last = await maybeOne<{ status: string; published: number; finished: number }>(db,
+          `SELECT s.status, count(d.*) FILTER (WHERE d.state='published')::int published,
+                  count(d.*) FILTER (WHERE d.state IN ('failed','expired','cancelled','unknown','handoff'))::int finished
+             FROM schedules s LEFT JOIN deliveries d ON d.schedule_id=s.id
+            WHERE s.post_id=$1 GROUP BY s.id, s.status, s.generation ORDER BY s.generation DESC LIMIT 1`, [p.id]);
+        if (!last) return no('draft', 'Draft — never scheduled.');
+        if (last.published > 0) return no('published', 'Already published.');
+        if (last.status === 'cancelled') return no('cancelled', 'Schedule was cancelled.');
+        if (last.finished > 0) return no('finished', 'Already sent or finished.');
+        return no('not_scheduled', 'Not scheduled.');
+      }
       if (s.started > 0) return no('publishing', 'Publishing has already started.');
       if (!cache.approval.has(p.brand_id)) cache.approval.set(p.brand_id, await approvalRequiredFor(db, ctx.access.workspaceId, p.brand_id));
       const needsApproval = cache.approval.get(p.brand_id)!;

@@ -388,6 +388,8 @@ export async function reschedule(ctx: Ctx, scheduleId: string, input: { input_lo
     const time = resolveScheduleTime({ input_local_time: input.input_local_time, timezone: input.timezone ?? s.input_timezone, offset: input.offset,
       deadline_minutes: input.deadline_minutes ?? Math.round((s.publish_before.getTime() - s.due_at.getTime()) / 60_000) }, brand, 'timed');
     const variants = await many<{ id: string; connection_id: string }>(tx, `SELECT id, connection_id FROM variants WHERE revision_id=$1`, [s.revision_id]);
+    // V3.1: mandatory brand rules (and asset expiry at the NEW time) apply to the revision being moved.
+    await enforceBrandRules(tx, ctx, post, variants.map((v) => v.connection_id), time.dueAt, { revisionId: s.revision_id });
     await supersedeLive(tx, post.id);
     const gen = await one<{ schedule_generation: number }>(tx, `UPDATE posts SET schedule_generation=schedule_generation+1 WHERE id=$1 RETURNING schedule_generation`, [post.id]);
     const ids = variants.map((v) => v.connection_id);

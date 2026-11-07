@@ -17,10 +17,10 @@ const TITLES: Record<OnboardingStepKey, string> = {
   invite_teammates: 'Invite teammates', create_draft: 'Create a draft', schedule_first_post: 'Review and schedule your first post',
 };
 const HREF: Record<OnboardingStepKey, { label: string; href: string }> = {
-  workspace: { label: 'Workspace settings', href: '/settings?tab=workspace' }, brand: { label: 'Add a brand', href: '/settings?tab=brand' },
-  brand_defaults: { label: 'Open brand settings', href: '/settings?tab=brand' }, connect_destination: { label: 'Connect an account', href: '/accounts' },
-  invite_teammates: { label: 'Invite people', href: '/settings?tab=team' }, create_draft: { label: 'New post', href: '/compose' },
-  schedule_first_post: { label: 'Open your draft', href: '/posts' },
+  workspace: { label: 'Workspace settings', href: '/settings/workspace/general' }, brand: { label: 'Add a brand', href: '/settings/workspace/branding' },
+  brand_defaults: { label: 'Open brand settings', href: '/settings/workspace/branding' }, connect_destination: { label: 'Connect an account', href: '/settings/connections/social' },
+  invite_teammates: { label: 'Invite people', href: '/team/invitations' }, create_draft: { label: 'New post', href: '/compose' },
+  schedule_first_post: { label: 'Open your draft', href: '/compose' },
 };
 
 async function brandIdsWith(ctx: Ctx, perm: Parameters<typeof authorizeCtx>[1], db: Queryable): Promise<string[]> {
