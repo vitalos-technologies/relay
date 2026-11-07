@@ -57,6 +57,22 @@ export async function addMember(workspaceId: string, userId: string, role: Role,
   for (const b of brandIds ?? []) {
     await testPool().query(`INSERT INTO membership_brand_grants(workspace_id, user_id, brand_id) VALUES ($1,$2,$3)`, [workspaceId, userId, b]);
   }
+  // V2: authority comes from scoped grants (same mapping as the V1 backfill in migration 009).
+  if (!brandIds || role === 'owner' || role === 'admin') {
+    await testPool().query(`INSERT INTO scoped_role_grants(workspace_id, principal_type, user_id, role, scope_type, source) VALUES ($1,'user',$2,$3,'workspace','test')`, [workspaceId, userId, role]);
+  } else {
+    for (const b of brandIds) {
+      await testPool().query(`INSERT INTO scoped_role_grants(workspace_id, principal_type, user_id, role, scope_type, brand_id, source) VALUES ($1,'user',$2,$3,'brand',$4,'test')`, [workspaceId, userId, role, b]);
+    }
+  }
+}
+
+/** V2 grant helper. */
+export async function grant(workspaceId: string, userId: string, role: string, brandId?: string, expiresAt?: Date): Promise<string> {
+  const r = await testPool().query<{ id: string }>(
+    `INSERT INTO scoped_role_grants(workspace_id, principal_type, user_id, role, scope_type, brand_id, expires_at, source)
+     VALUES ($1,'user',$2,$3,$4,$5,$6,'test') RETURNING id`, [workspaceId, userId, role, brandId ? 'brand' : 'workspace', brandId ?? null, expiresAt ?? null]);
+  return r.rows[0]!.id;
 }
 
 export async function createBrand(workspaceId: string, name = 'Test Brand', opts: { approvalRequired?: boolean; editorsCanPublish?: boolean } = {}): Promise<string> {

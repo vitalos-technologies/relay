@@ -107,7 +107,8 @@ export function route<P = Record<string, string>>(handler: Handler<P>, opts: Rou
         return toResponse(await handler({ req, params: await segment.params, ctx, session: resolved.session, correlationId }), correlationId);
       }
       if (!workspaceId) throw new AppError('forbidden', 'You are not a member of any workspace yet');
-      const access = await loadAccess(resolved.actor.userId, workspaceId);
+      const access = await loadAccess(resolved.actor.userId, workspaceId, undefined,
+        { mfaVerified: resolved.session.mfaVerified, authTime: resolved.session.authTime?.toISOString() ?? null });
       if (!access) throw new AppError('forbidden', 'You no longer have access to this workspace');
       const ctx: Ctx = { actor: resolved.actor, access, correlationId };
       return toResponse(await handler({ req, params: await segment.params, ctx, session: resolved.session, correlationId }), correlationId);

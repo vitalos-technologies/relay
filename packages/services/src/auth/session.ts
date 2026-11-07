@@ -18,9 +18,12 @@ export interface SessionRecord {
   csrfToken: string;
   activeWorkspaceId: string | null;
   expiresAt: Date;
+  /** Server-trusted assurance from the identity provider's ID token (acr/amr/auth_time). */
+  mfaVerified: boolean;
+  authTime: Date | null;
 }
 
-export async function createSession(db: Queryable, userId: string, meta: { userAgent?: string | null; ip?: string | null; workspaceId?: string | null }): Promise<{ token: string; session: SessionRecord }> {
+export async function createSession(db: Queryable, userId: string, meta: { userAgent?: string | null; ip?: string | null; workspaceId?: string | null; mfaVerified?: boolean; authTime?: Date | null; acr?: string | null; amr?: string[] }): Promise<{ token: string; session: SessionRecord }> {
   const token = randomToken();
   const csrf = randomToken(24);
   const expires = new Date(Date.now() + SESSION_TTL_MS);
@@ -31,10 +34,11 @@ export async function createSession(db: Queryable, userId: string, meta: { userA
     workspaceId = ws?.workspace_id ?? null;
   }
   const row = await maybeOne<{ id: string }>(db,
-    `INSERT INTO sessions(user_id, token_hash, csrf_token, active_workspace_id, expires_at, user_agent, ip)
-     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
-    [userId, sha256(token), csrf, workspaceId, expires, meta.userAgent?.slice(0, 300) ?? null, meta.ip ?? null]);
-  return { token, session: { id: row!.id, userId, csrfToken: csrf, activeWorkspaceId: workspaceId, expiresAt: expires } };
+    `INSERT INTO sessions(user_id, token_hash, csrf_token, active_workspace_id, expires_at, user_agent, ip, mfa_verified, auth_time, acr, amr)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
+    [userId, sha256(token), csrf, workspaceId, expires, meta.userAgent?.slice(0, 300) ?? null, meta.ip ?? null,
+      !!meta.mfaVerified, meta.authTime ?? null, meta.acr ?? null, meta.amr ?? []]);
+  return { token, session: { id: row!.id, userId, csrfToken: csrf, activeWorkspaceId: workspaceId, expiresAt: expires, mfaVerified: !!meta.mfaVerified, authTime: meta.authTime ?? null } };
 }
 
 export async function resolveSession(token: string | undefined | null): Promise<{ session: SessionRecord; actor: Actor } | null> {
@@ -42,9 +46,9 @@ export async function resolveSession(token: string | undefined | null): Promise<
   const db = getPool();
   const r = await maybeOne<{
     id: string; user_id: string; csrf_token: string; active_workspace_id: string | null; expires_at: Date; last_seen_at: Date;
-    email: string; name: string | null; disabled_at: Date | null;
+    email: string; name: string | null; disabled_at: Date | null; mfa_verified: boolean; auth_time: Date | null;
   }>(db,
-    `SELECT s.id, s.user_id, s.csrf_token, s.active_workspace_id, s.expires_at, s.last_seen_at, u.email, u.name, u.disabled_at
+    `SELECT s.id, s.user_id, s.csrf_token, s.active_workspace_id, s.expires_at, s.last_seen_at, u.email, u.name, u.disabled_at, s.mfa_verified, s.auth_time
        FROM sessions s JOIN users u ON u.id = s.user_id
       WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > now()`, [sha256(token)]);
   if (!r || r.disabled_at) return null;
@@ -56,7 +60,7 @@ export async function resolveSession(token: string | undefined | null): Promise<
     await db.query('UPDATE sessions SET last_seen_at = now() WHERE id = $1', [r.id]);
   }
   return {
-    session: { id: r.id, userId: r.user_id, csrfToken: r.csrf_token, activeWorkspaceId: r.active_workspace_id, expiresAt: r.expires_at },
+    session: { id: r.id, userId: r.user_id, csrfToken: r.csrf_token, activeWorkspaceId: r.active_workspace_id, expiresAt: r.expires_at, mfaVerified: r.mfa_verified, authTime: r.auth_time },
     actor: { userId: r.user_id, email: r.email, name: r.name, sessionId: r.id },
   };
 }

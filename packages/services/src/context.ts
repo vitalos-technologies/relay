@@ -1,6 +1,7 @@
 // Request/actor context passed into every service call. Services enforce authorization
 // themselves using this context; route handlers never bypass services for tenant data.
 import type { Role } from '@social-lite/core';
+import type { AuthzState } from './authz.js';
 
 export interface Actor {
   userId: string;
@@ -15,6 +16,8 @@ export interface WorkspaceAccess {
   /** null => all brands in the workspace; otherwise the explicit grant list. */
   brandIds: string[] | null;
   isDemo: boolean;
+  /** V2 policy state. Present for every real request (route() → loadAccess). Tests may omit it (legacy role matrix). */
+  authz?: AuthzState;
 }
 
 export interface Ctx {
