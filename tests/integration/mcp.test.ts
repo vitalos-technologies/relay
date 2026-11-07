@@ -13,6 +13,9 @@ import { confirmIntent, intentView } from '@social-lite/services/mcp/intents';
 import { downloadJob, runMcpJobs } from '@social-lite/services/mcp/jobs';
 import { Client, OAuthProtectedResourceMetadataSchema, StreamableHTTPClientTransport } from '@social-lite/services/mcp/sdk-client';
 import { createServiceAccount } from '@social-lite/services/service-accounts';
+import { connectTestSource } from '@social-lite/services/content-hub/connections';
+import { registerSelection } from '@social-lite/services/content-hub/items';
+import { runImport } from '@social-lite/services/content-hub/imports';
 import { addMember, closeTestPool, createBrand, createWorkspace, testPool, v2Ctx } from './helpers.js';
 import { seedConnections } from './engine-helpers.js';
 
@@ -300,9 +303,34 @@ describe('MCP drafts and review', () => {
     expect(long.version).toBe(3);
     expect(v2.ok).toBe(false);
     expect((v2.issues as Array<{ provider: string }>).some((i) => i.provider === 'x')).toBe(true);
-    // Content Hub is not available yet: explicit, documented error.
-    expect(err(await call(client, 'import_source_to_draft', { workspace_id: ws, brand_id: brandA, source_connection_id: randomUUID(), source_ref: 'doc-1', idempotency_key: 'imp-12345678' })).code)
-      .toBe('source_connections_unavailable');
+  });
+
+  it('Content Hub sources: list only user-selected items, preview, queue an import once, read its result', async () => {
+    const { client, ws, brandA, web } = await world();
+    // The user connects a (labelled test) Google source and selects one document in Relay.
+    const conn = await connectTestSource(web, { source: 'google', brand_id: brandA });
+    const sel = await registerSelection(web, { connection_id: conn.id, brand_id: brandA, items: [{ id: 'demoDoc000000000000001' }] });
+    const listed = ok(await call(client, 'list_sources', { workspace_id: ws, brand_id: brandA }));
+    expect((listed.items as Array<{ id: string }>).map((i) => i.id)).toEqual([sel.items[0]!.id]);
+    const pv = ok(await call(client, 'preview_source', { workspace_id: ws, source_item_id: sel.items[0]!.id }));
+    expect(pv.fingerprint).toMatch(/^[0-9a-f]{64}$/);
+    const sections = (pv.sections as Array<{ id: string }>).map((x) => x.id);
+    expect(sections.length).toBeGreaterThan(0);
+    // a stale fingerprint (source changed since preview) fails when the import runs; no draft is created
+    const stale = ok(await call(client, 'import_source_to_draft', { workspace_id: ws, source_item_id: sel.items[0]!.id, fingerprint: '0'.repeat(64), section_ids: [sections[0]], idempotency_key: 'imp-stale-1234' }));
+    await runImport(stale.import_id as string);
+    const staleDone = ok(await call(client, 'get_import_status', { workspace_id: ws, import_id: stale.import_id }));
+    expect(staleDone).toMatchObject({ status: 'failed', post_ids: [] });
+    expect(staleDone.error.code).toBeTruthy();
+    const args = { workspace_id: ws, source_item_id: sel.items[0]!.id, fingerprint: pv.fingerprint, section_ids: [sections[0]], idempotency_key: 'imp-12345678' };
+    const q1 = ok(await call(client, 'import_source_to_draft', args));
+    const q2 = ok(await call(client, 'import_source_to_draft', args));
+    expect(q2.import_id).toBe(q1.import_id); // retry never queues a second import
+    expect(ok(await call(client, 'get_import_status', { workspace_id: ws, import_id: q1.import_id })).status).toBe('queued');
+    await runImport(q1.import_id as string); // the worker's source-import job
+    const done = ok(await call(client, 'get_import_status', { workspace_id: ws, import_id: q1.import_id }));
+    expect(done.status).toBe('completed');
+    expect((done.post_ids as string[]).length).toBe(1);
   });
 
   it('paginates with bounded page sizes and bounded calendar ranges', async () => {

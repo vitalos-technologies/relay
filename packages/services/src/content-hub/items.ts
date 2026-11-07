@@ -19,6 +19,8 @@ import { isNotionId, normalizeNotionId, notionSearch, retrieveDataSource, retrie
 import { fetchNotionTree } from './notion-fetch.js';
 import { blockFile, pageTitle, parseNotionBlocks, richTextPlain, type TreeNode } from './notion-parse.js';
 import { SourceAccessError } from './transport.js';
+// Demo data for labelled non-production 'test' connections (inert in production: test connections cannot be created there).
+import './fakes.js';
 
 export interface SourceItemRow {
   id: string; workspace_id: string; brand_id: string; connection_id: string; parent_item_id: string | null; item_kind: SourceItemKind;

@@ -71,7 +71,10 @@ All take explicit ids (`workspace_id` from `list_workspaces` + brand/post/schedu
 | list_calendar | workspace_id, from, to (≤31 d), brand_id? | schedules in range |
 | create_draft | workspace_id, brand_id, text, title?, link?, connection_ids?, idempotency_key | post_id, version |
 | update_draft | workspace_id, post_id, expected_version, title?/text?/link?/connection_ids?, idempotency_key | new version (stale → version_conflict); invalidates intents |
-| import_source_to_draft | workspace_id, brand_id, source_connection_id, source_ref, title?, idempotency_key | `source_connections_unavailable` until Content Hub registers an importer (`mcp/ports.ts`) |
+| list_sources | workspace_id, brand_id | Google Docs/Drive files and Notion pages the user selected for the brand in Relay (MCP cannot browse beyond that selection) |
+| preview_source | workspace_id, source_item_id | title, fingerprint, sections (id, title, word_count, 280-char excerpt; untrusted), warnings |
+| import_source_to_draft | workspace_id, source_item_id, fingerprint, section_ids, combine?, connection_ids?, idempotency_key | import_id, status (queued); the worker runs it; a changed source fails it (preview again); retries return the same import |
+| get_import_status | workspace_id, import_id | status, post_ids, warnings, error |
 | validate_post | workspace_id, post_id, connection_ids? | ok, issues, per_destination (composer validation) |
 | submit_for_review | workspace_id, post_id, expected_version, connection_ids, local_time?, timezone?, offset?, idempotency_key | schedule (pending_approval), approval id |
 | get_review_status | workspace_id, post_id | review state |
