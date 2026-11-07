@@ -31,6 +31,7 @@ Product is now **Relay** (brand kit: docs/brand/relay-brand-kit.webp; decisions 
 - UX redesign stream (018) starts when V2-A finishes (A relaunched to finish CSP/scans/security UI/Keycloak test fixes; docs/v2-progress/A.md).
 - Lead V3 engine gaps DONE (commit 0c57bae): `handoff` delivery state (migration 019; TikTok inbox), YouTube early upload (engine/provider-scheduling.ts; 180 min early, publishAt = due time, <15 min lead → app-owned at due time). Tests: engine-handoff, v3-youtube-early-upload. Migration 019 applied to dev on its own (Home queries the handoff state); 015–017 still pending on dev — apply once AN/CH/MCP land (migrator locks checksums). Web /api/ready reports not_ready until then.
 - Lead V3 next: V3 docs (matrix, build status, gaps, activation).
+- UX redesign brief ready: `docs/queue/018_UX_REDESIGN_BRIEF.md` — launch as an agent when V2-A lands.
 
 ## Environment recovery
 
