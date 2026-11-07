@@ -1,6 +1,6 @@
 # V3 platform capabilities
 
-Relay's 10 social networks, as of 2026-11-07. Sources:
+Relay's 10 social networks, as of 2026-11-07 (`v3.0.0`). Sources:
 - the adapters' `capabilities()` (`packages/providers/src/<p>/adapter.ts`, `meta/common.ts`);
 - the provider register ([PROVIDER_CAPABILITIES.md](PROVIDER_CAPABILITIES.md));
 - [providers/*.md](providers/), with source URLs and fetch dates;
@@ -17,7 +17,7 @@ Contract tests (`tests/contracts/`):
 
 | Network | Tests |
 |---|---|
-| Meta (Instagram + Facebook) | 88 (`meta` 73, `meta-media` 15) |
+| Meta (Instagram + Facebook) | 89 (`meta` 74, `meta-media` 15) |
 | Telegram | 38 |
 | X | 40 |
 | TikTok | 35 |
@@ -68,8 +68,8 @@ None of the 10 adapters fetches account-level followers or audience data (`not_f
 
 | Network | Post metrics fetched | Needs | Notes |
 |---|---|---|---|
-| Instagram | views, reach, likes, comments, saves, shares, total interactions | `instagram_manage_insights` + `pages_read_engagement` | **Connect does not request `instagram_manage_insights`**: live data would show "permission missing" |
-| Facebook | media views, unique media views, clicks, reactions by type | `read_insights` + `pages_read_engagement` | **Connect does not request `read_insights`** |
+| Instagram | views, reach, likes, comments, saves, shares, total interactions | `instagram_manage_insights` + `pages_read_engagement` | Requested only when `META_REQUEST_INSIGHTS=true` (after Meta review); otherwise "permission missing" |
+| Facebook | media views, unique media views, clicks, reactions by type | `read_insights` + `pages_read_engagement` | Requested only when `META_REQUEST_INSIGHTS=true` (after Meta review) |
 | Telegram | none | – | Unsupported by provider (Bot API has no channel statistics); never shown as 0 |
 | X | impressions, likes, reposts, replies, quotes, bookmarks | `tweet.read users.read` | Billable reads, budget-metered (`limits.x_monthly_reads`) |
 | TikTok | views, likes, comments, shares | `video.list` | Public posts only; private/inbox posts have no public id, so metrics are unavailable |
