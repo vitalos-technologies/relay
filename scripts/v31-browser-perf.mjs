@@ -133,7 +133,7 @@ const warm = Object.fromEntries(NAV.map(([, k]) => [k, []]));
   for (let i = 0; i < RUNS + 1; i++) {
     for (const [label, key] of NAV) {
       const t0 = await page.evaluate(() => performance.now());
-      await page.getByRole('navigation', { name: 'Main' }).first().getByRole('link', { name: label, exact: true }).click();
+      await page.getByRole('navigation', { name: 'Main' }).first().getByRole('link', { name: new RegExp(`^${label}(,|$)`) }).first().click(); // "Approvals, 1 pending" when the badge shows
       await page.waitForFunction((l) => document.querySelector('main h1')?.textContent?.trim().startsWith(l === 'Content library' ? 'Content library' : l), label, { polling: 'raf', timeout: 30_000 });
       await page.waitForFunction(READY, null, { timeout: 30_000, polling: 'raf' });
       const t1 = await page.evaluate(() => performance.now());

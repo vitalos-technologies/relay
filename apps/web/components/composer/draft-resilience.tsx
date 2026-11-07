@@ -2,9 +2,10 @@
 // V3.1 §9 composer pieces: save status (Saving / Saved / Saved locally / Offline / Save failed / Edited elsewhere),
 // the recovery prompt for a copy kept in this browser, and the conflict dialog (yours vs server).
 // "Saved locally" means only this browser has it: it is never presented as saved.
-import { useState } from 'react';
-import { CircleCheck, CloudAlert, HardDrive, LoaderCircle, WifiOff } from 'lucide-react';
-import type { DraftContent } from '@social-lite/core';
+import { useEffect, useState } from 'react';
+import { Check, CircleCheck, CloudAlert, Copy, HardDrive, LoaderCircle, WifiOff } from 'lucide-react';
+import { changedFields, type DraftContent, type DraftField } from '@social-lite/core';
+import { diffWords } from '@/lib/client/diff';
 import type { DraftRecoveryStatus } from '@social-lite/core/contracts/v31-data';
 import { isApiError } from '@/lib/client/api';
 import { fmtRelative, fmtTime, zoneAbbr } from '@/lib/client/format';
@@ -131,22 +132,43 @@ export function RecoveryBanner({
 
 export interface ConflictCurrent { version?: number; updated_by?: string | null; updated_at?: string; title?: string | null; draft?: DraftContent }
 
-/** Yours vs server. Take theirs (yours stays in History) · Keep both (yours becomes a new draft) · Use mine. */
+const FIELD_LABEL: Record<DraftField, string> = {
+  title: 'Title', text: 'Text', link: 'Link', media: 'Media', destinations: 'Destinations', variants: 'Network versions', options: 'Publishing options',
+};
+
+/**
+ * Someone saved a newer version while you were editing. Nothing was overwritten. Choices:
+ *  - review the differences (field by field, theirs → yours);
+ *  - apply the selected parts of yours on top of the latest version (a normal optimistic save — re-checked by the server);
+ *  - keep yours as a new draft, or copy your text;
+ *  - discard yours (explicit, confirmed). Your version also stays in History as an unsaved copy.
+ */
 export function DraftConflictDialog({
-  open, onOpenChange, current, mine, onTakeTheirs, onKeepBoth, onUseMine, keptInHistory,
+  open, onOpenChange, current, mine, base, onTakeTheirs, onKeepBoth, onApplySelected, keptInHistory,
 }: {
   open: boolean; onOpenChange: (o: boolean) => void; current: ConflictCurrent | null;
   mine: { title: string; draft: DraftContent };
-  onTakeTheirs: () => Promise<void>; onKeepBoth: () => Promise<void>; onUseMine: () => Promise<void>;
+  /** The last version this tab saved or loaded: tells "you changed" from "they changed" (3-way). */
+  base?: { title: string; draft: DraftContent } | null;
+  onTakeTheirs: () => Promise<void>; onKeepBoth: () => Promise<void>; onApplySelected: (fields: DraftField[]) => Promise<void>;
   keptInHistory: boolean;
 }) {
-  const [busy, setBusy] = useState<'theirs' | 'both' | 'mine' | null>(null);
+  const [busy, setBusy] = useState<'theirs' | 'both' | 'apply' | null>(null);
   const [error, setError] = useState<unknown>(null);
-  const run = async (k: 'theirs' | 'both' | 'mine') => {
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const theirs = current?.draft;
+  const fields = theirs ? changedFields({ title: current?.title ?? '', draft: theirs }, { title: mine.title, draft: mine.draft }) : [];
+  const mineChanged = base ? changedFields(base, { title: mine.title, draft: mine.draft }) : fields;
+  const theirsChanged = base && theirs ? changedFields(base, { title: current?.title ?? '', draft: theirs }) : [];
+  const [chosen, setChosen] = useState<DraftField[]>([]);
+  // Default: keep only what YOU changed; their changes to other parts stay.
+  useEffect(() => { if (open) { setChosen(fields.filter((f) => mineChanged.includes(f))); setConfirmDiscard(false); setError(null); setCopied(false); } /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [open, current?.version]);
+  const run = async (k: 'theirs' | 'both' | 'apply') => {
     setBusy(k);
     setError(null);
     try {
-      await (k === 'theirs' ? onTakeTheirs() : k === 'both' ? onKeepBoth() : onUseMine());
+      await (k === 'theirs' ? onTakeTheirs() : k === 'both' ? onKeepBoth() : onApplySelected(chosen));
       onOpenChange(false);
     } catch (e) {
       setError(e);
@@ -154,51 +176,81 @@ export function DraftConflictDialog({
       setBusy(null);
     }
   };
-  const theirs = current?.draft;
+  const copyMine = async () => {
+    try { await navigator.clipboard.writeText([mine.title, mine.draft.baseText].filter(Boolean).join('\n\n')); setCopied(true); } catch { setCopied(false); }
+  };
   return (
     <Dialog
       open={open}
       onOpenChange={onOpenChange}
       busy={!!busy}
       size="lg"
-      title="Edited elsewhere"
-      description={keptInHistory ? 'Nothing was overwritten. Your version is also kept in History.' : 'Nothing was overwritten.'}
+      title="Someone else saved a newer version"
+      description={`Nothing was overwritten.${keptInHistory ? ' Your version is also kept in History.' : ''}`}
       footer={
-        <>
-          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={!!busy}>Later</Button>
-          {current?.version ? <Button variant="quiet" onClick={() => void run('mine')} loading={busy === 'mine'} disabled={!!busy && busy !== 'mine'}>Use mine</Button> : null}
-          <Button variant="secondary" onClick={() => void run('both')} loading={busy === 'both'} disabled={!!busy && busy !== 'both'}>Keep both</Button>
-          <Button variant="primary" onClick={() => void run('theirs')} loading={busy === 'theirs'} disabled={!!busy && busy !== 'theirs'}>Take theirs</Button>
-        </>
+        // Phones: full-width actions in priority order. Wider: one row, primary on the right.
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
+          {current?.version ? (
+            <Button variant="primary" className="max-sm:w-full sm:order-4" onClick={() => void run('apply')} loading={busy === 'apply'} disabled={!!busy && busy !== 'apply'}
+              disabledReason={!chosen.length ? 'Choose what to keep from your version.' : null}>Apply selected to latest</Button>
+          ) : null}
+          <Button variant="secondary" className="max-sm:w-full sm:order-3" onClick={() => void run('both')} loading={busy === 'both'} disabled={!!busy && busy !== 'both'}>Keep mine as new draft</Button>
+          <Button variant="ghost" className="max-sm:w-full sm:order-1" onClick={() => onOpenChange(false)} disabled={!!busy}>Later</Button>
+          {confirmDiscard ? (
+            <Button variant="danger" className="max-sm:w-full sm:order-2" onClick={() => void run('theirs')} loading={busy === 'theirs'} disabled={!!busy && busy !== 'theirs'}>Discard my changes</Button>
+          ) : (
+            <Button variant="quiet" className="max-sm:w-full sm:order-2" onClick={() => setConfirmDiscard(true)} disabled={!!busy}>Discard mine…</Button>
+          )}
+        </div>
       }
     >
-      <div className="grid gap-3 sm:grid-cols-2" data-testid="conflict-compare">
-        <Side label="Yours" meta="Not saved" title={mine.title} text={mine.draft.baseText} destinations={mine.draft.variants.length} />
-        <Side
-          label="Server"
-          meta={[current?.version ? `v${current.version}` : null, current?.updated_by ?? null, current?.updated_at ? fmtRelative(current.updated_at) : null].filter(Boolean).join(' · ')}
-          title={current?.title ?? ''}
-          text={theirs?.baseText ?? null}
-          destinations={theirs ? theirs.variants.length : null}
-        />
+      <div className="flex flex-col gap-3" data-testid="conflict-compare">
+        <p className="text-xs text-muted">
+          Latest: {[current?.version ? `v${current.version}` : null, current?.updated_by ?? null, current?.updated_at ? fmtRelative(current.updated_at) : null].filter(Boolean).join(' · ')}
+        </p>
+        {confirmDiscard ? <Banner tone="warn" title="Your unsaved changes will be dropped from this tab">They stay in History as an unsaved copy if the server kept one.</Banner> : null}
+        {!fields.length ? <p className="text-[13px] text-muted">Your version matches the latest. Nothing to merge.</p> : (
+          <fieldset className="flex flex-col gap-3">
+            <legend className="mb-1 text-[13px] font-medium">Keep from your version</legend>
+            {fields.map((f) => (
+              <div key={f} className="rounded-lg border border-border p-2.5">
+                <label className="flex items-center gap-2 text-[13px] font-medium">
+                  <input type="checkbox" className="size-4 accent-[var(--accent)]" checked={chosen.includes(f)}
+                    onChange={(e) => setChosen((c) => (e.target.checked ? [...c, f] : c.filter((x) => x !== f)))} />
+                  {FIELD_LABEL[f]}
+                  <span className="ml-auto text-xs font-normal text-muted">
+                    {mineChanged.includes(f) && theirsChanged.includes(f) ? 'Both changed' : mineChanged.includes(f) ? 'You changed' : theirsChanged.includes(f) ? 'They changed' : ''}
+                  </span>
+                </label>
+                <div className="mt-2">
+                  {f === 'title' ? <ConflictDiff before={current?.title ?? ''} after={mine.title} />
+                    : f === 'text' ? <ConflictDiff before={theirs?.baseText ?? ''} after={mine.draft.baseText} />
+                      : f === 'link' ? <p className="break-all text-xs text-muted">{theirs?.baseLink ?? 'none'} → {mine.draft.baseLink ?? 'none'}</p>
+                        : f === 'destinations' ? <p className="text-xs text-muted">{theirs?.variants.length ?? 0} → {mine.draft.variants.length} destinations</p>
+                          : <p className="text-xs text-muted">Different in your version</p>}
+                </div>
+              </div>
+            ))}
+          </fieldset>
+        )}
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="secondary" icon={copied ? <Check aria-hidden className="size-4" /> : <Copy aria-hidden className="size-4" />} onClick={() => void copyMine()}>{copied ? 'Copied' : 'Copy my text'}</Button>
+          <span className="text-xs text-muted">Unselected parts keep the latest version.</span>
+        </div>
       </div>
       {error ? <ErrorNotice error={error} className="mt-3" /> : null}
     </Dialog>
   );
 }
 
-function Side({ label, meta, title, text, destinations }: { label: string; meta: string; title: string; text: string | null; destinations: number | null }) {
+function ConflictDiff({ before, after }: { before: string; after: string }) {
   return (
-    <section className="flex min-w-0 flex-col gap-2 rounded-lg border border-border p-3" aria-label={label}>
-      <div className="flex items-baseline justify-between gap-2">
-        <h3 className="text-[13px] font-semibold">{label}</h3>
-        <span className="truncate text-xs text-muted">{meta}</span>
-      </div>
-      <p className="truncate text-[13px] font-medium">{title.trim() || 'Untitled post'}</p>
-      {text === null ? <p className="text-[13px] text-muted">—</p> : (
-        <p className="max-h-48 overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-sunken px-2.5 py-2 text-[13px] leading-relaxed">{text || <span className="text-muted">Empty</span>}</p>
-      )}
-      {destinations !== null ? <p className="text-xs text-muted">{destinations} destination{destinations === 1 ? '' : 's'}</p> : null}
-    </section>
+    <p className="max-h-40 overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-sunken px-2.5 py-2 text-[13px] leading-relaxed">
+      {diffWords(before, after).map((p, i, all) =>
+        p.kind === 'same' ? <span key={i}>{p.text}</span>
+          : p.kind === 'add' && all[i - 1]?.kind === 'del' ? <span key={i}><span aria-hidden> </span><ins className="rounded bg-success-soft text-success no-underline"><span className="sr-only">[yours: </span>{p.text}<span className="sr-only">]</span></ins></span>
+          : p.kind === 'add' ? <ins key={i} className="rounded bg-success-soft text-success no-underline"><span className="sr-only">[yours: </span>{p.text}<span className="sr-only">]</span></ins>
+            : <del key={i} className="rounded bg-danger-soft text-danger"><span className="sr-only">[latest: </span>{p.text}<span className="sr-only">]</span></del>)}
+    </p>
   );
 }

@@ -29,6 +29,7 @@ export const QUEUE_CLASS: Record<string, WorkloadClass> = {
   'analytics-report-export': 'report_export',
   'analytics-sync': 'analytics_refresh',
   'media-transcode': 'video',
+  'collab-notify': 'notifications',
 };
 
 function envInt(name: string, env: NodeJS.ProcessEnv): number | null {

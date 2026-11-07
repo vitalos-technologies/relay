@@ -5,7 +5,7 @@
 import {
   Activity, BadgeCheck, BookOpen, Building2, Cable, ChartColumn, CheckCheck, Cog, FileStack, Flag, Gauge, HandHelping, HeartPulse, KeyRound,
   LayoutDashboard, LifeBuoy, ListChecks, MessageSquareWarning, Plug, ScrollText, Send, ServerCog, ShieldCheck, Stethoscope, Tag, ToggleRight, UserCog, Users, UsersRound,
-  Webhook, Wrench, Workflow, type LucideIcon,
+  Webhook, Wrench, Workflow, MessagesSquare, UserRoundCog, BellRing, SlidersHorizontal, type LucideIcon,
 } from 'lucide-react';
 import type { Action, Permission } from '@social-lite/core';
 import { SETTINGS, itemAllowed, type Perms } from '@/components/settings-shell/registry';
@@ -47,6 +47,12 @@ export const WORKSPACE_NAV: AdminNavGroup[] = [
   { id: 'approvals', label: 'Approvals', icon: CheckCheck, items: [
     { href: '/admin/approvals', label: 'Backlog', icon: CheckCheck, visible: v2('content.read'), keywords: 'review pending decide' },
     settings('publishing', 'approvals'),
+  ] },
+  { id: 'collaboration', label: 'Collaboration', icon: MessagesSquare, items: [
+    { href: '/admin/collaboration', label: 'Overview', icon: MessagesSquare, visible: v2('content.read'), keywords: 'tasks overdue deadlines backlog discussions' },
+    { href: '/admin/collaboration/reassign', label: 'Reassign work', icon: UserRoundCog, visible: v2('members.manage'), keywords: 'offboarding leaver tasks reviews handover' },
+    { href: '/admin/collaboration/notifications', label: 'Notification delivery', icon: BellRing, visible: v2('workspace.manage'), keywords: 'email failed smtp digest diagnose' },
+    { href: '/admin/collaboration/settings', label: 'Collaboration settings', icon: SlidersHorizontal, visible: v2('workspace.manage'), keywords: 'client comments reminders presence defaults reviewers permissions' },
   ] },
   { id: 'content', label: 'Content and media', icon: FileStack, items: [
     { href: '/admin/content', label: 'Jobs and storage', icon: FileStack, visible: v2('content.read'), keywords: 'imports exports writeback media trash storage' },
@@ -106,6 +112,7 @@ export const PLATFORM_NAV: AdminNavGroup[] = [
   { id: 'p-ops', label: 'Operations', icon: Activity, items: [
     { href: '/admin/platform/rollouts', label: 'Rollouts', icon: Flag, visible: anyStaff, keywords: 'feature flags kill switch percent' },
     { href: '/admin/platform/integrations', label: 'Integrations', icon: ListChecks, visible: anyStaff, keywords: 'providers apps configured matrix' },
+    { href: '/admin/platform/collaboration', label: 'Collaboration pipeline', icon: MessagesSquare, visible: anyStaff, keywords: 'notifications email reminders outbox' },
   ] },
   { id: 'p-security', label: 'Security', icon: ShieldCheck, items: [
     { href: '/admin/platform/support', label: 'Support access', icon: LifeBuoy, visible: anyStaff, keywords: 'request time-boxed' },
@@ -119,7 +126,7 @@ export function visibleNav(groups: AdminNavGroup[], p: AdminPerms): AdminNavGrou
 }
 
 export function isActiveItem(pathname: string, item: AdminNavItem): boolean {
-  if (item.href === '/admin' || item.href === '/admin/platform') return pathname === item.href;
+  if (item.href === '/admin' || item.href === '/admin/platform' || item.href === '/admin/collaboration') return pathname === item.href;
   if (pathname === item.href || pathname.startsWith(`${item.href}/`)) return true;
   return (item.also ?? []).some((a) => pathname.startsWith(a));
 }

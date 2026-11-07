@@ -98,6 +98,10 @@ BEGIN
   IF to_regclass('public.platform_audit_events') IS NOT NULL THEN
     EXECUTE 'REVOKE UPDATE, DELETE, TRUNCATE ON platform_audit_events FROM socialite_app, socialite_worker';
   END IF;
+  -- Collaboration (027): task activity history is append-only for the same roles (cascades from task deletion run as owner).
+  IF to_regclass('public.collab_task_events') IS NOT NULL THEN
+    EXECUTE 'REVOKE UPDATE, DELETE, TRUNCATE ON collab_task_events FROM socialite_app, socialite_worker';
+  END IF;
 END $$;
 -- Migration bookkeeping is read-only outside the migrator.
 DO $$

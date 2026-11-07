@@ -8,13 +8,14 @@ import { AppError, isValidTimeZone, toLocalInput, type Permission } from '@socia
 import { getPool, many, maybeOne, type Queryable } from '@social-lite/db';
 import type { Ctx } from '../context.js';
 import { config } from '../config.js';
-import { sendMail } from '../email.js';
+import { mailer, sendMail } from '../email.js';
+import { emitCollabEvent } from './events.js';
 import { log } from '../log.js';
 import { assertUuid } from '../tenancy.js';
 import { authorize } from '../authz.js';
 import { entitledNow, staffAllowed, type Requirement } from './access.js';
 
-export const NOTIFICATION_EVENTS = ['mention', 'comment', 'review_requested', 'review_decided', 'assignment', 'publishing_problem', 'account_health', 'budget'] as const;
+export const NOTIFICATION_EVENTS = ['mention', 'comment', 'review_requested', 'review_decided', 'assignment', 'reminder', 'publishing_problem', 'account_health', 'budget'] as const;
 export type NotificationEvent = (typeof NOTIFICATION_EVENTS)[number];
 
 export interface Channels { in_app: boolean; email: boolean; digest: boolean }
@@ -25,6 +26,7 @@ export const DEFAULT_CHANNELS: Record<NotificationEvent, Channels> = {
   review_requested: { in_app: true, email: true, digest: false },
   review_decided: { in_app: true, email: false, digest: false },
   assignment: { in_app: true, email: true, digest: false },
+  reminder: { in_app: true, email: false, digest: false },
   publishing_problem: { in_app: true, email: true, digest: false },
   account_health: { in_app: true, email: true, digest: false },
   budget: { in_app: true, email: true, digest: false },
@@ -38,7 +40,8 @@ export function eventTypeForKind(kind: string): NotificationEvent {
   if (kind === 'approval.requested') return 'review_requested';
   if (kind.startsWith('approval.')) return 'review_decided';
   if (kind === 'mention') return 'mention';
-  if (kind === 'assignment') return 'assignment';
+  if (kind === 'assignment' || kind.startsWith('task.')) return kind.startsWith('task.reminder') ? 'reminder' : 'assignment';
+  if (kind.startsWith('reminder')) return 'reminder';
   return 'comment';
 }
 
@@ -49,9 +52,18 @@ async function settingsFor(db: Queryable, workspaceId: string, userId: string): 
   return s ?? { timezone: 'UTC', quiet_start: null, quiet_end: null, digest_hour: 8, last_digest_at: null };
 }
 
+/** The member's own choice, else the workspace default (admin), else the product default. */
 async function channelsFor(db: Queryable, workspaceId: string, userId: string, ev: NotificationEvent): Promise<Channels> {
   const p = await maybeOne<Channels>(db, `SELECT in_app, email, digest FROM notification_preferences WHERE workspace_id=$1 AND user_id=$2 AND event_type=$3`, [workspaceId, userId, ev]);
-  return p ?? DEFAULT_CHANNELS[ev];
+  if (p) return p;
+  return workspaceDefault(db, workspaceId, ev);
+}
+
+export async function workspaceDefault(db: Queryable, workspaceId: string, ev: NotificationEvent): Promise<Channels> {
+  const w = await maybeOne<{ d: Partial<Channels> | null }>(db, `SELECT notification_defaults->$2 AS d FROM workspace_collab_settings WHERE workspace_id=$1`, [workspaceId, ev]);
+  const base = DEFAULT_CHANNELS[ev];
+  if (!w?.d) return base;
+  return { in_app: w.d.in_app ?? base.in_app, email: w.d.email ?? base.email, digest: w.d.digest ?? base.digest };
 }
 
 function localMinutes(now: Date, tz: string): number {
@@ -74,6 +86,8 @@ export interface CollabNotification {
   workspaceId: string; userId: string; event: NotificationEvent; severity?: 'info' | 'warning' | 'critical';
   kind: string; title: string; body?: string | null; referenceType: string; referenceId: string; dedupeKey: string;
   requirement: Requirement;
+  /** Relative deep link (thread / task / review). Never carries content. */
+  linkPath?: string | null; actorId?: string | null;
 }
 
 export type DeliverResult = 'created' | 'duplicate' | 'not_entitled' | 'muted';
@@ -88,13 +102,14 @@ export async function deliverNotification(db: Queryable, n: CollabNotification, 
   const emailState = ch.email ? 'pending' : ch.digest ? 'digest' : 'none';
   const r = await maybeOne<{ id: string }>(db,
     `INSERT INTO notifications(workspace_id, user_id, severity, kind, title, body, reference_type, reference_id, dedupe_key,
-                               event_type, brand_id, required_permission, in_app, email_state, email_after)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+                               event_type, brand_id, required_permission, in_app, email_state, email_after, link_path, actor_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
      ON CONFLICT (user_id, dedupe_key) DO NOTHING RETURNING id`,
     [n.workspaceId, n.userId, n.severity ?? 'info', n.kind, n.title.slice(0, 200), n.body?.slice(0, 500) ?? null, n.referenceType, n.referenceId, n.dedupeKey,
       n.event, n.requirement.brandId, n.requirement.permission === 'review.shared' ? `review.shared:${n.requirement.postId ?? ''}` : n.requirement.permission,
-      ch.in_app, emailState, emailState === 'pending' ? (quiet ?? now) : null]);
+      ch.in_app, emailState, emailState === 'pending' ? (quiet ?? now) : null, safeLinkPath(n.linkPath), n.actorId ?? null]);
   if (!r) return 'duplicate';
+  if (ch.in_app) await emitCollabEvent(db, { workspaceId: n.workspaceId, audience: 'user', userId: n.userId, kind: 'notification', refId: r.id });
   if (emailState === 'pending' && !quiet) await sendNotificationEmail(db, r.id);
   return 'created';
 }
@@ -105,8 +120,15 @@ function parseRequirement(row: { brand_id: string | null; required_permission: s
   return { brandId: row.brand_id, permission: row.required_permission as Permission };
 }
 
-function linkFor(row: { reference_type: string | null; reference_id: string | null }): string {
+/** Relative in-app path only ("/x/..."); anything else is dropped. */
+export function safeLinkPath(p: string | null | undefined): string | null {
+  if (!p || typeof p !== 'string' || p.length > 300 || !/^\/[A-Za-z0-9]/.test(p) || p.startsWith('//') || /[\s\\]/.test(p)) return null;
+  return p;
+}
+
+function linkFor(row: { reference_type: string | null; reference_id: string | null; link_path?: string | null }): string {
   const base = config().APP_BASE_URL;
+  if (row.link_path && safeLinkPath(row.link_path)) return `${base}${row.link_path}`;
   switch (row.reference_type) {
     case 'post': return `${base}/posts/${row.reference_id}`;
     case 'approval': return `${base}/approvals/${row.reference_id}`;
@@ -116,22 +138,41 @@ function linkFor(row: { reference_type: string | null; reference_id: string | nu
   }
 }
 
-/** Send one pending email after re-checking entitlement (delayed sends included). Minimal content only. */
-export async function sendNotificationEmail(db: Queryable, id: string): Promise<'sent' | 'skipped' | 'failed'> {
-  const row = await maybeOne<{ id: string; workspace_id: string; user_id: string; title: string; reference_type: string | null; reference_id: string | null;
-    brand_id: string | null; required_permission: string | null; email_state: string; email: string; critical_security: boolean }>(db,
-    `SELECT n.id, n.workspace_id, n.user_id, n.title, n.reference_type, n.reference_id, n.brand_id, n.required_permission, n.email_state, u.email, n.critical_security
+const EMAIL_MAX_ATTEMPTS = 3;
+
+/**
+ * Send one pending email after re-checking entitlement (delayed sends included). Minimal content only: the generic
+ * title + a link (never comment text, post text or task details). Without SMTP the row becomes 'not_configured' —
+ * never 'sent'; in-app delivery is unaffected. A refused send is retried with backoff, then marked 'failed'.
+ */
+export async function sendNotificationEmail(db: Queryable, id: string): Promise<'sent' | 'skipped' | 'failed' | 'not_configured' | 'retry'> {
+  const row = await maybeOne<{ id: string; workspace_id: string; user_id: string; title: string; reference_type: string | null; reference_id: string | null; link_path: string | null;
+    brand_id: string | null; required_permission: string | null; email_state: string; email: string; critical_security: boolean; email_attempts: number }>(db,
+    `SELECT n.id, n.workspace_id, n.user_id, n.title, n.reference_type, n.reference_id, n.link_path, n.brand_id, n.required_permission, n.email_state, u.email, n.critical_security, n.email_attempts
        FROM notifications n JOIN users u ON u.id=n.user_id WHERE n.id=$1`, [id]);
   if (!row || row.email_state !== 'pending') return 'skipped';
   const req = parseRequirement(row);
   const member = await maybeOne(db, `SELECT 1 FROM memberships WHERE workspace_id=$1 AND user_id=$2 AND status='active' AND removed_at IS NULL`, [row.workspace_id, row.user_id]);
   if (!member || (req && !(await entitledNow(db, row.workspace_id, row.user_id, req)))) {
-    await db.query(`UPDATE notifications SET email_state='skipped' WHERE id=$1`, [id]);
+    await db.query(`UPDATE notifications SET email_state='skipped', email_error='recipient_not_entitled' WHERE id=$1`, [id]);
     return 'skipped';
   }
+  if (!mailer()) {
+    await db.query(`UPDATE notifications SET email_state='not_configured', email_error='smtp_not_configured' WHERE id=$1`, [id]);
+    return 'not_configured';
+  }
   const ok = await sendMail({ to: row.email, subject: `[${BRAND.name}] ${row.title}`, text: `${row.title}\n\nOpen: ${linkFor(row)}\n\nYou can change notification settings in ${BRAND.name}.\n` }).catch(() => false);
-  if (ok) await db.query(`UPDATE notifications SET email_state='sent', emailed_at=now() WHERE id=$1`, [id]);
-  return ok ? 'sent' : 'failed';
+  if (ok) {
+    await db.query(`UPDATE notifications SET email_state='sent', emailed_at=now(), email_attempts=email_attempts+1, email_error=NULL WHERE id=$1`, [id]);
+    return 'sent';
+  }
+  const attempts = row.email_attempts + 1;
+  if (attempts >= EMAIL_MAX_ATTEMPTS) {
+    await db.query(`UPDATE notifications SET email_state='failed', email_attempts=$2, email_error='smtp_rejected' WHERE id=$1`, [id, attempts]);
+    return 'failed';
+  }
+  await db.query(`UPDATE notifications SET email_attempts=$2, email_error='smtp_rejected', email_after=now() + make_interval(mins => $3) WHERE id=$1`, [id, attempts, 5 * attempts]);
+  return 'retry';
 }
 
 /** Worker sweep: emails deferred by quiet hours whose time has come. */
@@ -164,6 +205,10 @@ export async function sendDigests(db: Queryable = getPool(), now = new Date()): 
       `INSERT INTO notification_settings(workspace_id, user_id, last_digest_at) VALUES ($1,$2,$3)
        ON CONFLICT (workspace_id, user_id) DO UPDATE SET last_digest_at=$3`, [u.workspace_id, u.user_id, now]);
     if (!keep.length) continue;
+    if (!mailer()) {
+      await db.query(`UPDATE notifications SET email_state='not_configured', email_error='smtp_not_configured' WHERE id = ANY($1::uuid[])`, [keep.map((k) => k.id)]);
+      continue;
+    }
     const to = await maybeOne<{ email: string }>(db, `SELECT email FROM users WHERE id=$1`, [u.user_id]);
     if (!to) continue;
     const ok = await sendMail({ to: to.email, subject: `[${BRAND.name}] Daily digest — ${keep.length} update${keep.length === 1 ? '' : 's'}`,
@@ -240,8 +285,8 @@ export async function filterReadable<T extends ReadableRow>(ctx: Ctx, rows: T[],
 /** Deep link from the bell/email: re-check access on open, mark read, return where to go. Never acts on the resource. */
 export async function openNotification(ctx: Ctx, id: string, db: Queryable = getPool()): Promise<{ href: string }> {
   assertUuid(id, 'Notification');
-  const row = await maybeOne<ReadableRow & { reference_type: string | null; reference_id: string | null }>(db,
-    `SELECT id, brand_id, required_permission, reference_type, reference_id FROM notifications WHERE id=$1 AND workspace_id=$2 AND user_id=$3`,
+  const row = await maybeOne<ReadableRow & { reference_type: string | null; reference_id: string | null; link_path: string | null }>(db,
+    `SELECT id, brand_id, required_permission, reference_type, reference_id, link_path FROM notifications WHERE id=$1 AND workspace_id=$2 AND user_id=$3`,
     [id, ctx.access.workspaceId, ctx.actor.userId]);
   if (!row || !(await filterReadable(ctx, [row], db)).length) throw new AppError('not_found', 'This item is no longer available to you');
   await db.query(`UPDATE notifications SET read_at=coalesce(read_at, now()) WHERE id=$1`, [id]);

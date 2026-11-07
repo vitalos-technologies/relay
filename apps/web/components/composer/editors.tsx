@@ -90,6 +90,7 @@ export function BaseEditor({
           value={draft.baseText}
           onChange={(e) => onChange({ ...draft, baseText: e.target.value })}
           readOnly={readOnly}
+          data-anchor-field="base"
           rows={8}
           className="min-h-48 text-[14px]"
           placeholder="Write your post…"
@@ -210,6 +211,8 @@ export function VariantEditor({
             <Textarea
               value={variant.text ?? ''}
               readOnly={readOnly}
+              data-anchor-field="variant"
+              data-connection-id={connection.id}
               onChange={(e) => onChange({ ...variant, text: e.target.value })}
               rows={6}
               className="min-h-36"

@@ -21,6 +21,7 @@ import { assertUuid, authorizeCtx, brandAllowed, requireAction } from '../tenanc
 import { invalidatePendingApprovalIfChanged, loadPost, type PostRow } from '../posts/service.js';
 import { recordVersion, saveConflictCopy } from '../posts/versions.js';
 import { draftRecoveryPolicy } from './policy.js';
+import { emitCollabEvent } from '../collab/events.js';
 
 const CLIENT_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
 
@@ -94,6 +95,8 @@ async function saveTx(ctx: Ctx, postId: string, input: SaveInput, draftIn: Draft
       await tx.query(`UPDATE mcp_publication_intents SET status='invalidated', invalid_reason='The post changed.' WHERE post_id=$1 AND status IN ('prepared','confirmed')`, [post.id]);
     }
     await remember(r.version);
+    // Collaboration: other open editors learn a newer version exists (content-free event; they refetch).
+    await emitCollabEvent(tx, { workspaceId: ctx.access.workspaceId, brandId: post.brand_id, postId: post.id, audience: 'staff', kind: 'post.saved', refId: String(r.version), actorId: ctx.actor.userId });
     if (mode === 'recover') {
       await audit(tx, { workspaceId: ctx.access.workspaceId, brandId: post.brand_id, actorUserId: ctx.actor.userId, action: 'post.recovered_content_applied',
         resourceType: 'post', resourceId: post.id, diff: { base_version: input.base_version, version: r.version }, correlationId: ctx.correlationId });

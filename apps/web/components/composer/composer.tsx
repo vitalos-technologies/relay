@@ -1,12 +1,12 @@
 'use client';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Archive, CalendarClock, CircleCheck, Copy, Ellipsis, History, ListPlus, Save, Send, SendHorizontal, Trash2,
+  Archive, CalendarClock, CircleCheck, Copy, Ellipsis, History, ListPlus, MessageSquare, MessageSquarePlus, Save, Send, SendHorizontal, Trash2,
 } from 'lucide-react';
 import type { AutosaveResponse, DraftRecoveryStatus, RecoverResponse } from '@social-lite/core/contracts/v31-data';
 import { AUTOSAVE_DEBOUNCE_MS } from '@social-lite/core/contracts/v31-data';
-import { PROVIDER_LABEL, resolveVariants, type DraftContent, type ValidationIssue, type VariantDraft } from '@social-lite/core';
+import { PROVIDER_LABEL, applyFields, resolveVariants, type DraftContent, type DraftField, type ValidationIssue, type VariantDraft } from '@social-lite/core';
 import { api, isApiError } from '@/lib/client/api';
 import { useApi } from '@/lib/client/use-api';
 import { useSession } from '@/lib/client/session';
@@ -27,7 +27,8 @@ import { DraftConflictDialog, RecoveryBanner, SaveStatus, type ComposerSaveState
 import {
   clearLocalDraft, editorClientId, nextClientRevision, readLocalDraft, sameContent, writeLocalDraft, type LocalDraft,
 } from '@/lib/client/draft-recovery';
-import { HistoryPanel } from '@/components/collab/history-panel';
+import dynamic from 'next/dynamic';
+const HistoryPanel = dynamic(() => import('@/components/collab/history-panel').then((m) => m.HistoryPanel));
 import { TrashConfirmDialog, useTrashActions } from '@/components/trash/trash-actions';
 import { runSingleBulk } from '@/components/bulk/bulk';
 import { FindingList } from '@/components/brand-rules/brand-rules-settings';
@@ -39,7 +40,10 @@ import { DeliveriesPanel } from './deliveries-panel';
 import { AiAssist } from '@/components/ai/assist';
 import { VariantCrops } from '@/components/crops/variant-crops';
 import { QueueButton, useQueueAction } from '@/components/slots/queue-button';
-import { CollabPanel } from '@/components/collab/collab-panel';
+import { COLLAB_TABS, CollabPanel, type CollabTab } from '@/components/collab/collab-panel';
+import { PresenceBar } from '@/components/collab/presence';
+import type { ThreadAnchor } from '@/components/collab/types';
+import { useCollabSync, usePresence, type CollabEvent } from '@/lib/client/collab';
 import { conflictCopyFor, rememberConflictCopy } from '@/components/collab/conflict-copy';
 
 type SaveState = ComposerSaveState;
@@ -97,6 +101,8 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
   const [draft, setDraft] = useState<DraftContent>(() => normaliseDraft(post.draft));
   const [title, setTitle] = useState(post.title ?? '');
   const latest = useRef({ draft, title });
+  // Last content this tab knows the server has (loaded or acknowledged) — the base for 3-way conflict choices.
+  const serverSnap = useRef<{ title: string; draft: DraftContent }>({ title: post.title ?? '', draft: normaliseDraft(post.draft) });
   const versionRef = useRef(post.version);
   const [version, setVersion] = useState(post.version);
   const [saveState, setSaveState] = useState<SaveState>('saved');
@@ -106,7 +112,32 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
   const [conflictOpen, setConflictOpen] = useState(false);
   // V2: a rejected concurrent save is kept server-side as a conflict copy (History tab) — both versions recoverable.
   const [conflictCopy, setConflictCopy] = useState<string | null>(() => conflictCopyFor(post.id));
-  const [collabTab, setCollabTab] = useState(() => (conflictCopyFor(post.id) ? 'history' : 'comments'));
+  // Collaboration panel: deep links ?thread=<id> / ?panel=<tab>; desktop side panel (collapsible), sheet below xl.
+  const search = useSearchParams();
+  const focusThread = search.get('thread');
+  const panelParam = search.get('panel') as CollabTab | null;
+  const [collabTab, setCollabTab] = useState<CollabTab>(() => (focusThread ? 'discussion' : panelParam && COLLAB_TABS.includes(panelParam) ? panelParam : conflictCopyFor(post.id) ? 'history' : 'discussion'));
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    try { setCollapsed(localStorage.getItem('relay:collab-collapsed') === '1'); } catch { /* storage unavailable */ }
+    // Below xl the panel lives in a sheet: open it straight away for a deep link.
+    if ((focusThread || panelParam) && typeof window !== 'undefined') {
+      if (!window.matchMedia('(min-width: 1280px)').matches) setSheetOpen(true);
+      else {
+        setCollapsed(false);
+        setTimeout(() => scrollToPanel(), 400);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const setCollapsedPersist = (c: boolean) => { setCollapsed(c); try { localStorage.setItem('relay:collab-collapsed', c ? '1' : '0'); } catch { /* ignore */ } };
+  const [refresh, setRefresh] = useState({ discussion: 0, tasks: 0, review: 0, activity: 0 });
+  const [counts, setCounts] = useState({ unread: 0, open: 0, tasks: 0 });
+  const [selection, setSelection] = useState<ThreadAnchor | null>(null);
+  const [pendingSelection, setPendingSelection] = useState<ThreadAnchor | null>(null);
+  const [remote, setRemote] = useState<{ version: number; by: string | null } | null>(null);
+  const [startCursor, setStartCursor] = useState<number | null>(null);
   const dirty = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inflight = useRef<Promise<boolean> | null>(null);
@@ -181,7 +212,7 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
         retries.current = 0;
         versionRef.current = r.status === 'saved' ? r.version : Math.max(versionRef.current, r.version);
         setVersion(versionRef.current);
-        if (r.status === 'saved') setSavedAt(r.saved_at);
+        if (r.status === 'saved') { setSavedAt(r.saved_at); serverSnap.current = { title: snapshot.title, draft: snapshot.draft }; }
         setSaveError(null);
         if (dirty.current) setSaveState('dirty');
         else {
@@ -331,6 +362,64 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
     endRecovery();
   };
   const [historyOpen, setHistoryOpen] = useState(false);
+
+  // ---------------------------------------------------------------- collaboration sync (events) + presence
+  useEffect(() => {
+    let live = true;
+    api.get<{ cursor: number }>(`/api/collab/events`, { post: post.id, after: 'now' }).then((r) => { if (live) setStartCursor(r.cursor); }).catch(() => { if (live) setStartCursor(0); });
+    return () => { live = false; };
+  }, [post.id]);
+  const onCollabEvents = useCallback((events: CollabEvent[], meta: { reset: boolean }) => {
+    const bump = { discussion: 0, tasks: 0, review: 0, activity: 0 };
+    if (meta.reset) { bump.discussion = bump.tasks = bump.review = bump.activity = 1; }
+    for (const e of events) {
+      if (e.kind.startsWith('comment.') || e.kind.startsWith('thread.')) bump.discussion = 1;
+      if (e.kind.startsWith('task.')) bump.tasks = 1;
+      if (e.kind === 'review.updated') bump.review = 1;
+      if (e.kind !== 'notification') bump.activity = 1;
+      if (e.kind === 'post.saved' && !e.mine) {
+        const v = Number(e.ref_id);
+        if (Number.isFinite(v) && v > versionRef.current) setRemote({ version: v, by: null });
+      }
+    }
+    if (bump.review) void refetch();
+    setRefresh((r) => ({ discussion: r.discussion + bump.discussion, tasks: r.tasks + bump.tasks, review: r.review + bump.review, activity: r.activity + bump.activity }));
+    // After a reconnect gap: re-check the server version (never trust that nothing changed while offline).
+    if (meta.reset) {
+      void api.get<DraftRecoveryStatus>(`/api/posts/${post.id}/recovery-status`, { base_version: versionRef.current })
+        .then((st) => { if (st.server_newer) setRemote({ version: st.current_version, by: st.updated_by }); }).catch(() => undefined);
+    }
+  }, [post.id, refetch]);
+  const syncStatus = useCollabSync(post.id, startCursor, onCollabEvents);
+  const presence = usePresence(post.id, !readOnly && (saveState === 'dirty' || saveState === 'saving'));
+  // Selected text in an editor → "Comment on selection" (the thread keeps the quote against this version).
+  useEffect(() => {
+    const capture = () => {
+      const el = document.activeElement as HTMLTextAreaElement | null;
+      if (!el || el.tagName !== 'TEXTAREA' || !el.dataset.anchorField) { setPendingSelection(null); return; }
+      const [a, b] = [el.selectionStart ?? 0, el.selectionEnd ?? 0];
+      if (b - a < 2) { setPendingSelection(null); return; }
+      const field = el.dataset.anchorField as 'base' | 'variant';
+      setPendingSelection({ kind: 'text', field, connection_id: field === 'variant' ? el.dataset.connectionId ?? null : null,
+        quote: el.value.slice(a, b).slice(0, 500), prefix: el.value.slice(Math.max(0, a - 40), a), suffix: el.value.slice(b, b + 40) });
+    };
+    document.addEventListener('selectionchange', capture);
+    return () => document.removeEventListener('selectionchange', capture);
+  }, []);
+  const openCollab = (tab: CollabTab) => {
+    setCollabTab(tab);
+    if (window.matchMedia('(min-width: 1280px)').matches) {
+      setCollapsedPersist(false);
+      requestAnimationFrame(() => scrollToPanel());
+    } else setSheetOpen(true);
+  };
+  const reviewRemote = async () => {
+    try {
+      const fresh = await api.get<PostDetail>(`/api/posts/${post.id}`);
+      setConflict({ version: fresh.version, updated_by: fresh.updated_by_email ?? null, updated_at: fresh.updated_at, title: fresh.title, draft: fresh.draft });
+      setConflictOpen(true);
+    } catch (e) { toast.error(e, 'Couldn’t load the latest version'); }
+  };
   const linksOn = useFlag('v31.tracked_links');
   const [linkOpen, setLinkOpen] = useState(false);
   const planning = useApi<{ campaign: { id: string } | null }>(linksOn ? `/api/posts/${post.id}/planning` : null);
@@ -423,15 +512,21 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
     clearLocalDraft(policy, post.id);
     router.push(`/posts/${p.id}`);
   };
-  const takeTheirs = async () => { dirty.current = false; clearLocalDraft(policy, post.id); await reload(); };
-  const useMine = async () => {
-    // Resolve by saving mine on top of the server version; theirs stays in the version history.
-    if (!conflict?.version) return;
+  const takeTheirs = async () => { dirty.current = false; clearLocalDraft(policy, post.id); setRemote(null); await reload(); };
+  const applySelected = async (fields: DraftField[]) => {
+    // Apply the chosen parts of mine on top of the latest server version (a normal optimistic save). Theirs stays in
+    // history, and the server re-checks the version: if it moved again, this dialog comes back.
+    if (!conflict?.version || !conflict.draft) return;
+    const merged = applyFields({ title: conflict.title ?? '', draft: normaliseDraft(conflict.draft) }, { title: latest.current.title, draft: latest.current.draft }, fields);
+    setDraft(merged.draft);
+    setTitle(merged.title ?? '');
+    latest.current = { draft: merged.draft, title: merged.title ?? '' };
     versionRef.current = conflict.version;
     lastFailed.current = null;
     dirty.current = true;
     saveStateRef.current = 'dirty';
     setSaveState('dirty');
+    setRemote(null);
     const ok = await save();
     if (!ok) throw new Error((saveStateRef.current as SaveState) === 'conflict' ? 'It changed again. Compare and choose.' : 'Couldn’t save yours. Try again.');
   };
@@ -460,6 +555,13 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
   const activeConn = tab !== 'base' ? selectedConns.find((c) => c.id === tab) : undefined;
   const activeVariant = activeConn ? draft.variants.find((x) => x.connectionId === activeConn.id) : undefined;
 
+  const collabProps = {
+    postId: post.id, brandId: post.brand_id, tz: post.brand.timezone, version, canEdit: !readOnly, approvalId: post.approval?.id ?? null,
+    approvalRequired: post.brand.approval_required, tab: collabTab, onTab: setCollabTab, highlightVersion: conflictCopy, focusThread,
+    refresh, counts, onCounts: (c: Partial<typeof counts>) => setCounts((x) => ({ ...x, ...c })), selection, onClearSelection: () => setSelection(null),
+    onRestored: async () => { rememberConflictCopy(post.id, null); dirty.current = false; await reload(); },
+  };
+
   return (
     <div className="pb-24">
       {/* Header */}
@@ -481,6 +583,11 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
           />
         </div>
         <div className="flex items-center gap-2">
+          <PresenceBar people={presence.people} />
+          <Button size="sm" variant="secondary" icon={<MessageSquare aria-hidden className="size-4" />} onClick={() => openCollab(collabTab)}
+            aria-label={counts.unread ? `Collaborate, ${counts.unread} unread` : 'Collaborate'}>
+            <span className="max-sm:sr-only">Collaborate</span>{counts.unread ? <span className="ml-1 rounded-full bg-[var(--accent)] px-1.5 text-[11px] font-semibold text-[var(--on-accent)] tabular">{counts.unread}</span> : null}
+          </Button>
           <PostStatusBadge status={post.status} simulated={allMock} />
           <Menu>
             <MenuTrigger asChild>
@@ -508,6 +615,15 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
         />
       ) : null}
       {paused ? <Banner tone="warn" className="mb-6" title={`${session.workspace?.publishing_paused ? 'Workspace' : post.brand.name} paused — nothing will send`} /> : null}
+      {remote && remote.version > version && !readOnly ? (
+        <Banner tone="info" className="mb-6" role="status" title={`A newer version was saved (v${remote.version})${remote.by ? ` by ${remote.by}` : ''}`}
+          actions={dirty.current || saveState !== 'saved'
+            ? <Button size="sm" variant="primary" onClick={() => void reviewRemote()}>Review changes</Button>
+            : <Button size="sm" variant="primary" onClick={() => void takeTheirs()}>Load latest</Button>}>
+          <p className="text-muted">{dirty.current || saveState !== 'saved' ? 'You have unsaved edits. Nothing will be overwritten: compare first.' : 'You haven’t changed anything since.'}</p>
+        </Banner>
+      ) : null}
+      {syncStatus === 'revoked' ? <Banner tone="warn" className="mb-6" title="Your access to this post changed">Reload to see what you can do now.</Banner> : null}
       {recovery && !readOnly ? (
         <RecoveryBanner local={recovery.local} status={recovery.status} onRestore={restoreLocal} onKeepCopy={keepLocalAsCopy} onDiscard={endRecovery} />
       ) : null}
@@ -527,7 +643,7 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[240px_minmax(0,1fr)] xl:grid-cols-[248px_minmax(0,1fr)_340px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[240px_minmax(0,1fr)] xl:grid-cols-[240px_minmax(0,1fr)_364px]">
         {/* Region 1: content switcher + destinations */}
         <aside className={cn('flex min-w-0 flex-col gap-4 lg:row-span-2 xl:row-span-1', step !== 'setup' && 'max-lg:hidden')} aria-label="Destinations">
           <Card className="p-2">
@@ -552,7 +668,10 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
               <>
                 <div className="mb-4 flex items-center justify-between gap-2">
                   <h2 className="text-[15px] font-semibold">Base content</h2>
-                  {selectedConns.length ? <span className="text-xs text-muted">Shared by {selectedConns.length === 1 ? '1 destination' : `${selectedConns.length} destinations`}</span> : null}
+                  {pendingSelection ? (
+                    <Button size="sm" variant="secondary" icon={<MessageSquarePlus aria-hidden className="size-4" />}
+                      onMouseDown={(e) => e.preventDefault()} onClick={() => { setSelection(pendingSelection); openCollab('discussion'); }}>Comment on selection</Button>
+                  ) : selectedConns.length ? <span className="text-xs text-muted">Shared by {selectedConns.length === 1 ? '1 destination' : `${selectedConns.length} destinations`}</span> : null}
                 </div>
                 <BaseEditor
                   draft={draft}
@@ -598,7 +717,7 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
         </div>
 
         {/* Region 3: readiness + live preview + collaboration */}
-        <aside className={cn('flex min-w-0 flex-col gap-6 lg:col-start-2 xl:col-start-3 xl:row-start-1', step !== 'preview' && 'max-lg:hidden')} aria-label="Checks and preview">
+        <aside id="composer-side" className={cn('flex min-w-0 flex-col gap-6 lg:col-start-2 xl:col-start-3 xl:row-start-1 xl:sticky xl:top-[72px] xl:max-h-[calc(100dvh-148px)] xl:self-start xl:overflow-y-auto xl:overscroll-contain xl:pb-2', step !== 'preview' && 'max-lg:hidden')} aria-label="Checks, preview and collaboration">
           <Card aria-labelledby="h-checks">
             <CardHeader
               id="h-checks"
@@ -658,9 +777,9 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
             </Card>
           ) : null}
           {!isPublished ? <ReuseCard postId={post.id} brandId={post.brand_id} canEdit={post.can.edit} /> : null}
-          <CollabPanel postId={post.id} brandId={post.brand_id} tz={tz} currentText={draft.baseText} version={version} canEdit={!readOnly}
-            tab={collabTab} onTab={setCollabTab} highlightVersion={conflictCopy}
-            onRestored={async () => { rememberConflictCopy(post.id, null); dirty.current = false; await reload(); }} />
+          <div className="max-xl:hidden">
+            {!sheetOpen ? <CollabPanel {...collabProps} collapsed={collapsed} onCollapse={setCollapsedPersist} /> : null}
+          </div>
         </aside>
       </div>
 
@@ -765,15 +884,19 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
         onOpenChange={setConflictOpen}
         current={conflict}
         mine={{ title, draft }}
+        base={serverSnap.current}
         onTakeTheirs={takeTheirs}
         onKeepBoth={keepCopy}
-        onUseMine={useMine}
+        onApplySelected={applySelected}
         keptInHistory={!!conflictCopy}
       />
       {linksOn ? (
         <LinkBuilderDialog open={linkOpen} onOpenChange={setLinkOpen} brandId={post.brand_id} postId={post.id} campaignId={planning.data?.campaign?.id ?? null}
           initialUrl={draft.baseLink ?? ''} onUse={(url) => edit({ draft: { ...latest.current.draft, baseLink: url } })} />
       ) : null}
+      <Drawer open={sheetOpen} onOpenChange={setSheetOpen} title="Collaborate">
+        <CollabPanel {...collabProps} sheet />
+      </Drawer>
       <Drawer open={historyOpen} onOpenChange={setHistoryOpen} title="Version history">
         <HistoryPanel postId={post.id} currentText={draft.baseText} version={version} canEdit={!readOnly} tall
           highlight={conflictCopy}
@@ -823,6 +946,14 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
       />
     </div>
   );
+}
+
+/** Desktop: the side column scrolls on its own (the editor stays in view); bring the collaboration panel to its top. */
+function scrollToPanel() {
+  const side = document.getElementById('composer-side');
+  const panel = document.querySelector<HTMLElement>('[data-testid="collab-panel"]');
+  if (!side || !panel) return;
+  side.scrollTo({ top: side.scrollTop + panel.getBoundingClientRect().top - side.getBoundingClientRect().top - 4, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 }
 
 function allMockOf(ds: Array<{ is_mock: boolean }>) {

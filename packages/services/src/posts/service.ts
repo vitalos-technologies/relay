@@ -6,6 +6,8 @@ import {
 import { getPool, many, maybeOne, one, withTx, type Queryable } from '@social-lite/db';
 import type { Ctx } from '../context.js';
 import { audit } from '../audit.js';
+import { writeOutbox } from '../outbox.js';
+import { emitCollabEvent } from '../collab/events.js';
 import { assertBrand, assertUuid, authorizeCtx, brandAllowed, brandFilter, requireAction, type BrandRow } from '../tenancy.js';
 import { beginIdempotent, completeIdempotent } from '../idempotency.js';
 import { brandConnections, capabilitiesFor, contentHash, excerpt, mediaFacts, type ConnectionRow } from './shared.js';
@@ -115,6 +117,7 @@ async function updateDraftTx(ctx: Ctx, postId: string, input: { expected_version
       title: input.title === undefined ? post.title : (input.title ?? ''), draft, restoredFrom: opts.restoredFrom ?? null });
     // AP-02: a content change invalidates any pending approval for this post.
     if (input.draft !== undefined) await invalidatePendingApprovalIfChanged(tx, ctx, post, draft);
+    await emitCollabEvent(tx, { workspaceId: ctx.access.workspaceId, brandId: post.brand_id, postId: post.id, audience: 'staff', kind: 'post.saved', refId: String(r.version), actorId: ctx.actor.userId });
     return { version: r.version, updated_at: r.updated_at.toISOString() };
   });
 }
@@ -133,7 +136,9 @@ export async function invalidatePendingApprovalIfChanged(tx: Queryable, ctx: Ctx
   if (hash === pending.content_hash) return;
   await tx.query(`UPDATE approvals SET decision='invalidated', decided_at=now(), reason='Content changed after submission' WHERE id=$1`, [pending.approval_id]);
   await tx.query(`UPDATE schedules SET status='superseded' WHERE id=$1`, [pending.schedule_id]);
-  await audit(tx, { workspaceId: ctx.access.workspaceId, brandId: post.brand_id, actorUserId: ctx.actor.userId, action: 'approval.invalidated', resourceType: 'approval', resourceId: pending.approval_id, diff: { reason: 'content_changed' }, correlationId: ctx.correlationId });
+  await audit(tx, { workspaceId: ctx.access.workspaceId, brandId: post.brand_id, actorUserId: ctx.actor.userId, action: 'approval.invalidated', resourceType: 'approval', resourceId: pending.approval_id, diff: { reason: 'content_changed', post_id: post.id }, correlationId: ctx.correlationId });
+  // Collaboration: notify author + reviewers (collab/reviewers.ts).
+  await writeOutbox(tx, { workspaceId: ctx.access.workspaceId, aggregateType: 'approval', aggregateId: pending.approval_id, eventType: 'approval.invalidated', payload: { code: 'content_changed' } });
 }
 
 export interface DestinationValidation { ok: boolean; measured_length: number; limit: number; provider: string }

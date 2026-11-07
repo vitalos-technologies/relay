@@ -151,7 +151,7 @@ export async function onAssignmentChanged(db: Queryable, evt: { workspace_id: st
 
 /** Calendar ownership: decorate planner items (already brand-scoped) with campaign, team, assignee and review state. */
 export async function decoratePlannerItems<T extends { schedule_id: string; post_id: string }>(ctx: Ctx, items: T[], db: Queryable = getPool()) {
-  if (!items.length) return items.map((i) => ({ ...i, campaign: null, team: null, assignee: null, review: null }));
+  if (!items.length) return items.map((i) => ({ ...i, campaign: null, team: null, assignee: null, review: null, unread_threads: 0, open_tasks: 0, next_task_due: null as string | null }));
   const posts = await many<{ id: string; campaign_id: string | null; campaign_name: string | null; team_id: string | null; team_name: string | null; assignee_user_id: string | null; assignee_email: string | null; assignee_name: string | null; due_at: Date | null }>(db,
     `SELECT p.id, p.campaign_id, c.name AS campaign_name, p.team_id, t.name AS team_name, p.assignee_user_id, u.email AS assignee_email, u.name AS assignee_name, p.due_at
        FROM posts p LEFT JOIN campaigns c ON c.id=p.campaign_id LEFT JOIN teams t ON t.id=p.team_id LEFT JOIN users u ON u.id=p.assignee_user_id
@@ -159,11 +159,21 @@ export async function decoratePlannerItems<T extends { schedule_id: string; post
   const reviews = await many<{ schedule_id: string; id: string; decision: string; current_stage: number; stage_count: number }>(db,
     `SELECT DISTINCT ON (schedule_id) schedule_id, id, decision, current_stage, stage_count FROM approvals
       WHERE workspace_id=$1 AND schedule_id = ANY($2::uuid[]) ORDER BY schedule_id, requested_at DESC`, [ctx.access.workspaceId, items.map((i) => i.schedule_id)]);
+  // Collaboration: unread open discussions and open tasks (with the nearest editorial deadline) per post.
+  const postRows = await many<{ id: string; brand_id: string }>(db, `SELECT id, brand_id FROM posts WHERE workspace_id=$1 AND id = ANY($2::uuid[])`,
+    [ctx.access.workspaceId, [...new Set(items.map((i) => i.post_id))]]);
+  const { unreadThreadCounts } = await import('./comments.js');
+  const unread = await unreadThreadCounts(ctx, postRows, db);
+  const tasks = await many<{ post_id: string; n: number; next_due: Date | null }>(db,
+    `SELECT post_id, count(*)::int n, min(due_at) AS next_due FROM collab_tasks WHERE workspace_id=$1 AND post_id = ANY($2::uuid[]) AND status IN ('open','in_progress','blocked') GROUP BY post_id`,
+    [ctx.access.workspaceId, postRows.map((p) => p.id)]);
   return items.map((i) => {
     const p = posts.find((x) => x.id === i.post_id);
     const r = reviews.find((x) => x.schedule_id === i.schedule_id);
+    const t = tasks.find((x) => x.post_id === i.post_id);
     return {
       ...i,
+      unread_threads: unread.get(i.post_id) ?? 0, open_tasks: t?.n ?? 0, next_task_due: t?.next_due?.toISOString() ?? null,
       campaign: p?.campaign_id ? { id: p.campaign_id, name: p.campaign_name } : null,
       team: p?.team_id ? { id: p.team_id, name: p.team_name } : null,
       assignee: p?.assignee_user_id ? { id: p.assignee_user_id, email: p.assignee_email, name: p.assignee_name } : null,

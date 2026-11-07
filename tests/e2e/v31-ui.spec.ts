@@ -48,12 +48,14 @@ test.describe('V3.1 UI', () => {
     const other = await a.send('PUT', `/api/posts/${p.id}/autosave`, { base_version: cur.version, client_id: `e2eother_${tag}`, client_revision: 1, draft: { ...cur.draft, baseText: theirs } });
     expect(other.status).toBe(200);
     await textBox(page).fill(`Mine ${tag}`);
-    const dialog = page.getByRole('dialog', { name: 'Edited elsewhere' });
+    // (Collaboration stream: the dialog now compares field by field; discarding yours is an explicit two-step choice.)
+    const dialog = page.getByRole('dialog', { name: 'Someone else saved a newer version' });
     await expect(dialog).toBeVisible({ timeout: 15_000 });
     await expect(status).toHaveAttribute('data-save-state', 'conflict');
-    await expect(dialog.getByTestId('conflict-compare')).toContainText(`Mine ${tag}`);
-    await expect(dialog.getByTestId('conflict-compare')).toContainText(theirs);
-    await dialog.getByRole('button', { name: 'Take theirs' }).click();
+    await expect(dialog.getByTestId('conflict-compare')).toContainText('Mine');
+    await expect(dialog.getByTestId('conflict-compare')).toContainText('Server copy');
+    await dialog.getByRole('button', { name: 'Discard mine…' }).click();
+    await dialog.getByRole('button', { name: 'Discard my changes' }).click();
     await expect(textBox(page)).toHaveValue(theirs);
 
     // A copy left in this browser (refresh/restart) is offered, re-checked by the server, and restored on request.

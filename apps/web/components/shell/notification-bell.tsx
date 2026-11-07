@@ -16,6 +16,7 @@ function hrefFor(n: AppNotification): string | null {
     case 'review': return n.reference_id ? `/review/${n.reference_id}` : null; // guest portal; the page re-checks the share
     case 'connection': return '/accounts';
     case 'delivery': return '/history';
+    case 'task': return n.reference_id ? `/tasks?task=${n.reference_id}` : '/tasks';
     default: return null;
   }
 }
@@ -23,7 +24,7 @@ function hrefFor(n: AppNotification): string | null {
 export function NotificationBell() {
   const toast = useToast();
   const [open, setOpen] = useState(false);
-  const { data, error, loading, refetch, setData } = useApi<{ items: AppNotification[]; unread_count: number }>('/api/notifications', { poll: 60_000 });
+  const { data, error, loading, refetch, setData } = useApi<{ items: AppNotification[]; unread_count: number }>('/api/notifications?limit=20', { poll: 30_000 });
   const unread = data?.unread_count ?? 0;
 
   const markRead = async (n: AppNotification) => {
@@ -85,7 +86,7 @@ export function NotificationBell() {
                         {n.title}
                         {n.occurrences && n.occurrences > 1 ? <span className="ml-1 text-xs text-subtle">×{n.occurrences}</span> : null}
                       </p>
-                      {n.body ? <p className="mt-0.5 line-clamp-2 text-xs text-muted">{n.body}</p> : null}
+{detailLine(n) ? <p className="mt-0.5 line-clamp-2 text-xs text-muted">{detailLine(n)}</p> : null}
                       <p className="mt-1 text-[11px] text-subtle">
                         <span className="sr-only">{n.severity}. </span>
                         {fmtRelative(n.last_seen_at ?? n.created_at)}
@@ -107,7 +108,15 @@ export function NotificationBell() {
             </ul>
           )}
         </div>
+        <div className="border-t border-border px-4 py-2.5">
+          <Link href="/notifications" onClick={() => setOpen(false)} className="text-[13px] font-medium text-[var(--accent-text)] underline-offset-2 hover:underline">All notifications</Link>
+        </div>
       </PopoverContent>
     </Popover>
   );
+}
+
+/** One line of context: "Check image alt text · Spring menu launch · due Sat 7 Nov, 08:03 GMT". */
+function detailLine(n: { context?: string | null; body: string | null }): string {
+  return [n.context, n.body ? n.body.replace(/^Due /, 'due ') : null].filter(Boolean).join(' · ');
 }

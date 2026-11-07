@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { useState } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Check, MessageSquare, X } from 'lucide-react';
 import { PROVIDER_LABEL, type Provider, type ResolvedVariant } from '@social-lite/core';
 import { api } from '@/lib/client/api';
@@ -10,11 +10,13 @@ import { fmtRelative } from '@/lib/client/format';
 import type { Asset, Connection } from '@/lib/client/types';
 import {
   Badge, Banner, Button, Card, CardHeader, ConfirmDialog, Dialog, EmptyState, ErrorNotice, ErrorState, Field, PageHeader, PlatformIcon, Skeleton,
-  Textarea, TimeWithZone, ToneIcon, useToast,
+  Textarea, TimeWithZone, ToneIcon, cn, useToast,
 } from '@/components/ui';
 import { VariantPreview } from '@/components/composer/preview';
 import { StageProgressList } from '@/components/collab/stage-progress';
-import { INELIGIBLE, type CommentDto, type StageProgress } from '@/components/collab/types';
+import { INELIGIBLE, type CommentDto, type People, type StageProgress, type ThreadDto } from '@/components/collab/types';
+import { CommentBody } from '@/components/collab/comment-text';
+import { newClientKey } from '@/lib/client/collab';
 
 interface Review {
   id: string; decision: 'pending' | 'approved' | 'rejected' | 'invalidated'; fingerprint: string; reason: string | null; requested_at: string;
@@ -23,6 +25,7 @@ interface Review {
   variants: Array<ResolvedVariant & { provider: Provider; connection: { id: string; provider: Provider; display_name: string; username: string | null } }>;
   assets: Array<Partial<Asset> & { id: string }>;
   comments: CommentDto[];
+  threads?: ThreadDto[]; people?: People;
   review: { stages: StageProgress[]; current_stage: number; stage_count: number; me: { eligible: boolean; reason: string | null }; due_at: string | null };
   can: { approve: boolean; comment: boolean };
 }
@@ -31,7 +34,7 @@ interface Review {
 export default function ReviewDetailPage() {
   const { id } = useParams<{ id: string }>();
   const toast = useToast();
-  const { data, error, loading, refetch } = useApi<Review>(`/api/review/${id}`);
+  const { data, error, loading, refetch } = useApi<Review>(`/api/review/${id}`, { poll: 30_000 });
   const [approveOpen, setApproveOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   if (error && !data) return <><Back /><ErrorState error={error} onRetry={refetch} title="This review isn’t available" /></>;
@@ -73,7 +76,7 @@ export default function ReviewDetailPage() {
               {pending && !data.can.approve && data.review.me.reason ? <p className="text-xs text-muted">{INELIGIBLE[data.review.me.reason] ?? 'Waiting for others'}</p> : null}
             </div>
           </Card>
-          <ReviewComments id={data.id} comments={data.comments} canComment={data.can.comment} onDone={refetch} />
+          <ReviewComments id={data.id} threads={data.threads ?? []} people={data.people ?? {}} canComment={data.can.comment} onDone={refetch} />
         </aside>
       </div>
 
@@ -100,38 +103,77 @@ function Back() {
   return <Link href="/review" className="mb-4 inline-flex items-center gap-1.5 text-[13px] text-muted hover:text-fg"><ArrowLeft aria-hidden className="size-4" /> Reviews</Link>;
 }
 
-function ReviewComments({ id, comments, canComment, onDone }: { id: string; comments: CommentDto[]; canComment: boolean; onDone: () => Promise<unknown> }) {
+function ReviewComments({ id, threads, people, canComment, onDone }: { id: string; threads: ThreadDto[]; people: People; canComment: boolean; onDone: () => Promise<unknown> }) {
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<unknown>(null);
+  const focus = useSearchParams().get('thread');
+  const key = useRef(newClientKey('g'));
+  useEffect(() => {
+    if (!focus) return;
+    const t = setTimeout(() => { const el = document.getElementById(`thread-${focus}`); el?.scrollIntoView({ block: 'center' }); el?.focus({ preventScroll: true }); }, 200);
+    return () => clearTimeout(t);
+  }, [focus, threads.length]);
   return (
     <Card aria-labelledby="h-c">
       <CardHeader id="h-c" title="Comments" />
       <div className="flex flex-col gap-3 px-4 pb-4">
-        {comments.length ? (
-          <ul className="flex flex-col gap-2" aria-label="Comments">
-            {comments.map((c) => (
-              <li key={c.id} className="rounded-lg border border-border px-3 py-2">
-                <p className="mb-1 flex gap-2 text-xs text-muted"><span className="truncate font-medium text-fg">{c.mine ? 'You' : c.author?.name || 'Team'}</span><span className="ml-auto">{fmtRelative(c.created_at)}</span></p>
-                <p className="whitespace-pre-wrap break-words text-[13px]">{c.body}</p>
-              </li>
-            ))}
+        {threads.length ? (
+          <ul className="flex flex-col gap-3" aria-label="Comments">
+            {threads.map((t) => <li key={t.id}><GuestThread t={t} people={people} highlight={t.id === focus} onDone={onDone} /></li>)}
           </ul>
         ) : <EmptyState compact icon={<MessageSquare aria-hidden />} title="No comments" />}
         {canComment ? (
           <>
-            <label htmlFor="rc" className="sr-only">Comment</label>
+            <label htmlFor="rc" className="sr-only">New comment</label>
             <Textarea id="rc" rows={3} value={body} maxLength={5000} onChange={(e) => setBody(e.target.value)} placeholder="Comment for the team" />
             <Button size="sm" className="self-end" loading={busy} disabledReason={!body.trim() ? 'Write something first.' : null}
-              onClick={async () => { setBusy(true); setErr(null); try { await api.post(`/api/review/${id}/comments`, { body: body.trim() }); setBody(''); await onDone(); } catch (e) { setErr(e); } finally { setBusy(false); } }}>
+              onClick={async () => { setBusy(true); setErr(null); try { await api.post(`/api/review/${id}/comments`, { body: body.trim(), client_key: key.current }); setBody(''); key.current = newClientKey('g'); await onDone(); } catch (e) { setErr(e); } finally { setBusy(false); } }}>
               Send
             </Button>
             {err ? <ErrorNotice error={err} /> : null}
           </>
         ) : null}
-        {comments.length ? <Badge tone="neutral" className="self-start">Visible to the team and shared reviewers</Badge> : null}
+        <Badge tone="neutral" className="self-start">Visible to the team and shared reviewers</Badge>
       </div>
     </Card>
+  );
+}
+
+function GuestThread({ t, people, highlight, onDone }: { t: ThreadDto; people: People; highlight: boolean; onDone: () => Promise<unknown> }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<unknown>(null);
+  const key = useRef(newClientKey('gr'));
+  return (
+    <article id={`thread-${t.id}`} tabIndex={-1} className={cn('rounded-lg border border-border px-3 py-2 outline-none', highlight && 'ring-2 ring-[var(--accent)]')}>
+      {t.resolved ? <Badge tone="success" className="mb-1">Resolved</Badge> : null}
+      <ol className="flex flex-col gap-2">
+        {t.comments.map((c, i) => (
+          <li key={c.id} className={cn(i > 0 && 'border-l border-border pl-3')}>
+            {c.deleted ? <p className="text-xs italic text-subtle">Comment deleted</p> : (
+              <>
+                <p className="mb-0.5 flex gap-2 text-xs text-muted"><span className="truncate font-medium text-fg">{c.mine ? 'You' : c.author?.name || 'Team'}</span><span className="ml-auto">{fmtRelative(c.created_at)}</span></p>
+                <CommentBody body={c.body ?? ''} people={people} />
+              </>
+            )}
+          </li>
+        ))}
+      </ol>
+      {t.can.reply ? (open ? (
+        <div className="mt-2 flex flex-col gap-2">
+          <label htmlFor={`gr-${t.id}`} className="sr-only">Reply</label>
+          <Textarea id={`gr-${t.id}`} rows={2} value={text} maxLength={5000} onChange={(e) => setText(e.target.value)} autoFocus />
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button size="sm" variant="primary" loading={busy} disabledReason={!text.trim() ? 'Write something first.' : null}
+              onClick={async () => { setBusy(true); setErr(null); try { await api.post(`/api/threads/${t.id}/replies`, { body: text.trim(), client_key: key.current }); setText(''); setOpen(false); key.current = newClientKey('gr'); await onDone(); } catch (e) { setErr(e); } finally { setBusy(false); } }}>Reply</Button>
+          </div>
+          {err ? <ErrorNotice error={err} /> : null}
+        </div>
+      ) : <Button size="sm" variant="ghost" className="mt-1" onClick={() => setOpen(true)}>Reply</Button>) : null}
+    </article>
   );
 }
 

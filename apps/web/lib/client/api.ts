@@ -75,6 +75,8 @@ export interface RequestOptions {
   /** default true; public pages (invite preview) pass false. */
   redirectOn401?: boolean;
   query?: Record<string, string | number | boolean | null | undefined>;
+  /** Let the request outlive the page (presence "left" on tab close). */
+  keepalive?: boolean;
 }
 
 export function withQuery(path: string, query?: RequestOptions['query']): string {
@@ -166,7 +168,7 @@ export async function apiFetch<T>(path: string, opts: RequestOptions = {}): Prom
     if (mutating && csrfToken) headers['X-CSRF-Token'] = csrfToken;
     if (idemKey) headers['Idempotency-Key'] = idemKey;
     if (expectedWorkspace && !url.startsWith('/api/session')) headers['X-Workspace-Id'] = expectedWorkspace;
-    return fetch(url, { method, headers, body: bodyJson, credentials: 'same-origin', signal: opts.signal, cache: 'no-store' });
+    return fetch(url, { method, headers, body: bodyJson, credentials: 'same-origin', signal: opts.signal, cache: 'no-store', keepalive: opts.keepalive });
   };
 
   let res: Response;

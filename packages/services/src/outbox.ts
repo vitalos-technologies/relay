@@ -13,6 +13,7 @@ export type OutboxEventType =
   | 'tipsignal.event_received'
   | 'notification.created'      // email delivery for critical notifications
   | 'comment.created' | 'assignment.changed' | 'review.shared'  // V2 collaboration (collab/**)
+  | 'comment.edited' | 'task.changed' | 'approval.invalidated' | 'review.reviewers_requested'  // collaboration completion (collab/**)
   // V3 Content Hub (content-hub/jobs.ts → queues source-import / report-export / writeback)
   | 'source.import_requested' | 'source.changes_signal' | 'export.requested' | 'writeback.requested'
   | 'bulk.requested';            // V3.1 bulk jobs (data/bulk.ts → queue bulk-ops)

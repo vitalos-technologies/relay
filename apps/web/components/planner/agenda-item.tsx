@@ -1,4 +1,5 @@
 'use client';
+import { ListTodo, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { PROVIDER_LABEL, DELIVERY_STATE_LABEL } from '@social-lite/core';
@@ -42,8 +43,16 @@ export function OwnerMeta({ item }: { item: PlannerItem }) {
   const parts = [item.team?.name, item.assignee ? (item.assignee.name || item.assignee.email) : null,
     item.review && item.review.decision === 'pending' ? `Review ${item.review.stage_count > 1 ? `${item.review.stage}/${item.review.stage_count}` : 'pending'}` : null,
     item.campaign?.name].filter(Boolean);
-  if (!parts.length) return null;
-  return <span className="min-w-0 truncate text-subtle">{parts.join(' · ')}</span>;
+  const unread = item.unread_threads ?? 0;
+  const tasks = item.open_tasks ?? 0;
+  if (!parts.length && !unread && !tasks) return null;
+  return (
+    <span className="flex min-w-0 items-center gap-2 text-subtle">
+      {parts.length ? <span className="min-w-0 truncate">{parts.join(' · ')}</span> : null}
+      {unread ? <span className="inline-flex shrink-0 items-center gap-0.5 font-medium text-fg" title={`${unread} unread discussion${unread === 1 ? '' : 's'}`}><MessageSquare aria-hidden className="size-3" />{unread}<span className="sr-only"> unread discussion{unread === 1 ? '' : 's'}</span></span> : null}
+      {tasks ? <span className="inline-flex shrink-0 items-center gap-0.5" title={`${tasks} open task${tasks === 1 ? '' : 's'}`}><ListTodo aria-hidden className="size-3" />{tasks}<span className="sr-only"> open task{tasks === 1 ? '' : 's'}</span></span> : null}
+    </span>
+  );
 }
 
 const DOT: Record<string, string> = {

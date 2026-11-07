@@ -13,7 +13,7 @@ import {
 import { liveEngineDeps } from '@social-lite/services/engine/live-deps';
 import { handleEvent } from '@social-lite/services/engine/notify';
 import { runNotificationSweeps } from '@social-lite/services/collab/notifications';
-import { dispatchOutbox, QUEUE_DELIVERY_DUE, QUEUE_EVENTS, QUEUE_MEDIA_TRANSCODE, startBoss } from '@social-lite/services/engine/outbox-dispatcher';
+import { dispatchOutbox, QUEUE_COLLAB, QUEUE_DELIVERY_DUE, QUEUE_EVENTS, QUEUE_MEDIA_TRANSCODE, startBoss } from '@social-lite/services/engine/outbox-dispatcher';
 import { runHealthChecks } from '@social-lite/services/connections/index';
 import { ensureBucket } from '@social-lite/services/storage';
 import { instrumentEngineDeps } from '@social-lite/services/workload/runner';
@@ -97,6 +97,10 @@ async function main(): Promise<void> {
   await boss.work<{ aggregateId: string; workspaceId: string | null; payload: Record<string, unknown> }>(QUEUE_MEDIA_TRANSCODE, { batchSize: 1, pollingIntervalSeconds: 2, includeMetadata: true }, async (jobs) => {
     for (const job of jobs) await track(workload.job(QUEUE_MEDIA_TRANSCODE, job, async () => (await import('@social-lite/services/media/video-worker')).handleAssetUploaded({ workspace_id: job.data.workspaceId, aggregate_id: job.data.aggregateId, payload: job.data.payload })));
   });
+  // Collaboration notifications: own queue + 'notifications' workload class (publishing never waits behind them).
+  await boss.work<{ eventType: string; aggregateId: string; workspaceId: string | null; payload: Record<string, unknown> }>(QUEUE_COLLAB, { batchSize: 10, pollingIntervalSeconds: 1, includeMetadata: true }, async (jobs) => {
+    for (const job of jobs) await track(workload.job(QUEUE_COLLAB, job, () => handleEvent({ event_type: job.data.eventType, aggregate_id: job.data.aggregateId, workspace_id: job.data.workspaceId, payload: job.data.payload ?? {} })));
+  });
   // V3 Content Hub workload queues: ids only; handlers reload rows, re-check authority, one job per workspace per class.
   const contentHub = await import('@social-lite/services/content-hub/jobs');
   for (const q of [contentHub.QUEUE_SOURCE_IMPORT, contentHub.QUEUE_REPORT_EXPORT, contentHub.QUEUE_WRITEBACK]) {
@@ -142,6 +146,8 @@ async function main(): Promise<void> {
     every('analytics', 30_000, () => workload.run('historical_backfill', { queue: 'analytics-tick' }, () => analytics.analyticsTick(boss))),
     // V2 collaboration: quiet-hours-deferred emails + daily digests (recipient re-checked at send).
     every('notification-emails', 60_000, () => workload.run('notifications', { queue: 'notification-emails' }, () => runNotificationSweeps())),
+    // Collaboration: bounded deadline reminders, overdue reviews, offboarding (tasks of people who lost access), presence purge.
+    every('collab-sweeps', 60_000, async () => { const { runCollabSweeps } = await import('@social-lite/services/collab/sweeps'); await workload.run('notifications', { queue: 'collab-sweeps' }, () => runCollabSweeps()); }),
     // G7: revoke expired grants (already ignored at access time), audit, refresh summaries, revalidate authority.
     every('grant-expiry', 5 * 60_000, async () => { const { sweepExpiredGrants } = await import('@social-lite/services/grant-expiry'); await sweepExpiredGrants(); }),
     // V3 Content Hub: writeback sweep (app-owned facts only), Drive channel renewal, snapshot retention.
@@ -159,6 +165,8 @@ async function main(): Promise<void> {
       await pool.query(`DELETE FROM sessions WHERE expires_at < now() - interval '7 days'`);
       await pool.query(`DELETE FROM outbox WHERE dispatch_state='dispatched' AND dispatched_at < now() - interval '30 days'`);
       await pool.query(`DELETE FROM worker_heartbeats WHERE last_seen_at < now() - interval '7 days'`);
+      const { runCollabRetention } = await import('@social-lite/services/collab/sweeps');
+      await runCollabRetention();
     }),
   ];
 

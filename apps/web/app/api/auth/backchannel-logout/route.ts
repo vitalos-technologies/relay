@@ -24,7 +24,7 @@ export const POST = publicRoute(async ({ req, correlationId }) => {
     log.info('idp_backchannel_logout', { correlationId, revoked: r.revoked });
     return new NextResponse(null, { status: 200, headers });
   } catch (err) {
-    log.warn('idp_backchannel_logout_rejected', { correlationId, code: err instanceof AppError ? err.code : 'error' });
+    log.warn('idp_backchannel_logout_rejected', { correlationId, code: err instanceof AppError ? err.code : 'error', reason: err instanceof AppError ? err.message.slice(0, 80) : undefined });
     return NextResponse.json({ error: 'invalid_request' }, { status: 400, headers });
   }
 });

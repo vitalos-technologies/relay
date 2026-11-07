@@ -1,7 +1,7 @@
 'use client';
 import { useAreaHref } from '@/lib/client/hooks';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { ArrowLeft, Check, ExternalLink, X } from 'lucide-react';
 import { PROVIDER_LABEL } from '@social-lite/core';
@@ -16,7 +16,9 @@ import {
 } from '@/components/ui';
 import { VariantPreview } from '@/components/composer/preview';
 import { StageProgressList } from '@/components/collab/stage-progress';
-import { CommentsPanel } from '@/components/collab/comments-panel';
+import { Discussion } from '@/components/collab/discussion';
+import { RequestedReviewers } from '@/components/collab/review-panel';
+import { PostTasks } from '@/components/collab/tasks';
 import { ReviewShares } from '@/components/collab/review-shares';
 import { ReviewAssignment } from '@/components/collab/review-assignment';
 import { INELIGIBLE, type ReviewState } from '@/components/collab/types';
@@ -27,6 +29,7 @@ export default function ApprovalDetailPage() {
   const { id } = useParams<{ id: string }>();
   const toast = useToast();
   const { data, error, loading, refetch } = useApi<DetailV2>(`/api/approvals/${id}`);
+  const focusThread = useSearchParams().get('thread');
   const [approveOpen, setApproveOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
 
@@ -135,13 +138,15 @@ export default function ApprovalDetailPage() {
               ) : null}
             </div>
           </Card>
+          <Card aria-labelledby="h-comments"><CardHeader id="h-comments" title="Discussion" /><div className="px-4 pb-4"><Discussion postId={data.post_id} approvalId={data.id} focusThread={focusThread} /></div></Card>
+          {pending ? <Card aria-labelledby="h-reviewers"><CardHeader id="h-reviewers" title="Reviewers" /><div className="px-4 pb-4"><RequestedReviewers approvalId={data.id} bare /></div></Card> : null}
           {pending && data.can_assign ? (
             <Card aria-labelledby="h-assign"><CardHeader id="h-assign" title="Assignment" /><div className="px-4 pb-4"><ReviewAssignment approvalId={data.id} brandId={data.brand.id} assignee={r.assignee} dueAt={r.due_at} tz={s.input_timezone} onSaved={refetch} /></div></Card>
           ) : null}
           {data.can_share ? (
             <Card aria-labelledby="h-share"><CardHeader id="h-share" title="Client review" /><div className="px-4 pb-4"><ReviewShares postId={data.post_id} /></div></Card>
           ) : null}
-          <Card aria-labelledby="h-comments"><CardHeader id="h-comments" title="Comments" /><div className="px-4 pb-4"><CommentsPanel postId={data.post_id} approvalId={data.id} /></div></Card>
+          <Card aria-labelledby="h-tasks"><CardHeader id="h-tasks" title="Tasks" /><div className="px-4 pb-4"><PostTasks postId={data.post_id} brandId={data.brand.id} approvalId={data.id} tz={s.input_timezone} /></div></Card>
           <Card aria-labelledby="h-when">
             <CardHeader id="h-when" title="Schedule" />
             <div className="px-4 pb-4">

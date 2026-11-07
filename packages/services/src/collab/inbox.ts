@@ -11,6 +11,7 @@ import { approvalJson, type ApprovalRow } from '../posts/serialize.js';
 import { evaluateStages, loadPoliciesMany, loadPolicy, reviewState, reviewerFacts, reviewerFactsMany, stageEligibility, stageProgressFrom, type PolicyDef, type ReviewRequestRow } from '../posts/approval-policy.js';
 import { staffAllowed } from './access.js';
 import { deliverNotification } from './notifications.js';
+import { emitCollabEvent } from './events.js';
 
 type InboxRow = ApprovalRow & ReviewRequestRow & {
   title: string | null; base_text: string; revision_number: number; schedule_due: Date; is_immediate: boolean; input_timezone: string; brand_name: string;
@@ -109,6 +110,7 @@ export async function onApprovalRequested(db: Queryable, evt: { workspace_id: st
   const stages = await evaluateStages(db, a, policy);
   const cur = stages.find((s) => !s.met);
   const def = cur ? policy.stages.find((s) => s.position === cur.position) : null;
+  await emitCollabEvent(db, { workspaceId: a.workspace_id, brandId: a.brand_id, postId: a.post_id, audience: 'staff', kind: 'review.updated', refId: a.id });
   if (!def) return;
   const candidates = await many<{ user_id: string }>(db,
     `SELECT user_id FROM memberships WHERE workspace_id=$1 AND status='active' AND removed_at IS NULL LIMIT 1000`, [a.workspace_id]);
@@ -121,6 +123,7 @@ export async function onApprovalRequested(db: Queryable, evt: { workspace_id: st
       workspaceId: a.workspace_id, userId: c.user_id, event: 'review_requested', kind: 'approval.requested',
       title: def.position > 1 ? `A post is ready for "${def.name}"` : 'A post is waiting for your review',
       referenceType: staff ? 'approval' : 'review', referenceId: a.id, dedupeKey: `approval:${a.id}:stage:${def.position}`,
+      linkPath: staff ? `/approvals/${a.id}` : `/review/${a.id}`,
       requirement: staff ? { brandId: a.brand_id, permission: 'content.approve' } : { brandId: a.brand_id, permission: 'review.shared', postId: a.post_id },
     });
   }
@@ -130,13 +133,15 @@ export async function onApprovalRequested(db: Queryable, evt: { workspace_id: st
 export async function onApprovalDecided(db: Queryable, evt: { workspace_id: string; aggregate_id: string }) {
   const a = await maybeOne<{ requested_by: string | null; decision: string; post_id: string; brand_id: string }>(db,
     `SELECT requested_by, decision, post_id, brand_id FROM approvals WHERE id=$1 AND workspace_id=$2`, [evt.aggregate_id, evt.workspace_id]);
-  if (!a?.requested_by) return;
+  if (!a) return;
+  await emitCollabEvent(db, { workspaceId: evt.workspace_id, brandId: a.brand_id, postId: a.post_id, audience: 'staff', kind: 'review.updated', refId: evt.aggregate_id });
+  if (!a.requested_by) return;
   const s = await loadUserAuthz(a.requested_by, evt.workspace_id, null, db);
   if (!staffAllowed(s, 'content.read', a.brand_id)) return;
   await deliverNotification(db, {
     workspaceId: evt.workspace_id, userId: a.requested_by, event: 'review_decided', kind: `approval.${a.decision}`, severity: a.decision === 'rejected' ? 'warning' : 'info',
     title: a.decision === 'rejected' ? 'Changes were requested on your post' : 'Your post was approved',
-    referenceType: 'post', referenceId: a.post_id, dedupeKey: `approval:${evt.aggregate_id}:${a.decision}`,
+    referenceType: 'post', referenceId: a.post_id, dedupeKey: `approval:${evt.aggregate_id}:${a.decision}`, linkPath: `/posts/${a.post_id}?panel=review`,
     requirement: { brandId: a.brand_id, permission: 'content.read' },
   });
 }

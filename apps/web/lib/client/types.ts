@@ -155,6 +155,8 @@ export interface PlannerItem {
   campaign?: { id: string; name: string | null } | null; team?: { id: string; name: string | null } | null;
   assignee?: { id: string; email: string | null; name: string | null } | null;
   review?: { id: string; decision: string; stage: number; stage_count: number } | null;
+  /** Collaboration: unread open discussions, open tasks and the nearest task deadline. */
+  unread_threads?: number; open_tasks?: number; next_task_due?: string | null;
   /** V3 UX: signed thumbnail of the first base asset (null when none / not processed). */
   thumb_url?: string | null; media_kind?: 'image' | 'video' | null;
 }
@@ -185,7 +187,7 @@ export interface Dashboard {
 export interface AppNotification {
   id: string; severity: 'info' | 'warning' | 'critical'; kind: string; title: string; body: string | null;
   reference_type: string | null; reference_id: string | null; occurrences?: number; created_at: string;
-  last_seen_at?: string; read_at: string | null; url?: string | null;
+  last_seen_at?: string; read_at: string | null; url?: string | null; context?: string | null;
 }
 
 export interface SetupItem {

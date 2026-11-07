@@ -273,6 +273,8 @@ export async function invalidateRequest(tx: Queryable, ctx: Ctx, a: Pick<ReviewR
   await tx.query(`UPDATE schedules SET status='superseded' WHERE id=$1 AND status='pending_approval'`, [a.schedule_id]);
   await audit(tx, { workspaceId: a.workspace_id, brandId: a.brand_id, actorUserId: ctx.actor.userId, action: 'approval.invalidated',
     resourceType: 'approval', resourceId: a.id, diff: { reason: code }, correlationId: ctx.correlationId });
+  // Collaboration: tell the author and reviewers (collab/reviewers.ts, recipients re-checked at send).
+  await writeOutbox(tx, { workspaceId: a.workspace_id, aggregateType: 'approval', aggregateId: a.id, eventType: 'approval.invalidated', payload: { code } });
 }
 
 export type DecisionOutcome =

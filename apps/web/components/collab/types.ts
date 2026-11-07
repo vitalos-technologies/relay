@@ -53,3 +53,66 @@ export const INELIGIBLE: Record<string, string> = {
   not_pending: 'Closed',
   stale: 'Policy changed — needs resubmission',
 };
+
+// ------------------------------------------------------------------ collaboration completion
+export interface PersonRef { name: string; email: string | null; active: boolean }
+export type People = Record<string, PersonRef>;
+
+export interface ThreadComment {
+  id: string; thread_id: string; post_id: string; approval_id: string | null; visibility: 'internal' | 'shared';
+  author: { id: string; name: string | null; email: string | null } | null; body: string | null; deleted: boolean; edited: boolean; edited_at: string | null;
+  created_at: string; mine: boolean; can_edit: boolean; can_delete: boolean; mentions: string[];
+}
+
+export type ThreadAnchor =
+  | { kind: 'text'; field: 'base' | 'variant'; connection_id?: string | null; quote: string; prefix?: string; suffix?: string }
+  | { kind: 'media'; asset_id: string };
+
+export interface ThreadDto {
+  id: string; post_id: string; approval_id: string | null; visibility: 'internal' | 'shared'; created_by: string | null; created_at: string;
+  resolved: boolean; resolved_at: string | null; last_activity_at: string; anchor: ThreadAnchor | null; anchor_version: number | null;
+  anchor_status: 'none' | 'current' | 'moved' | 'outdated'; revision_number: number | null; comment_count: number; hidden_replies: number; unread: boolean;
+  can: { reply: boolean; resolve: boolean; change_visibility: boolean };
+  comments: ThreadComment[];
+}
+
+export interface ThreadList {
+  items: ThreadDto[]; counts: { open: number; resolved: number; unread: number }; cursor: number; next_cursor: string | null; people: People;
+  can: { internal: boolean; shared: boolean; moderate: boolean }; current_version: number;
+}
+
+export type TaskStatus = 'open' | 'in_progress' | 'blocked' | 'completed' | 'cancelled';
+export type TaskPriority = 'low' | 'normal' | 'high' | 'urgent';
+export interface TaskDto {
+  id: string; brand: { id: string; name: string }; title: string; description: string | null;
+  reference: { type: 'review'; id: string; post_id: string | null } | { type: 'post'; id: string; title: string | null } | { type: 'campaign'; id: string; name: string | null } | null;
+  post_id: string | null; campaign_id: string | null; approval_id: string | null;
+  assignee: { id: string; name: string | null; email: string | null } | null; creator: { id: string; name: string | null; email: string | null } | null;
+  due_at: string | null; due_timezone: string; due_local: string | null; overdue: boolean; priority: TaskPriority; status: TaskStatus; blocked_reason: string | null;
+  needs_reassignment: boolean; version: number; created_at: string; updated_at: string; closed_at: string | null; follower_count: number; following: boolean;
+  next_action: string; can: { edit: boolean; change_status: boolean };
+  followers?: Array<{ id: string; name: string | null; email: string }>;
+  history?: Array<{ id: string; kind: string; detail: Record<string, unknown>; actor: { id: string | null; name: string | null; email: string | null } | null; at: string }>;
+}
+
+export interface HistoryItem {
+  id: string; version: number | null; base_version: number; kind: string; current: boolean; author: { id: string; name: string | null; email: string | null } | null;
+  created_at: string; restored_from: string | null; changed: string[]; summary: string; open_threads: number;
+}
+export interface RevisionItem {
+  id: string; revision_number: number; created_at: string; created_by: string | null; post_version: number | null; older_than_current: boolean;
+  approvals: Array<{ id: string; decision: string; requested_at: string; decided_at: string | null; reason: string | null; stage: number; stage_count: number; applies_to_current: boolean }>;
+  publications: Array<{ provider: string; account: string; state: string; url: string | null; published_at: string | null; simulated: boolean }>;
+}
+export interface HistoryPage { current_version: number; items: HistoryItem[]; next_cursor: string | null; revisions: RevisionItem[]; can_restore: boolean }
+
+export interface CompareDto {
+  from: { ref: string; label: string; version: number | null; schedule: { due_at: string | null; status: string; timezone: string } | null };
+  to: { ref: string; label: string; version: number | null; schedule: { due_at: string | null; status: string; timezone: string } | null };
+  changed: string[]; summary: string;
+  title: { before: string; after: string }; text: { before: string; after: string }; link: { before: string | null; after: string | null };
+  media: { before: string[]; after: string[] }; destinations: { added: string[]; removed: string[] };
+  variants: Array<{ connection_id: string; provider: string | null; account: string; before_text: string | null; after_text: string | null; custom_before: boolean | null; custom_after: boolean | null;
+    link_before: string | null; link_after: string | null; media_before: string[]; media_after: string[]; options_changed: string[]; changed: boolean }>;
+  assets: Array<{ id: string; thumb_url: string | null; alt_text: string | null; media_kind: string }>;
+}

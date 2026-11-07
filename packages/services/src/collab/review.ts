@@ -15,7 +15,8 @@ import { decideApproval, decideRejection } from '../posts/scheduling.js';
 import type { ApprovalRow } from '../posts/serialize.js';
 import { loadPolicy, reviewState, type ReviewRequestRow } from '../posts/approval-policy.js';
 import { callerEntitled, isGuestOnly, staffAllowed } from './access.js';
-import { commentJson, commentsFor, insertComment } from './comments.js';
+import { commentJson, commentsFor, sharedThreadsFor, startThread } from './comments.js';
+import { collabSettings } from './settings.js';
 import { deliverNotification } from './notifications.js';
 
 // ------------------------------------------------------------------ staff side: sharing
@@ -149,6 +150,9 @@ export async function getReview(ctx: Ctx, approvalId: string) {
       media_kind: x.media_kind ?? 'image', duration_ms: x.duration_ms ?? null, status: x.status, original_filename: null }));
   const staff = !!ctx.access.authz && staffAllowed(ctx.access.authz, 'content.read', a.brand_id);
   const comments = await commentsFor(db, ctx.access.workspaceId, a.post_id, ['shared']);
+  const settings = await collabSettings(db, ctx.access.workspaceId);
+  const canComment = authorizeCtx(ctx, 'comments.shared', { brandId: a.brand_id }).allowed && a.decision === 'pending' && (staff || settings.client_comments);
+  const threads = await sharedThreadsFor(db, ctx, { postId: a.post_id, guestView: !staff, canPost: canComment });
   const state = await reviewState(db, ctx, a, { guestView: !staff });
   const policy = await loadPolicy(db, a.workspace_id, a.brand_id);
   return {
@@ -160,8 +164,9 @@ export async function getReview(ctx: Ctx, approvalId: string) {
       connection: { id: v.connection_id, provider: v.provider, display_name: v.display_name, username: v.username } })),
     assets,
     comments: comments.map((c) => commentJson(c, { viewerId: ctx.actor.userId, guestView: !staff })),
+    threads: threads.items, people: threads.people,
     review: { stages: state.stages, current_stage: state.current_stage, stage_count: state.stage_count, me: state.me, decisions: state.decisions, due_at: state.due_at },
-    can: { approve: state.me.eligible, comment: authorizeCtx(ctx, 'comments.shared', { brandId: a.brand_id }).allowed && a.decision === 'pending' },
+    can: { approve: state.me.eligible, comment: canComment },
     policy_generation: policy.generation,
   };
 }
@@ -178,13 +183,25 @@ export async function reviewReject(ctx: Ctx, approvalId: string, reason: string)
   return { decision: r.approval.decision };
 }
 
-export async function addReviewComment(ctx: Ctx, approvalId: string, body: string) {
+export async function addReviewComment(ctx: Ctx, approvalId: string, body: string, opts: { client_key?: string | null } = {}) {
   requireAction(ctx, 'comments.shared');
   return withTx(async (tx) => {
     const a = await loadSharedApproval(tx, ctx, approvalId);
     requireAction(ctx, 'comments.shared', { brandId: a.brand_id });
     if (a.decision !== 'pending') throw new AppError('invalid_state', 'This review is closed.');
-    const c = await insertComment(tx, ctx, { postId: a.post_id, brandId: a.brand_id, approvalId: a.id, visibility: 'shared', body, mentionUserIds: [] });
+    const isStaff = !!ctx.access.authz && staffAllowed(ctx.access.authz, 'content.read', a.brand_id);
+    if (!isStaff && !(await collabSettings(tx, ctx.access.workspaceId)).client_comments) throw new AppError('forbidden', 'Comments are turned off for this review');
+    if (opts.client_key) {
+      const prior = await maybeOne<{ id: string }>(tx, `SELECT id FROM comments WHERE author_id=$1 AND client_key=$2 AND workspace_id=$3`, [ctx.actor.userId, opts.client_key, ctx.access.workspaceId]);
+      if (prior) {
+        const [row] = (await commentsFor(tx, ctx.access.workspaceId, a.post_id, ['shared'])).filter((x) => x.id === prior.id);
+        if (row) return commentJson(row, { viewerId: ctx.actor.userId, guestView: !isStaff });
+      }
+    }
+    const post = await maybeOne<{ version: number }>(tx, `SELECT version FROM posts WHERE id=$1`, [a.post_id]);
+    const started = await startThread(tx, ctx, { id: a.post_id, brand_id: a.brand_id, version: post?.version ?? null },
+      { visibility: 'shared', body, approval_id: a.id, client_key: opts.client_key ?? null });
+    const c = { id: started.commentId };
     const staff = !!ctx.access.authz && staffAllowed(ctx.access.authz, 'content.read', a.brand_id);
     const [row] = (await commentsFor(tx, ctx.access.workspaceId, a.post_id, ['shared'])).filter((x) => x.id === c.id);
     return commentJson(row!, { viewerId: ctx.actor.userId, guestView: !staff });

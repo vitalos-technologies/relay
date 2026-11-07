@@ -10,3 +10,4 @@ export * from './validation.js';
 export * from './schemas.js';
 export * from './authz.js';
 export * from './brand.js';
+export * from './collab.js';

@@ -94,6 +94,25 @@ export async function handleEvent(evt: { event_type: string; workspace_id: strin
     case 'comment.created':
       await onCommentCreated(db, evt.aggregate_id);
       return;
+    // Collaboration completion (collab/**): edits notify newly mentioned people only; tasks; reviewer requests; resets.
+    case 'comment.edited':
+      await onCommentCreated(db, evt.aggregate_id, 'edited');
+      return;
+    case 'task.changed': {
+      const { onTaskChanged } = await import('../collab/tasks.js');
+      await onTaskChanged(db, { workspace_id: evt.workspace_id, aggregate_id: evt.aggregate_id, payload: evt.payload });
+      return;
+    }
+    case 'review.reviewers_requested': {
+      const { onReviewersRequested } = await import('../collab/reviewers.js');
+      await onReviewersRequested(db, { workspace_id: evt.workspace_id, aggregate_id: evt.aggregate_id, payload: evt.payload });
+      return;
+    }
+    case 'approval.invalidated': {
+      const { onApprovalInvalidated } = await import('../collab/reviewers.js');
+      await onApprovalInvalidated(db, { workspace_id: evt.workspace_id, aggregate_id: evt.aggregate_id, payload: evt.payload });
+      return;
+    }
     case 'assignment.changed':
       await onAssignmentChanged(db, { workspace_id: evt.workspace_id, aggregate_id: evt.aggregate_id, payload: evt.payload });
       return;

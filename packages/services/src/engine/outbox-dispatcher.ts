@@ -13,6 +13,8 @@ export const QUEUE_DELIVERY_DUE = 'delivery-due';
 export const QUEUE_EVENTS = 'events';
 /** V3.1 'video' workload class: uploaded videos are validated/transcoded on their own queue (not behind notifications). */
 export const QUEUE_MEDIA_TRANSCODE = 'media-transcode';
+/** Collaboration notifications (comments, mentions, tasks, reviews). */
+export const QUEUE_COLLAB = 'collab-notify';
 /** V3 workload-class queues (event type → queue). Publishing (delivery-due) keeps its own queue and priority. */
 export const WORKLOAD_QUEUES: Record<string, string> = {
   // V3 Content Hub (content-hub/jobs.ts)
@@ -22,6 +24,11 @@ export const WORKLOAD_QUEUES: Record<string, string> = {
   'bulk.requested': 'bulk-ops',
   // V3.1 PERF workload isolation (workload/policy.ts)
   'asset.uploaded': QUEUE_MEDIA_TRANSCODE,
+  // Collaboration notifications on their own queue: a comment/mention/reminder burst never delays publishing or
+  // operational alerts (worker: 'collab-notify', workload class 'notifications').
+  'comment.created': QUEUE_COLLAB, 'comment.edited': QUEUE_COLLAB, 'task.changed': QUEUE_COLLAB, 'assignment.changed': QUEUE_COLLAB,
+  'approval.requested': QUEUE_COLLAB, 'approval.decided': QUEUE_COLLAB, 'approval.invalidated': QUEUE_COLLAB,
+  'review.reviewers_requested': QUEUE_COLLAB, 'review.shared': QUEUE_COLLAB,
 };
 
 export function jobIdFor(outboxId: string): string {

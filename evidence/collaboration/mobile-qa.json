@@ -1,0 +1,556 @@
+{
+  "generated_at": "2026-11-07T21:01:45.035Z",
+  "base": "http://localhost:3000",
+  "sizes": [
+    "320x640",
+    "360x740",
+    "390x844",
+    "430x932",
+    "768x1024",
+    "1440x900"
+  ],
+  "routes": 10,
+  "overflow_issues": [],
+  "small_target_pages": 40,
+  "console_errors": [],
+  "workflows": [
+    {
+      "n": 1,
+      "name": "open-notification-at-thread",
+      "ok": true,
+      "ms": 1356,
+      "errors": []
+    },
+    {
+      "n": 2,
+      "name": "read-and-reply",
+      "ok": true,
+      "ms": 1118,
+      "errors": []
+    },
+    {
+      "n": 3,
+      "name": "mention-a-teammate",
+      "ok": true,
+      "ms": 1366,
+      "errors": []
+    },
+    {
+      "n": 4,
+      "name": "assign-task-with-deadline",
+      "ok": true,
+      "ms": 1514,
+      "errors": []
+    },
+    {
+      "n": 5,
+      "name": "review-and-request-changes",
+      "ok": true,
+      "ms": 1044,
+      "errors": []
+    },
+    {
+      "n": 6,
+      "name": "approve-when-authorised",
+      "ok": true,
+      "ms": 1047,
+      "errors": []
+    },
+    {
+      "n": 7,
+      "name": "inspect-revision-comparison",
+      "ok": true,
+      "ms": 1086,
+      "errors": []
+    },
+    {
+      "n": 8,
+      "name": "recover-from-conflict",
+      "ok": true,
+      "ms": 32729,
+      "errors": []
+    }
+  ],
+  "layout": [
+    {
+      "width": 320,
+      "height": 640,
+      "url": "/posts/37b09d88-b27b-4ee2-ac2e-9b880b5cbde4",
+      "page_overflow_px": 0,
+      "small_targets": 6,
+      "errors": []
+    },
+    {
+      "width": 320,
+      "height": 640,
+      "url": "/posts/37b09d88-b27b-4ee2-ac2e-9b880b5cbde4?panel=discussion",
+      "page_overflow_px": 0,
+      "small_targets": 1,
+      "errors": []
+    },
+    {
+      "width": 320,
+      "height": 640,
+      "url": "/tasks",
+      "page_overflow_px": 0,
+      "small_targets": 1,
+      "errors": []
+    },
+    {
+      "width": 320,
+      "height": 640,
+      "url": "/tasks?view=team",
+      "page_overflow_px": 0,
+      "small_targets": 1,
+      "errors": []
+    },
+    {
+      "width": 320,
+      "height": 640,
+      "url": "/notifications",
+      "page_overflow_px": 0,
+      "small_targets": 1,
+      "errors": []
+    },
+    {
+      "width": 320,
+      "height": 640,
+      "url": "/approvals/8d6c16b0-da04-4847-9b70-fa2b048a168d",
+      "page_overflow_px": 0,
+      "small_targets": 5,
+      "errors": []
+    },
+    {
+      "width": 320,
+      "height": 640,
+      "url": "/admin/collaboration",
+      "page_overflow_px": 0,
+      "small_targets": 0,
+      "errors": []
+    },
+    {
+      "width": 320,
+      "height": 640,
+      "url": "/admin/collaboration/reassign",
+      "page_overflow_px": 0,
+      "small_targets": 0,
+      "errors": []
+    },
+    {
+      "width": 320,
+      "height": 640,
+      "url": "/admin/collaboration/notifications",
+      "page_overflow_px": 0,
+      "small_targets": 0,
+      "errors": []
+    },
+    {
+      "width": 320,
+      "height": 640,
+      "url": "/admin/collaboration/settings",
+      "page_overflow_px": 0,
+      "small_targets": 0,
+      "errors": []
+    },
+    {
+      "width": 360,
+      "height": 740,
+      "url": "/posts/37b09d88-b27b-4ee2-ac2e-9b880b5cbde4",
+      "page_overflow_px": 0,
+      "small_targets": 6,
+      "errors": []
+    },
+    {
+      "width": 360,
+      "height": 740,
+      "url": "/posts/37b09d88-b27b-4ee2-ac2e-9b880b5cbde4?panel=discussion",
+      "page_overflow_px": 0,
+      "small_targets": 1,
+      "errors": []
+    },
+    {
+      "width": 360,
+      "height": 740,
+      "url": "/tasks",
+      "page_overflow_px": 0,
+      "small_targets": 1,
+      "errors": []
+    },
+    {
+      "width": 360,
+      "height": 740,
+      "url": "/tasks?view=team",
+      "page_overflow_px": 0,
+      "small_targets": 1,
+      "errors": []
+    },
+    {
+      "width": 360,
+      "height": 740,
+      "url": "/notifications",
+      "page_overflow_px": 0,
+      "small_targets": 1,
+      "errors": []
+    },
+    {
+      "width": 360,
+      "height": 740,
+      "url": "/approvals/8d6c16b0-da04-4847-9b70-fa2b048a168d",
+      "page_overflow_px": 0,
+      "small_targets": 5,
+      "errors": []
+    },
+    {
+      "width": 360,
+      "height": 740,
+      "url": "/admin/collaboration",
+      "page_overflow_px": 0,
+      "small_targets": 0,
+      "errors": []
+    },
+    {
+      "width": 360,
+      "height": 740,
+      "url": "/admin/collaboration/reassign",
+      "page_overflow_px": 0,
+      "small_targets": 0,
+      "errors": []
+    },
+    {
+      "width": 360,
+      "height": 740,
+      "url": "/admin/collaboration/notifications",
+      "page_overflow_px": 0,
+      "small_targets": 0,
+      "errors": []
+    },
+    {
+      "width": 360,
+      "height": 740,
+      "url": "/admin/collaboration/settings",
+      "page_overflow_px": 0,
+      "small_targets": 0,
+      "errors": []
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "url": "/posts/37b09d88-b27b-4ee2-ac2e-9b880b5cbde4",
+      "page_overflow_px": 0,
+      "small_targets": 6,
+      "errors": []
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "url": "/posts/37b09d88-b27b-4ee2-ac2e-9b880b5cbde4?panel=discussion",
+      "page_overflow_px": 0,
+      "small_targets": 1,
+      "errors": []
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "url": "/tasks",
+      "page_overflow_px": 0,
+      "small_targets": 1,
+      "errors": []
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "url": "/tasks?view=team",
+      "page_overflow_px": 0,
+      "small_targets": 1,
+      "errors": []
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "url": "/notifications",
+      "page_overflow_px": 0,
+      "small_targets": 1,
+      "errors": []
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "url": "/approvals/8d6c16b0-da04-4847-9b70-fa2b048a168d",
+      "page_overflow_px": 0,
+      "small_targets": 5,
+      "errors": []
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "url": "/admin/collaboration",
+      "page_overflow_px": 0,
+      "small_targets": 0,
+      "errors": []
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "url": "/admin/collaboration/reassign",
+      "page_overflow_px": 0,
+      "small_targets": 0,
+      "errors": []
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "url": "/admin/collaboration/notifications",
+      "page_overflow_px": 0,
+      "small_targets": 0,
+      "errors": []
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "url": "/admin/collaboration/settings",
+      "page_overflow_px": 0,
+      "small_targets": 0,
+      "errors": []
+    },
+    {
+      "width": 430,
+      "height": 932,
+      "url": "/posts/37b09d88-b27b-4ee2-ac2e-9b880b5cbde4",
+      "page_overflow_px": 0,
+      "small_targets": 6,
+      "errors": []
+    },
+    {
+      "width": 430,
+      "height": 932,
+      "url": "/posts/37b09d88-b27b-4ee2-ac2e-9b880b5cbde4?panel=discussion",
+      "page_overflow_px": 0,
+      "small_targets": 1,
+      "errors": []
+    },
+    {
+      "width": 430,
+      "height": 932,
+      "url": "/tasks",
+      "page_overflow_px": 0,
+      "small_targets": 1,
+      "errors": []
+    },
+    {
+      "width": 430,
+      "height": 932,
+      "url": "/tasks?view=team",
+      "page_overflow_px": 0,
+      "small_targets": 1,
+      "errors": []
+    },
+    {
+      "width": 430,
+      "height": 932,
+      "url": "/notifications",
+      "page_overflow_px": 0,
+      "small_targets": 1,
+      "errors": []
+    },
+    {
+      "width": 430,
+      "height": 932,
+      "url": "/approvals/8d6c16b0-da04-4847-9b70-fa2b048a168d",
+      "page_overflow_px": 0,
+      "small_targets": 5,
+      "errors": []
+    },
+    {
+      "width": 430,
+      "height": 932,
+      "url": "/admin/collaboration",
+      "page_overflow_px": 0,
+      "small_targets": 0,
+      "errors": []
+    },
+    {
+      "width": 430,
+      "height": 932,
+      "url": "/admin/collaboration/reassign",
+      "page_overflow_px": 0,
+      "small_targets": 0,
+      "errors": []
+    },
+    {
+      "width": 430,
+      "height": 932,
+      "url": "/admin/collaboration/notifications",
+      "page_overflow_px": 0,
+      "small_targets": 0,
+      "errors": []
+    },
+    {
+      "width": 430,
+      "height": 932,
+      "url": "/admin/collaboration/settings",
+      "page_overflow_px": 0,
+      "small_targets": 0,
+      "errors": []
+    },
+    {
+      "width": 768,
+      "height": 1024,
+      "url": "/posts/37b09d88-b27b-4ee2-ac2e-9b880b5cbde4",
+      "page_overflow_px": 0,
+      "small_targets": 6,
+      "errors": []
+    },
+    {
+      "width": 768,
+      "height": 1024,
+      "url": "/posts/37b09d88-b27b-4ee2-ac2e-9b880b5cbde4?panel=discussion",
+      "page_overflow_px": 0,
+      "small_targets": 1,
+      "errors": []
+    },
+    {
+      "width": 768,
+      "height": 1024,
+      "url": "/tasks",
+      "page_overflow_px": 0,
+      "small_targets": 1,
+      "errors": []
+    },
+    {
+      "width": 768,
+      "height": 1024,
+      "url": "/tasks?view=team",
+      "page_overflow_px": 0,
+      "small_targets": 1,
+      "errors": []
+    },
+    {
+      "width": 768,
+      "height": 1024,
+      "url": "/notifications",
+      "page_overflow_px": 0,
+      "small_targets": 1,
+      "errors": []
+    },
+    {
+      "width": 768,
+      "height": 1024,
+      "url": "/approvals/8d6c16b0-da04-4847-9b70-fa2b048a168d",
+      "page_overflow_px": 0,
+      "small_targets": 5,
+      "errors": []
+    },
+    {
+      "width": 768,
+      "height": 1024,
+      "url": "/admin/collaboration",
+      "page_overflow_px": 0,
+      "small_targets": 0,
+      "errors": []
+    },
+    {
+      "width": 768,
+      "height": 1024,
+      "url": "/admin/collaboration/reassign",
+      "page_overflow_px": 0,
+      "small_targets": 0,
+      "errors": []
+    },
+    {
+      "width": 768,
+      "height": 1024,
+      "url": "/admin/collaboration/notifications",
+      "page_overflow_px": 0,
+      "small_targets": 0,
+      "errors": []
+    },
+    {
+      "width": 768,
+      "height": 1024,
+      "url": "/admin/collaboration/settings",
+      "page_overflow_px": 0,
+      "small_targets": 0,
+      "errors": []
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "url": "/posts/37b09d88-b27b-4ee2-ac2e-9b880b5cbde4",
+      "page_overflow_px": 0,
+      "small_targets": 60,
+      "errors": []
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "url": "/posts/37b09d88-b27b-4ee2-ac2e-9b880b5cbde4?panel=discussion",
+      "page_overflow_px": 0,
+      "small_targets": 60,
+      "errors": []
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "url": "/tasks",
+      "page_overflow_px": 0,
+      "small_targets": 6,
+      "errors": []
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "url": "/tasks?view=team",
+      "page_overflow_px": 0,
+      "small_targets": 5,
+      "errors": []
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "url": "/notifications",
+      "page_overflow_px": 0,
+      "small_targets": 16,
+      "errors": []
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "url": "/approvals/8d6c16b0-da04-4847-9b70-fa2b048a168d",
+      "page_overflow_px": 0,
+      "small_targets": 14,
+      "errors": []
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "url": "/admin/collaboration",
+      "page_overflow_px": 0,
+      "small_targets": 1,
+      "errors": []
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "url": "/admin/collaboration/reassign",
+      "page_overflow_px": 0,
+      "small_targets": 1,
+      "errors": []
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "url": "/admin/collaboration/notifications",
+      "page_overflow_px": 0,
+      "small_targets": 1,
+      "errors": []
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "url": "/admin/collaboration/settings",
+      "page_overflow_px": 0,
+      "small_targets": 1,
+      "errors": []
+    }
+  ]
+}

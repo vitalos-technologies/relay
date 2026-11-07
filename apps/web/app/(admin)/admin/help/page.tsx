@@ -12,6 +12,9 @@ const TOPICS: Array<{ title: string; href: string; who: string; what: string; un
   { title: 'Support access', href: '/admin/security/support', who: 'Owners and admins approve', what: 'Relay staff get read-only access for the approved time. Everything they open is attributed to them.', undo: 'End it any time; it also ends on its own.' },
   { title: 'Audit log', href: '/admin/security/audit', who: 'Owners and admins', what: 'Append-only record of changes with actor, scope, result and reference.', undo: 'Entries can’t be edited or deleted by the app.' },
   { title: 'Usage and limits', href: '/admin/usage', who: 'Owners change caps; admins view', what: 'Caps apply to the next reservation in the app, worker and MCP.', undo: 'Remove the cap. Never retroactive.' },
+  { title: 'Collaboration', href: '/admin/collaboration', who: 'Everyone sees counts; admins manage settings', what: 'Overdue tasks, review backlog and work held by people who lost access. Discussion text never shows here.', undo: 'Settings are reversible; every change is in the audit log.' },
+  { title: 'Reassign work', href: '/admin/collaboration/reassign', who: 'Admins and owners', what: 'Moves open tasks, reviews and post owners to someone who can see each brand. Nothing is approved or published.', undo: 'Reassign again.' },
+  { title: 'Notification delivery', href: '/admin/collaboration/notifications', who: 'Admins and owners', what: 'Email outcomes and reasons (no content). In-app notifications work without email.', undo: 'Retry a failed email; access is re-checked first.' },
   { title: 'Live updates', href: '/admin', who: 'Everyone in admin', what: 'Pages refresh within about 10 seconds of a change; “Reconnecting” means showing the last data while retrying.', undo: '—' },
 ];
 
