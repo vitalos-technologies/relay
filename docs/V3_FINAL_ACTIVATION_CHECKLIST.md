@@ -82,7 +82,7 @@ Instagram, Facebook, Telegram and X apps/reviews: unchanged, see V1 checklist §
 
 | Network | What | How to verify | Unlocks |
 |---|---|---|---|
-| Instagram / Facebook | Meta App Review for `instagram_manage_insights` and `read_insights` (+ `pages_read_engagement`). **Also needs a code change: connect does not request them yet (gap P1)** | Analytics → data health shows "ok", not "permission missing" | FB/IG post metrics |
+| Instagram / Facebook | Meta App Review for `instagram_manage_insights` and `read_insights` (+ `pages_read_engagement`). then set `META_REQUEST_INSIGHTS=true` in Setup → Meta and reconnect the accounts | Analytics → data health shows "ok", not "permission missing" | FB/IG post metrics |
 | X | Prepaid credits; set the workspace read budget (`limits.x_monthly_reads`) | Metrics appear; budget usage moves | X metrics (billable) |
 | TikTok | `video.list` approved; Direct Post (public posts only have metrics) | Public test video shows views | TikTok metrics |
 | YouTube | `yt-analytics.readonly` included in the verified consent screen | Video shows views/watch time after YouTube's delay | YouTube metrics |
