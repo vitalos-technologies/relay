@@ -1,4 +1,4 @@
-// Setup page model, readiness and diagnostics against real PostgreSQL, SeaweedFS, Dex and Mailpit.
+// Setup page model, readiness and diagnostics against real PostgreSQL, SeaweedFS, Keycloak and Mailpit.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { resetConfigCache } from '@social-lite/services';
 import { diagnostics, readiness } from '../../packages/services/src/diagnostics.js';
@@ -92,7 +92,7 @@ describe('readiness and diagnostics', () => {
   });
 
   it('checks database, storage, OIDC, SMTP, worker heartbeat and dispatch flag (owner/admin only)', async () => {
-    process.env.OIDC_ISSUER = 'http://localhost:5556/dex';
+    process.env.OIDC_ISSUER = 'http://localhost:5556/realms/social-lite'; // local Keycloak realm
     resetConfigCache();
     await ensureBucket();
     const db = testPool();

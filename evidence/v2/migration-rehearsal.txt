@@ -1,9 +1,8 @@
-# Migration rehearsal 2026-11-07T03:37:05Z from backup-20261106T233102Z.dump
-NOTICE:  database "socialite_migration_rehearsal" does not exist, skipping
+# Migration rehearsal 2026-11-07T05:12:31Z from backup-20261106T233102Z.dump
 UPDATE 1
 before: migrations=3 members=6 posts=5 deliveries=12 published=7
-{"msg":"migrations","applied":["004_tipsignal.sql","005_ai.sql","006_media_expansion.sql","007_slots_crops_analytics.sql","008_rate_limits_and_deletion.sql","009_v2_authz.sql","011_v2_tenancy.sql"],"alreadyApplied":3}
-after:  migrations=10 members=6 posts=5 deliveries=12 published=7
+{"msg":"migrations","applied":["004_tipsignal.sql","005_ai.sql","006_media_expansion.sql","007_slots_crops_analytics.sql","008_rate_limits_and_deletion.sql","009_v2_authz.sql","010_v2_identity.sql","011_v2_tenancy.sql","012_v2_collaboration.sql","013_v2_product.sql","014_v3_providers.sql"],"alreadyApplied":3}
+after:  migrations=14 members=6 posts=5 deliveries=12 published=7
 PASS posts preserved (5)
 PASS deliveries preserved (12)
 PASS published history preserved (7)

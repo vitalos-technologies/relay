@@ -23,7 +23,9 @@ BEFORE_POSTS=$(q 'SELECT count(*) FROM posts'); BEFORE_DEL=$(q 'SELECT count(*) 
 BEFORE_MEM=$(q 'SELECT count(*) FROM memberships WHERE removed_at IS NULL')
 
 set -a; . ./.env; set +a
-DATABASE_URL="postgres://socialite:socialite-local-only@localhost:54329/$DB" npx tsx packages/db/src/cli.ts migrate
+R_URL="postgres://socialite:socialite-local-only@localhost:54329/$DB"
+# Point EVERY URL the CLI may read at the disposable database (never the dev DB).
+DATABASE_URL="$R_URL" MIGRATOR_DATABASE_URL="$R_URL" DATABASE_ADMIN_URL="$R_URL" npx tsx packages/db/src/cli.ts migrate
 
 echo "after:  migrations=$(q 'SELECT count(*) FROM schema_migrations') members=$(q 'SELECT count(*) FROM memberships WHERE status<>'"'removed'"'') posts=$(q 'SELECT count(*) FROM posts') deliveries=$(q 'SELECT count(*) FROM deliveries') published=$(q "SELECT count(*) FROM deliveries WHERE state='published'")"
 fail=0

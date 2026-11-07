@@ -15,7 +15,7 @@ describe('production configuration', () => {
   it.each([
     ['mock providers', { ENABLE_MOCK_PROVIDERS: 'true' }, /ENABLE_MOCK_PROVIDERS/],
     ['insecure OIDC', { OIDC_ALLOW_INSECURE_HTTP: 'true' }, /OIDC_ALLOW_INSECURE_HTTP/],
-    ['local Dex issuer', { OIDC_ISSUER: 'http://localhost:5556/dex' }, /development identity provider/],
+    ['local Keycloak issuer', { OIDC_ISSUER: 'http://localhost:5556/realms/social-lite' }, /development identity provider/],
     ['http base URL', { APP_BASE_URL: 'http://social.example.com' }, /https/],
     ['local S3 secret', { S3_SECRET_ACCESS_KEY: 'socialite-local-secret-not-for-production' }, /local development defaults/],
     ['local SMTP capture', { SMTP_URL: 'smtp://localhost:1025' }, /local email capture/],

@@ -1,6 +1,7 @@
 # Stream A — Identity & security (progress)
 
 ## Status
+- RESUMED 2026-11-07 05:1x after container restart. Code found already present (committed in ab628ff): factors POST route (= idp-action), security page, Settings → Service accounts UI, integrations-settings SA binding, seed SA binding, proxy.ts nonce CSP + lib/csp.ts + next.config headers, E2E specs for enrol/recovery/removal + SA keys. Remaining = verification/fixes, Dex test/docs, scans.
 - [x] 0. Read contracts/spec
 - [~] 1. Keycloak replaces Dex — compose `oidc` = keycloak/keycloak:26.4 on :5556 (DONE, healthy); realm infra/keycloak/social-lite-realm.json; .env/.env.example OIDC_ISSUER=http://localhost:5556/realms/social-lite; infra/dex removed; tests/e2e/helpers.ts signIn completes TOTP. TODO: auth.test.ts (Dex-driven) → Keycloak; README/docs refs.
 - [~] 2. OIDC assurance / step-up / sessions / back-channel logout — services DONE: auth/session.ts (30m idle/12h abs, rotate, list/revoke), auth/oidc.ts (assurance from JWKS-verified ID token, step-up purpose, idp_action purpose, RP logout URL, handleBackchannelLogout), auth/jwt.ts, auth/idp-admin.ts (KC view-users credentials). Routes: api/auth/{callback,step-up,backchannel-logout,logout}. Tests PASS: tests/integration/auth.test.ts (real KC step-up), identity.test.ts. Step-up = acr_values=mfa + max_age=0 + prompt=login (without prompt=login KC only asked OTP and did not refresh auth_time). TODO: /api/security routes, idp-action POST route, E2E.
