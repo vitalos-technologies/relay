@@ -10,7 +10,14 @@
 
 - Done: migration 009 (teams, scoped grants, restrictions, membership status, policy versions, session assurance, service accounts/API key tables, V1 backfill + review items); `core/authz.ts` (presets, precedence, delegation); `services/authz.ts` (`authorize()`); `tenancy.ts` enforcement (declared permissions re-checked per touched brand); `v2Ctx` test helper; docs V2_THREAT_MODEL, PERMISSIONS_MATRIX.
 - Known failing: `tests/integration/members.test.ts` (2) — members/invitations still write V1 roles; fixed by tenancy workstream.
-- Next: workstreams in `docs/V2_WORKSTREAMS.md`.
+- Running (agents): A identity/security, B tenancy/lifecycle, C collaboration, D product/fairness — each keeps `docs/v2-progress/<A-D>.md`.
+- Lead done: adversarial tests (tests/integration/v2-adversarial.test.ts), V1→V2 migration rehearsal (scripts/migration-rehearsal.sh, PASS).
+- Lead next: integrate stream results, finish adversarial §12 cases as features land, V2 docs (CHANGELOG, USER_LIFECYCLE, MIGRATION_RUNBOOK, TEST_REPORT, REQUIREMENTS_MATRIX, GAPS, ACTIVATION), E2E with Keycloak, tag v2.
+
+## V3 early start
+
+- V3-P providers (TikTok, YouTube, LinkedIn, Threads, Pinterest, Bluesky) running in parallel — `docs/v3-progress/providers.md`, migration 014.
+- Remaining V3 streams start after V2: design system + shell/left Settings nav; analytics pipeline; Drive/Docs/Notion Content Hub; MCP server (auth via Keycloak AS).
 
 ## Environment recovery
 
