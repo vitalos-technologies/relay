@@ -21,7 +21,7 @@ describe('CSV import (drafts only)', () => {
     ].join('\n');
     const p = await previewImport(t.ownerCtx, t.brandId, csv);
     expect(p.rows.map((r) => r.ok)).toEqual([true, false, true, false, false]);
-    expect(p.rows[1]!.issues[0]!.message).toMatch(/Instagram: an image is required/);
+    expect(p.rows[1]!.issues[0]!.message).toMatch(/Instagram: an image or video is required/);
     expect(p.rows[3]!.issues[0]!.code).toBe('gap');
     expect(p.rows[4]!.issues[0]!.code).toBe('unknown_provider');
     expect(p.rows[0]!.suggested_time!.utc).toBe('2027-01-10T09:00:00.000Z');

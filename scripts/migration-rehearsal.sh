@@ -41,7 +41,7 @@ check "brand-restricted members not widened to workspace" "$(q "SELECT count(*) 
 check "no publisher grants created by backfill" "$(q "SELECT count(*) FROM scoped_role_grants WHERE source='v1_backfill' AND role='publisher'")" "0"
 check "every workspace keeps an owner" "$(q "SELECT count(*) FROM workspaces w WHERE NOT EXISTS (SELECT 1 FROM scoped_role_grants g WHERE g.workspace_id=w.id AND g.role='owner' AND g.revoked_at IS NULL)")" "0"
 echo "review items: $(q 'SELECT kind || '"'='"' || count(*) FROM migration_review_items GROUP BY kind' | tr '\n' ' ')"
-echo "Rollback: application images roll back freely; schema is additive (no destructive down-migrations). Rehearsal DB kept: $DB"
+echo "Rollback: schema is additive (no destructive down-migrations), but V1.1 app images must NOT run against a V2 schema (they ignore suspension, guest expiry and publication authority). Roll back by restoring the pre-upgrade backup. See docs/V2_MIGRATION_RUNBOOK.md. Rehearsal DB kept: $DB"
 [ $fail = 0 ] && echo "RESULT: PASS" || echo "RESULT: FAIL"
 } 2>&1 | tee "$OUT"
 grep -q "RESULT: PASS" "$OUT"
