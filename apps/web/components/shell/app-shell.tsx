@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Suspense, useState, type ReactNode } from 'react';
 import {
-  Activity, CalendarDays, CheckCheck, Ellipsis, FileClock, House, Images, Plug, Settings, SquarePen, Wrench, type LucideIcon,
+  Activity, CalendarDays, ChartColumn, CheckCheck, Ellipsis, FileClock, House, Images, Plug, Settings, SquarePen, Wrench, type LucideIcon,
 } from 'lucide-react';
 import type { Action } from '@social-lite/core';
 import { useSession } from '@/lib/client/session';
@@ -28,6 +28,7 @@ const NAV: NavItem[] = [
   { href: '/approvals', label: 'Approvals', icon: CheckCheck, badge: 'approvals', mobile: true },
   { href: '/library', label: 'Library', icon: Images },
   { href: '/history', label: 'History', icon: FileClock, perm: 'history.read' },
+  { href: '/analytics', label: 'Analytics', icon: ChartColumn, perm: 'history.read' },
   { href: '/accounts', label: 'Accounts', icon: Plug },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];

@@ -123,7 +123,7 @@ export function classifyXError(e: XApiError, nowMs: number): XErrorClass {
     return { kind: 'permission', code: 'x_forbidden', message: 'X refused the request for this account (403). Check the account is not locked or restricted and that the app has Read and write permission, then reconnect.' };
   }
   if (e.status >= 500) return { kind: 'server', code: 'x_server_error', message: `X returned a server error (${e.status}).` };
-  if (/media/i.test(text)) return { kind: 'invalid', code: 'x_media_rejected', message: 'X rejected the image. Use a single JPEG or PNG up to 5 MB.' };
+  if (/media/i.test(text)) return { kind: 'invalid', code: 'x_media_rejected', message: 'X rejected the media. Use up to 4 JPEG/PNG images (≤ 5 MB each) or one H.264/AAC MP4 video.' };
   if (/text|too long|length/i.test(text)) return { kind: 'invalid', code: 'x_text_rejected', message: 'X rejected the text (too long or invalid). Shorten it to 280 weighted characters.' };
   return { kind: 'invalid', code: 'x_invalid_request', message: `X rejected the request${e.detail ? ` (${e.detail.slice(0, 120)})` : ''}. Fix the content and schedule again.` };
 }

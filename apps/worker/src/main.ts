@@ -77,6 +77,8 @@ async function main(): Promise<void> {
   });
   await boss.work<{ eventType: string; aggregateId: string; workspaceId: string | null; payload: Record<string, unknown> }>(QUEUE_EVENTS, { batchSize: 10, pollingIntervalSeconds: 2 }, async (jobs) => {
     for (const job of jobs) {
+      // V1.1 media: uploaded videos are validated/transcoded here, never in the web request (throws ⇒ pg-boss retries).
+      if (job.data.eventType === 'asset.uploaded') { await track((await import('@social-lite/services/media/video-worker')).handleAssetUploaded({ workspace_id: job.data.workspaceId, aggregate_id: job.data.aggregateId, payload: job.data.payload })); continue; }
       await handleEvent({ event_type: job.data.eventType, aggregate_id: job.data.aggregateId, workspace_id: job.data.workspaceId, payload: job.data.payload ?? {} });
     }
   });

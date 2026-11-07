@@ -20,6 +20,9 @@ import { BaseEditor, DestinationPicker, VariantEditor } from './editors';
 import { VariantPreview } from './preview';
 import { ConflictDialog, PublishNowDialog, ScheduleDialog, SubmitDialog } from './action-dialogs';
 import { DeliveriesPanel } from './deliveries-panel';
+import { AiAssist } from '@/components/ai/assist';
+import { VariantCrops } from '@/components/crops/variant-crops';
+import { QueueButton } from '@/components/slots/queue-button';
 
 type SaveState = 'saved' | 'dirty' | 'saving' | 'failed' | 'conflict';
 interface ConflictDetails { version?: number; updated_by?: string; updated_at?: string }
@@ -249,6 +252,12 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
   const updateVariant = (v: VariantDraft) => {
     edit({ draft: { ...latest.current.draft, variants: latest.current.draft.variants.map((x) => (x.connectionId === v.connectionId ? v : x)) } });
   };
+  // AI suggestion accepted by the user: apply locally, then save via PATCH with expected_version.
+  const acceptSuggestion = (scope: string, text: string) => {
+    const d = latest.current.draft;
+    edit({ draft: scope === 'base' ? { ...d, baseText: text } : { ...d, variants: d.variants.map((x) => (x.connectionId === scope ? { ...x, inheritText: false, text } : x)) } });
+    void flush();
+  };
 
   // ---------------------------------------------------------------- other actions
   const duplicate = async () => {
@@ -377,6 +386,7 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
                         check={local.get(c.id)}
                         canUpload={can('assets.upload')}
                       />
+                      <VariantCrops draft={draft} variant={v} assets={assets} onChange={updateVariant} readOnly={readOnly} />
                     </TabsContent>
                   );
                 })}
@@ -451,6 +461,7 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
         <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-2 px-4 py-2 sm:px-6 md:px-8">
           <SaveStatus state={saveState} savedAt={savedAt} tz={tz} error={saveError} onRetry={() => void save()} onConflict={() => setConflictOpen(true)} readOnly={readOnly} />
           <span className="flex-1" />
+          <AiAssist postId={post.id} draft={draft} connections={selectedConns} tab={tab} readOnly={readOnly} flush={flush} onAccept={acceptSuggestion} />
           {!readOnly ? (
             <Button variant="ghost" size="md" icon={<Save aria-hidden className="size-4" />} onClick={() => void flush()} disabled={saveState === 'saved' || saveState === 'saving' || saveState === 'conflict'}>
               <span className="sr-only sm:not-sr-only">Save</span><span className="sr-only"> draft now</span>
@@ -470,6 +481,9 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
             >
               {post.current_schedule && (post.current_schedule.status === 'active' || post.current_schedule.status === 'pending_approval') ? 'Reschedule' : 'Schedule'}
             </Button>
+          ) : null}
+          {can('drafts.edit') && (post.can.schedule || post.can.submit) ? (
+            <QueueButton postId={post.id} flush={flush} disabledReason={blockReason} onDone={(t, b) => void afterAction(t, b)} />
           ) : null}
           {post.can.publish_now ? (
             <Button variant="secondary" icon={<SendHorizontal aria-hidden className="size-4" />} onClick={() => setDialog('publish')} disabledReason={blockReason}>

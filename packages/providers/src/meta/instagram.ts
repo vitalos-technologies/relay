@@ -1,5 +1,10 @@
 // Instagram professional-account publishing via the Facebook Login route (graph.facebook.com,
-// Page access token). Single JPEG image + caption.
+// Page access token). Single JPEG image + caption; V1.1: Reels (single video) and carousels
+// (2–20 images/videos) — see ./carousel.ts and docs/providers/meta.md.
+//
+//  reel     → POST /{ig-user-id}/media { media_type=REELS, video_url, caption, share_to_feed, cover_url }
+//  carousel → children POST /{ig-user-id}/media { is_carousel_item=true, image_url | media_type=VIDEO+video_url }
+//             then POST /{ig-user-id}/media { media_type=CAROUSEL, children=<ids>, caption }  (parent = containerId)
 //
 //  prepare  → POST /{ig-user-id}/media { image_url, caption }  → container id (checkpoint, expires +24h)
 //             GET  /{container-id}?fields=status_code,status    → IN_PROGRESS | FINISHED | ERROR | EXPIRED | PUBLISHED
@@ -14,7 +19,8 @@ import type {
   AdapterContext, AttemptReference, Checkpoint, ConnectionHealth, PrepareOutcome, ProviderCredentials,
   PublishConnection, PublishInput, PublishOutcome, PublishingAdapter, ReconcileOutcome,
 } from '@social-lite/core';
-import { capabilitiesFor, igUserIdOf, textMatches, validateMeta, validationFailureMessage } from './common.js';
+import { capabilitiesFor, igUserIdOf, metaShape, textMatches, validateMeta, validationFailureMessage } from './common.js';
+import { prepareCarousel } from './carousel.js';
 import {
   isTransportError, normalizeGraphError, prepareOutcomeFromGraphError, prepareOutcomeFromTransportError,
   publishOutcomeFromGraphError, publishOutcomeFromTransportError,
@@ -27,21 +33,27 @@ export const CONTAINER_TTL_MS = 24 * 60 * 60_000;
 const EXPIRY_SAFETY_MS = 10 * 60_000;
 /** Give up on a container stuck IN_PROGRESS after this long; a fresh container is made on retry. */
 export const PROCESSING_TIMEOUT_MS = 10 * 60_000;
+/** Video containers (Reels, carousels with video) are transcoded by Instagram and take longer. */
+export const VIDEO_PROCESSING_TIMEOUT_MS = 30 * 60_000;
 const RECONCILE_WINDOW_MS = 10 * 60_000;
 /** After this long with the container still unpublished, non-publication is considered established. */
 const NOT_PUBLISHED_AFTER_MS = 10 * 60_000;
 
 type StatusCode = 'IN_PROGRESS' | 'FINISHED' | 'ERROR' | 'EXPIRED' | 'PUBLISHED';
 
-interface ContainerData {
+export interface ContainerData {
   containerId: string;
   createdAt: string;
   expiresAt: string;
   polls: number;
   published?: boolean;
+  /** V1.1: what the container holds ('image' when absent). */
+  kind?: 'image' | 'reel' | 'carousel';
+  /** V1.1 carousel: child containers in media order. */
+  children?: Array<{ assetId: string; containerId: string; finished: boolean; video: boolean }>;
 }
 
-function containerFrom(cp: Checkpoint | null | undefined): ContainerData | null {
+export function containerFrom(cp: Checkpoint | null | undefined): ContainerData | null {
   const d = cp?.data as Partial<ContainerData> | undefined;
   if (!d || typeof d.containerId !== 'string' || !d.containerId) return null;
   return {
@@ -50,24 +62,29 @@ function containerFrom(cp: Checkpoint | null | undefined): ContainerData | null 
     expiresAt: typeof d.expiresAt === 'string' ? d.expiresAt : (cp?.expiresAt ?? new Date(0).toISOString()),
     polls: typeof d.polls === 'number' ? d.polls : 0,
     published: d.published === true,
+    ...(d.kind ? { kind: d.kind } : {}),
+    ...(Array.isArray(d.children) ? { children: d.children } : {}),
   };
 }
 
-function checkpointOf(step: string, c: ContainerData): Checkpoint {
+export function checkpointOf(step: string, c: ContainerData): Checkpoint {
   return { step, data: { ...c }, expiresAt: c.expiresAt };
 }
 
 /** Poll delay: quick first checks (images usually finish in seconds), then back off to 60s. */
-export function pollDelayMs(polls: number): number {
-  const schedule = [5_000, 5_000, 10_000, 15_000, 30_000];
+export function pollDelayMs(polls: number, video = false): number {
+  const schedule = video ? [10_000, 15_000, 30_000] : [5_000, 5_000, 10_000, 15_000, 30_000];
   return schedule[polls] ?? 60_000;
 }
+
+const hasVideo = (c: ContainerData) => c.kind === 'reel' || !!c.children?.some((x) => x.video);
 
 const credentialsMissing = 'This Instagram account has no usable credentials. Reconnect it in Settings → Connections.';
 
 const ERROR_STATUS_MESSAGE = 'Instagram could not process this image. Use a JPEG (sRGB) between 4:5 and 1.91:1, at least 320px wide and under 8 MB, then try again.';
+const VIDEO_ERROR_STATUS_MESSAGE = 'Instagram could not process this video. Use an H.264/AAC MP4 between 3 seconds and 15 minutes, 23–60 fps, at most 1920px wide and under 300 MB, then try again.';
 
-async function containerStatus(ctx: AdapterContext, token: string, containerId: string) {
+export async function containerStatus(ctx: AdapterContext, token: string, containerId: string) {
   return graph<{ id?: string; status_code?: string; status?: string }>(ctx, {
     method: 'GET', path: containerId, token, params: { fields: 'status_code,status' }, op: 'meta.instagram.container_status',
   });
@@ -89,14 +106,19 @@ async function findMediaByCaption(ctx: AdapterContext, token: string, igUserId: 
   }) ?? null;
 }
 
-async function createContainer(ctx: AdapterContext, input: PublishInput, token: string): Promise<PrepareOutcome> {
+export async function createContainer(ctx: AdapterContext, input: PublishInput, token: string): Promise<PrepareOutcome> {
+  const shape = metaShape('instagram', input.media);
+  if (shape === 'carousel') return prepareCarousel(ctx, input, token, null);
   const igUserId = igUserIdOf(input.connection);
-  const image = input.media[0]!;
+  const item = input.media[0]!;
+  const reel = shape === 'reel';
   let res;
   try {
     res = await graph<{ id?: string }>(ctx, {
       method: 'POST', path: `${igUserId}/media`, token, op: 'meta.instagram.media_create', timeoutMs: 60_000,
-      params: { image_url: image.url, caption: input.variant.text || undefined },
+      params: reel
+        ? { media_type: 'REELS', video_url: item.url, caption: input.variant.text || undefined, share_to_feed: true, cover_url: item.posterUrl || undefined }
+        : { image_url: item.url, caption: input.variant.text || undefined },
     });
   } catch (err) {
     if (isTransportError(err)) return prepareOutcomeFromTransportError(err); // containers are invisible; safe to recreate
@@ -106,11 +128,11 @@ async function createContainer(ctx: AdapterContext, input: PublishInput, token: 
   const id = str(res.data.id);
   if (!id) return { kind: 'retryable', code: 'missing_container_id', message: 'Instagram did not return an upload ID. It will be retried.', retryAfterMs: 30_000 };
   const now = ctx.now();
-  const c: ContainerData = { containerId: id, createdAt: now.toISOString(), expiresAt: new Date(now.getTime() + CONTAINER_TTL_MS).toISOString(), polls: 0 };
+  const c: ContainerData = { containerId: id, createdAt: now.toISOString(), expiresAt: new Date(now.getTime() + CONTAINER_TTL_MS).toISOString(), polls: 0, ...(reel ? { kind: 'reel' as const } : {}) };
   return pollContainer(ctx, token, c, input, true);
 }
 
-async function pollContainer(ctx: AdapterContext, token: string, c: ContainerData, input: PublishInput, fresh: boolean): Promise<PrepareOutcome> {
+export async function pollContainer(ctx: AdapterContext, token: string, c: ContainerData, input: PublishInput, fresh: boolean): Promise<PrepareOutcome> {
   let res;
   try {
     res = await containerStatus(ctx, token, c.containerId);
@@ -143,15 +165,15 @@ async function pollContainer(ctx: AdapterContext, token: string, c: ContainerDat
         }
         if (n.cls === 'invalid') return { kind: 'permanent', code: n.code, message: n.message };
       }
-      return { kind: 'permanent', code: 'ig_container_error', message: ERROR_STATUS_MESSAGE };
+      return { kind: 'permanent', code: 'ig_container_error', message: hasVideo(c) ? VIDEO_ERROR_STATUS_MESSAGE : ERROR_STATUS_MESSAGE };
     }
     case 'IN_PROGRESS':
     default: {
       const age = ctx.now().getTime() - Date.parse(c.createdAt);
-      if (age > PROCESSING_TIMEOUT_MS) {
-        return { kind: 'retryable', code: 'ig_processing_timeout', message: 'Instagram is taking too long to process the image. A fresh upload will be tried.', retryAfterMs: 60_000 };
+      if (age > (hasVideo(c) ? VIDEO_PROCESSING_TIMEOUT_MS : PROCESSING_TIMEOUT_MS)) {
+        return { kind: 'retryable', code: 'ig_processing_timeout', message: `Instagram is taking too long to process the ${hasVideo(c) ? 'video' : 'image'}. A fresh upload will be tried.`, retryAfterMs: 60_000 };
       }
-      return { kind: 'pending', checkpoint: checkpointOf('container_created', next), checkAfterMs: pollDelayMs(c.polls) };
+      return { kind: 'pending', checkpoint: checkpointOf('container_created', next), checkAfterMs: pollDelayMs(c.polls, hasVideo(c)) };
     }
   }
 }
@@ -180,6 +202,7 @@ export const instagramAdapter: PublishingAdapter = {
     if (!v.ok) return { kind: 'permanent', code: 'invalid_content', message: validationFailureMessage(v) };
     const token = pageToken(input.credentials);
     if (!token) return { kind: 'permanent', code: 'credentials_missing', message: credentialsMissing, blocking: 'reconnect' };
+    if (metaShape('instagram', input.media) === 'carousel') return prepareCarousel(ctx, input, token, checkpoint);
 
     const c = containerFrom(checkpoint);
     if (!c) return createContainer(ctx, input, token);

@@ -1,6 +1,6 @@
 // Destination-aware validation (CO-04). Used when composing, scheduling and at dispatch.
 import { countHashtags, countMentions, measure, composeTextWithLink } from './text.js';
-import type { ChannelConstraints, MediaFormat, Provider, ResolvedVariant, ValidationIssue, ValidationResult, DraftContent, UrlButton } from './types.js';
+import type { ChannelConstraints, MediaFormat, MediaKind, Provider, ResolvedVariant, ValidationIssue, ValidationResult, DraftContent, UrlButton } from './types.js';
 import { PROVIDER_LABEL } from './types.js';
 
 export interface MediaFacts {
@@ -10,6 +10,31 @@ export interface MediaFacts {
   bytes: number | null;
   width: number | null;
   height: number | null;
+  // ---- V1.1 (optional, additive)
+  /** 'image' | 'video'. Absent ⇒ inferred from mime (video/* ⇒ video). */
+  kind?: MediaKind;
+  durationMs?: number | null;
+  videoCodec?: string | null;
+  audioCodec?: string | null;
+  frameRate?: number | null;
+}
+
+/** Media kind from an explicit kind or the MIME type. */
+export function mediaKindOf(m: { kind?: MediaKind | null; mime?: string | null }): MediaKind {
+  if (m.kind === 'video' || m.kind === 'image') return m.kind;
+  return m.mime?.startsWith('video/') ? 'video' : 'image';
+}
+
+/**
+ * Publication format for a destination given the kinds of its attached media, in order.
+ * 0 items ⇒ text; 1 image ⇒ image; 1 video ⇒ reel on Instagram (the only IG video feed format), else video;
+ * 2+ items ⇒ album (Instagram carousel, Facebook multi-photo, Telegram media group, X multi-image).
+ */
+export function deriveFormat(provider: Provider, kinds: MediaKind[]): MediaFormat {
+  if (kinds.length === 0) return 'text';
+  if (kinds.length > 1) return 'album';
+  if (kinds[0] === 'video') return provider === 'instagram' ? 'reel' : 'video';
+  return 'image';
 }
 
 export interface ValidateVariantInput {
@@ -26,6 +51,33 @@ export interface ValidateVariantInput {
 
 const URL_RE = /^https:\/\/[^\s/$.?#].[^\s]*$/i;
 
+const fmtSeconds = (s: number) => (s >= 60 ? `${Math.floor(s / 60)} min${s % 60 ? ` ${Math.round(s % 60)} s` : ''}` : `${Number.isInteger(s) ? s : s.toFixed(1)} s`);
+
+function validateVideo(m: MediaFacts, c: ChannelConstraints, add: (field: ValidationIssue['field'], code: string, message: string) => void): void {
+  if (m.mime && c.videoMimes && !c.videoMimes.includes(m.mime)) add('media', 'video_mime', `${m.mime} videos are not accepted (allowed: ${c.videoMimes.join(', ')}).`);
+  if (m.bytes && c.maxVideoBytes && m.bytes > c.maxVideoBytes) add('media', 'video_too_large', `video is ${(m.bytes / 1_048_576).toFixed(1)} MB; the limit is ${(c.maxVideoBytes / 1_048_576).toFixed(0)} MB.`);
+  if (m.durationMs !== undefined && m.durationMs !== null) {
+    const sec = m.durationMs / 1000;
+    if (c.minVideoSeconds && sec < c.minVideoSeconds - 0.001) add('media', 'video_too_short', `video is ${fmtSeconds(sec)} long; at least ${fmtSeconds(c.minVideoSeconds)} is required.`);
+    if (c.maxVideoSeconds && sec > c.maxVideoSeconds + 0.001) add('media', 'video_too_long', `video is ${fmtSeconds(sec)} long; the limit is ${fmtSeconds(c.maxVideoSeconds)}. Trim it.`);
+  }
+  if (m.videoCodec && c.videoCodecs && !c.videoCodecs.includes(m.videoCodec)) add('media', 'video_codec', `video codec ${m.videoCodec} is not accepted (allowed: ${c.videoCodecs.join(', ')}).`);
+  if (m.audioCodec && c.audioCodecs && !c.audioCodecs.includes(m.audioCodec)) add('media', 'audio_codec', `audio codec ${m.audioCodec} is not accepted (allowed: ${c.audioCodecs.join(', ')}).`);
+  if (m.frameRate && c.maxFrameRate && m.frameRate > c.maxFrameRate + 0.01) add('media', 'frame_rate', `video is ${m.frameRate.toFixed(0)} fps; at most ${c.maxFrameRate} fps.`);
+  if (m.frameRate && c.minFrameRate && m.frameRate < c.minFrameRate - 0.01) add('media', 'frame_rate', `video is ${m.frameRate.toFixed(0)} fps; at least ${c.minFrameRate} fps is required.`);
+  if (m.width && m.height) {
+    const ar = m.width / m.height;
+    if (c.minVideoAspectRatio && ar < c.minVideoAspectRatio - 0.005) add('media', 'video_aspect', `video aspect ratio ${ar.toFixed(2)} is too tall (minimum ${c.minVideoAspectRatio.toFixed(2)}). Crop it.`);
+    if (c.maxVideoAspectRatio && ar > c.maxVideoAspectRatio + 0.005) add('media', 'video_aspect', `video aspect ratio ${ar.toFixed(2)} is too wide (maximum ${c.maxVideoAspectRatio.toFixed(2)}). Crop it.`);
+    if (c.maxVideoWidth && m.width > c.maxVideoWidth) add('media', 'video_dimensions', `video is ${m.width}px wide; at most ${c.maxVideoWidth}px.`);
+    const long = Math.max(m.width, m.height);
+    const short = Math.min(m.width, m.height);
+    if ((c.maxVideoLongSide && long > c.maxVideoLongSide) || (c.maxVideoShortSide && short > c.maxVideoShortSide)) {
+      add('media', 'video_dimensions', `video is ${m.width}×${m.height}; at most ${c.maxVideoLongSide ?? long}×${c.maxVideoShortSide ?? short} (either orientation).`);
+    }
+  }
+}
+
 export function validateVariant(v: ValidateVariantInput): ValidationResult {
   const issues: ValidationIssue[] = [];
   const label = PROVIDER_LABEL[v.provider];
@@ -34,9 +86,30 @@ export function validateVariant(v: ValidateVariantInput): ValidationResult {
   const c = v.constraints;
   const hasMedia = v.media.length > 0;
 
+  const kinds = v.media.map(mediaKindOf);
+  const videos = kinds.filter((k) => k === 'video').length;
+  const images = kinds.length - videos;
+  const isAlbum = v.media.length > 1;
+  const maxVideos = c.maxVideos ?? 0;
+
   if (c.requiresMedia && !hasMedia) add('media', 'media_required', 'an image is required. Add an image or remove this destination.');
   if (!hasMedia && !c.supportsTextOnly) add('media', 'text_only_unsupported', 'text-only posts are not supported. Add an image.');
-  if (v.media.length > c.maxImages) add('media', 'too_many_images', `at most ${c.maxImages} image${c.maxImages === 1 ? '' : 's'} per post in this release. Remove ${v.media.length - c.maxImages}.`);
+  if (videos > 0 && maxVideos <= 0) {
+    add('media', 'video_unsupported', 'videos are not supported for this destination. Remove the video or deselect it.');
+  } else if (videos > 0 && isAlbum && !c.albumAllowsVideo) {
+    add('media', 'mixed_media_unsupported', 'a video must be posted on its own here. Remove the other media or the video.');
+  } else if (!isAlbum && videos > maxVideos) {
+    add('media', 'too_many_videos', `at most ${maxVideos} video per post.`);
+  }
+  if (images > c.maxImages) add('media', 'too_many_images', `at most ${c.maxImages} image${c.maxImages === 1 ? '' : 's'} per post in this release. Remove ${images - c.maxImages}.`);
+  if (isAlbum) {
+    const maxItems = c.maxAlbumItems ?? c.maxImages;
+    if (v.media.length > maxItems && images <= c.maxImages) add('media', 'too_many_items', `at most ${maxItems} items per post. Remove ${v.media.length - maxItems}.`);
+    if (c.minAlbumItems && v.media.length < c.minAlbumItems) add('media', 'too_few_items', `a multi-item post needs at least ${c.minAlbumItems} items.`);
+    if (c.albumSupportsButtons === false && v.buttons.length && c.supportsButtons) {
+      add('buttons', 'album_buttons_unsupported', 'buttons cannot be attached to a multi-image post. Remove the buttons or use one image.');
+    }
+  }
 
   const outgoing = v.linkIsSeparateField ? v.text : composeTextWithLink(v.text, v.link);
   if (!hasMedia && outgoing.trim().length === 0) add('text', 'empty', 'write some text or add an image.');
@@ -62,8 +135,15 @@ export function validateVariant(v: ValidateVariantInput): ValidationResult {
   }
 
   for (const m of v.media) {
+    const kind = mediaKindOf(m);
+    const noun = kind === 'video' ? 'video' : 'image';
     if (m.status !== 'ready') {
-      add('media', 'media_not_ready', m.status === 'rejected' ? 'an attached image was rejected. Replace it.' : m.status === 'missing' ? 'an attached image no longer exists. Replace it.' : 'an attached image is still processing. Wait for it to finish.');
+      add('media', 'media_not_ready', m.status === 'rejected' ? `an attached ${noun} was rejected. Replace it.` : m.status === 'missing' ? `an attached ${noun} no longer exists. Replace it.` : `an attached ${noun} is still processing. Wait for it to finish.`);
+      continue;
+    }
+    if (kind === 'video') {
+      if (maxVideos <= 0) continue; // already reported once as video_unsupported
+      validateVideo(m, c, add);
       continue;
     }
     if (m.mime && !c.imageMimes.includes(m.mime)) add('media', 'mime', `${m.mime} is not accepted (allowed: ${c.imageMimes.join(', ')}).`);
@@ -84,7 +164,13 @@ export function mergeResults(results: ValidationResult[]): ValidationResult {
 }
 
 /** Resolve the working draft into concrete per-destination variants (CO-01, CO-03). */
-export function resolveVariants(draft: DraftContent, connections: Array<{ id: string; provider: Provider }>): ResolvedVariant[] {
+export function resolveVariants(
+  draft: DraftContent,
+  connections: Array<{ id: string; provider: Provider }>,
+  /** Optional media kinds by asset id; when given, single videos resolve to 'video' / 'reel' (V1.1). */
+  assetKinds?: ReadonlyMap<string, MediaKind> | Record<string, MediaKind>,
+): ResolvedVariant[] {
+  const kindOf = (id: string): MediaKind => (assetKinds instanceof Map ? assetKinds.get(id) : (assetKinds as Record<string, MediaKind> | undefined)?.[id]) ?? 'image';
   const byId = new Map(connections.map((c) => [c.id, c]));
   return draft.variants.flatMap((v) => {
     const conn = byId.get(v.connectionId);
@@ -92,7 +178,7 @@ export function resolveVariants(draft: DraftContent, connections: Array<{ id: st
     const text = v.inheritText ? draft.baseText : (v.text ?? '');
     const assetIds = v.inheritMedia ? draft.baseAssetIds : (v.assetIds ?? []);
     const link = v.link === undefined ? (draft.baseLink ?? null) : v.link;
-    const format: MediaFormat = assetIds.length > 1 ? 'album' : assetIds.length === 1 ? 'image' : 'text';
+    const format: MediaFormat = deriveFormat(conn.provider, assetIds.map(kindOf));
     return [{
       connectionId: v.connectionId, provider: conn.provider, inheritText: v.inheritText, text, link: link || null,
       assetIds, format, buttons: v.buttons ?? [], options: v.options ?? {},

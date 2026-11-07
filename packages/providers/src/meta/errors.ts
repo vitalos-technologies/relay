@@ -51,7 +51,7 @@ const IG_SUBCODES: Record<number, Rule> = {
   2207010: { cls: 'invalid', code: 'caption_too_long', message: 'Instagram: captions are limited to 2,200 characters, 30 hashtags and 20 @mentions. Shorten the caption.' },
   2207020: { cls: 'container_expired', code: 'ig_media_expired', message: 'The prepared Instagram upload expired. A new upload will be prepared.' },
   2207023: { cls: 'invalid', code: 'media_type', message: 'Instagram did not recognise the media type. Use a single JPEG image.' },
-  2207026: { cls: 'invalid', code: 'video_format', message: 'Instagram: unsupported video format. Only single JPEG images are supported in this release.' },
+  2207026: { cls: 'invalid', code: 'video_format', message: 'Instagram: unsupported video format. Use an H.264/AAC MP4 (3 s – 15 min, 23–60 fps, at most 1920px wide).' },
   2207027: { cls: 'not_ready', code: 'ig_media_not_ready', message: 'Instagram is still processing the image. Publishing will be retried shortly.' },
   2207032: { cls: 'transient', code: 'ig_media_create_failed', message: 'Instagram failed to create the media. It will be retried.' },
   2207040: { cls: 'invalid', code: 'too_many_mentions', message: 'Instagram: use at most 20 @mentions.' },
@@ -87,6 +87,8 @@ function rule(e: GraphErrorInfo): Rule {
   if (code === 9004) return IG_SUBCODES[2207052]!;
   if (code !== null && IG_CODE_ALIASES[code]) return IG_SUBCODES[IG_CODE_ALIASES[code]!]!;
   if (code === 1609005) return { cls: 'invalid', code: 'link_unreachable', message: 'Facebook could not read the link. Check the URL is public and correct, then try again.' };
+  if (code === 382) return { cls: 'invalid', code: 'video_too_small', message: 'Facebook: the video file is too small. Upload a longer video.' };
+  if (code === 389) return { cls: 'invalid', code: 'video_fetch_failed', message: 'Facebook could not download the video. Re-upload it and try again.' };
   if (code === 324) return { cls: 'invalid', code: 'image_invalid', message: 'Facebook could not read the image. Re-upload a JPEG or PNG under 10 MB.' };
   if (code === 100 && e.subcode === 33) return { cls: 'permission', code: 'object_inaccessible', message: 'Meta cannot access this Page or account with the current connection. Reconnect and select it again.', blocking: 'permission' };
   if (code === 100) return { cls: 'invalid', code: 'invalid_request', message: 'Meta rejected the post content or parameters (code 100). Check the text, link and image, then try again.' };

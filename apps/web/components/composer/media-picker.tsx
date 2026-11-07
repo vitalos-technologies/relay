@@ -1,11 +1,13 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Check, ImageOff, Search } from 'lucide-react';
+import { Check, ImageOff, Play, Search } from 'lucide-react';
 import { useApi } from '@/lib/client/use-api';
 import { useDebouncedValue } from '@/lib/client/hooks';
 import type { Asset, Page } from '@/lib/client/types';
 import { Button, cn, Dialog, EmptyState, ErrorState, Input, Skeleton, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui';
 import { UploadDropzone } from '@/components/library/upload-dropzone';
+import { VideoUpload } from '@/components/media/video-upload';
+import { fmtDuration, isVideoAsset, type MediaAsset } from '@/components/media/media-kind';
 
 /** Choose ready images from the brand library or upload new ones. */
 export function MediaPicker({
@@ -43,7 +45,7 @@ export function MediaPicker({
       onOpenChange={onOpenChange}
       size="lg"
       title="Add media"
-      description={max === 1 ? 'One image.' : `Up to ${max} images.`}
+      description={max === 1 ? 'One image or video.' : `Up to ${max} items, or one video.`}
       footer={
         <>
           <span className="mr-auto text-xs text-muted" aria-live="polite">{picked.length} selected</span>
@@ -83,6 +85,7 @@ export function MediaPicker({
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={a.thumb_url} alt={a.alt_text || a.original_filename} className="size-full object-cover" loading="lazy" />
                       ) : <span className="flex size-full items-center justify-center text-xs text-muted">{a.original_filename}</span>}
+                      {isVideoAsset(a) ? <span className="absolute bottom-1.5 left-1.5 inline-flex items-center gap-0.5 rounded bg-[var(--overlay)] px-1 py-0.5 text-[10px] font-medium text-white"><Play aria-hidden className="size-2.5 fill-current" />{fmtDuration((a as MediaAsset).duration_ms) ?? 'Video'}</span> : null}
                       {on ? <span className="absolute right-1.5 top-1.5 flex size-6 items-center justify-center rounded-full bg-[var(--text)] text-bg"><Check aria-hidden className="size-4" /></span> : null}
                       <span className="sr-only">{a.original_filename}{on ? ', selected' : ''}</span>
                     </button>
@@ -93,6 +96,9 @@ export function MediaPicker({
           )}
         </TabsContent>
         <TabsContent value="upload">
+          <div className="mb-3 flex justify-end">
+            <VideoUpload brandId={brandId} onUploaded={(a) => { onAssetsSeen([a]); if (a.status === 'ready') { setPicked((p) => (max === 1 ? [a.id] : p.length < max ? [...p, a.id] : p)); void refetch(); } }} />
+          </div>
           <UploadDropzone
             brandId={brandId}
             onUploaded={(a) => {

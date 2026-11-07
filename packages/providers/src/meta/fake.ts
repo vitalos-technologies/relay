@@ -6,6 +6,10 @@
 // Simulation choices (not provider facts): throttling is answered like Graph does (HTTP 400 +
 // code 80001/80002 + X-Business-Use-Case-Usage), not with HTTP 429; re-publishing an already
 // published container answers code 24 / subcode 2207008.
+//
+// V1.1 media: IG carousel items (is_carousel_item), CAROUSEL parents and REELS containers; Facebook
+// unpublished photos (published=false) + /feed attached_media, and /videos (file_url) with an async
+// video status (processing for PROCESSING_POLLS polls under the `processing` scenario).
 import type { HttpRequest, HttpResponse } from '@social-lite/core';
 import { json, lostResponse, type FakeEnv, type FakeHandler, type MockObject } from '../transport/mock.js';
 
@@ -183,19 +187,54 @@ export const metaFake: FakeHandler = async (req, env) => {
     if (edge === 'feed' && p.method === 'POST') {
       const message = params.get('message');
       const link = params.get('link');
-      if (!message && !link) return invalidParam('Either message or link must be provided');
+      const attached: string[] = [];
+      for (let i = 0; params.has(`attached_media[${i}]`); i++) {
+        let fbid: unknown;
+        try { fbid = (JSON.parse(params.get(`attached_media[${i}]`)!) as { media_fbid?: unknown }).media_fbid; } catch { fbid = null; }
+        if (typeof fbid !== 'string') return invalidParam(`attached_media[${i}] must be {"media_fbid":"<id>"}`);
+        const photo = await env.store.get(env.provider, fbid);
+        if (!photo || photo.kind !== 'photo' || photo.accountId !== env.accountId || photo.data.used) {
+          return invalidParam(`Unsupported post request. Object with ID '${fbid}' does not exist, cannot be loaded due to missing permissions, or does not support this operation.`, 33);
+        }
+        attached.push(fbid);
+      }
+      if (!message && !link && !attached.length) return invalidParam('Either message or link must be provided');
       if (env.scenario === 'fail_permanent') return invalidParam('Invalid parameter');
       const gate = await publishGate(env, 'feed');
       if (gate && gate !== 'lose_response') return gate;
       const id = `${pageId}_${env.newId('')}`;
-      await put(env, id, 'post', { message, link, created_time: fbTime(now) });
+      await put(env, id, 'post', { message, link, created_time: fbTime(now), ...(attached.length ? { attached_media: attached } : {}) });
+      for (const fbid of attached) {
+        const photo = (await env.store.get(env.provider, fbid))!;
+        await put(env, fbid, 'photo', { ...photo.data, used: true, post_id: id }, photo.createdAt);
+      }
       if (gate === 'lose_response') lostResponse();
       return json(200, { id });
+    }
+    if (edge === 'videos' && p.method === 'POST') {
+      const fileUrl = params.get('file_url');
+      if (!isHttpsUrl(fileUrl)) return gerr(400, 389, 'Unable to fetch video file from URL.');
+      if (env.scenario === 'fail_permanent') return gerr(400, 389, 'Unable to fetch video file from URL.');
+      const gate = await publishGate(env, 'videos');
+      if (gate && gate !== 'lose_response') return gate;
+      const videoId = env.newId();
+      const postId = `${pageId}_${videoId.slice('mock_'.length)}`;
+      await put(env, videoId, 'video', { description: params.get('description') ?? '', post_id: postId, processing: env.scenario === 'processing', polls: 0, created_time: fbTime(now) });
+      await put(env, postId, 'post', { message: params.get('description') ?? '', video_id: videoId, created_time: fbTime(now) });
+      if (gate === 'lose_response') lostResponse();
+      return json(200, { id: videoId });
     }
     if (edge === 'photos' && p.method === 'POST') {
       const url = params.get('url');
       if (!isHttpsUrl(url)) return gerr(400, 324, '(#324) Requires upload file');
       if (env.scenario === 'fail_permanent') return invalidParam('Invalid parameter');
+      if (params.get('published') === 'false') {
+        // Unpublished (staged) photo for a multi-photo post: invisible, no post_id.
+        if (env.scenario === 'missing_permission') return gerr(403, 200, '(#200) The user hasn\'t authorized the application to perform this action');
+        const photoId = env.newId();
+        await put(env, photoId, 'photo', { published: false, used: false });
+        return json(200, { id: photoId });
+      }
       const gate = await publishGate(env, 'photos');
       if (gate && gate !== 'lose_response') return gate;
       const photoId = env.newId();
@@ -221,11 +260,45 @@ export const metaFake: FakeHandler = async (req, env) => {
     if (!edge && p.method === 'GET') return json(200, pick(igAccount(env), params.get('fields')));
     if (edge === 'media' && p.method === 'POST') {
       if (env.scenario === 'missing_permission') return gerr(403, 10, 'Application does not have permission for this action');
+      const mediaType = params.get('media_type');
+      const isItem = params.get('is_carousel_item') === 'true';
+      const caption = params.get('caption') ?? '';
+      if ([...caption].length > 2200) return gerr(400, 36004, 'The caption is too long.', { subcode: 2207010 });
+      if (mediaType === 'CAROUSEL') {
+        const children = (params.get('children') ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+        if (children.length < 2 || children.length > 20) return invalidParam('The parameter children must contain between 2 and 20 container IDs');
+        for (const cid of children) {
+          const c = await env.store.get(env.provider, cid);
+          if (!c || c.kind !== 'container' || c.accountId !== env.accountId || !c.data.carousel_item) return gerr(400, 24, 'The media container does not exist.', { subcode: 2207006 });
+          if (containerStatus(c, env, Number(c.data.polls ?? 0)) !== 'FINISHED') return gerr(400, 9007, 'Media ID is not available', { subcode: 2207027 });
+        }
+        const id = env.newId();
+        await put(env, id, 'container', { caption, media_type: 'CAROUSEL', children, processing: false, published: false });
+        return json(200, { id });
+      }
+      if (isItem) {
+        if (params.has('caption')) return invalidParam('The parameter caption is not supported on carousel items');
+        const video = mediaType === 'VIDEO';
+        const src = video ? params.get('video_url') : params.get('image_url');
+        if (!src) return invalidParam(video ? 'The parameter video_url is required' : 'The parameter image_url is required');
+        if (!isHttpsUrl(src)) return gerr(400, 9004, 'Only photo or video can be accepted as media type.', { subcode: 2207052 });
+        if (env.scenario === 'fail_permanent') return gerr(400, 36003, 'The submitted image with aspect ratio is not supported.', { subcode: 2207009 });
+        const id = env.newId();
+        await put(env, id, 'container', { carousel_item: true, media_type: video ? 'VIDEO' : 'IMAGE', processing: env.scenario === 'processing', published: false });
+        return json(200, { id });
+      }
+      if (mediaType === 'REELS') {
+        const videoUrl = params.get('video_url');
+        if (!videoUrl) return invalidParam('The parameter video_url is required');
+        if (!isHttpsUrl(videoUrl)) return gerr(400, 9004, 'Only photo or video can be accepted as media type.', { subcode: 2207052 });
+        if (env.scenario === 'fail_permanent') return invalidParam('The video format is not supported.', 2207026);
+        const id = env.newId();
+        await put(env, id, 'container', { caption, media_type: 'REELS', share_to_feed: params.get('share_to_feed'), processing: env.scenario === 'processing', published: false });
+        return json(200, { id });
+      }
       const imageUrl = params.get('image_url');
       if (!imageUrl) return invalidParam('The parameter image_url is required');
       if (!isHttpsUrl(imageUrl)) return gerr(400, 9004, 'Only photo or video can be accepted as media type.', { subcode: 2207052 });
-      const caption = params.get('caption') ?? '';
-      if ([...caption].length > 2200) return gerr(400, 36004, 'The caption is too long.', { subcode: 2207010 });
       if (env.scenario === 'fail_permanent') return gerr(400, 36003, 'The submitted image with aspect ratio is not supported.', { subcode: 2207009 });
       const id = env.newId();
       await put(env, id, 'container', { caption, image_url_present: true, processing: env.scenario === 'processing', published: false });
@@ -252,11 +325,14 @@ export const metaFake: FakeHandler = async (req, env) => {
       const status = containerStatus(c, env, polls);
       if (status === 'EXPIRED' || status === 'PUBLISHED') return gerr(400, 24, 'The media container does not exist or has expired.', { subcode: 2207008 });
       if (status === 'IN_PROGRESS') return gerr(400, 9007, 'Media ID is not available', { subcode: 2207027 });
+      if (c.data.carousel_item) return invalidParam('A carousel item cannot be published on its own; publish the CAROUSEL container');
       const gate = await publishGate(env, 'media_publish');
       if (gate && gate !== 'lose_response') return gate;
       const mediaId = env.newId();
+      const kind = c.data.media_type === 'CAROUSEL' ? { media_type: 'CAROUSEL_ALBUM', children: c.data.children }
+        : c.data.media_type === 'REELS' ? { media_type: 'VIDEO', media_product_type: 'REELS' } : { media_type: 'IMAGE' };
       await put(env, mediaId, 'media', {
-        caption: c.data.caption, timestamp: fbTime(now), permalink: `https://www.instagram.com/p/${mediaId}/`, container_id: creationId,
+        caption: c.data.caption, timestamp: fbTime(now), permalink: `https://www.instagram.com/${c.data.media_type === 'REELS' ? 'reel' : 'p'}/${mediaId}/`, container_id: creationId, ...kind,
       });
       await put(env, c.objectId, 'container', { ...c.data, published: true, media_id: mediaId }, c.createdAt);
       if (gate === 'lose_response') lostResponse();
@@ -275,6 +351,15 @@ export const metaFake: FakeHandler = async (req, env) => {
         return json(200, pick({ id: o.objectId, status_code: status, status: status === 'ERROR' ? 'Error: 2207001' : status }, params.get('fields')));
       }
       if (o.kind === 'media') return json(200, pick({ id: o.objectId, ...o.data }, params.get('fields')));
+      if (o.kind === 'video') {
+        const polls = Number(o.data.polls ?? 0) + 1;
+        await put(env, o.objectId, 'video', { ...o.data, polls }, o.createdAt);
+        const status = o.data.processing && polls <= PROCESSING_POLLS ? 'processing' : 'ready';
+        return json(200, pick({
+          id: o.objectId, status: { video_status: status, processing_progress: status === 'ready' ? 100 : 50 },
+          permalink_url: `/${pageId}/videos/${o.objectId}/`, created_time: o.data.created_time, description: o.data.description,
+        }, params.get('fields')));
+      }
       if (o.kind === 'post') return json(200, pick({ id: o.objectId, ...o.data, permalink_url: `https://www.facebook.com/${o.objectId}` }, params.get('fields')));
     }
   }

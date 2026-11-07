@@ -507,7 +507,7 @@ describe('validation', () => {
     expect(facebookAdapter.validate(input('facebook', { text: long, link: 'https://example.com/a-long-link-path' })).ok).toBe(true);
     expect(facebookAdapter.validate(input('facebook', { text: long, link: 'https://example.com/a-long-link-path' }, [jpeg()])).ok).toBe(false);
     const caps = facebookAdapter.capabilities(conn('facebook'));
-    expect(caps.formats).toEqual(['text', 'image']);
+    expect(caps.formats).toEqual(['text', 'image', 'album', 'video']); // V1.1: album + video (tests/contracts/meta-media.test.ts)
     expect(caps.constraints.textCounting).toBe('codepoints');
     expect(instagramAdapter.capabilities(conn('instagram')).constraints).toMatchObject({ requiresMedia: true, imageMimes: ['image/jpeg'], supportsLink: false, maxCaptionLength: 2200 });
   });

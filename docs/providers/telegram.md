@@ -128,3 +128,28 @@ Scenarios: `success`, `fail_permanent` (400 bad content), `fail_transient_once` 
 success), `timeout_after_send` (message stored, response lost), `rate_limited_once` (429 with `retry_after: 3`),
 `processing` (same as success), `revoked` (401 everywhere), `missing_permission` (admin without
 `can_post_messages`; sends return 400 "need administrator rights"). Message ids are `mock_…`.
+
+## V1.1 albums and video (research date 2026-11-07)
+
+Source: T1 (https://core.telegram.org/bots/api, fetched 2026-11-07; latest changelog entry still Bot API 10.3).
+Code: `adapter.ts`, `fake.ts`. Contract tests: `tests/contracts/telegram-media.test.ts`.
+
+**Verified.**
+- `sendMediaGroup`: `chat_id`, `media` = "A JSON-serialized Array … must include 2-10 items" of InputMediaAudio/Document/
+  LivePhoto/Photo/Video; "Documents and audio files can be only grouped in an album with messages of the same type";
+  returns an Array of the sent Messages. It has **no `reply_markup`** parameter.
+- InputMedia `media` may be "attach://<file_attach_name>" to upload with multipart/form-data under that name; captions
+  0–1024 characters per item.
+- `sendVideo`: `video`, `duration`, `width`, `height`, `thumbnail`, `cover`, `caption`, `supports_streaming`,
+  `reply_markup`. "Telegram clients support MPEG4 videos … Bots can currently send video files of up to 50 MB."
+- Sending files: by URL 5 MB photos / 20 MB other; multipart 10 MB photos / 50 MB other files.
+
+**Assumed.** The album caption is shown when only the first item carries it (we put it on item 0); Telegram documents no
+video duration limit (pipeline cap 15 min); H.264/AAC is what "MPEG4" means in practice.
+
+**Behaviour.** Album ⇒ one multipart `sendMediaGroup` (`file0…fileN`, caption on the first item, videos with width/height/
+duration/supports_streaming); all returned `message_id`s are stored, the URL is the first message. URL buttons on an album
+are refused by validation (`album_buttons_unsupported`). Video ⇒ multipart `sendVideo` (≤ 50 MB). There is no staging step,
+so nothing to resume; a 5xx or lost response is **Unknown** with manual resolution (no history lookup). Capabilities:
+`text, image, album, video` (constraints `telegram-bot-api-10.3@2026-11-07`). The simulator serves both methods and the
+standard scenarios.

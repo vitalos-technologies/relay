@@ -6,6 +6,15 @@ import {
 import { DEFAULT_GRAPH_VERSION } from './graph.js';
 
 export const RESEARCHED_ON = '2026-11-06';
+/** V1.1 richer-media research date (carousel / Reels / multi-photo / Page video). */
+export const MEDIA_RESEARCHED_ON = '2026-11-07';
+
+/** Video envelope shared by the media pipeline (MP4/MOV upload ≤ 300 MB, ≤ 15 min; publish derivative is MP4). */
+const PIPELINE_VIDEO = {
+  videoMimes: ['video/mp4', 'video/quicktime'],
+  maxVideoBytes: 300 * 1_048_576,
+  maxVideoSeconds: 15 * 60,
+};
 
 /** Scopes requested at login and checked by health(). See docs/providers/meta.md. */
 export const FACEBOOK_SCOPES = ['pages_show_list', 'pages_read_engagement', 'pages_manage_posts'] as const;
@@ -29,9 +38,18 @@ export const FACEBOOK_CONSTRAINTS: ChannelConstraints = {
   supportsLink: true,
   supportsButtons: false,
   maxButtons: 0,
-  maxImages: 1,
+  // V1.1: multi-photo posts (unpublished /photos + /feed attached_media). 10 is a product limit (Meta documents none).
+  maxImages: 10,
+  maxAlbumItems: 10,
+  minAlbumItems: 2,
+  albumAllowsVideo: false,
   imageMimes: ['image/jpeg', 'image/png'],
   maxImageBytes: 10 * 1_048_576,
+  // V1.1: single Page video (/{page-id}/videos file_url). Limits = pipeline envelope (Meta's are larger; not re-verified).
+  maxVideos: 1,
+  ...PIPELINE_VIDEO,
+  videoCodecs: ['h264'],
+  audioCodecs: ['aac'],
 };
 
 /**
@@ -48,7 +66,11 @@ export const INSTAGRAM_CONSTRAINTS: ChannelConstraints = {
   supportsLink: false,
   supportsButtons: false,
   maxButtons: 0,
-  maxImages: 1,
+  // V1.1 carousel (verified 2026-11-07, IG User Media reference): up to 20 images/videos, mixed allowed.
+  maxImages: 20,
+  maxAlbumItems: 20,
+  minAlbumItems: 2,
+  albumAllowsVideo: true,
   imageMimes: ['image/jpeg'],
   maxImageBytes: 8 * 1_048_576,
   minImageWidth: 320,
@@ -56,26 +78,42 @@ export const INSTAGRAM_CONSTRAINTS: ChannelConstraints = {
   maxAspectRatio: 1.91,
   maxHashtags: 30,
   maxMentions: 20,
+  // V1.1 Reels (verified 2026-11-07, "Reel Video Specifications"): MOV/MP4, H.264/HEVC, AAC, 23–60 fps,
+  // ≤ 1920 columns, aspect 0.01:1..10:1 (9:16 recommended), 3 s – 15 min, ≤ 300 MB.
+  maxVideos: 1,
+  ...PIPELINE_VIDEO,
+  minVideoSeconds: 3,
+  videoCodecs: ['h264', 'hevc'],
+  audioCodecs: ['aac'],
+  minVideoAspectRatio: 0.01,
+  maxVideoAspectRatio: 10,
+  maxVideoWidth: 1920,
+  minFrameRate: 23,
+  maxFrameRate: 60,
 };
 
 export function capabilitiesFor(provider: 'facebook' | 'instagram', connection: PublishConnection): ChannelCapabilities {
   const version = typeof connection.metadata?.graph_version === 'string' ? connection.metadata.graph_version : DEFAULT_GRAPH_VERSION;
   return {
     provider,
-    formats: provider === 'facebook' ? ['text', 'image'] : ['image'],
+    // V1.1: album = IG carousel / FB multi-photo; IG videos publish as Reels, FB as Page videos.
+    formats: provider === 'facebook' ? ['text', 'image', 'album', 'video'] : ['image', 'album', 'reel'],
     canPublish: true,
     canEditPublished: false,
     canDeletePublished: false,
     canReadMetrics: false,
     canReconcile: true,
     constraints: provider === 'facebook' ? FACEBOOK_CONSTRAINTS : INSTAGRAM_CONSTRAINTS,
-    constraintsVersion: `meta-${provider}-${RESEARCHED_ON}-${version}`,
+    constraintsVersion: `meta-${provider}-${MEDIA_RESEARCHED_ON}-${version}`,
     checkedAt: `${RESEARCHED_ON}T00:00:00.000Z`,
   };
 }
 
 export function toMediaFacts(media: PublishInput['media']): MediaFacts[] {
-  return media.map((m) => ({ assetId: m.assetId, status: 'ready', mime: m.mime, bytes: m.bytes, width: m.width, height: m.height }));
+  return media.map((m) => ({
+    assetId: m.assetId, status: 'ready', mime: m.mime, bytes: m.bytes, width: m.width, height: m.height,
+    kind: m.kind, durationMs: m.durationMs, videoCodec: m.videoCodec, audioCodec: m.audioCodec, frameRate: m.frameRate,
+  }));
 }
 
 export function validateMeta(provider: 'facebook' | 'instagram', input: Pick<PublishInput, 'variant' | 'media' | 'connection'>): ValidationResult {
@@ -133,3 +171,16 @@ export function missingScopes(required: readonly string[], granted: string[]): s
   const g = new Set(granted);
   return required.filter((s) => !g.has(s));
 }
+
+/** Publication shape for the attached media (V1.1). */
+export type MetaShape = 'text' | 'image' | 'carousel' | 'album' | 'reel' | 'video';
+
+export function metaShape(provider: 'facebook' | 'instagram', media: PublishInput['media']): MetaShape {
+  if (media.length === 0) return 'text';
+  if (media.length > 1) return provider === 'instagram' ? 'carousel' : 'album';
+  const isVideo = media[0]!.kind === 'video' || media[0]!.mime.startsWith('video/');
+  if (isVideo) return provider === 'instagram' ? 'reel' : 'video';
+  return 'image';
+}
+
+export const isVideoMedia = (m: PublishInput['media'][number]): boolean => m.kind === 'video' || m.mime.startsWith('video/');

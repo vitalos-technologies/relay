@@ -11,6 +11,9 @@ import {
   deleteObject, ensureBucket, getObjectBytes, headObject, ObjectTooLargeError, presignUpload, putObject, signedGetUrl,
 } from '../storage.js';
 import { ALLOWED_MIME, MAX_UPLOAD_BYTES, processImage, TRANSFORM_VERSION } from './process.js';
+import { MAX_VIDEO_UPLOAD_BYTES, VIDEO_MIME } from './video.js';
+import { writeOutbox } from '../outbox.js';
+import { ensureCropDerivative, type CropSpec } from '../crops/index.js';
 
 export const PREVIEW_URL_TTL_SECONDS = 300;
 export const UPLOAD_URL_TTL_SECONDS = 600;
@@ -22,6 +25,8 @@ export interface AssetDto {
   original_filename: string | null; mime: string | null; bytes: number | null; width: number | null; height: number | null;
   alt_text: string | null; tags: string[]; created_at: string;
   preview_url: string | null; thumb_url: string | null; usage_count: number;
+  /** V1.1: 'image' | 'video'; duration of a video in ms (null for images / unprocessed videos). */
+  media_kind?: 'image' | 'video'; duration_ms?: number | null;
 }
 
 interface AssetRow {
@@ -30,6 +35,7 @@ interface AssetRow {
   mime: string | null; checksum_sha256: string | null; bytes: string | null; width: number | null; height: number | null;
   status: AssetStatus; rejection_reason: string | null; alt_text: string | null; tags: string[];
   created_at: Date; created_at_cursor?: string; usage_count?: number;
+  media_kind?: 'image' | 'video'; duration_ms?: number | null;
 }
 
 const USAGE_SQL = `(SELECT count(*) FROM posts p
@@ -73,6 +79,7 @@ async function toDtos(rows: AssetRow[]): Promise<AssetDto[]> {
       preview_url: preview ? await signedGetUrl(preview.key, PREVIEW_URL_TTL_SECONDS, { contentType: preview.mime }) : null,
       thumb_url: thumb ? await signedGetUrl(thumb.key, PREVIEW_URL_TTL_SECONDS, { contentType: thumb.mime }) : null,
       usage_count: r.usage_count ?? 0,
+      media_kind: r.media_kind ?? 'image', duration_ms: r.duration_ms ?? null,
     };
   }));
 }
@@ -96,11 +103,14 @@ export async function createUploadIntent(ctx: Ctx, input: UploadIntentInput): Pr
   requireAction(ctx, 'assets.upload');
   const brand = await assertBrand(ctx, input.brand_id);
   if (brand.archived_at) throw notFound('Brand');
-  if (!(ALLOWED_MIME as readonly string[]).includes(input.content_type)) {
-    throw new AppError('unsupported_media', 'Only JPEG and PNG images are supported.', { content_type: 'Only image/jpeg and image/png are supported' });
+  const isVideo = (VIDEO_MIME as readonly string[]).includes(input.content_type);
+  if (!isVideo && !(ALLOWED_MIME as readonly string[]).includes(input.content_type)) {
+    throw new AppError('unsupported_media', 'Only JPEG and PNG images and MP4 or MOV videos are supported.', { content_type: 'Only image/jpeg, image/png, video/mp4 and video/quicktime are supported' });
   }
   if (!Number.isInteger(input.bytes) || input.bytes <= 0) throw new AppError('validation_failed', 'File size is invalid', { bytes: 'Must be a positive integer' });
-  if (input.bytes > MAX_UPLOAD_BYTES) throw new AppError('payload_too_large', 'Images must be 20 MB or smaller.');
+  if (!isVideo && input.bytes > MAX_UPLOAD_BYTES) throw new AppError('payload_too_large', 'Images must be 20 MB or smaller.');
+  if (isVideo && input.bytes > MAX_VIDEO_UPLOAD_BYTES) throw new AppError('payload_too_large', `Videos must be ${MAX_VIDEO_UPLOAD_BYTES / 1_048_576} MB or smaller.`);
+  const maxBytes = isVideo ? MAX_VIDEO_UPLOAD_BYTES : MAX_UPLOAD_BYTES;
   if (config().APP_ENV !== 'production') await ensureBucket();
 
   const filename = sanitizeFilename(input.filename);
@@ -108,19 +118,19 @@ export async function createUploadIntent(ctx: Ctx, input: UploadIntentInput): Pr
     const id = (await maybeOne<{ id: string }>(tx, `SELECT gen_random_uuid() AS id`))!.id;
     const key = originalKey(ctx.access.workspaceId, brand.id, id);
     await tx.query(
-      `INSERT INTO assets(id, workspace_id, brand_id, uploaded_by, object_key, original_filename, declared_mime, declared_bytes, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending_upload')`,
-      [id, ctx.access.workspaceId, brand.id, ctx.actor.userId, key, filename, input.content_type, input.bytes]);
+      `INSERT INTO assets(id, workspace_id, brand_id, uploaded_by, object_key, original_filename, declared_mime, declared_bytes, status, media_kind)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending_upload',$9)`,
+      [id, ctx.access.workspaceId, brand.id, ctx.actor.userId, key, filename, input.content_type, input.bytes, isVideo ? 'video' : 'image']);
     await audit(tx, { workspaceId: ctx.access.workspaceId, brandId: brand.id, actorUserId: ctx.actor.userId, action: 'asset.upload_intent',
       resourceType: 'asset', resourceId: id, diff: { filename, declared_mime: input.content_type, declared_bytes: input.bytes }, correlationId: ctx.correlationId });
     return { id, key };
   });
-  const post = await presignUpload({ key: row.key, contentType: input.content_type, maxBytes: MAX_UPLOAD_BYTES, expiresSeconds: UPLOAD_URL_TTL_SECONDS });
+  const post = await presignUpload({ key: row.key, contentType: input.content_type, maxBytes, expiresSeconds: UPLOAD_URL_TTL_SECONDS });
   return {
     asset_id: row.id,
     upload: { method: 'POST', url: post.url, fields: post.fields },
     expires_at: new Date(Date.now() + UPLOAD_URL_TTL_SECONDS * 1000).toISOString(),
-    max_bytes: MAX_UPLOAD_BYTES,
+    max_bytes: maxBytes,
   };
 }
 
@@ -148,6 +158,7 @@ export async function completeUpload(ctx: Ctx, assetId: string): Promise<AssetDt
     throw forbidden('Only the person who uploaded this file can complete it');
   }
   if (existing.status === 'ready' || existing.status === 'rejected' || existing.status === 'archived') return getAsset(ctx, assetId);
+  if (existing.media_kind === 'video') return completeVideoUpload(ctx, existing);
 
   const claimed = await maybeOne<AssetRow>(getPool(),
     `UPDATE assets SET status='quarantined' WHERE id=$1 AND workspace_id=$2 AND status IN ('pending_upload','quarantined') RETURNING *`,
@@ -328,15 +339,10 @@ export async function archiveAsset(ctx: Ctx, assetId: string): Promise<AssetDto>
  * Archived assets remain publishable (archive is refused while referenced by active deliveries;
  * physical deletion only happens after retention).
  */
-export async function loadPublishMedia(db: Queryable, workspaceId: string, assetIds: string[], ttlSeconds = 3600): Promise<PublishMedia[]> {
+export async function loadPublishMedia(db: Queryable, workspaceId: string, assetIds: string[], ttlSeconds = 3600, opts: { crops?: Record<string, CropSpec> } = {}): Promise<PublishMedia[]> {
   if (!assetIds.length) return [];
   if (!assetIds.every(isUuid)) throw new AppError('invalid_state', 'An attached image is no longer available.');
-  const rows = await many<{ id: string; status: AssetStatus; object_key: string | null; mime: string | null; bytes: string | null; width: number | null; height: number | null }>(db,
-    `SELECT a.id, a.status, d.object_key, d.mime, d.bytes, d.width, d.height
-       FROM assets a
-       LEFT JOIN asset_derivatives d ON d.asset_id = a.id AND d.workspace_id = a.workspace_id
-            AND d.variant = 'jpeg_publish' AND d.transform_version = $3
-      WHERE a.workspace_id = $1 AND a.id = ANY($2::uuid[])`, [workspaceId, assetIds, TRANSFORM_VERSION]);
+  const rows = await many<PublishRow>(db, PUBLISH_ROWS_SQL, [workspaceId, assetIds, TRANSFORM_VERSION]);
   const byId = new Map(rows.map((r) => [r.id, r]));
   const out: PublishMedia[] = [];
   for (const id of assetIds) {
@@ -344,32 +350,109 @@ export async function loadPublishMedia(db: Queryable, workspaceId: string, asset
     if (!r || (r.status !== 'ready' && r.status !== 'archived') || !r.object_key || !r.mime || r.bytes === null || r.width === null || r.height === null) {
       throw new AppError('invalid_state', 'An attached image is not available for publishing. Replace it and try again.', undefined, { asset_id: id });
     }
-    const key = r.object_key;
-    const bytes = Number(r.bytes);
+    if (r.media_kind === 'video') {
+      // V1.1 video: the provider-compatible MP4 derivative (+ poster frame for covers). Crops never apply.
+      const vkey = r.object_key;
+      const vbytes = Number(r.bytes);
+      out.push({
+        assetId: id, mime: r.mime, width: r.width, height: r.height, bytes: vbytes, kind: 'video',
+        durationMs: r.duration_ms, videoCodec: r.video_codec, audioCodec: r.audio_codec, frameRate: r.frame_rate !== null ? Number(r.frame_rate) : null,
+        url: await signedGetUrl(vkey, ttlSeconds, { contentType: r.mime }),
+        posterUrl: r.poster_key ? await signedGetUrl(r.poster_key, ttlSeconds, { contentType: 'image/jpeg' }) : null,
+        load: async () => new Uint8Array(await getObjectBytes(vkey, Math.max(vbytes, 1) + 1024)),
+      });
+      continue;
+    }
+    // V1.1: a variant crop publishes the cached, deterministic crop derivative instead (generated on first use).
+    const crop = opts.crops?.[id];
+    const c = crop ? await ensureCropDerivative(db, workspaceId, id, crop) : null;
+    const key = c ? c.object_key : r.object_key;
+    const bytes = c ? c.bytes : Number(r.bytes);
+    const mime = c ? c.mime : r.mime;
     out.push({
-      assetId: id, mime: r.mime, width: r.width, height: r.height, bytes,
-      url: await signedGetUrl(key, ttlSeconds, { contentType: r.mime }),
+      assetId: id, mime, width: c ? c.width : r.width, height: c ? c.height : r.height, bytes,
+      url: await signedGetUrl(key, ttlSeconds, { contentType: mime }),
       load: async () => new Uint8Array(await getObjectBytes(key, Math.max(bytes, 1) + 1024)),
     });
   }
   return out;
 }
 
-/** Validation facts (from the jpeg_publish derivative) for core validateVariant(); unknown ids ⇒ status 'missing'. */
+/** Validation facts (from the jpeg_publish / video_publish derivative) for core validateVariant(); unknown ids ⇒ status 'missing'. */
 export async function assetFacts(db: Queryable, workspaceId: string, assetIds: string[]): Promise<MediaFacts[]> {
   const valid = assetIds.filter(isUuid);
-  const rows = valid.length
-    ? await many<{ id: string; status: AssetStatus; mime: string | null; bytes: string | null; width: number | null; height: number | null }>(db,
-      `SELECT a.id, a.status, d.mime, d.bytes, d.width, d.height
-         FROM assets a
-         LEFT JOIN asset_derivatives d ON d.asset_id = a.id AND d.workspace_id = a.workspace_id
-              AND d.variant = 'jpeg_publish' AND d.transform_version = $3
-        WHERE a.workspace_id = $1 AND a.id = ANY($2::uuid[])`, [workspaceId, valid, TRANSFORM_VERSION])
-    : [];
+  const rows = valid.length ? await many<PublishRow>(db, PUBLISH_ROWS_SQL, [workspaceId, valid, TRANSFORM_VERSION]) : [];
   const byId = new Map(rows.map((r) => [r.id, r]));
   return assetIds.map((id) => {
     const r = byId.get(id);
     if (!r) return { assetId: id, status: 'missing', mime: null, bytes: null, width: null, height: null };
-    return { assetId: id, status: r.status, mime: r.mime, bytes: r.bytes !== null ? Number(r.bytes) : null, width: r.width, height: r.height };
+    return { assetId: id, status: r.status, mime: r.mime, bytes: r.bytes !== null ? Number(r.bytes) : null, width: r.width, height: r.height, ...videoFacts(r) };
   });
+}
+
+// ------------------------------------------------------------------ V1.1 video helpers
+
+interface PublishRow {
+  id: string; status: AssetStatus; media_kind: 'image' | 'video'; object_key: string | null; mime: string | null; bytes: string | null;
+  width: number | null; height: number | null; duration_ms: number | null; video_codec: string | null; audio_codec: string | null;
+  frame_rate: string | null; poster_key: string | null; a_mime: string | null; a_bytes: string | null; a_width: number | null; a_height: number | null;
+}
+
+/** Publish derivative per asset: jpeg_publish for images, video_publish (+ poster) for videos. */
+const PUBLISH_ROWS_SQL = `
+  SELECT a.id, a.status, a.media_kind, d.object_key, d.mime, d.bytes, d.width, d.height, d.duration_ms, d.video_codec, d.audio_codec, d.frame_rate,
+         a.mime AS a_mime, a.bytes AS a_bytes, a.width AS a_width, a.height AS a_height,
+         (SELECT p.object_key FROM asset_derivatives p WHERE p.asset_id = a.id AND p.workspace_id = a.workspace_id
+             AND p.variant = 'poster' AND p.transform_version = $3) AS poster_key
+    FROM assets a
+    LEFT JOIN asset_derivatives d ON d.asset_id = a.id AND d.workspace_id = a.workspace_id
+         AND d.variant = CASE WHEN a.media_kind = 'video' THEN 'video_publish' ELSE 'jpeg_publish' END AND d.transform_version = $3
+   WHERE a.workspace_id = $1 AND a.id = ANY($2::uuid[])`;
+
+function videoFacts(r: PublishRow): Partial<MediaFacts> {
+  if (r.media_kind !== 'video') return { kind: 'image' };
+  return { kind: 'video', durationMs: r.duration_ms, videoCodec: r.video_codec, audioCodec: r.audio_codec, frameRate: r.frame_rate !== null ? Number(r.frame_rate) : null };
+}
+
+/**
+ * Validation facts with the semantics of posts/shared mediaFacts(): the publish derivative's facts when it
+ * exists; a 'ready' asset without one is reported as still processing; videos carry kind/duration/codecs.
+ */
+export async function publishFacts(db: Queryable, workspaceId: string, assetIds: string[]): Promise<MediaFacts[]> {
+  if (!assetIds.length) return [];
+  const valid = assetIds.filter(isUuid);
+  const rows = valid.length ? await many<PublishRow>(db, PUBLISH_ROWS_SQL, [workspaceId, valid, TRANSFORM_VERSION]) : [];
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  return assetIds.map((id) => {
+    const r = byId.get(id);
+    if (!r) return { assetId: id, status: 'missing', mime: null, bytes: null, width: null, height: null };
+    const has = r.mime !== null;
+    return {
+      assetId: id,
+      status: r.status === 'ready' && !has ? 'quarantined' : r.status,
+      mime: has ? r.mime : r.a_mime,
+      bytes: Number(has ? r.bytes : r.a_bytes) || null,
+      width: has ? r.width : r.a_width,
+      height: has ? r.height : r.a_height,
+      ...videoFacts(r),
+    };
+  });
+}
+
+/** V1.1 videos: never processed in the web request. Quarantine + enqueue 'asset.uploaded' for the worker. */
+async function completeVideoUpload(ctx: Ctx, existing: AssetRow): Promise<AssetDto> {
+  if (existing.status === 'quarantined') return getAsset(ctx, existing.id); // already queued for the worker
+  const head = await headObject(existing.object_key);
+  if (!head) throw new AppError('invalid_state', 'The upload has not finished yet. Upload the file, then try again.');
+  await withTx(async (tx) => {
+    const claimed = await maybeOne<{ id: string }>(tx,
+      `UPDATE assets SET status='quarantined', bytes=$3, processing_started_at=NULL
+        WHERE id=$1 AND workspace_id=$2 AND status='pending_upload' RETURNING id`,
+      [existing.id, ctx.access.workspaceId, head.ContentLength ?? null]);
+    if (!claimed) return;
+    await writeOutbox(tx, { workspaceId: ctx.access.workspaceId, aggregateType: 'asset', aggregateId: existing.id, eventType: 'asset.uploaded', payload: { assetId: existing.id, kind: 'video' } });
+    await audit(tx, { workspaceId: ctx.access.workspaceId, brandId: existing.brand_id, actorUserId: ctx.actor.userId, action: 'asset.uploaded',
+      resourceType: 'asset', resourceId: existing.id, diff: { kind: 'video', bytes: head.ContentLength ?? null }, correlationId: ctx.correlationId });
+  });
+  return getAsset(ctx, existing.id);
 }

@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { Building, Gauge, OctagonPause, Play, Plus, Tag, Users } from 'lucide-react';
+import { Building, CalendarClock, Gauge, OctagonPause, Play, Plug, Plus, Tag, Users } from 'lucide-react';
 import { useSession } from '@/lib/client/session';
 import { useBrandFilter, useQueryState } from '@/lib/client/hooks';
 import { useApi } from '@/lib/client/use-api';
@@ -12,8 +12,12 @@ import {
   Select, Skeleton, Switch, Tabs, TabsContent, TabsList, TabsTrigger, Textarea, TimeWithZone, useToast,
 } from '@/components/ui';
 import { TeamTab } from '@/components/settings/team-tab';
+import { SlotsSettings } from '@/components/slots/slots-settings';
+import { IntegrationsSettings } from '@/components/integrations/integrations-settings';
+import { BudgetsSettings } from '@/components/integrations/budgets-settings';
 
 export default function SettingsPage() {
+  const { can } = useSession();
   const [params, setParams] = useQueryState();
   const tab = params.get('tab') ?? 'workspace';
   return (
@@ -24,12 +28,16 @@ export default function SettingsPage() {
           <TabsTrigger value="workspace"><Building aria-hidden className="size-4" /> Workspace</TabsTrigger>
           <TabsTrigger value="brand"><Tag aria-hidden className="size-4" /> Brand</TabsTrigger>
           <TabsTrigger value="team"><Users aria-hidden className="size-4" /> Team</TabsTrigger>
-          <TabsTrigger value="budgets"><Gauge aria-hidden className="size-4" /> Budgets</TabsTrigger>
+          <TabsTrigger value="slots"><CalendarClock aria-hidden className="size-4" /> Slots</TabsTrigger>
+          {can('workspace.settings') ? <TabsTrigger value="budgets"><Gauge aria-hidden className="size-4" /> Budgets</TabsTrigger> : null}
+          {can('setup.manage') ? <TabsTrigger value="integrations"><Plug aria-hidden className="size-4" /> Integrations</TabsTrigger> : null}
         </TabsList>
         <TabsContent value="workspace"><WorkspaceTab /></TabsContent>
         <TabsContent value="brand"><BrandTab /></TabsContent>
         <TabsContent value="team"><TeamTab /></TabsContent>
-        <TabsContent value="budgets"><BudgetsTab /></TabsContent>
+        <TabsContent value="slots"><SlotsSettings /></TabsContent>
+        <TabsContent value="budgets"><BudgetsSettings /></TabsContent>
+        <TabsContent value="integrations"><IntegrationsSettings /></TabsContent>
       </Tabs>
     </>
   );
@@ -293,34 +301,4 @@ function CreateBrandDialog({ open, onOpenChange, onCreated }: { open: boolean; o
       </div>
     </Dialog>
   );
-}
-
-// ------------------------------------------------------------------ budgets
-function BudgetsTab() {
-  const { data, error, loading, refetch } = useApi<Workspace>('/api/workspace');
-  if (error && !data) return <ErrorState error={error} onRetry={refetch} />;
-  if (loading || !data) return <Skeleton className="h-40 w-full max-w-2xl rounded-xl" />;
-  const entries = Object.entries(data.limits ?? {});
-  return (
-    <Card className="max-w-2xl">
-      <CardHeader title="Usage limits" actions={<MetaChip>Read only</MetaChip>} />
-      <div className="px-4 pb-4">
-        {!entries.length ? (
-          <p className="text-[13px] text-muted">No limits set</p>
-        ) : (
-          <Facts items={entries.map(([k, v]) => [humanKey(k), <span key={k} className="font-mono text-[12px]">{formatValue(v)}</span>])} />
-        )}
-      </div>
-    </Card>
-  );
-}
-
-function humanKey(k: string) {
-  return k.replace(/[_.]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
-function formatValue(v: unknown): string {
-  if (typeof v === 'number') return v.toLocaleString('en-GB');
-  if (typeof v === 'string' || typeof v === 'boolean') return String(v);
-  if (v === null || v === undefined) return '—';
-  return JSON.stringify(v);
 }

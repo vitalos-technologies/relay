@@ -31,6 +31,15 @@ RUN pnpm --filter @social-lite/web build && pnpm --filter @social-lite/worker bu
 FROM ${NODE_IMAGE} AS web
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
 WORKDIR /app
+# ffmpeg/ffprobe for the V1.1 video pipeline (probe, poster frame, transcode). Uses the optional build-time
+# proxy CA (BuildKit secret "extra_ca") for apt only; it is mounted, never copied into the runtime image.
+RUN --mount=type=secret,id=extra_ca,required=false \
+    set -eu; APT_CA=""; \
+    if [ -s /run/secrets/extra_ca ]; then APT_CA="-o Acquire::https::CAInfo=/run/secrets/extra_ca"; fi; \
+    apt-get $APT_CA update \
+ && apt-get $APT_CA install -y --no-install-recommends ffmpeg \
+ && rm -rf /var/lib/apt/lists/* \
+ && ffprobe -version >/dev/null
 RUN useradd --uid 10001 --create-home app
 COPY --from=build --chown=app /repo/apps/web/.next/standalone ./
 COPY --from=build --chown=app /repo/apps/web/.next/static ./apps/web/.next/static
@@ -43,6 +52,15 @@ CMD ["node", "apps/web/server.js"]
 FROM ${NODE_IMAGE} AS worker
 ENV NODE_ENV=production MIGRATIONS_DIR=/app/migrations WORKER_HEALTH_PORT=3001
 WORKDIR /app
+# ffmpeg/ffprobe for the V1.1 video pipeline (probe, poster frame, transcode). Uses the optional build-time
+# proxy CA (BuildKit secret "extra_ca") for apt only; it is mounted, never copied into the runtime image.
+RUN --mount=type=secret,id=extra_ca,required=false \
+    set -eu; APT_CA=""; \
+    if [ -s /run/secrets/extra_ca ]; then APT_CA="-o Acquire::https::CAInfo=/run/secrets/extra_ca"; fi; \
+    apt-get $APT_CA update \
+ && apt-get $APT_CA install -y --no-install-recommends ffmpeg \
+ && rm -rf /var/lib/apt/lists/* \
+ && ffprobe -version >/dev/null
 RUN useradd --uid 10001 --create-home app
 COPY --from=build --chown=app /out/worker/node_modules ./node_modules
 COPY --from=build --chown=app /repo/apps/worker/dist ./dist

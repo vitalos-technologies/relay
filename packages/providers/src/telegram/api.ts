@@ -124,6 +124,9 @@ export function classifyTelegramError(e: TelegramApiError): TelegramErrorClass {
   if (/message text is empty|text must be non-empty/i.test(d)) return { kind: 'invalid', code: 'empty', message: 'Telegram: the message is empty. Add text.' };
   if (/can't parse entities/i.test(d)) return { kind: 'invalid', code: 'formatting', message: 'Telegram could not parse the message formatting. Remove special formatting characters.' };
   if (/BUTTON|inline keyboard|reply markup/i.test(d)) return { kind: 'invalid', code: 'button_rejected', message: 'Telegram rejected a button. Each button needs a label and a valid https:// URL.' };
+  if (e.status === 413 || /Request Entity Too Large/i.test(d)) return { kind: 'invalid', code: 'file_too_large', message: 'Telegram rejected the upload as too large. Photos must be at most 10 MB and videos at most 50 MB.' };
+  if (/VIDEO|video/.test(d)) return { kind: 'invalid', code: 'video_rejected', message: 'Telegram rejected the video. Use an H.264/AAC MP4 up to 50 MB.' };
+  if (/MEDIA_GROUP|media group|too (many|few) media/i.test(d)) return { kind: 'invalid', code: 'album_rejected', message: 'Telegram rejected the album. Use 2–10 photos or videos, with the caption on the first item.' };
   if (/PHOTO|IMAGE_PROCESS_FAILED|wrong file|file is too big|too big|failed to get HTTP URL content|wrong type of the web page content|dimensions/i.test(d)) {
     return { kind: 'invalid', code: 'image_rejected', message: 'Telegram rejected the image. Use a JPEG or PNG up to 10 MB, width + height at most 10000 px, aspect ratio at most 20:1.' };
   }

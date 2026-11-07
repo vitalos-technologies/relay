@@ -22,6 +22,6 @@ export function liveEngineDeps(): EngineDeps {
       }
     },
     adapterContext: (provider, connection) => buildAdapterContext(provider, connection),
-    loadMedia: (workspaceId, assetIds) => loadPublishMedia(getPool(), workspaceId, assetIds),
+    loadMedia: (workspaceId, assetIds, opts) => loadPublishMedia(getPool(), workspaceId, assetIds, undefined, opts),
   };
 }

@@ -75,6 +75,15 @@ export interface PublishMedia {
   url: string;
   /** Load bytes for providers that require multipart upload (X, Telegram multipart). */
   load(): Promise<Uint8Array>;
+  // ---- V1.1 (optional, additive): present for video publish derivatives.
+  /** 'video' for video/* media; absent ⇒ inferred from mime. */
+  kind?: 'image' | 'video';
+  durationMs?: number | null;
+  videoCodec?: string | null;
+  audioCodec?: string | null;
+  frameRate?: number | null;
+  /** Signed URL of a JPEG poster frame (Reel cover etc.), when available. */
+  posterUrl?: string | null;
 }
 
 export interface PublishConnection {

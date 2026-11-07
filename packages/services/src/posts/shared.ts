@@ -4,6 +4,7 @@ import type { ChannelCapabilities, ConnectionStatus, MediaFacts, Provider, Resol
 import { many, type Queryable } from '@social-lite/db';
 import { getAdapter } from '@social-lite/providers';
 import { stableStringify } from '../idempotency.js';
+import { publishFacts } from '../media/assets.js';
 
 export interface ConnectionRow {
   id: string; workspace_id: string; brand_id: string; provider: Provider; provider_account_id: string;
@@ -33,31 +34,12 @@ export function capabilitiesFor(c: ConnectionRow): ChannelCapabilities | null {
   }
 }
 
-/** Facts used by validation: the publish derivative's dimensions/type when available. */
+/**
+ * Facts used by validation: the publish derivative's dimensions/type when available.
+ * V1.1: delegated to the media service so videos carry kind/duration/codecs (same image semantics).
+ */
 export async function mediaFacts(db: Queryable, workspaceId: string, assetIds: string[]): Promise<MediaFacts[]> {
-  if (!assetIds.length) return [];
-  const rows = await many<{ id: string; status: MediaFacts['status']; mime: string | null; bytes: string | null; width: number | null; height: number | null;
-    d_mime: string | null; d_bytes: string | null; d_width: number | null; d_height: number | null }>(db,
-    `SELECT a.id, a.status, a.mime, a.bytes, a.width, a.height,
-            d.mime AS d_mime, d.bytes AS d_bytes, d.width AS d_width, d.height AS d_height
-       FROM assets a
-       LEFT JOIN LATERAL (SELECT * FROM asset_derivatives x WHERE x.asset_id=a.id AND x.variant='jpeg_publish'
-                          ORDER BY transform_version DESC LIMIT 1) d ON TRUE
-      WHERE a.workspace_id=$1 AND a.id = ANY($2::uuid[])`, [workspaceId, assetIds]);
-  const byId = new Map(rows.map((r) => [r.id, r]));
-  return assetIds.map((id) => {
-    const r = byId.get(id);
-    if (!r) return { assetId: id, status: 'missing', mime: null, bytes: null, width: null, height: null };
-    const useDerivative = r.d_mime !== null;
-    return {
-      assetId: id,
-      status: r.status === 'ready' && !useDerivative ? 'quarantined' : r.status,
-      mime: useDerivative ? r.d_mime : r.mime,
-      bytes: Number(useDerivative ? r.d_bytes : r.bytes) || null,
-      width: useDerivative ? r.d_width : r.width,
-      height: useDerivative ? r.d_height : r.height,
-    };
-  });
+  return publishFacts(db, workspaceId, assetIds);
 }
 
 export function contentHash(baseText: string, baseLink: string | null, baseAssetIds: string[], variants: ResolvedVariant[]): string {

@@ -136,7 +136,8 @@ describe('telegram validation', () => {
     expect(v({ text: 'a'.repeat(4097) }).issues[0]?.code).toBe('too_long');
     expect(v({ text: 'a'.repeat(1025) }, [image]).issues[0]?.code).toBe('too_long');
     expect(v({ text: 'ok' }, [{ ...image, width: 9000, height: 1500 }]).issues.map((i) => i.code)).toContain('dimensions');
-    expect(v({ text: 'ok' }, [image, { ...image, assetId: 'a2' }]).issues.map((i) => i.code)).toContain('too_many_images');
+    // V1.1: albums of 2-10 items are supported (tests/contracts/telegram-media.test.ts); 11 is too many.
+    expect(v({ text: 'ok' }, Array.from({ length: 11 }, (_, i) => ({ ...image, assetId: `a${i}` }))).issues.map((i) => i.code)).toContain('too_many_images');
     expect(v({ text: 'ok', buttons: [{ text: 'x', url: 'http://insecure' }] }).issues.map((i) => i.code)).toContain('button_url');
   });
 });

@@ -71,10 +71,57 @@ export const xFake: FakeHandler = async (req: HttpRequest, env: FakeEnv): Promis
     });
   }
 
+  // ---- V1.1 chunked upload (video): initialize → append (segments) → finalize → STATUS
+  if (req.method === 'POST' && path === '/2/media/upload/initialize') {
+    const body = JSON.parse(typeof req.body === 'string' ? req.body : '{}') as { media_type?: string; total_bytes?: number; media_category?: string };
+    if (!body.media_type || !Number.isInteger(body.total_bytes) || (body.total_bytes ?? 0) <= 0 || !body.media_category) {
+      return problem(400, 'Invalid Request', 'media_type, total_bytes and media_category are required', 'https://api.x.com/2/problems/invalid-request');
+    }
+    if (body.media_category !== 'tweet_video') return problem(400, 'Invalid Request', 'unsupported media_category', 'https://api.x.com/2/problems/invalid-request');
+    const id = env.newId('mock_');
+    await env.store.put({
+      provider: 'x', accountId: env.accountId, objectId: id, kind: 'media', createdAt: env.now().toISOString(),
+      data: { video: true, total_bytes: body.total_bytes, media_type: body.media_type, segments: {} as Record<string, number>, state: 'initialized' },
+    });
+    return json(200, { data: { id, media_key: `7_${id}`, expires_after_secs: 86400 } });
+  }
+  const chunk = path.match(/^\/2\/media\/upload\/([^/]+)\/(append|finalize)$/);
+  if (req.method === 'POST' && chunk) {
+    const id = decodeURIComponent(chunk[1]!);
+    const obj = await env.store.get('x', id);
+    if (!obj || obj.kind !== 'media' || !obj.data.video) return problem(400, 'Invalid Request', 'media_id not found', 'https://api.x.com/2/problems/invalid-request');
+    const segments = { ...(obj.data.segments as Record<string, number>) };
+    if (chunk[2] === 'append') {
+      if (obj.data.state !== 'initialized') return problem(400, 'Invalid Request', 'media is already finalized', 'https://api.x.com/2/problems/invalid-request');
+      if (!(typeof FormData !== 'undefined' && req.body instanceof FormData)) return problem(400, 'Invalid Request', 'multipart body required', 'https://api.x.com/2/problems/invalid-request');
+      const seg = Number(req.body.get('segment_index'));
+      const media = req.body.get('media');
+      if (!Number.isInteger(seg) || seg < 0 || seg > 999 || !media || typeof media === 'string') return problem(400, 'Invalid Request', 'segment_index and media are required', 'https://api.x.com/2/problems/invalid-request');
+      if (media.size > 8 * 1024 * 1024) return problem(400, 'Invalid Request', 'segment too large', 'https://api.x.com/2/problems/invalid-request');
+      segments[String(seg)] = media.size; // re-sending a segment replaces it
+      await env.store.put({ ...obj, data: { ...obj.data, segments } });
+      return { status: 204, headers: {}, body: '' };
+    }
+    // finalize
+    if (obj.data.state !== 'initialized') return problem(400, 'Invalid Request', 'media is already finalized', 'https://api.x.com/2/problems/invalid-request');
+    const idx = Object.keys(segments).map(Number).sort((a, b) => a - b);
+    const total = idx.reduce((n, i) => n + segments[String(i)]!, 0);
+    if (idx.some((v, i) => v !== i) || total !== obj.data.total_bytes) {
+      return problem(400, 'Invalid Request', `File size mismatch: received ${total} of ${String(obj.data.total_bytes)} bytes`, 'https://api.x.com/2/problems/invalid-request');
+    }
+    const failed = env.scenario === 'fail_permanent';
+    await env.store.put({ ...obj, data: { ...obj.data, state: failed ? 'failed' : 'pending', size: total } });
+    return json(200, { data: { id, media_key: `7_${id}`, size: total, expires_after_secs: 86400, processing_info: { state: 'pending', check_after_secs: 1 } } });
+  }
+
   if (req.method === 'GET' && path === '/2/media/upload' && url.searchParams.get('command') === 'STATUS') {
     const id = url.searchParams.get('media_id') ?? '';
     const obj = await env.store.get('x', id);
     if (!obj) return problem(400, 'Invalid Request', 'media_id not found', 'https://api.x.com/2/problems/invalid-request');
+    if (obj.data.state === 'initialized') return problem(400, 'Invalid Request', 'media is not finalized', 'https://api.x.com/2/problems/invalid-request');
+    if (obj.data.state === 'failed') {
+      return json(200, { data: { id, media_key: `7_${id}`, processing_info: { state: 'failed', progress_percent: 100, error: { code: 1, name: 'InvalidMedia', message: 'Unsupported video' } } } });
+    }
     const polls = await env.store.incr(`x:media-status:${id}`);
     const done = polls >= 2;
     if (done && obj.data.state !== 'succeeded') await env.store.put({ ...obj, data: { ...obj.data, state: 'succeeded' } });
@@ -88,6 +135,12 @@ export const xFake: FakeHandler = async (req: HttpRequest, env: FakeEnv): Promis
     const body = JSON.parse(typeof req.body === 'string' ? req.body : '{}') as { text?: string; media?: { media_ids?: string[] } };
     const text = body.text ?? '';
     const mediaIds = body.media?.media_ids ?? [];
+    if (mediaIds.length > 4) return problem(400, 'Invalid Request', 'One or more parameters to your request was invalid: media_ids (at most 4)', 'https://api.x.com/2/problems/invalid-request');
+    if (mediaIds.length > 1) {
+      for (const m of mediaIds) {
+        if ((await env.store.get('x', m))?.data.video) return problem(400, 'Invalid Request', 'Your media IDs are invalid: a video cannot be combined with other media', 'https://api.x.com/2/problems/invalid-request');
+      }
+    }
     for (const m of mediaIds) {
       const obj = await env.store.get('x', m);
       if (!obj || obj.kind !== 'media') return problem(400, 'Invalid Request', 'One or more parameters to your request was invalid: media_ids', 'https://api.x.com/2/problems/invalid-request');

@@ -34,7 +34,9 @@ const schema = z.object({
   TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
   TIPSIGNAL_SIGNING_SECRET: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
-  AI_MODEL: z.string().default('claude-sonnet-5-5'),
+  AI_MODEL: z.string().default('claude-opus-5-5'),
+  // Deterministic, clearly labelled AI suggestions for demos/tests. Forbidden in production.
+  AI_FIXTURE: bool.default(false),
   WORKER_ID: z.string().optional(),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 });
@@ -60,6 +62,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 export function assertProductionSafe(c: AppConfig): void {
   const problems: string[] = [];
   if (c.ENABLE_MOCK_PROVIDERS) problems.push('ENABLE_MOCK_PROVIDERS must be false in production');
+  if (c.AI_FIXTURE) problems.push('AI_FIXTURE must be false in production');
   if (c.OIDC_ALLOW_INSECURE_HTTP) problems.push('OIDC_ALLOW_INSECURE_HTTP must be false in production');
   if (!c.APP_BASE_URL.startsWith('https://')) problems.push('APP_BASE_URL must use https in production');
   if (!c.SESSION_SECRET) problems.push('SESSION_SECRET is required');

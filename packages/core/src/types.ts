@@ -100,7 +100,38 @@ export interface ChannelConstraints {
   maxAspectRatio?: number;
   maxHashtags?: number;
   maxMentions?: number;
+
+  // ---- V1.1 richer media (all optional: absent ⇒ the destination does not support it)
+  /** Items allowed in one multi-item post (carousel / album / multi-photo). Absent ⇒ maxImages. */
+  maxAlbumItems?: number;
+  /** Minimum items for a multi-item post (provider minimum, e.g. Telegram media group 2). */
+  minAlbumItems?: number;
+  /** Videos may appear inside a multi-item post (Instagram carousel, Telegram album). */
+  albumAllowsVideo?: boolean;
+  /** URL buttons can be attached to a multi-item post (Telegram media groups cannot carry reply_markup). */
+  albumSupportsButtons?: boolean;
+  /** Videos allowed per post (single-video formats). 0 / absent ⇒ video unsupported. */
+  maxVideos?: number;
+  videoMimes?: string[];
+  maxVideoBytes?: number;
+  minVideoSeconds?: number;
+  maxVideoSeconds?: number;
+  /** Accepted video codecs (ffprobe codec_name, e.g. 'h264', 'hevc'). */
+  videoCodecs?: string[];
+  /** Accepted audio codecs ('aac'); a video without audio is always accepted. */
+  audioCodecs?: string[];
+  minVideoAspectRatio?: number;   // width / height
+  maxVideoAspectRatio?: number;
+  maxVideoWidth?: number;
+  /** Longest / shortest side limits (orientation-independent), e.g. X 1280×1024. */
+  maxVideoLongSide?: number;
+  maxVideoShortSide?: number;
+  minFrameRate?: number;
+  maxFrameRate?: number;
 }
+
+/** Kind of an asset as far as publishing is concerned. */
+export type MediaKind = 'image' | 'video';
 
 export interface ChannelCapabilities {
   provider: Provider;

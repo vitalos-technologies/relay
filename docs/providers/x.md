@@ -175,3 +175,34 @@ The fake also rejects duplicate text with the 403 duplicate-content shape. Ids a
 
 - Token revocation on disconnect (`/2/oauth2/revoke`) is not called. The stored credential is deleted immediately.
 - Every number above (prices, limits) must be re-checked against the project's own console before launch.
+
+## V1.1 multi-image and video (research date 2026-11-07)
+
+Code: `media.ts`, `adapter.ts`, `fake.ts`. Contract tests: `tests/contracts/x-media.test.ts`.
+
+| # | URL (fetched 2026-11-07) | Used for |
+|---|---|---|
+| X11 | https://docs.x.com/x-api/media/quickstart/media-upload-chunked | initialize / append / finalize / STATUS request shapes, segment size |
+| X12 | https://docs.x.com/x-api/media/quickstart/best-practices | 4 photos / 1 GIF / 1 video per post; video constraints |
+| X13 | https://docs.x.com/x-api/media/introduction | Size and duration limits per `media_category` |
+
+**Verified.**
+- `POST /2/media/upload/initialize` JSON `{media_type: "video/mp4", total_bytes, media_category: "tweet_video"}` → `data.id`,
+  `expires_after_secs`; `POST /2/media/upload/{id}/append` multipart `segment_index` (from 0) + `media`, segments ≤ 5 MB
+  (server max 8 MB); `POST /2/media/upload/{id}/finalize` → `processing_info`; `GET /2/media/upload?command=STATUS&media_id=`
+  until `succeeded | failed`, waiting `check_after_secs`. `command=INIT|APPEND|FINALIZE` must not be sent.
+- "You may attach up to 4 photos, 1 animated GIF or 1 video in a Post."
+- tweet_video: ≥ 0.5 s; 20 min / 8 GB (default account); 32×32–1280×1024; ≤ 60 fps; aspect 1:3–3:1; H.264 (High
+  recommended), AAC-LC, mono/stereo, yuv420p, progressive, no open GOP.
+
+**Assumed.** Re-sending an already received segment replaces it (used on resume); 1280×1024 applies to either orientation
+(X recommends 720×1280 for portrait); a second `finalize` after a lost response errors with 4xx, so we then ask STATUS.
+Videos and photos are not mixed (implied by "4 photos, 1 GIF or 1 video").
+
+**Behaviour.** 2–4 images: one simple upload each (`tweet_image`); checkpoint `data.items[]` keeps every uploaded
+`mediaId` so a retry uploads only the missing ones. Video: initialize → 4 MB appends (checkpoint `media_uploading` with
+`nextSegment`) → finalize → `pending` until STATUS `succeeded` (`media_processing` → `media_ready`). A retry continues
+from the next segment of the same media id. Publish sends `media.media_ids` in order (`publishes: true`, lost ⇒ unknown,
+reconciled by timeline search). The pipeline transcodes videos into the 1280×1024 envelope, so derivatives fit X.
+Capabilities: `text, image, album, video` (constraints `x-api-v2@2026-11-07`). Simulator: chunked endpoints, segment and
+size checks, `fail_permanent` ⇒ processing `failed`, video never mixed with other media.

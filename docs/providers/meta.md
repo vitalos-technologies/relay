@@ -228,3 +228,52 @@ keeps the previous status.
   - `revoked`: `190/460` on every call that uses a token.
 - Throttling is simulated as Graph does it: HTTP 400 with code 80001 or 80002 and an `X-Business-Use-Case-Usage` header (2 minutes), not as HTTP 429.
 - Objects persist in `env.store`, and the "once" counters are keyed by provider, account, op and scenario.
+
+## V1.1 richer media (research date 2026-11-07)
+
+Code: `instagram.ts` (Reels), `carousel.ts` (IG carousels), `facebook-media.ts` (multi-photo, Page video), `fake.ts`.
+Contract tests: `tests/contracts/meta-media.test.ts`. Engine: `tests/integration/media-video-engine.test.ts`.
+
+| # | URL (fetched 2026-11-07) | Used for |
+|---|---|---|
+| M21 | https://developers.facebook.com/docs/instagram-platform/content-publishing | Carousel flow, up to 20 items, mixed media, Reels `media_type=REELS`, status codes, polling advice |
+| M22 | https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/reference/ig-user/media | `is_carousel_item`, `children`, `share_to_feed`, `cover_url`, Reel video specification |
+| M23 | https://developers.facebook.com/docs/graph-api/reference/page/photos/ | `published=false` staging (~24 h), multi-photo `/feed` with `attached_media[n]={"media_fbid":…}` |
+| M24 | https://developers.facebook.com/docs/graph-api/reference/page/videos/ | `/{page-id}/videos` `file_url`, `description`, `published`; errors 382/389 |
+| M25 | https://developers.facebook.com/docs/graph-api/reference/video-status | `status.video_status` ready / processing / error |
+
+**Verified (M21–M25).**
+- Carousel: one child container per item, `is_carousel_item=true`; images `image_url`, videos `media_type=VIDEO` + `video_url`;
+  `caption` is **not supported** on children. Parent: `media_type=CAROUSEL`, `children` (comma-separated, up to **20**),
+  `caption`. Images and videos can be mixed; images are cropped to the first item's aspect. Reels cannot be carousel items.
+  A carousel counts as one post against the publishing limit.
+- Reels: `media_type=REELS`, `video_url` (public, fetched by Meta), `caption`, `share_to_feed`, `cover_url` (wins over
+  `thumb_offset`). Spec: MOV/MP4, H.264 or HEVC, AAC ≤ 48 kHz mono/stereo, 23–60 fps, ≤ 1920 columns, aspect
+  0.01:1–10:1 (9:16 recommended), 3 s – 15 min, ≤ 300 MB, VBR ≤ 25 Mbps. "Video uploads are asynchronous": poll `status_code`.
+- Facebook multi-photo: `POST /{page}/photos {url, published=false}` → `{id}`; unpublished photos are deleted after ~24 h;
+  then `POST /{page}/feed` with `attached_media[n]`.
+- Facebook video: `POST /{page}/videos {file_url, description, published}` → `{id}`; Video Status `video_status` ∈
+  `ready | processing | error`.
+
+**Assumed.** Facebook documents no multi-photo maximum (product limit **10**); Facebook video size/duration limits were
+not found on the pages read (we use the pipeline envelope: ≤ 300 MB, ≤ 15 min); the video post's `description` is what
+`/published_posts` reports as `message` (used by reconcile after a lost response); IG carousel video items follow the Reel
+spec; the content-publishing guide still says both 50 and 100 posts/24 h (we trust `quota_total`). Resumable IG upload
+(`rupload.facebook.com`, Facebook Login for Business only) is not used: Meta fetches our signed URL.
+
+**Flows.**
+- *Reel*: prepare creates the REELS container (cover = our poster frame) and polls (10 s, 15 s, 30 s, then 60 s; give up and
+  rebuild after 30 min); publish/reconcile are the image flow (`media_publish`, container status + media list).
+- *Carousel*: prepare creates missing children **in order** (checkpoint `carousel_children` holds `{assetId, containerId,
+  finished, video}` per child), polls unfinished children (`pending` while any is `IN_PROGRESS`), then creates the parent
+  and polls it. A retry after a failure re-uses created children; an expired set (24 h) is rebuilt only after confirming
+  the parent is not `PUBLISHED`. The parent id is `containerId`, so publish/reconcile are unchanged (never republished).
+- *Facebook multi-photo*: prepare stages each photo unpublished (checkpoint `album_photos`, re-staged after 20 h); publish
+  is one `/feed` call (`publishes: true`; lost response ⇒ **unknown**). Staged photos gone (100/33) ⇒ safe retry.
+- *Facebook video*: prepare marks the attempt (`{kind:'video'}`); publish `/videos` (`publishes: true`) ⇒ **processing**
+  with the video id; the engine polls `reconcile` (`GET /{video}?fields=id,status,permalink_url,created_time`):
+  `processing` ⇒ keep polling, `ready` ⇒ published (permalink), `error` ⇒ not published. Lost response ⇒ unknown, then the
+  Page post search.
+- New op labels: `meta.instagram.carousel_item_create`, `meta.facebook.{photo_stage,videos,video_status}` (`videos` publishes).
+- Capabilities: Facebook `text, image, album, video`; Instagram `image, album, reel` (constraints version `meta-*-2026-11-07-<graph>`).
+- Simulator: carousel items/parents, REELS, unpublished photos + `attached_media`, `/videos` with `processing` (2 polls).

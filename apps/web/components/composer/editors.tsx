@@ -10,6 +10,8 @@ import {
   SimulatedBadge, Textarea,
 } from '@/components/ui';
 import { MediaPicker } from './media-picker';
+import { OrderedMediaStrip } from '@/components/media/ordered-media-strip';
+import { FormatSupport } from '@/components/media/format-support';
 
 // ------------------------------------------------------------------ counter
 export function Counter({ check, id }: { check: LocalCheck | undefined; id?: string }) {
@@ -116,15 +118,17 @@ export function BaseEditor({
         <Input type="url" inputMode="url" value={draft.baseLink ?? ''} readOnly={readOnly} onChange={(e) => onChange({ ...draft, baseLink: e.target.value || null })} placeholder="https://" />
       </Field>
       <div>
-        <p className="mb-2 text-[13px] font-medium">Media</p>
-        <MediaStrip
+        <p className="mb-2 flex items-center gap-1 text-[13px] font-medium">Media<InfoTip label="About media">Images, an album or one video. Drag or use the arrows to set the order. Each network shows which formats it takes.</InfoTip></p>
+        <OrderedMediaStrip
           label="Base media"
           ids={draft.baseAssetIds}
           assets={assets}
           disabled={readOnly}
           onAdd={() => setPicker(true)}
+          onReorder={(ids) => onChange({ ...draft, baseAssetIds: ids })}
           onRemove={(id) => onChange({ ...draft, baseAssetIds: draft.baseAssetIds.filter((x) => x !== id) })}
         />
+        <FormatSupport className="mt-3" connections={checksFor.map((c) => c.connection)} ids={draft.baseAssetIds} assets={assets} />
       </div>
       <MediaPicker
         open={picker}
@@ -247,14 +251,16 @@ export function VariantEditor({
             options={[{ value: 'inherit', label: 'Inherited', disabled: readOnly }, { value: 'custom', label: 'Custom', disabled: readOnly }]}
           />
         </div>
-        <MediaStrip
+        <OrderedMediaStrip
           label={`Media for ${connection.display_name}`}
           ids={variant.inheritMedia ? draft.baseAssetIds : variant.assetIds ?? []}
           assets={assets}
           disabled={readOnly || variant.inheritMedia}
           onAdd={() => setPicker(true)}
+          onReorder={(ids) => onChange({ ...variant, inheritMedia: false, assetIds: ids })}
           onRemove={(id) => onChange({ ...variant, assetIds: (variant.assetIds ?? []).filter((x) => x !== id) })}
         />
+        <FormatSupport connections={[connection]} ids={variant.inheritMedia ? draft.baseAssetIds : variant.assetIds ?? []} assets={assets} />
         {k?.requiresMedia ? <p className="text-xs text-muted">Image required</p> : null}
         <MediaPicker
           open={picker}

@@ -1,7 +1,7 @@
 // Delivery processing (spec §11 steps 5-10). External calls run OUTSIDE transactions; every state
 // write is fenced. Ambiguous outcomes become Unknown and are reconciled, never blindly resent.
 import {
-  decideRetry, type AdapterContext, type Checkpoint, type PrepareOutcome, type ProviderCredentials, type PublishConnection,
+  decideRetry, deriveFormat, mediaKindOf, type AdapterContext, type Checkpoint, type PrepareOutcome, type ProviderCredentials, type PublishConnection,
   type PublishInput, type PublishMedia, type PublishOutcome, type PublishingAdapter, type ReconcileOutcome, type BlockingReason, type Provider,
 } from '@social-lite/core';
 import { getPool, maybeOne, one, withTx, type Pool, type Queryable } from '@social-lite/db';
@@ -11,6 +11,7 @@ import { blockDeliveriesForConnection } from './hooks.js';
 import { fencedUpdate, heartbeat, type ClaimedDelivery } from './claim.js';
 import { checkAndConsumeBudget, budgetMeterFor } from './budget.js';
 import { recordCircuit } from './circuit.js';
+import { cropsFromOptions, type CropSpec } from '../crops/index.js';
 
 /** Thrown by EngineDeps.getCredentials when the connection cannot be used (revoked, refresh failed). */
 export class CredentialsUnavailable extends Error {
@@ -22,7 +23,8 @@ export interface EngineDeps {
   adapterFor(provider: Provider): PublishingAdapter;
   getCredentials(connectionId: string, opts?: { forceRefresh?: boolean }): Promise<{ credentials: ProviderCredentials; connection: PublishConnection }>;
   adapterContext(provider: Provider, connection: PublishConnection): Promise<AdapterContext>;
-  loadMedia(workspaceId: string, assetIds: string[]): Promise<PublishMedia[]>;
+  /** opts.crops (V1.1): per-asset crop specs from the variant; the cropped derivative must be returned. */
+  loadMedia(workspaceId: string, assetIds: string[], opts?: { crops?: Record<string, CropSpec> }): Promise<PublishMedia[]>;
   now?(): Date;
 }
 
@@ -168,10 +170,12 @@ function withHeartbeat<T>(pool: Pool, d: ClaimedDelivery, fn: () => Promise<T>):
 async function buildInput(pool: Pool, deps: EngineDeps, d: ClaimedDelivery, credentials: ProviderCredentials, connection: PublishConnection): Promise<PublishInput> {
   const v = await one<{ rendered_text: string; link: string | null; format: PublishInput['variant']['format']; buttons: PublishInput['variant']['buttons']; options: Record<string, unknown>; asset_ids: string[] }>(pool,
     `SELECT rendered_text, link, format, buttons, options, asset_ids FROM variants WHERE id=$1 AND workspace_id=$2`, [d.variant_id, d.workspace_id]);
-  const media = await deps.loadMedia(d.workspace_id, v.asset_ids);
+  const { crops } = cropsFromOptions(v.options); // V1.1: publish the cropped derivative when a crop is set
+  const media = Object.keys(crops).length ? await deps.loadMedia(d.workspace_id, v.asset_ids, { crops }) : await deps.loadMedia(d.workspace_id, v.asset_ids);
   return {
     deliveryId: d.id, attemptNumber: d.attempt_count, idempotencyKey: `${d.id}:${d.generation}`, connection, credentials,
-    variant: { text: v.rendered_text, link: v.link, format: v.format, buttons: v.buttons ?? [], options: v.options ?? {} }, media,
+    // V1.1: the format follows the media actually attached (image/album/video/reel), not the snapshot's count-only guess.
+    variant: { text: v.rendered_text, link: v.link, format: media.length ? deriveFormat(d.provider, media.map(mediaKindOf)) : v.format, buttons: v.buttons ?? [], options: v.options ?? {} }, media,
   };
 }
 

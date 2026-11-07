@@ -1,6 +1,7 @@
 // X (Twitter) API v2 publishing adapter. See docs/providers/x.md for sources and costs.
 //  prepare: POST /2/media/upload (multipart, media_category=tweet_image) => checkpoint {mediaId, expiresAt};
 //           polls GET /2/media/upload?command=STATUS when processing_info is returned.
+//  V1.1: 2–4 images or one video (chunked initialize/append/finalize + STATUS) via ./media.ts.
 //  publish: POST /2/tweets {text (link appended), media:{media_ids}}.
 //  reconcile: GET /2/users/:id/tweets around the send time (each call is a BILLABLE read).
 import {
@@ -10,6 +11,7 @@ import {
   type PublishOutcome, type PublishingAdapter, type ReconcileOutcome, type ValidationResult,
 } from '@social-lite/core';
 import { XApiError, accessTokenFrom, classifyXError, xCall } from './api.js';
+import { mediaIdsFrom, needsMediaFlow, prepareMedia } from './media.js';
 import { X_REQUIRED_SCOPES, refreshXCredentials } from './oauth.js';
 
 export const X_CONSTRAINTS_VERSION = 'x-api-v2@2026-11-06';
@@ -23,10 +25,28 @@ export const X_CONSTRAINTS: ChannelConstraints = {
   supportsLink: true,
   supportsButtons: false,
   maxButtons: 0,
-  maxImages: 1,                       // product scope: single image (API allows up to 4)
+  maxImages: 4,                       // V1.1: "up to 4 photos, 1 animated GIF or 1 video in a Post"
+  maxAlbumItems: 4,
+  albumAllowsVideo: false,            // a video is posted on its own
   imageMimes: ['image/jpeg', 'image/png'],
   maxImageBytes: 5 * 1024 * 1024,     // tweet_image: 5 MB
+  // V1.1 tweet_video (verified 2026-11-07): ≥ 0.5 s, ≤ 20 min default (pipeline cap 15 min / 300 MB),
+  // 32×32..1280×1024, ≤ 60 fps, aspect 1:3..3:1, H.264 + AAC-LC.
+  maxVideos: 1,
+  videoMimes: ['video/mp4', 'video/quicktime'],
+  maxVideoBytes: 300 * 1024 * 1024,
+  minVideoSeconds: 0.5,
+  maxVideoSeconds: 15 * 60,
+  videoCodecs: ['h264'],
+  audioCodecs: ['aac'],
+  minVideoAspectRatio: 1 / 3,
+  maxVideoAspectRatio: 3,
+  maxVideoLongSide: 1280,
+  maxVideoShortSide: 1024,
+  maxFrameRate: 60,
 };
+
+export const X_MEDIA_CONSTRAINTS_VERSION = 'x-api-v2@2026-11-07';
 
 interface MediaUploadData {
   id: string;
@@ -43,8 +63,8 @@ export function xPostUrl(connection: PublishConnection, id: string): string | nu
 
 function capabilities(): ChannelCapabilities {
   return {
-    provider: 'x', formats: ['text', 'image'], canPublish: true, canEditPublished: false, canDeletePublished: false,
-    canReadMetrics: false, canReconcile: true, constraints: X_CONSTRAINTS, constraintsVersion: X_CONSTRAINTS_VERSION,
+    provider: 'x', formats: ['text', 'image', 'album', 'video'], canPublish: true, canEditPublished: false, canDeletePublished: false,
+    canReadMetrics: false, canReconcile: true, constraints: X_CONSTRAINTS, constraintsVersion: X_MEDIA_CONSTRAINTS_VERSION,
     checkedAt: new Date().toISOString(),
   };
 }
@@ -53,7 +73,10 @@ function validate(input: Pick<PublishInput, 'variant' | 'media' | 'connection'>)
   return validateVariant({
     provider: 'x', connectionId: input.connection.id, constraints: X_CONSTRAINTS,
     text: input.variant.text, link: input.variant.link, buttons: input.variant.buttons,
-    media: input.media.map((m) => ({ assetId: m.assetId, status: 'ready', mime: m.mime, bytes: m.bytes, width: m.width, height: m.height })),
+    media: input.media.map((m) => ({
+      assetId: m.assetId, status: 'ready', mime: m.mime, bytes: m.bytes, width: m.width, height: m.height,
+      kind: m.kind, durationMs: m.durationMs, videoCodec: m.videoCodec, audioCodec: m.audioCodec, frameRate: m.frameRate,
+    })),
   });
 }
 
@@ -91,9 +114,11 @@ function mediaOutcome(ctx: AdapterContext, data: MediaUploadData, prevExpiresAt:
 async function prepare(ctx: AdapterContext, input: PublishInput, checkpoint: Checkpoint | null): Promise<PrepareOutcome> {
   const image = input.media[0];
   if (!image) return { kind: 'ready', checkpoint: { step: 'no_media', data: {} } };
-  if (input.media.length > 1) return { kind: 'permanent', code: 'too_many_images', message: 'X: one image per post in this release.' };
+  const v = validate(input);
+  if (!v.ok) return { kind: 'permanent', code: 'invalid_content', message: v.issues.map((i) => i.message).join(' ') };
   const token = accessTokenFrom(input.credentials);
   const nowMs = ctx.now().getTime();
+  if (needsMediaFlow(input.media)) return prepareMedia(ctx, input, token, checkpoint, (err) => prepareError(err, nowMs));
   const mediaId = typeof checkpoint?.data.mediaId === 'string' ? checkpoint.data.mediaId : null;
   const expiresAt = checkpoint?.expiresAt ?? (typeof checkpoint?.data.expiresAt === 'string' ? checkpoint.data.expiresAt : null);
   const stillValid = !!mediaId && (!expiresAt || Date.parse(expiresAt) - nowMs > 5 * 60_000);
@@ -131,11 +156,11 @@ async function publish(ctx: AdapterContext, input: PublishInput, checkpoint: Che
   const body: Record<string, unknown> = {};
   if (text.trim().length) body.text = text;
   if (input.media.length) {
-    const mediaId = checkpoint?.data.mediaId;
-    if (typeof mediaId !== 'string' || !mediaId) {
-      return { kind: 'rejected_safe_to_retry', code: 'media_not_prepared', message: 'The image was not uploaded yet; nothing was sent.' };
+    const mediaIds = mediaIdsFrom(checkpoint, input.media.length);
+    if (!mediaIds) {
+      return { kind: 'rejected_safe_to_retry', code: 'media_not_prepared', message: 'The media was not uploaded yet; nothing was sent.' };
     }
-    body.media = { media_ids: [mediaId] };
+    body.media = { media_ids: mediaIds };
   }
   try {
     const r = await xCall<{ data: { id: string; text?: string } }>(ctx, {

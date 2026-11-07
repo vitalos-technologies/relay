@@ -10,6 +10,7 @@ import { assertBrand, assertUuid, brandAllowed, brandFilter, requireAction, type
 import { beginIdempotent, completeIdempotent } from '../idempotency.js';
 import { brandConnections, capabilitiesFor, contentHash, excerpt, mediaFacts, type ConnectionRow } from './shared.js';
 import { assetsByIds } from '../media/assets.js';
+import { cropAwareMediaFacts } from '../crops/index.js';
 import { approvalJson, connectionJson, deliveryJson, DELIVERY_SELECT, scheduleJson, type ApprovalRow, type DeliveryRow, type ScheduleRow } from './serialize.js';
 
 export interface PostRow {
@@ -135,7 +136,9 @@ export async function validateDraft(db: Queryable, ctx: Ctx, post: PostRow, conn
     else if (!['ready', 'expiring', 'paused'].includes(conn.status)) issues.push({ connectionId: id, provider: conn.provider, field: 'destination', code: 'not_ready', message: `${conn.display_name} needs attention (${conn.status.replace(/_/g, ' ')}). Fix it on Accounts or deselect it.` });
     const caps = capabilitiesFor(conn);
     if (!caps) { results.push({ ok: false, issues: [...issues, { connectionId: id, provider: conn.provider, field: 'destination', code: 'no_capabilities', message: `${conn.display_name}: publishing rules are unavailable. Run an account check.` }] }); continue; }
-    const media = await mediaFacts(db, ctx.access.workspaceId, v.assetIds);
+    // V1.1 crops: validate the cropped facts (dims/aspect of the derivative that will actually be sent).
+    const { facts: media, issues: cropIssues } = await cropAwareMediaFacts(db, ctx.access.workspaceId, v.assetIds, v.options, { connectionId: id, provider: conn.provider });
+    issues.push(...cropIssues);
     const linkSeparate = conn.provider === 'facebook' && media.length === 0;
     const r = validateVariant({ provider: conn.provider, connectionId: id, constraints: caps.constraints, text: v.text, link: v.link, buttons: v.buttons, media, linkIsSeparateField: linkSeparate });
     const outgoing = linkSeparate ? v.text : composeTextWithLink(v.text, v.link);

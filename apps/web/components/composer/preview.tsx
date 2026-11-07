@@ -4,6 +4,8 @@ import { PROVIDER_LABEL, type ResolvedVariant } from '@social-lite/core';
 import { linkIsSeparate, outgoingText } from '@/lib/client/variants';
 import type { Asset, Connection } from '@/lib/client/types';
 import { PlatformIcon, SimulatedBadge } from '@/components/ui';
+import { PreviewMedia } from '@/components/media/preview-media';
+import { isVideoAsset } from '@/components/media/media-kind';
 
 /**
  * Approximate per-platform preview. Text is rendered as plain text (React escapes it) with
@@ -15,7 +17,8 @@ export function VariantPreview({ variant, connection, assets }: { variant: Resol
   const name = connection.display_name;
   const handle = connection.username ? `@${connection.username.replace(/^@/, '')}` : null;
   const img = imgs[0];
-  const image = img ? (
+  // V1.1: albums / videos use the approximate multi-media layout (components/media).
+  const image = imgs.length > 1 || isVideoAsset(img) ? <PreviewMedia items={imgs} provider={connection.provider} /> : img ? (
     img.preview_url || img.thumb_url ? (
       // eslint-disable-next-line @next/next/no-img-element
       <img src={(img.preview_url || img.thumb_url)!} alt={img.alt_text || ''} className="block max-h-[360px] w-full bg-black object-contain" />
