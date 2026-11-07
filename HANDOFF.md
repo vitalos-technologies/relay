@@ -34,6 +34,14 @@ Last updated: 2026-11-07 07:25 UTC · Lead agent keeps this current after every 
 
 To recreate them on GitHub from any machine: `git tag v2.0.0 4815af8 && git push origin v2.0.0` (same for the others).
 
+## User reminder (do this when the whole queue is complete)
+The user asked to be reminded, after the full build (through Docs + Help Centre) is finished, of the things only they can do:
+1. Network approvals (Meta incl. insights, TikTok, YouTube/Google, LinkedIn, Threads, Pinterest, X credits): needed before real customers connect accounts.
+2. Publish the version tags from their own machine (table above).
+3. Choose hosting (offer: ARM build + setup for their shared Oracle VM).
+4. Supply the master SVG logo for the final brand assets.
+Include these at the top of the final consolidated activation checklist and in the final message.
+
 ## Specs (all in repo)
 | Phase | Brief |
 |---|---|
