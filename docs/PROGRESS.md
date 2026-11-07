@@ -29,7 +29,8 @@ Product is now **Relay** (brand kit: docs/brand/relay-brand-kit.webp; decisions 
 - V3-P providers DONE (adapters, connectors, fakes, metrics, 164 contract tests, docs; migration 014 applied to dev). Gaps for V3 streams: Bluesky connect route/UI; composer per-provider required fields (TikTok privacy+consent, YouTube title/privacy/madeForKids, Pinterest board, LinkedIn org); YouTube native scheduling needs early upload dispatch before publishAt; dedicated `manual_handoff` delivery state (TikTok inbox drafts currently Unknown + handoff text); self-hosted Bluesky PDS allow-list.
 - V3 streams RUNNING (contracts: docs/V3_WORKSTREAMS.md): AN analytics (015), CH content hub (016), MCP (017). Progress notes docs/v3-progress/{analytics,content-hub,mcp}.md.
 - UX redesign stream (018) starts when V2-A finishes (A relaunched to finish CSP/scans/security UI/Keycloak test fixes; docs/v2-progress/A.md).
-- Lead V3 items: engine gaps (manual_handoff state, YouTube early upload before publishAt), V3 docs.
+- Lead V3 engine gaps DONE (commit 0c57bae): `handoff` delivery state (migration 019; TikTok inbox), YouTube early upload (engine/provider-scheduling.ts; 180 min early, publishAt = due time, <15 min lead → app-owned at due time). Tests: engine-handoff, v3-youtube-early-upload. Migration 019 NOT yet applied to dev: apply 015–019 together once AN/CH/MCP land (migrator locks checksums).
+- Lead V3 next: V3 docs (matrix, build status, gaps, activation).
 
 ## Environment recovery
 
