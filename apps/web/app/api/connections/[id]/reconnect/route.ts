@@ -1,4 +1,4 @@
-// POST /api/connections/:id/reconnect — OAuth: {} => { authorization_url }; Telegram: { bot_token } => Connection.
+// POST /api/connections/:id/reconnect — OAuth: {} => { authorization_url }; Telegram: { bot_token }; Bluesky: { app_password } => Connection.
 import { reconnectConnection, reconnectSchema } from '@social-lite/services/connections/index';
 import { parseJson, route } from '@/lib/api';
 

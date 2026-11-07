@@ -19,6 +19,7 @@ import { blockDeliveriesForConnection, onConnectionRestored, onScopePaused, onSc
 import { CredentialUnavailableError, getUsableCredentials, peekCredentials } from './credentials.js';
 import { revokeXToken } from '@social-lite/providers/x/index';
 import { oauthConnectorFor, startOAuth } from './oauth.js';
+import { connectBluesky } from './bluesky.js';
 import { buildAdapterContext, isOAuthProvider, oauthRedirectUri, providerAppConfig, setupContext } from './runtime.js';
 import {
   healthDetail, insertCredential, loadConnection, replaceCredential, toConnectionJson, toPublishConnection, upsertConnectionFromDestination,
@@ -338,11 +339,12 @@ export async function disconnectConnection(ctx: Ctx, id: string): Promise<{ conn
   });
 }
 
-export const reconnectSchema = z.object({ bot_token: z.string().trim().min(1).max(200).optional() }).passthrough();
+export const reconnectSchema = z.object({ bot_token: z.string().trim().min(1).max(200).optional(), app_password: z.string().trim().min(1).max(64).optional() }).passthrough();
 
 /**
  * Reconnect: OAuth providers => { authorization_url } (the flow updates the same identity, or creates a
- * new connection for a different identity); Telegram => re-verify with { bot_token }; simulated => fresh token.
+ * new connection for a different identity); Telegram => re-verify with { bot_token }; Bluesky => { app_password };
+ * simulated => fresh token.
  */
 export async function reconnectConnection(ctx: Ctx, id: string, body: unknown): Promise<ConnectionJson | { authorization_url: string }> {
   requireAction(ctx, 'connections.manage', 'Only owners and admins can reconnect accounts.');
@@ -352,6 +354,11 @@ export async function reconnectConnection(ctx: Ctx, id: string, body: unknown): 
   if (c.provider === 'telegram') {
     if (!input.bot_token) throw new AppError('validation_failed', 'Paste the bot token to reconnect.', { bot_token: 'Required' });
     return connectTelegram(ctx, c.brand_id, { bot_token: input.bot_token, channel: c.provider_account_id }, { reconnectConnectionId: c.id });
+  }
+  if (c.provider === 'bluesky') {
+    if (!input.app_password) throw new AppError('validation_failed', 'Paste a new app password to reconnect.', { app_password: 'Required' });
+    const handle = (typeof c.metadata?.handle === 'string' && c.metadata.handle) || c.username || c.provider_account_id;
+    return connectBluesky(ctx, c.brand_id, { handle, app_password: input.app_password }, { reconnectConnectionId: c.id });
   }
   if (isOAuthProvider(c.provider)) return startOAuth(ctx, c.brand_id, c.provider, { reconnectConnectionId: c.id });
   throw invalidState('This account type cannot be reconnected.');

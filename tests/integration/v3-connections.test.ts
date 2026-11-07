@@ -5,7 +5,7 @@ import type { HttpRequest, HttpResponse, Transport } from '@social-lite/core';
 import { MemoryMockStore, mockId } from '@social-lite/providers';
 import { resetConfigCache } from '@social-lite/services';
 import { blueskyFake } from '../../packages/providers/src/bluesky/index.js';
-import { connectBluesky, isOAuthProvider, setLiveTransportFactoryForTests, startOAuth } from '../../packages/services/src/connections/index.js';
+import { connectBluesky, isOAuthProvider, reconnectConnection, setLiveTransportFactoryForTests, startOAuth } from '../../packages/services/src/connections/index.js';
 import { closeTestPool, tenant, testPool } from './helpers.js';
 
 const APP_PW = 'abcd-efgh-ijkl-mnop';
@@ -44,6 +44,20 @@ describe('V3 connections', () => {
     expect(dump).not.toContain(APP_PW);
     expect(dump).toContain('app_password');
     await expect(connectBluesky(t.ownerCtx, t.brandId, { handle: 'sim.bsky.social', app_password: 'my-main-password' })).rejects.toMatchObject({ code: 'validation_failed' });
+  });
+
+  it('Bluesky reconnect re-verifies the same account with a new app password (no new connection)', async () => {
+    const t = await tenant();
+    const live = new BskyLive();
+    setLiveTransportFactoryForTests(() => live);
+    const c = await connectBluesky(t.ownerCtx, t.brandId, { handle: 'sim.bsky.social', app_password: APP_PW });
+    await testPool().query(`UPDATE connections SET status='reconnect_required' WHERE id=$1`, [c.id]);
+    await expect(reconnectConnection(t.ownerCtx, c.id, {})).rejects.toMatchObject({ code: 'validation_failed' });
+    const r = await reconnectConnection(t.ownerCtx, c.id, { app_password: 'wxyz-abcd-efgh-ijkl' });
+    expect(r).toMatchObject({ id: c.id, provider: 'bluesky', status: 'ready' });
+    expect(JSON.parse(String(live.requests.at(-1)!.body)).identifier).toBe('sim.bsky.social');
+    const n = await testPool().query(`SELECT count(*)::int n FROM connections WHERE brand_id=$1 AND provider='bluesky'`, [t.brandId]);
+    expect(n.rows[0].n).toBe(1);
   });
 
   it('V3 OAuth providers are registered: TikTok start returns the Login Kit URL with a state', async () => {
