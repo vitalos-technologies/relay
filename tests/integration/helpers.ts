@@ -98,3 +98,15 @@ export async function tenant(opts: { approvalRequired?: boolean; editorsCanPubli
   await addMember(workspaceId, owner.id, 'owner');
   return { workspaceId, brandId, owner, ownerCtx: ctxFor(owner.id, workspaceId, 'owner') };
 }
+
+/**
+ * V2 context built through the REAL policy path (loadAccess → authz). Use this in V2 tests.
+ * Defaults to a session with verified MFA authenticated just now; override to test assurance gates.
+ */
+export async function v2Ctx(userId: string, workspaceId: string, assurance: { mfaVerified?: boolean; authTime?: string | null } = {}): Promise<Ctx> {
+  const { loadAccess } = await import('@social-lite/services');
+  const access = await loadAccess(userId, workspaceId, testPool(), { mfaVerified: assurance.mfaVerified ?? true, authTime: assurance.authTime === undefined ? new Date().toISOString() : assurance.authTime });
+  if (!access) throw Object.assign(new Error('no access'), { code: 'forbidden' });
+  const u = await testPool().query<{ email: string }>(`SELECT email FROM users WHERE id=$1`, [userId]);
+  return { actor: { userId, email: u.rows[0]?.email ?? 'x', name: 'Test', sessionId: randomUUID() }, access, correlationId: randomUUID() };
+}
