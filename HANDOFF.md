@@ -63,6 +63,7 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
 1. V1 + V1.1 **done** (v1.1.0-local) → 2. V2 **done** (v2.0.0) → 3. V3 **done** (v3.0.0) → 4. V3.1 **done** (v3.1.0)
 5. V3.1 Admin **done** (see below; tag v3.1.1 suggested on the admin commit)
 6. Collaboration completion (`docs/queue/03d_COLLABORATION_PROMPT.md`) — **next / running**
+6b. Support inbox (proposed, pending user OK): Help → Contact support → two-way thread with Relay staff in Platform → Support (status, assignee, in-app + email notice, support-access request from the thread); reuse V3.5 inbox pieces. Also noted: no subscriptions/billing exist and none is queued (ask user).
 7. **V3.5** (`docs/queue/03f_V3_5_PROMPT.md`) → 8. Copy cleanup (03e) → 9. Docs + Help Centre (04) → 10. One consolidated activation checklist + user reminder.
 
 ## Current state (keep updated)
