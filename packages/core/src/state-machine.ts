@@ -21,6 +21,14 @@ const T: Record<DeliveryState, DeliveryState[]> = {
   expired: [],
 };
 
+/** A scheduled/retrying delivery this far past its dispatch time is "Overdue" (publisher stopped or backlogged). */
+export const OVERDUE_GRACE_MS = 120_000;
+export function isDeliveryOverdue(state: DeliveryState, nextAttemptAt: Date | string | null | undefined, now: number = Date.now()): boolean {
+  if (state !== 'scheduled' && state !== 'retry_wait') return false;
+  if (!nextAttemptAt) return false;
+  return new Date(nextAttemptAt).getTime() < now - OVERDUE_GRACE_MS;
+}
+
 export function canTransition(from: DeliveryState, to: DeliveryState): boolean {
   if (from === to && from === 'processing') return true;
   return T[from].includes(to);

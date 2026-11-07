@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aggregateStatus, canTransition, isCancellable, decideRetry, canSchedule, can } from '@social-lite/core';
+import { aggregateStatus, canTransition, isDeliveryOverdue, OVERDUE_GRACE_MS, isCancellable, decideRetry, canSchedule, can } from '@social-lite/core';
 
 describe('delivery state machine', () => {
   it('allows the happy path and forbids regressions', () => {
@@ -57,5 +57,22 @@ describe('permissions', () => {
     expect(canSchedule({ role: 'editor', editorsCanPublish: false, approvalRequired: false, contentApproved: false }).allowed).toBe(false);
     expect(canSchedule({ role: 'approver', editorsCanPublish: false, approvalRequired: true, contentApproved: true }).allowed).toBe(true);
     expect(canSchedule({ role: 'viewer', editorsCanPublish: true, approvalRequired: false, contentApproved: true }).allowed).toBe(false);
+  });
+});
+
+describe('overdue label', () => {
+  const now = Date.parse('2026-11-07T12:00:00Z');
+  const ago = (ms: number) => new Date(now - ms).toISOString();
+  it('scheduled/retry_wait past the grace period are overdue', () => {
+    expect(isDeliveryOverdue('scheduled', ago(OVERDUE_GRACE_MS + 1000), now)).toBe(true);
+    expect(isDeliveryOverdue('retry_wait', ago(10 * 60_000), now)).toBe(true);
+  });
+  it('within the grace period, future, or any other state is not', () => {
+    expect(isDeliveryOverdue('scheduled', ago(OVERDUE_GRACE_MS - 1000), now)).toBe(false);
+    expect(isDeliveryOverdue('scheduled', ago(-60_000), now)).toBe(false);
+    for (const s of ['preparing', 'publishing', 'processing', 'published', 'failed', 'paused', 'unknown', 'handoff'] as const) {
+      expect(isDeliveryOverdue(s, ago(3600_000), now)).toBe(false);
+    }
+    expect(isDeliveryOverdue('scheduled', null, now)).toBe(false);
   });
 });

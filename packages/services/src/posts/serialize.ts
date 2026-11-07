@@ -1,5 +1,5 @@
 // JSON shapes per docs/API.md for posts, schedules, approvals and deliveries.
-import { CONNECTION_STATUS_LABEL, DELIVERY_STATE_LABEL, type DeliveryState, type Provider } from '@social-lite/core';
+import { CONNECTION_STATUS_LABEL, DELIVERY_STATE_LABEL, isDeliveryOverdue, type DeliveryState, type Provider } from '@social-lite/core';
 import type { ConnectionRow } from './shared.js';
 
 const iso = (d: Date | string | null | undefined) => (d ? new Date(d).toISOString() : null);
@@ -67,6 +67,7 @@ export function deliveryJson(d: DeliveryRow, attempts?: unknown[]) {
     next_attempt_at: iso(d.next_attempt_at), provider_ids: d.provider_ids, provider_url: d.provider_url, published_at: iso(d.published_at),
     last_error_code: d.last_error_code, last_error_message: d.last_error_message, blocked_reason: d.blocked_reason,
     unknown_since: iso(d.unknown_since), needs_reconcile: d.needs_reconcile, ...retryInfo(d),
+    overdue: isDeliveryOverdue(d.state, d.next_attempt_at),
     ...(attempts ? { attempts } : {}),
   };
 }

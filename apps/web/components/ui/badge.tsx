@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import {
   Ban, CalendarClock, CircleCheck, CircleExclamationPoint, CircleQuestionMark, CircleX, Clock, ClockExclamationPoint,
   FlaskConical, Hourglass, Link2Off, LoaderCircle, OctagonX, Pause, RotateCcwClock, ShieldExclamationPoint, SquarePen,
-  TimerOff, TriangleExclamationPoint, Unplug, Hand, type LucideIcon } from 'lucide-react';
+  TimerOff, TriangleExclamationPoint, Unplug, Hand, AlarmClock, type LucideIcon } from 'lucide-react';
 import { CONNECTION_STATUS_LABEL, DELIVERY_STATE_LABEL, type ConnectionStatus, type DeliveryState, type PostAggregateStatus } from '@social-lite/core';
 import { cn } from './cn';
 import type { Tone } from './feedback';
@@ -50,8 +50,10 @@ const DELIVERY: Record<DeliveryState, { Icon: LucideIcon; tone: Tone; spin?: boo
 };
 
 /** Delivery state with icon + text. Simulated destinations never say "Published". */
-export function DeliveryStateBadge({ state, isMock, size, className }: { state: DeliveryState | null; isMock?: boolean; size?: 'sm' | 'md'; className?: string }) {
+export function DeliveryStateBadge({ state, isMock, overdue, size, className }: { state: DeliveryState | null; isMock?: boolean; overdue?: boolean; size?: 'sm' | 'md'; className?: string }) {
   if (!state) return <StateBadge Icon={SquarePen} tone="neutral" label="Not scheduled" size={size} className={className} />;
+  // Past its time and not sent: never shown as a calm "Scheduled".
+  if (overdue) return <StateBadge Icon={AlarmClock} tone="warn" label="Overdue" size={size} className={className} />;
   const d = DELIVERY[state];
   let label = DELIVERY_STATE_LABEL[state];
   if (state === 'published' && isMock) label = 'Simulated · delivered';
@@ -92,7 +94,8 @@ const POST: Record<PostAggregateStatus, { Icon: LucideIcon; tone: Tone; spin?: b
   expired: { Icon: TimerOff, tone: 'danger' },
 };
 
-export function PostStatusBadge({ status, simulated, size, className }: { status: PostAggregateStatus; simulated?: boolean; size?: 'sm' | 'md'; className?: string }) {
+export function PostStatusBadge({ status, simulated, overdue, size, className }: { status: PostAggregateStatus; simulated?: boolean; overdue?: boolean; size?: 'sm' | 'md'; className?: string }) {
+  if (overdue && status === 'scheduled') return <StateBadge Icon={AlarmClock} tone="warn" label="Overdue" size={size} className={className} />;
   const p = POST[status] ?? POST.draft;
   const label = status === 'published' && simulated ? 'Simulated · delivered' : POST_STATUS_LABEL[status] ?? status;
   return <StateBadge Icon={status === 'published' && simulated ? FlaskConical : p.Icon} tone={p.tone} spin={p.spin} label={label} size={size} className={className} />;

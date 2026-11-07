@@ -26,7 +26,7 @@ export function AgendaItem({ item, brandName, actions, href }: { item: PlannerIt
           <OwnerMeta item={item} />
         </div>
       </div>
-      <span className="hidden shrink-0 sm:block"><PostStatusBadge status={item.status} simulated={allMock} size="sm" /></span>
+      <span className="hidden shrink-0 sm:block"><PostStatusBadge status={item.status} simulated={allMock} overdue={item.overdue} size="sm" /></span>
       {actions}
     </div>
   );
@@ -43,7 +43,7 @@ export function OwnerMeta({ item }: { item: PlannerItem }) {
 
 const DOT: Record<string, string> = {
   published: 'bg-[var(--success)]', failed: 'bg-[var(--danger)]', expired: 'bg-[var(--danger)]',
-  unknown: 'bg-[var(--warn)]', blocked: 'bg-[var(--warn)]', retry_wait: 'bg-[var(--warn)]',
+  unknown: 'bg-[var(--warn)]', blocked: 'bg-[var(--warn)]', retry_wait: 'bg-[var(--warn)]', handoff: 'bg-[var(--warn)]',
 };
 
 /** Platform tiles with a tiny state marker; state is also in the accessible label (never colour alone). */
@@ -51,12 +51,12 @@ export function DestinationDots({ destinations, size = 'xs' }: { destinations: P
   return (
     <ul className="flex shrink-0 items-center gap-1" aria-label="Destinations">
       {destinations.map((d) => {
-        const label = `${PROVIDER_LABEL[d.provider]}${d.is_mock ? ' (simulated)' : ''}: ${d.state === 'published' && d.is_mock ? 'Simulated · delivered' : DELIVERY_STATE_LABEL[d.state]}`;
+        const label = `${PROVIDER_LABEL[d.provider]}${d.is_mock ? ' (simulated)' : ''}: ${d.overdue ? 'Overdue' : d.state === 'published' && d.is_mock ? 'Simulated · delivered' : DELIVERY_STATE_LABEL[d.state]}`;
         return (
           <li key={d.connection_id} className="relative" title={label}>
             <span className="sr-only">{label}</span>
             <PlatformIcon provider={d.provider} size={size} decorative />
-            {DOT[d.state] ? <span aria-hidden className={cn('absolute -bottom-0.5 -right-0.5 size-2 rounded-full ring-2 ring-[var(--surface)]', DOT[d.state])} /> : null}
+            {(d.overdue ? DOT.retry_wait : DOT[d.state]) ? <span aria-hidden className={cn('absolute -bottom-0.5 -right-0.5 size-2 rounded-full ring-2 ring-[var(--surface)]', d.overdue ? DOT.retry_wait : DOT[d.state])} /> : null}
           </li>
         );
       })}

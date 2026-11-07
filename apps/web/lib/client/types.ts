@@ -116,6 +116,8 @@ export interface Delivery {
   attempt_count: number; max_attempts: number; next_attempt_at: string | null; provider_ids: string[];
   provider_url: string | null; published_at: string | null; last_error_code: string | null; last_error_message: string | null;
   blocked_reason: string | null; unknown_since: string | null; can_retry: boolean; retry_requires_ack: boolean;
+  /** Scheduled/retrying but past its dispatch time (publisher stopped or backlogged). */
+  overdue?: boolean;
   attempts?: DeliveryAttempt[];
 }
 export interface HistoryRow extends Delivery {
@@ -138,7 +140,9 @@ export interface ValidateResponse {
 export interface PlannerItem {
   schedule_id: string; post_id: string; brand_id: string; title: string | null; excerpt: string; due_at: string;
   input_timezone: string; input_local_time: string | null; status: PostAggregateStatus; schedule_status: Schedule['status'];
-  destinations: Array<{ connection_id: string; provider: Provider; is_mock: boolean; state: DeliveryState }>;
+  destinations: Array<{ connection_id: string; provider: Provider; is_mock: boolean; state: DeliveryState; overdue?: boolean }>;
+  /** Past its time and not sent (publisher stopped or backlogged). */
+  overdue?: boolean;
   /** V2 calendar ownership (stream C) — only for brands already in scope. */
   campaign?: { id: string; name: string | null } | null; team?: { id: string; name: string | null } | null;
   assignee?: { id: string; email: string | null; name: string | null } | null;
@@ -161,7 +165,8 @@ export interface ApprovalDetail extends Approval {
 
 export interface Dashboard {
   today: PlannerItem[];
-  attention: { blocked: Delivery[]; unknown: Delivery[]; failed: Delivery[]; expired: Delivery[] };
+  attention: { blocked: Delivery[]; unknown: Delivery[]; failed: Delivery[]; expired: Delivery[]; handoff?: Delivery[] };
+  delayed?: { overdue: number; oldest_due_at: string | null; publisher_running: boolean; dispatch_enabled: boolean };
   account_warnings: Connection[];
   recent: HistoryRow[];
   paused: { workspace: boolean; brands: string[] };

@@ -1,5 +1,5 @@
 // Read models: history (DE-04), CSV export, planner (bounded UTC range), home dashboard, operations.
-import { AppError, aggregateStatus, type DeliveryState, type Provider } from '@social-lite/core';
+import { AppError, aggregateStatus, isDeliveryOverdue, OVERDUE_GRACE_MS, type DeliveryState, type Provider } from '@social-lite/core';
 import { getPool, many, maybeOne, one } from '@social-lite/db';
 import type { Ctx } from './context.js';
 import { DELIVERY_SELECT, deliveryJson, type DeliveryRow } from './posts/serialize.js';
@@ -110,8 +110,8 @@ export async function planner(ctx: Ctx, q: { from?: string; to?: string; brand_i
        FROM schedules s JOIN posts p ON p.id=s.post_id JOIN post_revisions r ON r.id=s.revision_id
       WHERE ${where} AND s.generation = p.schedule_generation ORDER BY s.due_at LIMIT 1000`, params);
   const ids = rows.map((r) => r.id);
-  const dels = ids.length ? await many<{ schedule_id: string; connection_id: string; provider: Provider; is_mock: boolean; state: DeliveryState }>(getPool(),
-    `SELECT schedule_id, connection_id, provider, is_mock, state FROM deliveries WHERE schedule_id = ANY($1::uuid[])`, [ids]) : [];
+  const dels = ids.length ? await many<{ schedule_id: string; connection_id: string; provider: Provider; is_mock: boolean; state: DeliveryState; next_attempt_at: Date | null }>(getPool(),
+    `SELECT schedule_id, connection_id, provider, is_mock, state, next_attempt_at FROM deliveries WHERE schedule_id = ANY($1::uuid[])`, [ids]) : [];
   const pendingDest = ids.length ? await many<{ schedule_id: string; connection_id: string; provider: Provider; is_mock: boolean }>(getPool(),
     `SELECT s.id schedule_id, v.connection_id, c.provider, c.is_mock FROM schedules s JOIN variants v ON v.revision_id=s.revision_id JOIN connections c ON c.id=v.connection_id
       WHERE s.id = ANY($1::uuid[]) AND s.status='pending_approval'`, [ids]) : [];
@@ -120,10 +120,11 @@ export async function planner(ctx: Ctx, q: { from?: string; to?: string; brand_i
     let status = ds.length ? aggregateStatus(ds.map((d) => d.state)) : 'scheduled';
     if (r.status === 'pending_approval') status = 'pending_approval';
     if (r.status === 'cancelled' && !ds.some((d) => d.state === 'published')) status = 'cancelled';
-    const destinations = ds.length ? ds.map((d) => ({ connection_id: d.connection_id, provider: d.provider, is_mock: d.is_mock, state: d.state }))
+    const destinations = ds.length ? ds.map((d) => ({ connection_id: d.connection_id, provider: d.provider, is_mock: d.is_mock, state: d.state, overdue: isDeliveryOverdue(d.state, d.next_attempt_at) }))
       : pendingDest.filter((d) => d.schedule_id === r.id).map((d) => ({ connection_id: d.connection_id, provider: d.provider, is_mock: d.is_mock, state: null }));
     return { schedule_id: r.id, post_id: r.post_id, brand_id: r.brand_id, title: r.title, excerpt: excerpt(r.base_text), due_at: r.due_at.toISOString(),
-      input_timezone: r.input_timezone, input_local_time: r.input_local_time, status, schedule_status: r.status, generation: r.generation, destinations };
+      input_timezone: r.input_timezone, input_local_time: r.input_local_time, status, schedule_status: r.status, generation: r.generation, destinations,
+      overdue: destinations.some((d) => 'overdue' in d && d.overdue) };
   });
   if (q.status) items = items.filter((i) => i.status === q.status);
   return { items };
@@ -156,11 +157,24 @@ export async function dashboard(ctx: Ctx, q: { brand_id?: string }) {
   const pausedBrands = await many<{ id: string }>(getPool(), `SELECT id FROM brands WHERE workspace_id=$1 AND publishing_paused`, [ctx.access.workspaceId]);
   return {
     today: today.items,
-    attention: { blocked: await attention('blocked'), unknown: await attention('unknown'), failed: await attention('failed'), expired: await attention('expired') },
+    attention: { blocked: await attention('blocked'), unknown: await attention('unknown'), failed: await attention('failed'), expired: await attention('expired'), handoff: await attention('handoff') },
+    delayed: await delayed(ctx, q.brand_id),
     account_warnings: warnings,
     recent: recent.items.filter((r) => !['scheduled', 'paused'].includes(r.state)),
     paused: { workspace: ws.publishing_paused, reason: ws.paused_reason, brands: pausedBrands.map((b) => b.id) },
   };
+}
+
+/** Posts past their time that have not been sent, and whether the publisher is running (no silent "Scheduled"). */
+async function delayed(ctx: Ctx, brandId?: string) {
+  const params: unknown[] = [];
+  const where = scope(ctx, 'd', params, brandId);
+  const r = await one<{ n: number; oldest: Date | null }>(getPool(),
+    `SELECT count(DISTINCT d.post_id)::int n, min(d.next_attempt_at) oldest FROM deliveries d
+      WHERE ${where} AND d.state IN ('scheduled','retry_wait') AND d.next_attempt_at < now() - interval '${OVERDUE_GRACE_MS / 1000} seconds'`, params);
+  const hb = await maybeOne<{ last: Date | null }>(getPool(), `SELECT max(last_seen_at) last FROM worker_heartbeats WHERE NOT coalesce((info->>'stopped')::boolean, false)`);
+  const flag = await maybeOne<{ value: unknown }>(getPool(), `SELECT value FROM system_flags WHERE key='dispatch_enabled'`);
+  return { overdue: r.n, oldest_due_at: r.oldest?.toISOString() ?? null, publisher_running: !!hb?.last && Date.now() - hb.last.getTime() < 60_000, dispatch_enabled: flag?.value !== false };
 }
 
 /** Operational facts only — real counts with periods and denominators (spec §17). */

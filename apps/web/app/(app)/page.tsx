@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { CircleCheck, Globe, OctagonPause, Plug, Plus } from 'lucide-react';
+import { AlarmClock, CircleCheck, Globe, OctagonPause, Plug, Plus } from 'lucide-react';
 import { PROVIDER_LABEL } from '@social-lite/core';
 import { useSession } from '@/lib/client/session';
 import { useApi } from '@/lib/client/use-api';
@@ -37,6 +37,7 @@ export default function HomePage() {
         { key: 'failed', label: 'Failed', items: data.attention.failed },
         { key: 'blocked', label: 'Blocked', items: data.attention.blocked },
         { key: 'expired', label: 'Expired', items: data.attention.expired },
+        { key: 'handoff', label: 'Manual handoff', items: data.attention.handoff ?? [] },
       ].filter((g) => g.items.length > 0)
     : [];
   const attentionCount = attention.reduce((n, g) => n + g.items.length, 0);
@@ -63,6 +64,18 @@ export default function HomePage() {
         <div className="flex flex-col gap-6">
           {data?.paused.workspace ? (
             <Banner tone="danger" icon={<OctagonPause aria-hidden className="size-4 text-danger" />} title="Workspace paused" />
+          ) : null}
+          {data?.delayed && data.delayed.overdue > 0 ? (
+            <Banner
+              tone="warn"
+              icon={<AlarmClock aria-hidden className="size-4 text-warn" />}
+              title={`${data.delayed.overdue} ${data.delayed.overdue === 1 ? 'post is' : 'posts are'} overdue`}
+              actions={can('diagnostics.read') ? <LinkButton href="/operations" size="sm">Operations</LinkButton> : null}
+            >
+              {!data.delayed.dispatch_enabled ? 'Publishing is switched off for maintenance. Overdue posts go out when it is back on, unless their publish-before deadline passes.'
+                : data.delayed.publisher_running ? 'Publishing is running behind. These go out shortly.'
+                : 'The publisher is not running. Overdue posts go out when it restarts, unless their publish-before deadline passes.'}
+            </Banner>
           ) : null}
           {data && data.paused.brands.length ? (
             <Banner tone="warn" icon={<OctagonPause aria-hidden className="size-4 text-warn" />} title={`Paused: ${data.paused.brands.map(brandName).join(', ')}`} />
@@ -91,7 +104,7 @@ export default function HomePage() {
                               {d.blocked_reason ?? d.last_error_message ?? (d.state === 'unknown' ? 'Not confirmed' : d.state === 'expired' ? 'Missed deadline' : '—')}
                             </p>
                           </div>
-                          <span className="hidden shrink-0 sm:block"><DeliveryStateBadge state={d.state} isMock={d.is_mock} size="sm" /></span>
+                          <span className="hidden shrink-0 sm:block"><DeliveryStateBadge state={d.state} isMock={d.is_mock} overdue={d.overdue} size="sm" /></span>
                           <Link href={`/posts/${d.post_id}#deliveries`} className={buttonClass('secondary', 'sm')}>
                             Resolve<span className="sr-only"> {d.display_name} ({d.state})</span>
                           </Link>
@@ -164,7 +177,7 @@ export default function HomePage() {
                               <TimeWithZone instant={r.published_at ?? r.due_at} tz={r.input_timezone || tz} /> · {r.display_name}
                             </p>
                           </div>
-                          <DeliveryStateBadge state={r.state} isMock={r.is_mock} size="sm" />
+                          <DeliveryStateBadge state={r.state} isMock={r.is_mock} overdue={r.overdue} size="sm" />
                         </li>
                       ))}
                     </ul>

@@ -39,7 +39,7 @@ export function DeliveryCard({ delivery: d, tz, onChanged, canAct = true, expand
             {d.attempt_count ? <> · {d.attempt_count}/{d.max_attempts}<span className="sr-only"> attempts</span></> : null}
           </p>
         </div>
-        <DeliveryStateBadge state={d.state} isMock={d.is_mock} size="sm" />
+        <DeliveryStateBadge state={d.state} isMock={d.is_mock} overdue={d.overdue} size="sm" />
       </div>
 
       <DeliveryExplanation d={d} tz={tz} />

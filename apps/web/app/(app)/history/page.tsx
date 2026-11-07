@@ -131,7 +131,7 @@ export default function HistoryPage() {
                         {r.is_mock ? <SimulatedBadge className="shrink-0" /> : null}
                       </span>
                     </Td>
-                    <Td><DeliveryStateBadge state={r.state} isMock={r.is_mock} size="sm" /></Td>
+                    <Td><DeliveryStateBadge state={r.state} isMock={r.is_mock} overdue={r.overdue} size="sm" /></Td>
                     <Td className="whitespace-nowrap"><TimeWithZone instant={r.due_at} tz={r.input_timezone || tz} /></Td>
                     <Td className="whitespace-nowrap">{r.published_at ? <TimeWithZone instant={r.published_at} tz={r.input_timezone || tz} /> : <span className="text-muted">—</span>}</Td>
                     <Td className="text-right tabular">{r.attempt_count}/{r.max_attempts}</Td>
@@ -151,7 +151,7 @@ export default function HistoryPage() {
                       <p className="truncate text-[13px] font-medium">{postTitle(r)}</p>
                       <p className="truncate text-xs text-muted"><TimeWithZone instant={r.published_at ?? r.due_at} tz={r.input_timezone || tz} /> · {r.display_name}</p>
                     </div>
-                    <DeliveryStateBadge state={r.state} isMock={r.is_mock} size="sm" className="shrink-0" />
+                    <DeliveryStateBadge state={r.state} isMock={r.is_mock} overdue={r.overdue} size="sm" className="shrink-0" />
                   </div>
                 </button>
               </li>
