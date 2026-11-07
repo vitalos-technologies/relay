@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import { TransportError, type Checkpoint, type PublishConnection } from '@social-lite/core';
 import { threadsAdapter, threadsConnector, threadsFake, threadsMetricsFetcher, threadsTextLength } from '../../packages/providers/src/threads/index.js';
-import { RecordingTransport, SCENARIOS, SECRET_ACCESS, ctxWith, expectNoSecrets, image, inputOf, prepareUntilReady, res, simulated, video } from './v3-helpers.js';
+import { NOW, RecordingTransport, SCENARIOS, SECRET_ACCESS, ctxWith, expectNoSecrets, image, inputOf, prepareUntilReady, res, simulated, video } from './v3-helpers.js';
 
 const conn = (over: Partial<PublishConnection> = {}): PublishConnection => ({ id: 'c1', provider: 'threads', providerAccountId: '1789', displayName: 'Prof', username: 'prof', isMock: false, metadata: {}, ...over });
 const creds = { kind: 'oauth2' as const, accessToken: SECRET_ACCESS, refreshToken: SECRET_ACCESS, expiresAt: '2027-01-06T12:00:00Z', scope: '' };
@@ -153,7 +153,7 @@ describe('threads simulator scenarios', () => {
     const cp = prep.kind === 'ready' ? prep.checkpoint : null;
     const first = await threadsAdapter.publish(s.ctx, inp, cp);
     const second = await threadsAdapter.publish(s.ctx, inp, cp);
-    const recon = () => threadsAdapter.reconcile(s.ctx, { deliveryId: 'd', connection: c, credentials: inp.credentials, variantText: inp.variant.text, providerIds: [], checkpoint: cp, sentAt: new Date(Date.now() - 60_000).toISOString() });
+    const recon = () => threadsAdapter.reconcile(s.ctx, { deliveryId: 'd', connection: c, credentials: inp.credentials, variantText: inp.variant.text, providerIds: [], checkpoint: cp, sentAt: new Date(NOW.getTime() - 60_000).toISOString() });
     return { prep, first, second, recon };
   }
   it('success; publishing the same container twice is refused (no duplicate)', async () => { const r = await run('success'); expect(r.first.kind).toBe('confirmed'); expect(r.second.kind).toBe('permanent_failure'); });

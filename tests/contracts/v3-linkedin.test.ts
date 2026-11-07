@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import { TransportError, type Checkpoint, type PublishConnection } from '@social-lite/core';
 import { LI_DEFAULT_VERSION, linkedinAdapter, linkedinConnector, linkedinFake, linkedinMetricsFetcher, littleEscape, littleUnescape } from '../../packages/providers/src/linkedin/index.js';
-import { RecordingTransport, SCENARIOS, SECRET_ACCESS, ctxWith, expectNoSecrets, image, inputOf, prepareUntilReady, res, simulated, video } from './v3-helpers.js';
+import { NOW, RecordingTransport, SCENARIOS, SECRET_ACCESS, ctxWith, expectNoSecrets, image, inputOf, prepareUntilReady, res, simulated, video } from './v3-helpers.js';
 
 const member = (over: Partial<PublishConnection> = {}): PublishConnection => ({ id: 'c1', provider: 'linkedin', providerAccountId: 'urn:li:person:abc123', displayName: 'Jane', username: null, isMock: false, metadata: { account_type: 'member', granted_scopes: ['openid', 'profile', 'w_member_social'] }, ...over });
 const org = (over: Partial<PublishConnection> = {}): PublishConnection => member({ providerAccountId: 'urn:li:organization:2414183', displayName: 'Acme', metadata: { account_type: 'organization', granted_scopes: ['w_organization_social', 'r_organization_social', 'rw_organization_admin'] }, ...over });
@@ -181,7 +181,7 @@ describe('linkedin simulator scenarios', () => {
     const cp = prep.kind === 'ready' ? prep.checkpoint : null;
     const first = await linkedinAdapter.publish(s.ctx, inp, cp);
     const second = await linkedinAdapter.publish(s.ctx, inp, cp);
-    const recon = () => linkedinAdapter.reconcile(s.ctx, { deliveryId: 'd', connection: c, credentials: inp.credentials, variantText: inp.variant.text, providerIds: [], checkpoint: cp, sentAt: new Date(Date.now() - 60_000).toISOString() });
+    const recon = () => linkedinAdapter.reconcile(s.ctx, { deliveryId: 'd', connection: c, credentials: inp.credentials, variantText: inp.variant.text, providerIds: [], checkpoint: cp, sentAt: new Date(NOW.getTime() - 60_000).toISOString() });
     return { prep, first, second, recon };
   }
   it('success; a repeat is refused as duplicate ⇒ unknown', async () => { const r = await run('success'); expect(r.first.kind).toBe('confirmed'); expect(r.second).toMatchObject({ kind: 'unknown', code: 'duplicate_content' }); });

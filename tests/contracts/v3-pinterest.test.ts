@@ -116,7 +116,7 @@ describe('pinterest simulator scenarios', () => {
     const cp = prep.kind === 'ready' ? prep.checkpoint : null;
     const first = await pinterestAdapter.publish(s.ctx, inp, cp);
     const second = first.kind === 'rejected_safe_to_retry' ? await pinterestAdapter.publish(s.ctx, inp, cp) : null;
-    const recon = () => pinterestAdapter.reconcile(s.ctx, { deliveryId: 'd', connection: c, credentials: inp.credentials, variantText: inp.variant.text, providerIds: [], checkpoint: cp, sentAt: new Date(Date.now() - 60_000).toISOString() });
+    const recon = () => pinterestAdapter.reconcile(s.ctx, { deliveryId: 'd', connection: c, credentials: inp.credentials, variantText: inp.variant.text, providerIds: [], checkpoint: cp, sentAt: new Date(NOW.getTime() - 60_000).toISOString() });
     return { prep, first, second, recon };
   }
   it('success', async () => { expect((await run('success')).first.kind).toBe('confirmed'); });

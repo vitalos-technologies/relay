@@ -1,6 +1,11 @@
 // Zod schemas for API payloads shared by route handlers and the client.
 import { z } from 'zod';
 
+// Browser bundles: Zod v4 probes `new Function("")` when an object schema is built, which a strict CSP (no
+// 'unsafe-eval') reports as a violation even though the probe is caught. jitless skips the probe (same results;
+// the server keeps the JIT fast path).
+if (typeof (globalThis as { document?: unknown }).document !== 'undefined') z.config({ jitless: true });
+
 export const uuid = z.string().uuid();
 
 export const urlButtonSchema = z.object({ text: z.string().trim().min(1).max(64), url: z.string().url().max(2048) });

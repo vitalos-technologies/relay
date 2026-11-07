@@ -2,13 +2,18 @@
 import { expect, test } from '@playwright/test';
 import { api, demoBrand, signIn } from './helpers';
 
+/** Destinations created by the seed (scripts/seed-agency.ts), as opposed to ones other specs create at run time. */
+const SEEDED = /^Vitalos (Instagram|Facebook|Telegram|X)\b.*\(simulated\)$/;
+
 test.describe('owner publishing journey', () => {
   test('sign in, compose, publish to four simulated destinations, see honest results', async ({ page }) => {
     await signIn(page, 'owner@demo.social-lite.test');
     const a = await api(page);
     const brand = await demoBrand(a, /Vitalos/);
     const conns = (await a.get(`/api/brands/${brand.id}/connections`)).body.items
-      .filter((c: any) => c.is_mock && c.status === 'ready' && !/rejects/.test(c.display_name));
+      // Seeded destinations only ("Vitalos <Network> (simulated)"): the E2E workspace persists between runs and other
+      // specs add their own simulated accounts (e.g. "Health FB …" with a missing-permission scenario).
+      .filter((c: any) => c.is_mock && c.status === 'ready' && SEEDED.test(c.display_name) && !/rejects/.test(c.display_name));
     const byProvider = Object.fromEntries(conns.map((c: any) => [c.provider, c.id]));
     expect(Object.keys(byProvider).sort()).toEqual(['facebook', 'instagram', 'telegram', 'x']);
     const assets = (await a.get(`/api/brands/${brand.id}/assets?status=ready`)).body.items;
@@ -43,8 +48,8 @@ test.describe('owner publishing journey', () => {
     const a = await api(page);
     const brand = await demoBrand(a, /Vitalos/);
     const conns = (await a.get(`/api/brands/${brand.id}/connections`)).body.items;
-    const fb = conns.find((c: any) => c.provider === 'facebook' && c.is_mock);
-    const tg = conns.find((c: any) => c.provider === 'telegram' && c.is_mock);
+    const fb = conns.find((c: any) => c.provider === 'facebook' && c.is_mock && SEEDED.test(c.display_name));
+    const tg = conns.find((c: any) => c.provider === 'telegram' && c.is_mock && SEEDED.test(c.display_name));
     await a.send('PATCH', `/api/connections/${tg.id}/mock-scenario`, { scenario: 'fail_permanent' });
     try {
       const p = (await a.send('POST', `/api/brands/${brand.id}/posts`, { title: 'E2E partial', draft: { baseText: `Partial ${Date.now()}`, baseLink: null, baseAssetIds: [],
@@ -73,7 +78,7 @@ test.describe('owner publishing journey', () => {
     await signIn(page, 'owner@demo.social-lite.test');
     const a = await api(page);
     const brand = await demoBrand(a, /Vitalos/);
-    const ig = (await a.get(`/api/brands/${brand.id}/connections`)).body.items.find((c: any) => c.provider === 'instagram' && c.is_mock);
+    const ig = (await a.get(`/api/brands/${brand.id}/connections`)).body.items.find((c: any) => c.provider === 'instagram' && c.is_mock && SEEDED.test(c.display_name));
     const p = (await a.send('POST', `/api/brands/${brand.id}/posts`, { draft: { baseText: 'text only', baseLink: null, baseAssetIds: [], variants: [{ connectionId: ig.id, inheritText: true, inheritMedia: true }] } })).body;
     const r = await a.send('POST', `/api/posts/${p.id}/publish`, { expected_version: p.version, connection_ids: [ig.id] });
     expect(r.status).toBe(422);

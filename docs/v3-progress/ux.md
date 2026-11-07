@@ -5,7 +5,7 @@ Brief: `docs/queue/018_UX_REDESIGN_BRIEF.md`. Resume point for this stream.
 ## Status
 - 2026-11-07: started. V2-A landed (e09ff58): settings files unlocked (not csp.ts/proxy.ts/keycloak/auth/security.spec).
 - Final evidence (after lead reset with E2E Workspace): 104 shots `evidence/v3/ux/<screen>-<1440|390>-<light|dark>.png` via `scripts/ux-shots.mjs`. Checkpoints in `evidence/v3/ux/checkpoints/`.
-- Verification: root + web tsc clean; `pnpm test` 490/490; E2E full run 32/39 (7 failures = dev-server restarts/compile stalls/switch race); all 7 pass on targeted rerun after the race fix.
+- Verification (post-commit 3e5e3f2): full E2E on a production build (`next build --webpack` + `next start`) **39/39**. Fixes: Zod `jitless` in the browser (`packages/core/src/schemas.ts`) so the strict CSP sees no `script-src eval` probe; publishing.spec pinned to seeded destinations (E2E workspace persists between runs). Root + web tsc clean; `pnpm test` 488/490 — the 2 failures (v3-linkedin / v3-pinterest `timeout_after_send ⇒ reconciled`) fail identically without UX changes (pre-existing).
 
 ## Done
 - 1 Tokens + shell/nav (rail 72 / 240 expanded, top bar scope, Admin group, new labels): `evidence/v3/ux/checkpoints/1-shell-light.png`, `evidence/v3/ux/checkpoints/1-shell-dark.png`
@@ -28,7 +28,6 @@ Brief: `docs/queue/018_UX_REDESIGN_BRIEF.md`. Resume point for this stream.
 - `scripts/ux-shots.mjs` regenerates `evidence/v3/ux/*` (dev only; inserts a short-lived owner session; ensures draft "Autumn menu launch (UX showcase)" on Relay Coffee).
 
 ## Next
-1. One clean full E2E run on a stable server (production build recommended; next dev OOMs ~12 GB).
 2. Approvals list/detail polish; Settings sub-pages without content (Retention, Guests, Webhooks, Recovery, AI usage) need backend first.
 3. Keyboard/screen-reader pass on composer + planner drag alternative (menu → Reschedule exists).
 
