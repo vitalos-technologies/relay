@@ -52,6 +52,9 @@ Include these at the top of the final consolidated activation checklist and in t
 | V3 UX redesign (lead brief) | `docs/queue/018_UX_REDESIGN_BRIEF.md` |
 | V3.1 performance & resilience | `docs/queue/03b_V3_1_PROMPT.md` |
 | V3.1 Admin app | `docs/queue/03c_V3_1_ADMIN_PROMPT.md` |
+| Collaboration | `docs/queue/03d_COLLABORATION_PROMPT.md` |
+| V3.5 | `docs/queue/03f_V3_5_PROMPT.md` |
+| V4 commercial + support | `docs/queue/03g_V4_PROMPT.md` |
 | Collaboration completion | `docs/queue/03d_COLLABORATION_PROMPT.md` |
 | V3.5 integrations, inbox, listening, AI | `docs/queue/03f_V3_5_PROMPT.md` |
 | Copy cleanup | `docs/queue/03e_COPY_CLEANUP_PROMPT.md` |
@@ -63,9 +66,8 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
 1. V1 + V1.1 **done** (v1.1.0-local) → 2. V2 **done** (v2.0.0) → 3. V3 **done** (v3.0.0) → 4. V3.1 **done** (v3.1.0)
 5. V3.1 Admin **done** (see below; tag v3.1.1 suggested on the admin commit)
 6. Collaboration completion (`docs/queue/03d_COLLABORATION_PROMPT.md`) — **next / running**
-6b. Support inbox (proposed, pending user OK): Help → Contact support → two-way thread with Relay staff in Platform → Support (status, assignee, in-app + email notice, support-access request from the thread); reuse V3.5 inbox pieces. Also noted: no subscriptions/billing exist and none is queued (ask user).
-   Activation item (told user): serve Platform scope from a separate host (e.g. ops.<domain>) restricted to office/VPN IPs; small code change (host check in platformRoute) + hosting config.
-7. **V3.5** (`docs/queue/03f_V3_5_PROMPT.md`) → 8. Copy cleanup (03e) → 9. Docs + Help Centre (04) → 10. One consolidated activation checklist + user reminder.
+6b. (Support inbox proposal → superseded by V4.) Platform host restriction (ops.<domain>, office/VPN IPs) is an activation item.
+7. **V3.5** (`docs/queue/03f_V3_5_PROMPT.md`) → 7b. **V4** commercial + customer support (`docs/queue/03g_V4_PROMPT.md`: Relay support tickets, Platform → Support, plans/trials/subscriptions/billing via Stripe test mode behind a billing service, entitlements, tenant lifecycle; no Stripe keys in this environment → build against a provider interface with a test double + locally signed webhook fixtures; never request keys in chat) → 8. Copy cleanup (03e) → 9. Docs + Help Centre (04) → 10. One consolidated activation checklist + user reminder.
 
 ## Current state (keep updated)
 - **V3.1 Admin: done and committed.** `/admin` app (Workspace ↔ Platform scope), platform operators (migration 026, applied to dev, frozen; next migration is **027**), support access (owner-approved, time-boxed, step-up), suspension gate in the engine, change-feed sync (10 s poll, ≤ 60 s backoff). Bootstrap an operator: `pnpm platform:operator` (dev seed makes owner@demo one).
