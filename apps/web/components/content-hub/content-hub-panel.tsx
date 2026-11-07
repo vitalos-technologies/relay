@@ -168,7 +168,7 @@ export function ContentHubPanel({ brandId }: { brandId: string }) {
         ) : (
           <Button key={c.id} size="sm" icon={<Plus aria-hidden className="size-4" />} onClick={() => setNotionConn(c)}>Notion{active.filter((x) => x.source === 'notion').length > 1 ? ` · ${c.account_label}` : ''}</Button>
         ))) : null}
-        {!active.length ? <LinkButton href="/settings?tab=sources" size="sm">Connect Drive or Notion</LinkButton> : null}
+        {!active.length ? <LinkButton href="/settings/connections/google" size="sm">Connect Drive or Notion</LinkButton> : null}
         <span className="flex-1" />
         {canV2('exports.create') ? <Button size="sm" icon={<Download aria-hidden className="size-4" />} onClick={() => setExportOpen(true)}>Export plan</Button> : null}
       </div>

@@ -161,11 +161,12 @@ export async function startContentOAuth(ctx: Ctx, input: { source: string; brand
 export type ContentCallbackError = 'invalid_source' | 'invalid_state' | 'session_required' | 'session_mismatch' | 'access_denied' | 'authorization_failed'
   | 'forbidden' | 'not_configured' | 'token_exchange_failed' | 'scope_denied' | 'account_mismatch';
 
-const RETURN_PATH = '/settings?tab=sources';
+/** Settings → Connections → Google Drive and Docs / Notion (redesigned left-hand Settings). */
+export const contentReturnPath = (source: string) => `/settings/connections/${source === 'notion' ? 'notion' : 'google'}`;
 
 /** Finish the redirect. The state is consumed ONLY by the user who started the flow; provider text is never echoed. */
 export async function handleContentOAuthCallback(p: { source: string; params: URLSearchParams; sessionUserId: string | null }): Promise<{ location: string; error?: ContentCallbackError; connectionId?: string }> {
-  const fail = (error: ContentCallbackError) => ({ location: `${RETURN_PATH}&error=${error}`, error });
+  const fail = (error: ContentCallbackError) => ({ location: `${contentReturnPath(p.source)}?error=${error}`, error });
   if (p.source !== 'google' && p.source !== 'notion') return fail('invalid_source');
   const source: ContentSource = p.source;
   const state = p.params.get('state');
@@ -224,7 +225,7 @@ export async function handleContentOAuthCallback(p: { source: string; params: UR
     throw err;
   });
   if (!connectionId) return fail('account_mismatch');
-  return { location: `${RETURN_PATH}&connected=${connectionId}`, connectionId };
+  return { location: `${contentReturnPath(source)}?connected=${connectionId}`, connectionId };
 }
 
 /** Insert or refresh a connection for an external account (same account + scope ⇒ same row, credentials replaced). */

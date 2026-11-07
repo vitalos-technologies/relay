@@ -114,7 +114,7 @@ describe('connections (OAuth, scopes, tenancy)', () => {
     expect(u.searchParams.get('code_challenge_method')).toBe('S256');
     expect(u.searchParams.get('redirect_uri')).toBe('http://localhost:3000/api/content-hub/oauth/google/callback');
     const r = await handleContentOAuthCallback({ source: 'google', params: new URLSearchParams({ state: u.searchParams.get('state')!, code: 'good-code' }), sessionUserId: w.owner.id });
-    expect(r.location).toMatch(/^\/settings\?tab=sources&connected=/);
+    expect(r.location).toMatch(/^\/settings\/connections\/google\?connected=/);
     const token = google.requests.find((x) => x.op === 'google.oauth.token')!;
     expect(new URLSearchParams(token.body!).get('code_verifier')).toMatch(/^[\w-]{43,}$/);
     const row = await one<{ credentials_enc: unknown; granted_scopes: string[]; account_label: string; status: string }>(`SELECT * FROM content_connections WHERE id=$1`, [r.connectionId]);
