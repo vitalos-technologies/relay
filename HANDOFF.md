@@ -29,6 +29,7 @@ Last updated: 2026-11-07 07:25 UTC · Lead agent keeps this current after every 
 |---|---|
 | v1.0.0-local | fa905db |
 | v1.1.0-local | e2bc6ec |
+| v3.0.0 | 95f8e34 |
 | v2.0.0 | 4815af8 |
 
 To recreate them on GitHub from any machine: `git tag v2.0.0 4815af8 && git push origin v2.0.0` (same for the others).
@@ -52,7 +53,7 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
 ## Queue (in order)
 1. V1 + V1.1: **done** (tag `v1.1.0-local`).
 2. V2: **done** (all streams A–D). Final run on main: unit 104, contracts 351, integration 321, security E2E 8/8, rehearsal PASS (`docs/V2_TEST_REPORT.md`). Full browser E2E re-run is pending until the redesign lands (last run 33/38).
-3. V3:
+3. V3: **done (v3.0.0)**.
    - Providers: done.
    - Lead engine gaps: done.
    - MCP (017), CH content hub (016), AN analytics (015) **all done and integrated** (864cf18, 57e056b, 523c1dd; MCP source + analytics tools 18b5c53, ed9aa1f).
@@ -66,8 +67,9 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
 - **V3.1 PERF: done** (277c2ff; docs/PERFORMANCE_{BASELINE,BUDGETS,RESULTS}.md). Round 2 done (per-day analytics summary, migration 025 applied; approval inbox within budget). Only the planner remains over budget (UI decision; UX now loads the visible range with a limit). Worker now uses up to 20 DB connections per instance (main 10 + bulk 6 + pg-boss 4): note for V3.1 activation (production max_connections / pooler sizing).
 - **Open UI decision (PERF):** planner payload ~700–800 KB across all brands; needs paging or per-brand loading in the redesigned Planner.
 - **V3 UX redesign: done and committed** (3e5e3f2). E2E now uses its own seeded "E2E Workspace" (`pnpm db:seed:e2e`; Playwright globalSetup). Dev web now runs as a production build (`next build --webpack` + `next start --port 3000`) to avoid dev-server OOM during E2E.
-- **Lead next:** full E2E on the production build, update V3 docs (UX rows), tag v3.0.0, then the V3.1 UI stream (screens for V3.1 backend: autosave states, trash/undo, bulk, Cmd+K search, brand rules + reviews, queues, links, diagnostics, onboarding, feature flags, release notes, support) and V3.1 docs.
-- **Background agents** (a new session will NOT have them): none. Relaunch any missing one from its progress note + brief (started 07:5x; brief `docs/queue/018_UX_REDESIGN_BRIEF.md`, progress `docs/v3-progress/ux.md`; A has landed and UX was told it may now edit Settings).
+- **V3 done:** full E2E 39/39 on a production build, tag v3.0.0. V3 docs being updated for the redesign (docs agent).
+- **Running:** V3.1 UI stream (brief `docs/queue/031_V3_1_UI_BRIEF.md`, progress `docs/v3-1-progress/ui.md`, checkpoints `evidence/v3-1/ui/checkpoints/`). Previously planned: (screens for V3.1 backend: autosave states, trash/undo, bulk, Cmd+K search, brand rules + reviews, queues, links, diagnostics, onboarding, feature flags, release notes, support) and V3.1 docs.
+- **Background agents** (a new session will NOT have them): V3.1 UI, V3 docs update. Relaunch any missing one from its progress note + brief (started 07:5x; brief `docs/queue/018_UX_REDESIGN_BRIEF.md`, progress `docs/v3-progress/ux.md`; A has landed and UX was told it may now edit Settings).
 - **CH follow-ups:** CH's edits to `apps/web/lib/csp.ts`, `apps/web/proxy.ts`, `tests/unit/security-headers.test.ts`, `apps/web/app/(app)/settings/page.tsx` are uncommitted (mixed with A's); commit with A. Live Google/Notion apps + browser Picker untested (activation).
 - **MCP follow-ups:** recreate Keycloak (`docker compose -f infra/compose.yaml up -d --force-recreate oidc`) after A lands to load the `relay-mcp` client/scopes; place MCP settings in the redesigned Settings nav (now `/mcp/settings`). Real MCP clients need public HTTPS (activation checklist).
   - If they're gone, re-launch each from its progress note. Each note lists what is done and what's next:
