@@ -13,6 +13,7 @@ interface History { current_version: number; versions: VersionDto[]; revisions: 
 const KIND: Record<VersionDto['kind'], { label: string; tone: 'neutral' | 'warn' | 'info' | 'success' }> = {
   created: { label: 'Created', tone: 'neutral' }, saved: { label: 'Saved', tone: 'neutral' },
   conflict: { label: 'Unsaved copy', tone: 'warn' }, restored: { label: 'Restored', tone: 'info' },
+  recovered: { label: 'Recovered', tone: 'info' },
 };
 
 export function DiffText({ before, after }: { before: string; after: string }) {
@@ -30,8 +31,10 @@ export function DiffText({ before, after }: { before: string; after: string }) {
  * Version history: every save, restores and kept conflict copies ("Unsaved copy" = someone's edit that lost a
  * concurrent save — never discarded). Compare any version with the current draft and restore it explicitly.
  */
-export function HistoryPanel({ postId, currentText, version, canEdit, onRestored, highlight }: {
+export function HistoryPanel({ postId, currentText, version, canEdit, onRestored, highlight, tall }: {
   postId: string; currentText: string; version: number; canEdit: boolean; onRestored: () => Promise<void> | void; highlight?: string | null;
+  /** In the version-history drawer: no inner scroll cap. */
+  tall?: boolean;
 }) {
   const toast = useToast();
   const { data, error, loading, refetch } = useApi<History>(`/api/posts/${postId}/versions?v=${version}`);
@@ -43,7 +46,7 @@ export function HistoryPanel({ postId, currentText, version, canEdit, onRestored
   const picked = data.versions.find((v) => v.id === (sel ?? highlight));
   return (
     <div className="flex flex-col gap-3">
-      <ul className="flex max-h-[300px] flex-col overflow-y-auto" aria-label="Versions">
+      <ul className={cn('flex flex-col overflow-y-auto', tall ? 'max-h-[50dvh]' : 'max-h-[300px]')} aria-label="Versions">
         {data.versions.map((v) => {
           const k = KIND[v.kind];
           const current = v.version === data.current_version;

@@ -13,14 +13,16 @@ import { fmtRelative } from '@/lib/client/format';
 import { Banner, Button, ConfirmDialog, Dialog, EmptyState, ErrorNotice, ErrorState, Input, LinkButton, Segmented, Select, SkeletonRows, useToast } from '@/components/ui';
 import { SourceCard } from './source-card';
 import { SourceImportDialog } from './import-dialogs';
-import { pickFromDrive, TEST_PICKS, type PickerConfig, type PickMode } from './google-picker';
+import type { PickerConfig, PickMode } from './google-picker';
 
 type SelectionResult = { items: SourceItemDto[]; destinations: Array<{ id: string; title: string | null; writable: boolean }>; rejected: Array<{ id: string; reason: string }> };
 
 /** Explicit Drive selection → server-side verification with the saved authorization. */
 export async function selectFromDrive(conn: ContentConnectionDto, brandId: string, mode: PickMode, purpose: 'import' | 'export_destination' = 'import'): Promise<SelectionResult | null> {
   const cfg = await api.get<PickerConfig>(`/api/content-hub/connections/${conn.id}/picker`, { brand_id: brandId });
-  const ids = cfg.test ? TEST_PICKS[mode] : await pickFromDrive(cfg, mode);
+  // The picker module (and Google's scripts, which it loads itself) is fetched only when someone opens it.
+  const picker = await import('./google-picker');
+  const ids = cfg.test ? picker.TEST_PICKS[mode] : await picker.pickFromDrive(cfg, mode);
   if (!ids.length) return null;
   return api.post<SelectionResult>('/api/content-hub/selection', { connection_id: conn.id, brand_id: brandId, purpose, items: ids.map((id) => ({ id })) });
 }

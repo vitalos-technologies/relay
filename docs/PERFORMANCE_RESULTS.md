@@ -277,3 +277,58 @@ write (never stale, no authorization data; readers keep the same scope and permi
 - `npx vitest run --project integration`: 47 files, 369 tests passed (round 2: 49 files, 374 tests) (incl. `tests/integration/v31-perf.test.ts`: provider
   cap exact under 8 concurrent claimers with no duplicate sends; batched inbox + immediate revocation; planner/dashboard
   truncation flags; workload samples per workspace + `diagnostics.read` gate).
+
+## Browser (V3.1 UI stream, lab) — `scripts/v31-browser-perf.mjs`
+
+**Conditions.** Production build (`next build --webpack` + `next start`) on the shared dev host: 4 vCPU Intel Xeon
+2.1 GHz, 16 GB, the same host also runs Postgres, the worker and Keycloak. Headless Chromium 153 (Playwright), 1440×900,
+**localhost with no network or CPU throttling** — these are lab numbers and optimistic for real networks and phones;
+field Web Vitals need a deployment. Cold cache per run (fresh browser context), server warmed once per route before
+measuring. Dataset: Demo Workspace (3 brands, 19 connections, 907 posts, 896 schedules, 905 deliveries) — smaller than
+the PERF Medium profile; larger workloads are server-side results above. **n = 10 cold loads per route** and 10 warm laps;
+percentiles are nearest-rank, so p95 of 10 is the slowest run and only indicative. Evidence:
+`evidence/v3-1/perf/browser-initial.json` (first measurement), `browser-after.json` (after the fixes below),
+`browser-budget-check.json` (n = 3, budget check only).
+
+| Route | LCP p75 / p95 (ms) | Useful content p50 / p95 (ms) | CLS p75 (max) | INP proxy p75 (max) ms, initial → after | JS KB p50, initial → after | Requests p50 |
+|---|---|---|---|---|---|---|
+| Overview | 384 / 400 | 519 / 607 | 0.032 (0.039) | 200 → 48 (56) | 291 → 292 | 64 |
+| Planner (week) | 552 / 576 | 454 / 551 | 0.002 (0.002) | 192 → 56 (64) | 298 → 300 | 63 |
+| Create | 348 / 416 | 363 / 439 | 0 (0) | 192 → 40 (48) | 284 → 286 | 68 |
+| Composer | 472 / 512 | 480 / 523 | 0.005 (0.008) | 40 → 40 (48) | 349 → 352 | 73 |
+| Analytics (28 d) | 556 / 656 | 500 / 639 | 0 (0) | 152 → 48 (56) | 288 → 289 | 76 |
+| Content library | 348 / 376 | 369 / 398 | 0 (0) | 168 → 40 (48) | 314 → 311 | 59 |
+| Approvals | 328 / 352 | 341 / 390 | 0 (0) | 152 → 40 (48) | 288 → 289 | 56 |
+| Connections | 472 / 492 | 493 / 793 | **0.222 → 0** (0) | 160 → 48 (48) | 293 → 296 | 66 |
+| History | 348 / 356 | 439 / 524 | 0 (0) | 192 → 64 (64) | 294 → 295 | 59 |
+| Settings | 352 / 396 | 364 / 438 | 0 (0) | 152 → 40 (48) | 326 → 303 | 78 |
+| Trash | 348 / 356 | 313 / 348 | 0 (0) | 176 → 32 (48) | 290 → 292 | 58 |
+
+Warm navigation through the shell (click → route rendered, no skeleton), n = 10 per target, ms:
+
+| Target | p50 | p95 | initial p95 |
+|---|---|---|---|
+| Planner | 120 | 191 | 147 |
+| Content library | 75 | 96 | 96 |
+| Approvals | 82 | 95 | 98 |
+| Connections | 132 | 153 | 143 |
+| Overview | 175 | 202 | 214 |
+
+**Against the targets (lab):** LCP p75 ≤ 556 ms (target 2 s), CLS p75 ≤ 0.032 (0.1), INP proxy p75 ≤ 64 ms (200),
+warm navigation p95 ≤ 202 ms (300) — all within, under the optimistic conditions above.
+
+**What changed between the two measurements (measured, not assumed):**
+- INP: every keystroke in the command menu cost 100–140 ms of *presentation delay* (handlers ≤ 14 ms) because the
+  full-screen dialog overlay used `backdrop-filter: blur`, which repaints the page behind it each frame. The blur was
+  removed from the command menu and the shared `Dialog` overlay: keystrokes now 16–24 ms.
+- CLS on Connections (0.222 → 0): brand sections loaded independently and the first one pushed the others down; they
+  now appear together after one skeleton, and Content sources renders after them. Trade-off: cold useful-content p95
+  on Connections rose (439 → 793 ms) because it waits for the slowest brand.
+- JS: Settings sections and the Content Hub panel load on demand (Settings 326 → 303 KB); the Picker module is a dynamic import.
+
+**Not done / honest limits:**
+- The ~230 KB shared baseline is unchanged. The biggest lever is the `@social-lite/core` barrel pulling zod (and all
+  schemas) into the browser; narrowing client imports or marking core side-effect free is a shared-package change
+  (raised with the lead).
+- No throttled (slow 4G / 4× CPU) series yet; the harness supports `--cpu 4`.
+- INP is a lab proxy for one scripted interaction per route, not field INP.

@@ -9,10 +9,15 @@ import { fmtBytes, fmtRelative } from '@/lib/client/format';
 import type { Asset, Page, Template } from '@/lib/client/types';
 import {
   Badge, Banner, Button, Card, ConfirmDialog, Dialog, Drawer, EmptyState, ErrorNotice, ErrorState, Facts, Field, IconButton, Input,
-  PageHeader, Pagination, Select, Skeleton, Tabs, TabsContent, TabsList, TabsTrigger, Textarea, useToast,
+  PageHeader, Pagination, Select, Skeleton, Tabs, TabsContent, TabsList, TabsTrigger, Textarea, cn, useToast,
 } from '@/components/ui';
 import { UploadDropzone } from '@/components/library/upload-dropzone';
-import { ContentHubPanel } from '@/components/content-hub/content-hub-panel';
+import dynamic from 'next/dynamic';
+// Sources tab (Google/Notion, incl. the Drive picker) loads only when opened.
+const ContentHubPanel = dynamic(() => import('@/components/content-hub/content-hub-panel').then((m) => m.ContentHubPanel), { loading: () => <Skeleton className="h-48 w-full rounded-xl" /> });
+import { TrashConfirmDialog, useTrashActions } from '@/components/trash/trash-actions';
+import { AssetGovernancePanel } from '@/components/brand-rules/asset-governance';
+import { BulkBar, SelectAll, useSelection } from '@/components/bulk/bulk';
 
 export default function LibraryPage() {
   const { session } = useSession();
@@ -87,6 +92,17 @@ function AssetsTab({ brandId }: { brandId: string }) {
     poll: (d) => (d?.items.some((a) => a.status === 'quarantined' || a.status === 'pending_upload') ? 5_000 : false),
   });
   const [open, setOpen] = useState<Asset | null>(null);
+  const sel = useSelection<Asset>();
+  const canBulk = can('assets.upload');
+  // Deep link from search: /library?asset=<id> opens its drawer.
+  const [qp] = useQueryState();
+  const deepAsset = qp.get('asset');
+  useEffect(() => {
+    if (!deepAsset) return;
+    let live = true;
+    api.get<Asset>(`/api/assets/${deepAsset}`).then((a) => { if (live) setOpen(a); }).catch(() => undefined);
+    return () => { live = false; };
+  }, [deepAsset]);
 
   const upsert = (a: Asset) => setData((d) => ({ items: d?.items.some((x) => x.id === a.id) ? d.items.map((x) => (x.id === a.id ? a : x)) : [a, ...(d?.items ?? [])], next_cursor: d?.next_cursor ?? null }));
 
@@ -111,6 +127,9 @@ function AssetsTab({ brandId }: { brandId: string }) {
         </div>
       </div>
 
+      {canBulk && data?.items.length ? (
+        <label className="-mb-3 flex w-fit items-center gap-2 text-[13px] text-muted"><SelectAll rows={data.items} selection={sel} />Select all on this page</label>
+      ) : null}
       {error && !data ? <ErrorState error={error} onRetry={refetch} /> : loading ? (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{Array.from({ length: 10 }, (_, i) => <Skeleton key={i} className="aspect-[4/5] h-auto w-full rounded-xl" />)}</div>
       ) : !data?.items.length ? (
@@ -119,8 +138,17 @@ function AssetsTab({ brandId }: { brandId: string }) {
         <>
           <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {data.items.map((a) => (
-              <li key={a.id}>
-                <button type="button" onClick={() => setOpen(a)} className="group block w-full rounded-xl text-left">
+              <li key={a.id} className="relative">
+                {canBulk ? (
+                  <input
+                    type="checkbox"
+                    aria-label={`Select ${a.original_filename}`}
+                    checked={sel.has(a.id)}
+                    onChange={() => sel.toggle(a)}
+                    className={cn('absolute right-2 top-2 z-10 size-5 accent-[var(--text)]', !sel.size && 'opacity-0 focus:opacity-100 [li:hover_&]:opacity-100')}
+                  />
+                ) : null}
+                <button type="button" onClick={() => setOpen(a)} className={cn('group block w-full rounded-xl text-left', sel.has(a.id) && 'ring-2 ring-[var(--text)] ring-offset-2 ring-offset-[var(--bg)]')}>
                   <div className="relative aspect-square overflow-hidden rounded-xl bg-sunken transition-opacity group-hover:opacity-90">
                     {a.thumb_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -145,13 +173,21 @@ function AssetsTab({ brandId }: { brandId: string }) {
           ) : null}
         </>
       )}
-      <AssetDrawer asset={open} onClose={() => setOpen(null)} onChanged={(a) => { upsert(a); setOpen(a); }} canEdit={can('assets.upload')} />
+      <AssetDrawer asset={open} onClose={() => setOpen(null)} onChanged={(a) => { upsert(a); setOpen(a); }} canEdit={can('assets.upload')}
+        onTrashed={(id) => { setOpen(null); setData((d) => ({ items: (d?.items ?? []).filter((x) => x.id !== id), next_cursor: d?.next_cursor ?? null })); }}
+        onRestored={() => void refetch()} />
+      {canBulk ? <BulkBar targetKind="asset" selection={sel} actions={['add_tags', 'archive', 'remove_tags', 'unarchive', 'trash']} onDone={() => { sel.clear(); void refetch(); }} /> : null}
     </div>
   );
 }
 
-function AssetDrawer({ asset, onClose, onChanged, canEdit }: { asset: Asset | null; onClose: () => void; onChanged: (a: Asset) => void; canEdit: boolean }) {
+function AssetDrawer({ asset, onClose, onChanged, canEdit, onTrashed, onRestored }: {
+  asset: Asset | null; onClose: () => void; onChanged: (a: Asset) => void; canEdit: boolean; onTrashed: (id: string) => void; onRestored: () => void;
+}) {
   const toast = useToast();
+  const { canOn } = useSession();
+  const [trashOpen, setTrashOpen] = useState(false);
+  const trashActions = useTrashActions();
   const [alt, setAlt] = useState('');
   const [tags, setTags] = useState('');
   const [busy, setBusy] = useState(false);
@@ -188,7 +224,8 @@ function AssetDrawer({ asset, onClose, onChanged, canEdit }: { asset: Asset | nu
       description={`Added ${fmtRelative(asset.created_at)}`}
       footer={canEdit && asset.status !== 'archived' ? (
         <>
-          <Button variant="quiet" icon={<Archive aria-hidden className="size-4" />} onClick={() => setArchiveOpen(true)} className="mr-auto">Archive</Button>
+          <Button variant="quiet" icon={<Archive aria-hidden className="size-4" />} onClick={() => setArchiveOpen(true)}>Archive</Button>
+          {canOn(asset.brand_id, 'assets.manage') ? <Button variant="quiet" icon={<Trash2 aria-hidden className="size-4" />} onClick={() => setTrashOpen(true)} className="mr-auto">Trash</Button> : <span className="mr-auto" />}
           <Button variant="primary" onClick={save} loading={busy} disabled={!changed}>Save</Button>
         </>
       ) : null}
@@ -218,7 +255,10 @@ function AssetDrawer({ asset, onClose, onChanged, canEdit }: { asset: Asset | nu
           <Input placeholder="Comma-separated" value={tags} onChange={(e) => setTags(e.target.value)} readOnly={!canEdit} />
         </Field>
         {error ? <ErrorNotice error={error} /> : null}
+        <AssetGovernancePanel key={asset.id} assetId={asset.id} brandId={asset.brand_id} />
       </div>
+      <TrashConfirmDialog kind="asset" id={asset.id} open={trashOpen} onOpenChange={setTrashOpen}
+        onConfirm={async () => { await trashActions.trash('asset', asset.id, { onUndone: onRestored }); onTrashed(asset.id); }} />
       <ConfirmDialog
         open={archiveOpen}
         onOpenChange={setArchiveOpen}

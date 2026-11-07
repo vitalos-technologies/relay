@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState, type DragEvent } from 'react';
-import { CalendarClock, CalendarDays, ChevronLeft, ChevronRight, Copy, Ellipsis, FileClock, LayoutGrid, List, PanelRight, Plus, SquareArrowOutUpRight, TriangleAlert, Undo2 } from 'lucide-react';
+import { CalendarClock, CalendarDays, ChevronLeft, ChevronRight, Copy, Ellipsis, FileClock, LayoutGrid, List, ListOrdered, PanelRight, Plus, SquareArrowOutUpRight, TriangleAlert, Undo2 } from 'lucide-react';
 import { resolveWallTime, toLocalInput, type PostAggregateStatus } from '@social-lite/core';
 import { api } from '@/lib/client/api';
 import { useSession } from '@/lib/client/session';
@@ -17,6 +17,8 @@ import {
 import { AgendaItem, DestinationDots, OwnerMeta } from '@/components/planner/agenda-item';
 import { RescheduleDialog, type RescheduleResult } from '@/components/planner/reschedule-dialog';
 import { PostDrawer } from '@/components/planner/post-drawer';
+import { BulkBar, useSelection, type Selection } from '@/components/bulk/bulk';
+import { useFlag } from '@/lib/client/flags';
 
 /** Same destination within 15 minutes of another post: shown as a conflict (text + icon, never colour alone). */
 function findConflicts(items: PlannerItem[]): Set<string> {
@@ -85,6 +87,9 @@ export default function PlannerPage() {
   const campaignFilter = params.get('campaign') ?? '';
   const conflictOnly = params.get('conflicts') === '1';
   const [drawer, setDrawer] = useState<PlannerItem | null>(null);
+  const sel = useSelection<{ id: string; brand_id: string; title: string | null }>();
+  const listView = view === 'agenda' || !desktop;
+  const queueOn = useFlag('v31.content_queue');
 
   // Visible range in the view zone
   const range = useMemo(() => {
@@ -238,6 +243,7 @@ export default function PlannerPage() {
         title="Planner"
         meta={<span className="truncate">{viewTz.replace(/_/g, ' ')} · {zoneAbbr(new Date(), viewTz)}</span>}
         actions={<>
+          {queueOn ? <LinkButton href={withBrand('/queue')} variant="ghost" icon={<ListOrdered aria-hidden className="size-4" />}>Queue</LinkButton> : null}
           {can('history.read') ? <LinkButton href={withBrand('/history')} variant="ghost" icon={<FileClock aria-hidden className="size-4" />}>History</LinkButton> : null}
           {can('drafts.edit') && session.brands.length ? <LinkButton href={withBrand('/compose')} variant="primary" icon={<Plus aria-hidden className="size-4" />}>Create post</LinkButton> : null}
         </>}
@@ -318,7 +324,8 @@ export default function PlannerPage() {
       ) : loading ? (
         <SkeletonRows rows={5} />
       ) : view === 'agenda' || !desktop ? (
-        <Agenda start={range.start} days={range.days} byDay={byDay} today={today} brandName={brand ? undefined : brandName} menu={itemMenu} empty={!data?.items.length} canCreate={can('drafts.edit')} withBrand={withBrand} onOpen={setDrawer} />
+        <Agenda start={range.start} days={range.days} byDay={byDay} today={today} brandName={brand ? undefined : brandName} menu={itemMenu} empty={!data?.items.length} canCreate={can('drafts.edit')} withBrand={withBrand} onOpen={setDrawer}
+          selection={can('drafts.edit') ? sel : undefined} />
       ) : (
         <CalendarGrid
           view={view}
@@ -337,6 +344,10 @@ export default function PlannerPage() {
         />
       )}
 
+      {listView && can('drafts.edit') ? (
+        <BulkBar targetKind="post" selection={sel} actions={['reschedule', 'assign', 'set_campaign', 'add_tags', 'remove_tags', 'duplicate', 'archive']} onDone={() => { sel.clear(); void refetch(); }}
+          describe={(id) => { const it = data?.items.find((x) => x.post_id === id); return it ? POST_STATUS_LABEL[it.status] ?? null : null; }} />
+      ) : null}
       <PostDrawer
         item={drawer}
         onOpenChange={(o) => !o && setDrawer(null)}
@@ -361,10 +372,11 @@ export default function PlannerPage() {
 }
 
 function Agenda({
-  start, days, byDay, today, brandName, menu, empty, canCreate, withBrand, onOpen,
+  start, days, byDay, today, brandName, menu, empty, canCreate, withBrand, onOpen, selection,
 }: {
   start: string; days: number; byDay: Map<string, PlannerItem[]>; today: string; brandName?: (id: string) => string;
   menu: (i: PlannerItem) => React.ReactNode; empty: boolean; canCreate: boolean; withBrand: (h: string) => string; onOpen: (i: PlannerItem) => void;
+  selection?: Selection<{ id: string; brand_id: string; title: string | null }>;
 }) {
   if (empty) {
     return (
@@ -382,7 +394,13 @@ function Agenda({
           </h3>
           <ul className="flex flex-col">
             {byDay.get(d)!.map((i) => (
-              <li key={i.schedule_id}><AgendaItem item={i} brandName={brandName?.(i.brand_id)} actions={menu(i)} onOpen={() => onOpen(i)} /></li>
+              <li key={i.schedule_id} className="flex items-center gap-1">
+                {selection ? (
+                  <input type="checkbox" aria-label={`Select ${postTitle(i)}`} className="ml-1 size-4 shrink-0 accent-[var(--text)]"
+                    checked={selection.has(i.post_id)} onChange={() => selection.toggle({ id: i.post_id, brand_id: i.brand_id, title: postTitle(i) })} />
+                ) : null}
+                <div className="min-w-0 flex-1"><AgendaItem item={i} brandName={brandName?.(i.brand_id)} actions={menu(i)} onOpen={() => onOpen(i)} /></div>
+              </li>
             ))}
           </ul>
         </section>

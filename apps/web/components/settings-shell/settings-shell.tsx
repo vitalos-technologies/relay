@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ChevronRight, PanelLeft, Search, X } from 'lucide-react';
 import { useSession } from '@/lib/client/session';
 import { cn } from '@/components/ui';
+import { useFlags } from '@/lib/client/flags';
 import { itemHref, visibleSettings, type SettingsGroup, type SettingsItem } from './registry';
 
 function useActive(groups: SettingsGroup[]) {
@@ -21,7 +22,8 @@ function useActive(groups: SettingsGroup[]) {
 
 export function SettingsShell({ children }: { children: ReactNode }) {
   const { can, canV2 } = useSession();
-  const groups = useMemo(() => visibleSettings({ can, canV2 }), [can, canV2]);
+  const flags = useFlags();
+  const groups = useMemo(() => visibleSettings({ can, canV2, flag: flags.enabled }), [can, canV2, flags]);
   const active = useActive(groups);
   const [drawer, setDrawer] = useState(false);
   const pathname = usePathname();

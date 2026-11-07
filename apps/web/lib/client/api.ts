@@ -111,6 +111,12 @@ export function redirectToLogin() {
   window.location.assign(`/login?returnTo=${encodeURIComponent(here)}`);
 }
 
+// Safe references of recent failed requests (ids only, no bodies), offered in "Report a problem" by explicit choice.
+const recentRefs: Array<{ id: string; at: string; status: number }> = [];
+export function recentCorrelationIds(): Array<{ id: string; at: string; status: number }> {
+  return [...recentRefs];
+}
+
 async function parseError(res: Response): Promise<ApiError> {
   const correlation = res.headers.get('x-correlation-id');
   let body: unknown = null;
@@ -122,6 +128,11 @@ async function parseError(res: Response): Promise<ApiError> {
   const env = (body ?? {}) as { error?: { code?: string; message?: string; fieldErrors?: Record<string, string>; details?: Record<string, unknown> }; correlation_id?: string };
   const err = env.error;
   const fallback = res.status === 404 ? 'Not found.' : res.status >= 500 ? 'The server could not complete the request.' : `Request failed (${res.status}).`;
+  const ref = env.correlation_id ?? correlation;
+  if (ref && res.status >= 400) {
+    recentRefs.unshift({ id: ref, at: new Date().toISOString(), status: res.status });
+    recentRefs.splice(10);
+  }
   return new ApiError(
     res.status,
     err?.code ?? (res.status >= 500 ? 'internal' : 'bad_response'),

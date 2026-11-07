@@ -32,7 +32,7 @@ export interface CommentDto {
 }
 
 export interface VersionDto {
-  id: string; version: number | null; base_version: number; kind: 'created' | 'saved' | 'conflict' | 'restored'; title: string | null;
+  id: string; version: number | null; base_version: number; kind: 'created' | 'saved' | 'conflict' | 'restored' | 'recovered'; title: string | null;
   draft: { baseText?: string; baseLink?: string | null; variants?: Array<{ connectionId: string; text?: string; inheritText?: boolean }> };
   saved_by_email: string | null; restored_from: string | null; created_at: string;
 }

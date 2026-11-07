@@ -2,8 +2,10 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Archive, CalendarClock, CircleCheck, CloudAlert, Copy, Ellipsis, ListPlus, LoaderCircle, Save, Send, SendHorizontal,
+  Archive, CalendarClock, CircleCheck, Copy, Ellipsis, History, ListPlus, Save, Send, SendHorizontal, Trash2,
 } from 'lucide-react';
+import type { AutosaveResponse, DraftRecoveryStatus, RecoverResponse } from '@social-lite/core/contracts/v31-data';
+import { AUTOSAVE_DEBOUNCE_MS } from '@social-lite/core/contracts/v31-data';
 import { PROVIDER_LABEL, resolveVariants, type DraftContent, type ValidationIssue, type VariantDraft } from '@social-lite/core';
 import { api, isApiError } from '@/lib/client/api';
 import { useApi } from '@/lib/client/use-api';
@@ -13,14 +15,26 @@ import { fmtTime, zoneAbbr } from '@/lib/client/format';
 import { constraintsOf, localChecks } from '@/lib/client/variants';
 import type { Asset, Connection, PostDetail, ValidateResponse } from '@/lib/client/types';
 import {
-  Banner, Button, Card, CardHeader, cn, ConfirmDialog, EmptyState, ErrorState, IconButton, InfoTip, LinkButton, Menu, MenuContent, MenuItem,
+  Banner, Button, Card, CardHeader, cn, ConfirmDialog, Drawer, EmptyState, ErrorState, IconButton, InfoTip, LinkButton, Menu, MenuContent, MenuItem,
   MenuLabel, MenuTrigger, PlatformIcon, PostStatusBadge, Segmented, Select, Skeleton, ToneIcon, useToast,
 } from '@/components/ui';
 import { BaseEditor, VariantEditor } from './editors';
 import { ContentSwitcher, DestinationSelector } from './destination-rail';
 import { ProviderOptions } from './provider-options';
 import { VariantPreview } from './preview';
-import { ConflictDialog, PublishNowDialog, ScheduleDialog, SubmitDialog } from './action-dialogs';
+import { PublishNowDialog, ScheduleDialog, SubmitDialog } from './action-dialogs';
+import { DraftConflictDialog, RecoveryBanner, SaveStatus, type ComposerSaveState, type ConflictCurrent } from './draft-resilience';
+import {
+  clearLocalDraft, editorClientId, nextClientRevision, readLocalDraft, sameContent, writeLocalDraft, type LocalDraft,
+} from '@/lib/client/draft-recovery';
+import { HistoryPanel } from '@/components/collab/history-panel';
+import { TrashConfirmDialog, useTrashActions } from '@/components/trash/trash-actions';
+import { runSingleBulk } from '@/components/bulk/bulk';
+import { FindingList } from '@/components/brand-rules/brand-rules-settings';
+import { ProvenanceLink, ReuseCard, SimilarList, useSimilar } from './reuse-panel';
+import { LinkBuilderButton, LinkBuilderDialog } from '@/components/links/links';
+import { useFlag } from '@/lib/client/flags';
+import type { ReuseResult } from '@social-lite/core/contracts/v31-gov';
 import { DeliveriesPanel } from './deliveries-panel';
 import { AiAssist } from '@/components/ai/assist';
 import { VariantCrops } from '@/components/crops/variant-crops';
@@ -28,8 +42,8 @@ import { QueueButton, useQueueAction } from '@/components/slots/queue-button';
 import { CollabPanel } from '@/components/collab/collab-panel';
 import { conflictCopyFor, rememberConflictCopy } from '@/components/collab/conflict-copy';
 
-type SaveState = 'saved' | 'dirty' | 'saving' | 'failed' | 'conflict';
-interface ConflictDetails { version?: number; updated_by?: string; updated_at?: string }
+type SaveState = ComposerSaveState;
+type ConflictDetails = ConflictCurrent;
 
 export function Composer({ postId }: { postId: string }) {
   const { data, error, loading, refetch } = useApi<PostDetail>(`/api/posts/${postId}`);
@@ -121,26 +135,60 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
   const [server, setServer] = useState<{ version: number; result: ValidateResponse } | null>(null);
   const [validating, setValidating] = useState(false);
 
-  // ---------------------------------------------------------------- autosave (CO-02)
+  // ---------------------------------------------------------------- autosave (V3.1 §9)
+  // PUT /api/posts/:id/autosave with base_version + this tab's client id/revision. Only status 'saved' means saved.
+  // Between edits and the server ack, the content is also kept in this browser per the workspace policy
+  // (session.draft_recovery): that is "Saved locally", never "Saved".
+  const policy = session.draft_recovery ?? null;
+  const lastFailed = useRef<{ snap: { draft: DraftContent; title: string }; rev: number } | null>(null);
+  const localTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [localSaved, setLocalSaved] = useState(false);
+  const recoveryPending = useRef(false);
+  const retries = useRef(0);
+
+  const writeLocal = useCallback((): boolean => {
+    if (localTimer.current) { clearTimeout(localTimer.current); localTimer.current = null; }
+    // While a recovered copy awaits a decision, don't overwrite it.
+    if (recoveryPending.current || !dirty.current) return false;
+    const ok = writeLocalDraft(policy, post.id, { base_version: versionRef.current, draft: latest.current.draft, title: latest.current.title.trim() || null });
+    setLocalSaved(ok);
+    return ok;
+  }, [policy, post.id]);
+
   const save = useCallback(async (): Promise<boolean> => {
     if (inflight.current) {
       await inflight.current;
-      return dirty.current ? save() : true;
+      return dirty.current && saveStateRef.current !== 'conflict' ? save() : !dirty.current;
     }
     if (!dirty.current) return true;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      writeLocal();
+      setSaveState('offline');
+      return false;
+    }
     const snapshot = latest.current;
+    // A retry of the same content reuses its revision so the server can recognise it.
+    const rev = lastFailed.current && lastFailed.current.snap === snapshot ? lastFailed.current.rev : nextClientRevision();
     dirty.current = false;
     setSaveState('saving');
     const p = (async () => {
       try {
-        const r = await api.patch<{ version: number; updated_at: string }>(`/api/posts/${post.id}`, {
-          expected_version: versionRef.current, draft: snapshot.draft, title: snapshot.title.trim() || null,
+        const r = await api.put<AutosaveResponse>(`/api/posts/${post.id}/autosave`, {
+          base_version: versionRef.current, client_id: editorClientId(), client_revision: rev,
+          draft: snapshot.draft, title: snapshot.title.trim() || null,
         });
-        versionRef.current = r.version;
-        setVersion(r.version);
-        setSavedAt(r.updated_at);
+        lastFailed.current = null;
+        retries.current = 0;
+        versionRef.current = r.status === 'saved' ? r.version : Math.max(versionRef.current, r.version);
+        setVersion(versionRef.current);
+        if (r.status === 'saved') setSavedAt(r.saved_at);
         setSaveError(null);
-        setSaveState(dirty.current ? 'dirty' : 'saved');
+        if (dirty.current) setSaveState('dirty');
+        else {
+          if (!recoveryPending.current) clearLocalDraft(policy, post.id);
+          setLocalSaved(false);
+          setSaveState('saved');
+        }
         return true;
       } catch (e) {
         dirty.current = true;
@@ -148,12 +196,15 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
           const cur = (e.details?.current ?? {}) as ConflictDetails;
           const copyId = typeof e.details?.conflict_copy_id === 'string' ? e.details.conflict_copy_id : null;
           if (copyId) { rememberConflictCopy(post.id, copyId); setConflictCopy(copyId); }
+          writeLocal();
           setConflict(cur);
           setConflictOpen(true);
           setSaveState('conflict');
         } else {
+          lastFailed.current = { snap: snapshot, rev };
+          const local = writeLocal();
           setSaveError(e);
-          setSaveState('failed');
+          setSaveState(isApiError(e) && e.isNetwork ? 'offline' : local ? 'saved_locally' : 'save_failed');
         }
         return false;
       } finally {
@@ -164,14 +215,14 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
     const ok = await p;
     if (ok && dirty.current) return save();
     return ok;
-  }, [post.id]);
+  }, [post.id, policy, writeLocal]);
 
   const schedule = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       timer.current = null;
       if (saveStateRef.current !== 'conflict') void save();
-    }, 1000);
+    }, AUTOSAVE_DEBOUNCE_MS);
   }, [save]);
   const saveStateRef = useRef(saveState);
   saveStateRef.current = saveState;
@@ -182,7 +233,10 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
     if (next.title !== undefined) setTitle(next.title);
     latest.current = { draft: next.draft ?? latest.current.draft, title: next.title ?? latest.current.title };
     dirty.current = true;
-    if (saveStateRef.current !== 'conflict') setSaveState('dirty');
+    if (saveStateRef.current !== 'conflict' && saveStateRef.current !== 'offline') setSaveState('dirty');
+    // Keep a browser copy shortly after typing pauses (cheap, off the keystroke path).
+    if (localTimer.current) clearTimeout(localTimer.current);
+    localTimer.current = setTimeout(() => { localTimer.current = null; writeLocal(); }, 250);
     schedule();
   };
 
@@ -197,22 +251,89 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
     return ok ? versionRef.current : null;
   }, [save]);
 
-  // Retry a failed save when the connection returns.
+  // Back online: save straight away. Other failures retry with backoff (5 s → 60 s).
   useEffect(() => {
-    if (online && saveState === 'failed') void save();
+    if (online && saveState === 'offline') { void save(); return; }
+    if (saveState !== 'save_failed' && saveState !== 'saved_locally') return;
+    const t = setTimeout(() => { retries.current += 1; void save(); }, Math.min(60_000, 5_000 * 2 ** retries.current));
+    return () => clearTimeout(t);
   }, [online, saveState, save]);
 
-  // Warn before leaving with unsaved edits.
+  // Leaving with unsaved edits: keep the browser copy now and warn.
   useEffect(() => {
     const h = (e: BeforeUnloadEvent) => {
       if (dirty.current || inflight.current) {
+        writeLocal();
         e.preventDefault();
         e.returnValue = '';
       }
     };
+    const hide = () => { if (dirty.current) writeLocal(); };
     window.addEventListener('beforeunload', h);
-    return () => window.removeEventListener('beforeunload', h);
+    window.addEventListener('pagehide', hide);
+    return () => {
+      window.removeEventListener('beforeunload', h);
+      window.removeEventListener('pagehide', hide);
+    };
+  }, [writeLocal]);
+
+  // ---------------------------------------------------------------- recovery after refresh / restart
+  // A copy in this browser that differs from the server is offered, never synced on its own. The server re-checks
+  // permission and revision (recovery-status, then recover): a newer server version is never overwritten.
+  const [recovery, setRecovery] = useState<null | { local: LocalDraft; status: DraftRecoveryStatus | null }>(null);
+  useEffect(() => {
+    if (!post.can.edit) return;
+    const local = readLocalDraft(policy, post.id);
+    if (!local) return;
+    if (sameContent(local, { draft: normaliseDraft(post.draft), title: post.title })) { clearLocalDraft(policy, post.id); return; }
+    recoveryPending.current = true;
+    let live = true;
+    api.get<DraftRecoveryStatus>(`/api/posts/${post.id}/recovery-status`, { base_version: local.base_version })
+      .then((status) => { if (live) setRecovery({ local, status }); })
+      .catch(() => { if (live) setRecovery({ local, status: null }); });
+    return () => { live = false; };
+    // Runs once per loaded post version (the composer remounts after a reload).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  const endRecovery = () => {
+    recoveryPending.current = false;
+    clearLocalDraft(policy, post.id);
+    setRecovery(null);
+    if (dirty.current) writeLocal();
+  };
+  const restoreLocal = async () => {
+    if (!recovery) return;
+    const r = await api.post<RecoverResponse>(`/api/posts/${post.id}/recover`, {
+      base_version: recovery.local.base_version, client_id: editorClientId(), draft: recovery.local.draft,
+      title: recovery.local.title, local_saved_at: recovery.local.saved_at,
+    });
+    recoveryPending.current = false;
+    clearLocalDraft(policy, post.id);
+    if (r.status === 'kept_as_copy') {
+      rememberConflictCopy(post.id, r.conflict_copy_id);
+      toast.info('Kept as a copy in History', 'The server had a newer version.');
+    } else {
+      toast.success('Restored');
+    }
+    dirty.current = false;
+    await reload();
+  };
+  const keepLocalAsCopy = async () => {
+    if (!recovery) return;
+    const r = await api.post<RecoverResponse>(`/api/posts/${post.id}/recover`, {
+      base_version: recovery.local.base_version, client_id: editorClientId(), draft: recovery.local.draft,
+      title: recovery.local.title, local_saved_at: recovery.local.saved_at,
+    });
+    if (r.status === 'kept_as_copy') { rememberConflictCopy(post.id, r.conflict_copy_id); setConflictCopy(r.conflict_copy_id); }
+    toast.success(r.status === 'kept_as_copy' ? 'Kept as a copy in History' : 'Restored');
+    if (r.status === 'applied') { recoveryPending.current = false; clearLocalDraft(policy, post.id); dirty.current = false; await reload(); return; }
+    setCollabTab('history');
+    endRecovery();
+  };
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const linksOn = useFlag('v31.tracked_links');
+  const [linkOpen, setLinkOpen] = useState(false);
+  const planning = useApi<{ campaign: { id: string } | null }>(linksOn ? `/api/posts/${post.id}/planning` : null);
 
   // ---------------------------------------------------------------- validation (CO-04)
   const connectionIds = draft.variants.map((v) => v.connectionId).filter((id) => post.connections.some((c) => c.id === id));
@@ -240,6 +361,11 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
     ? server.result.issues.filter((i) => !i.connectionId || connectionIds.includes(i.connectionId))
     : [...local.values()].flatMap((c) => c.issues);
   const issuesFor = (id: string) => issues.filter((i) => i.connectionId === id);
+  // Brand findings come only from the server; the last result stays until the next check (mandatory ones block).
+  const brand = server?.result.brand_rules ?? null;
+  const brandFindings = brand ? [...brand.mandatory, ...brand.advisory].filter((f) => !f.connection_id || connectionIds.includes(f.connection_id)) : [];
+  const brandMandatory = brandFindings.filter((f) => f.severity === 'mandatory');
+  const similar = useSimilar(post.id, version, !readOnly && connectionIds.length > 0);
   const generalIssues = issues.filter((i) => !i.connectionId);
 
   const resolved = useMemo(() => resolveVariants(draft, post.connections), [draft, post.connections]);
@@ -276,14 +402,17 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
   const duplicate = async () => {
     try {
       await flush();
-      const p = await api.post<PostDetail>(`/api/posts/${post.id}/duplicate`, {}, { idempotent: true });
-      toast.success('Duplicated');
-      router.push(`/posts/${p.id}`);
+      // V3.1 §13: a new draft with provenance (never a re-publication of the original).
+      const r = await api.post<ReuseResult>(`/api/posts/${post.id}/reuse`, { mode: 'duplicate' }, { idempotent: true });
+      toast.success('Duplicated as a new draft', r.similar.length ? `${r.similar.length} similar recent post${r.similar.length === 1 ? '' : 's'} on these destinations` : undefined);
+      router.push(`/posts/${r.post_id}`);
     } catch (e) {
       toast.error(e, 'Could not duplicate');
     }
   };
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [trashOpen, setTrashOpen] = useState(false);
+  const trashActions = useTrashActions();
   const queue = useQueueAction(post.id, flush, (t, b) => void afterAction(t, b));
   const keepCopy = async () => {
     const mine = latest.current;
@@ -291,7 +420,20 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
       title: `${mine.title.trim() || 'Untitled post'} (my copy)`, draft: mine.draft, connection_ids: connectionIds,
     }, { idempotent: true });
     dirty.current = false;
+    clearLocalDraft(policy, post.id);
     router.push(`/posts/${p.id}`);
+  };
+  const takeTheirs = async () => { dirty.current = false; clearLocalDraft(policy, post.id); await reload(); };
+  const useMine = async () => {
+    // Resolve by saving mine on top of the server version; theirs stays in the version history.
+    if (!conflict?.version) return;
+    versionRef.current = conflict.version;
+    lastFailed.current = null;
+    dirty.current = true;
+    saveStateRef.current = 'dirty';
+    setSaveState('dirty');
+    const ok = await save();
+    if (!ok) throw new Error((saveStateRef.current as SaveState) === 'conflict' ? 'It changed again. Compare and choose.' : 'Couldn’t save yours. Try again.');
   };
   const afterAction = async (msg: string, body?: string) => {
     toast.success(msg, body);
@@ -301,10 +443,12 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
 
   // ---------------------------------------------------------------- render helpers
   const blockReason =
-    saveState === 'conflict' ? 'Resolve the conflict first.'
+    !online ? 'You’re offline. Drafting only.'
+    : saveState === 'conflict' ? 'Resolve the conflict first.'
       : !connectionIds.length ? 'Pick a destination.'
         : issues.length ? `Fix ${issues.length} issue${issues.length === 1 ? '' : 's'} first.`
-          : null;
+          : brandMandatory.length ? `Brand rule: ${brandMandatory[0]!.message}`
+            : null;
   const tz = post.brand.timezone;
   const workspaceTz = session.workspace?.timezone;
   const paused = session.workspace?.publishing_paused || post.brand.publishing_paused;
@@ -321,7 +465,7 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
       {/* Header */}
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
-          <p className="mb-1 flex items-center gap-1 truncate text-xs text-subtle">{post.brand.name}<InfoTip label="About the title">Internal title — never published.</InfoTip></p>
+          <p className="mb-1 flex items-center gap-1 truncate text-xs text-subtle">{post.brand.name}<InfoTip label="About the title">Internal title — never published.</InfoTip><span className="ml-2"><ProvenanceLink postId={post.id} /></span></p>
           <h1 className="sr-only">Edit post{title.trim() ? `: ${title.trim()}` : ''}</h1>
           <label htmlFor="post-title" className="sr-only">Post title (internal)</label>
           <textarea
@@ -343,8 +487,10 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
               <IconButton label="More post actions" icon={<Ellipsis aria-hidden className="size-4" />} />
             </MenuTrigger>
             <MenuContent>
+              <MenuItem icon={<History aria-hidden />} onSelect={() => setHistoryOpen(true)}>Version history</MenuItem>
               {can('drafts.edit') ? <MenuItem icon={<Copy aria-hidden />} onSelect={() => void duplicate()}>Duplicate</MenuItem> : null}
-              {post.can.edit ? <MenuItem icon={<Archive aria-hidden />} danger onSelect={() => setArchiveOpen(true)}>Archive</MenuItem> : null}
+              {post.can.edit ? <MenuItem icon={<Archive aria-hidden />} onSelect={() => setArchiveOpen(true)}>Archive</MenuItem> : null}
+              {post.can.edit && !isPublished ? <MenuItem icon={<Trash2 aria-hidden />} danger onSelect={() => setTrashOpen(true)}>Move to Trash</MenuItem> : null}
             </MenuContent>
           </Menu>
         </div>
@@ -362,6 +508,9 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
         />
       ) : null}
       {paused ? <Banner tone="warn" className="mb-6" title={`${session.workspace?.publishing_paused ? 'Workspace' : post.brand.name} paused — nothing will send`} /> : null}
+      {recovery && !readOnly ? (
+        <RecoveryBanner local={recovery.local} status={recovery.status} onRestore={restoreLocal} onKeepCopy={keepLocalAsCopy} onDiscard={endRecovery} />
+      ) : null}
 
       {/* Mobile: three steps; ≥1024 the regions sit side by side */}
       <div className="mb-4 lg:hidden">
@@ -415,6 +564,7 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
                   maxImages={baseMax}
                   canUpload={can('assets.upload')}
                   checksFor={selectedConns.map((c) => ({ connection: c, check: local.get(c.id)! })).filter((x) => x.check)}
+                  linkTools={linksOn ? <LinkBuilderButton onClick={() => setLinkOpen(true)} /> : undefined}
                 />
               </>
             ) : (
@@ -457,9 +607,16 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
               actions={<span className="text-xs text-subtle">{validating ? 'Checking…' : serverFresh ? 'Verified' : 'Live'}</span>}
             />
             <div className="px-4 pb-4" aria-live="polite">
-              {!connectionIds.length ? <p className="text-[13px] text-muted">No destinations</p> : issues.length === 0 ? (
+              {brandFindings.length ? (
+                <div className="mb-3" data-testid="brand-findings">
+                  <p className="mb-1.5 text-xs font-medium text-muted">Brand rules</p>
+                  <FindingList findings={brandFindings} />
+                </div>
+              ) : null}
+              {similar.length ? <div className="mb-3"><SimilarList items={similar} connections={post.connections} /></div> : null}
+              {!connectionIds.length ? <p className="text-[13px] text-muted">No destinations</p> : issues.length === 0 ? (brandMandatory.length ? null : (
                 <p className="flex items-center gap-2 text-[13px] text-muted"><CircleCheck aria-hidden className="size-4 text-success" /> Ready</p>
-              ) : (
+              )) : (
                 <ul className="flex flex-col gap-3">
                   {generalIssues.map((i, n) => <IssueRow key={`g${n}`} issue={i} />)}
                   {groupIssues(selectedConns, issuesFor).map((g) => (
@@ -500,6 +657,7 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
               <div className="px-4 pb-4"><VariantPreview variant={previewVariant} connection={previewConn} assets={assets} /></div>
             </Card>
           ) : null}
+          {!isPublished ? <ReuseCard postId={post.id} brandId={post.brand_id} canEdit={post.can.edit} /> : null}
           <CollabPanel postId={post.id} brandId={post.brand_id} tz={tz} currentText={draft.baseText} version={version} canEdit={!readOnly}
             tab={collabTab} onTab={setCollabTab} highlightVersion={conflictCopy}
             onRestored={async () => { rememberConflictCopy(post.id, null); dirty.current = false; await reload(); }} />
@@ -509,7 +667,7 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
       {/* Sticky action bar */}
       <div className="fixed inset-x-0 bottom-16 z-20 border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:bottom-0 md:left-[var(--rail-w)] xl:left-[var(--nav-w)]">
         <div className="mx-auto flex max-w-[1320px] flex-wrap items-center gap-2 px-4 py-2 sm:px-6 md:px-8">
-          <SaveStatus state={saveState} savedAt={savedAt} tz={tz} error={saveError} onRetry={() => void save()} onConflict={() => setConflictOpen(true)} readOnly={readOnly} />
+          <SaveStatus state={saveState} savedAt={savedAt} tz={tz} error={saveError} localSaved={localSaved} onRetry={() => { retries.current = 0; void save(); }} onConflict={() => setConflictOpen(true)} onHistory={() => setHistoryOpen(true)} readOnly={readOnly} />
           <span className="flex-1" />
           <AiAssist postId={post.id} draft={draft} connections={selectedConns} tab={tab} readOnly={readOnly} flush={flush} onAccept={acceptSuggestion} />
           {!readOnly ? (
@@ -602,14 +760,25 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
         onConflict={(e) => { setConflict(((isApiError(e) ? e.details?.current : null) ?? {}) as ConflictDetails); setSaveState('conflict'); setConflictOpen(true); }}
         onDone={(r) => void afterAction(allMockOf(r.deliveries) ? 'Simulated publish started' : 'Publishing started')}
       />
-      <ConflictDialog
+      <DraftConflictDialog
         open={conflictOpen}
         onOpenChange={setConflictOpen}
-        details={conflict}
-        onReload={async () => { dirty.current = false; await reload(); }}
-        onKeepCopy={keepCopy}
+        current={conflict}
+        mine={{ title, draft }}
+        onTakeTheirs={takeTheirs}
+        onKeepBoth={keepCopy}
+        onUseMine={useMine}
         keptInHistory={!!conflictCopy}
       />
+      {linksOn ? (
+        <LinkBuilderDialog open={linkOpen} onOpenChange={setLinkOpen} brandId={post.brand_id} postId={post.id} campaignId={planning.data?.campaign?.id ?? null}
+          initialUrl={draft.baseLink ?? ''} onUse={(url) => edit({ draft: { ...latest.current.draft, baseLink: url } })} />
+      ) : null}
+      <Drawer open={historyOpen} onOpenChange={setHistoryOpen} title="Version history">
+        <HistoryPanel postId={post.id} currentText={draft.baseText} version={version} canEdit={!readOnly} tall
+          highlight={conflictCopy}
+          onRestored={async () => { rememberConflictCopy(post.id, null); dirty.current = false; clearLocalDraft(policy, post.id); setHistoryOpen(false); await reload(); }} />
+      </Drawer>
       <ConfirmDialog
         open={!!pendingRemove}
         onOpenChange={(o) => !o && setPendingRemove(null)}
@@ -618,6 +787,19 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
         confirmLabel="Remove"
         confirmVariant="danger"
         onConfirm={() => { if (pendingRemove) removeDestination(pendingRemove.id); }}
+      />
+      <TrashConfirmDialog
+        kind="post"
+        id={post.id}
+        open={trashOpen}
+        onOpenChange={setTrashOpen}
+        onConfirm={async () => {
+          await flush();
+          await trashActions.trash('post', post.id, { expectedVersion: versionRef.current });
+          dirty.current = false;
+          clearLocalDraft(policy, post.id);
+          router.push('/planner');
+        }}
       />
       <ConfirmDialog
         open={archiveOpen}
@@ -629,7 +811,13 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
         onConfirm={async () => {
           await api.post(`/api/posts/${post.id}/archive`, {});
           dirty.current = false;
-          toast.success('Post archived');
+          clearLocalDraft(policy, post.id);
+          toast.show({
+            tone: 'success', title: 'Post archived',
+            action: { label: 'Undo', onClick: async () => {
+              try { await runSingleBulk('post', 'unarchive', post.id); toast.success('Unarchiving'); } catch (e) { toast.error(e, 'Couldn’t undo'); }
+            } },
+          });
           router.push('/planner');
         }}
       />
@@ -672,34 +860,5 @@ function IssueRow({ issue }: { issue: ValidationIssue }) {
       <ToneIcon tone="danger" className="mt-0.5" />
       <span>{issue.message}</span>
     </li>
-  );
-}
-
-function SaveStatus({
-  state, savedAt, tz, error, onRetry, onConflict, readOnly,
-}: { state: SaveState; savedAt: string; tz: string; error: unknown; onRetry: () => void; onConflict: () => void; readOnly: boolean }) {
-  if (readOnly) return <span className="text-xs text-muted">Read only</span>;
-  return (
-    <div role="status" aria-live="polite" className="flex min-w-0 items-center gap-2 text-[13px]">
-      {state === 'saving' ? (
-        <><LoaderCircle aria-hidden className="size-4 anim-spin text-info" /><span className="text-muted">Saving…</span></>
-      ) : state === 'dirty' ? (
-        <><span aria-hidden className="size-2 rounded-full bg-[var(--warn)]" /><span className="text-muted">Unsaved</span></>
-      ) : state === 'failed' ? (
-        <>
-          <CloudAlert aria-hidden className="size-4 text-danger" />
-          <span className="truncate text-danger">Couldn’t save{isApiError(error) && error.isNetwork ? ' — offline' : ''}</span>
-          <Button size="sm" variant="quiet" onClick={onRetry}>Retry</Button>
-        </>
-      ) : state === 'conflict' ? (
-        <>
-          <ToneIcon tone="warn" />
-          <span className="text-warn">Edited elsewhere</span>
-          <Button size="sm" variant="quiet" onClick={onConflict}>Resolve</Button>
-        </>
-      ) : (
-        <><CircleCheck aria-hidden className="size-4 text-success" /><span className="sr-only text-muted sm:not-sr-only">Saved {fmtTime(savedAt, tz)} {zoneAbbr(savedAt, tz)}</span></>
-      )}
-    </div>
   );
 }

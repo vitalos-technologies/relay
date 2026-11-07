@@ -67,10 +67,12 @@ export function MediaStrip({
 
 // ------------------------------------------------------------------ base editor
 export function BaseEditor({
-  draft, onChange, readOnly, brand, assets, onAssetsSeen, maxImages, canUpload, checksFor,
+  draft, onChange, readOnly, brand, assets, onAssetsSeen, maxImages, canUpload, checksFor, linkTools,
 }: {
   draft: DraftContent; onChange: (d: DraftContent) => void; readOnly: boolean; brand: Brand; assets: Map<string, Asset>;
   onAssetsSeen: (a: Asset[]) => void; maxImages: number; canUpload: boolean; checksFor: Array<{ check: LocalCheck; connection: Connection }>;
+  /** V3.1 §14 campaign link builder entry (flagged). */
+  linkTools?: React.ReactNode;
 }) {
   const [picker, setPicker] = useState(false);
   const prohibited = (brand.voice?.prohibited ?? []).filter((t) => t && draft.baseText.toLowerCase().includes(t.toLowerCase()));
@@ -117,6 +119,7 @@ export function BaseEditor({
       <Field label="Link" optional info="Appended to the text where a network has no link field." error={linkInvalid ? 'Use a full https:// link.' : null}>
         <Input type="url" inputMode="url" value={draft.baseLink ?? ''} readOnly={readOnly} onChange={(e) => onChange({ ...draft, baseLink: e.target.value || null })} placeholder="https://" />
       </Field>
+      {linkTools && !readOnly ? <div className="-mt-3">{linkTools}</div> : null}
       <div>
         <p className="mb-2 flex items-center gap-1 text-[13px] font-medium">Media<InfoTip label="About media">Images, an album or one video. Drag or use the arrows to set the order. Each network shows which formats it takes.</InfoTip></p>
         <OrderedMediaStrip

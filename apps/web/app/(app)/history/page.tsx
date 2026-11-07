@@ -13,6 +13,7 @@ import {
   FilterBar, FilterSelect, SimulatedBadge, SkeletonRows, Spinner, Table, Td, Th, THead, TimeWithZone, Tr,
 } from '@/components/ui';
 import { DeliveryCard } from '@/components/deliveries/delivery-card';
+import { BulkBar, SelectAll, useSelection } from '@/components/bulk/bulk';
 
 function dayStartIso(date: string, tz: string): string | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
@@ -40,6 +41,9 @@ export default function HistoryPage() {
   const tz = session.brands.find((b) => b.id === brand)?.timezone ?? session.workspace?.timezone ?? 'Europe/London';
   const [cursors, setCursors] = useState<Array<string | null>>([null]);
   const [selected, setSelected] = useState<HistoryRow | null>(null);
+  const sel = useSelection<{ id: string; brand_id: string; title: string | null }>();
+  const canBulk = can('drafts.edit');
+  const asSel = (r: HistoryRow) => ({ id: r.post_id, brand_id: r.brand_id, title: postTitle(r) });
 
   const filters = useMemo(() => {
     const q = new URLSearchParams();
@@ -105,6 +109,7 @@ export default function HistoryPage() {
             <Table caption="Delivery history">
               <THead>
                 <tr>
+                  {canBulk ? <Th className="w-10"><SelectAll rows={dedupe(data.items.map(asSel))} selection={sel} /></Th> : null}
                   <Th>Post</Th>
                   <Th>Destination</Th>
                   <Th>Result</Th>
@@ -116,6 +121,7 @@ export default function HistoryPage() {
               <tbody>
                 {data.items.map((r) => (
                   <Tr key={r.id}>
+                    {canBulk ? <Td><input type="checkbox" aria-label={`Select ${postTitle(r)}`} className="size-4 accent-[var(--text)]" checked={sel.has(r.post_id)} onChange={() => sel.toggle(asSel(r))} /></Td> : null}
                     <Td className="max-w-[280px]">
                       <button type="button" onClick={() => setSelected(r)} className="block max-w-full truncate text-left font-medium hover:underline">
                         {postTitle(r)}
@@ -140,8 +146,9 @@ export default function HistoryPage() {
           {/* Mobile cards */}
           <ul className="flex flex-col divide-y divide-border md:hidden">
             {data.items.map((r) => (
-              <li key={r.id}>
-                <button type="button" onClick={() => setSelected(r)} className="w-full py-3 text-left">
+              <li key={r.id} className="flex items-center gap-2">
+                {canBulk ? <input type="checkbox" aria-label={`Select ${postTitle(r)}`} className="size-4 shrink-0 accent-[var(--text)]" checked={sel.has(r.post_id)} onChange={() => sel.toggle(asSel(r))} /> : null}
+                <button type="button" onClick={() => setSelected(r)} className="min-w-0 flex-1 py-3 text-left">
                   <div className="flex items-center gap-3">
                     <PlatformIcon provider={r.provider} size="sm" />
                     <div className="min-w-0 flex-1">
@@ -166,6 +173,7 @@ export default function HistoryPage() {
       )}
 
       <HistoryDrawer row={selected} onClose={() => setSelected(null)} onChanged={() => void refetch()} />
+      {canBulk ? <BulkBar targetKind="post" selection={sel} actions={['duplicate', 'add_tags', 'set_campaign', 'remove_tags', 'archive']} onDone={() => { sel.clear(); void refetch(); }} /> : null}
     </>
   );
 }
@@ -194,4 +202,9 @@ function HistoryDrawer({ row, onClose, onChanged }: { row: HistoryRow | null; on
       </div>
     </Drawer>
   );
+}
+
+function dedupe<T extends { id: string }>(xs: T[]): T[] {
+  const seen = new Set<string>();
+  return xs.filter((x) => (seen.has(x.id) ? false : (seen.add(x.id), true)));
 }

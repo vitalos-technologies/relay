@@ -4,24 +4,33 @@
 // server still authorizes every request. Search only ever sees visible entries.
 import type { ReactNode } from 'react';
 import {
-  Bell, BookText, Building2, Cable, CalendarClock, Clock, FileDown, Fingerprint, FolderInput, Gauge, HeartPulse, KeyRound, Mail, MessageSquareQuote,
-  Palette, Plug, ScrollText, ShieldCheck, ShieldHalf, Stamp, Tag, UserRound, Users, UsersRound, Webhook, type LucideIcon,
+  BadgeCheck, Bell, BookText, Building2, Cable, CalendarClock, Clock, FileDown, Fingerprint, FolderInput, Gauge, HardDrive, HeartPulse, KeyRound, Link2, Mail, MessageSquareQuote,
+  Palette, Plug, ScrollText, ShieldCheck, ShieldHalf, Stamp, Tag, UserRound, ToggleRight, Users, UsersRound, Webhook, type LucideIcon,
 } from 'lucide-react';
 import type { Action, Permission } from '@social-lite/core';
-import { NotificationPrefs } from '@/components/collab/notification-prefs';
-import { SlotsSettings } from '@/components/slots/slots-settings';
-import { IntegrationsSettings } from '@/components/integrations/integrations-settings';
-import { BudgetsSettings } from '@/components/integrations/budgets-settings';
-import { ServiceAccountsSettings } from '@/components/settings/service-accounts';
-import { SecurityPolicySettings } from '@/components/settings/security-policy';
-import { SourceConnectionsSettings } from '@/components/content-hub/source-connections';
-import { McpDeveloperSettings } from '@/components/mcp';
+import dynamic from 'next/dynamic';
+import { Skeleton } from '@/components/ui';
+
+// V3.1 §4: each settings page loads its own code when opened (the nav + search only need this registry).
+const loading = () => <Skeleton className="h-64 w-full max-w-3xl rounded-xl" />;
+const NotificationPrefs = dynamic(() => import('@/components/collab/notification-prefs').then((m) => m.NotificationPrefs), { loading });
+const SlotsSettings = dynamic(() => import('@/components/slots/slots-settings').then((m) => m.SlotsSettings), { loading });
+const IntegrationsSettings = dynamic(() => import('@/components/integrations/integrations-settings').then((m) => m.IntegrationsSettings), { loading });
+const BudgetsSettings = dynamic(() => import('@/components/integrations/budgets-settings').then((m) => m.BudgetsSettings), { loading });
+const ServiceAccountsSettings = dynamic(() => import('@/components/settings/service-accounts').then((m) => m.ServiceAccountsSettings), { loading });
+const SecurityPolicySettings = dynamic(() => import('@/components/settings/security-policy').then((m) => m.SecurityPolicySettings), { loading });
+const SourceConnectionsSettings = dynamic(() => import('@/components/content-hub/source-connections').then((m) => m.SourceConnectionsSettings), { loading });
+const McpDeveloperSettings = dynamic(() => import('@/components/mcp').then((m) => m.McpDeveloperSettings), { loading });
+const DraftRecoverySettings = dynamic(() => import('@/components/settings/draft-recovery').then((m) => m.DraftRecoverySettings), { loading });
+const BrandRulesSettings = dynamic(() => import('@/components/brand-rules/brand-rules-settings').then((m) => m.BrandRulesSettings), { loading });
+const UtmDefaultsSettings = dynamic(() => import('@/components/links/links').then((m) => m.UtmDefaultsSettings), { loading });
+const FeatureFlagsSettings = dynamic(() => import('@/components/support/support').then((m) => m.FeatureFlagsSettings), { loading });
 import {
   AppearanceSection, ApprovalPoliciesSection, BrandingSection, BrandVoiceSection, DataExportSection, ProfileSection, PublishingDefaultsSection,
   SafetyRulesSection, WorkspaceSection,
 } from '@/components/settings/sections';
 
-export interface Perms { can: (a: Action) => boolean; canV2: (p: Permission) => boolean }
+export interface Perms { can: (a: Action) => boolean; canV2: (p: Permission) => boolean; flag?: (key: string) => boolean }
 
 export interface SettingsItem {
   group: string;
@@ -36,6 +45,8 @@ export interface SettingsItem {
   ownHeader?: boolean;
   render?: () => ReactNode;
   visible?: (p: Perms) => boolean;
+  /** Workspace feature flag that must be on (V3.1 §16; safe default off). */
+  flag?: string;
 }
 
 export interface SettingsGroup { id: string; label: string; items: SettingsItem[] }
@@ -53,6 +64,7 @@ export const SETTINGS: SettingsGroup[] = [
     { slug: 'general', label: 'General', icon: Building2, keywords: 'name workspace', render: () => <WorkspaceSection part="general" /> },
     { slug: 'branding', label: 'Brands', icon: Tag, keywords: 'brand create new', render: () => <BrandingSection /> },
     { slug: 'timezone', label: 'Time zone and locale', icon: Clock, keywords: 'timezone date format', render: () => <WorkspaceSection part="timezone" /> },
+    { slug: 'drafts', label: 'Draft recovery', icon: HardDrive, keywords: 'autosave offline local browser unsaved recovery', render: () => <DraftRecoverySettings /> },
   ]),
   G('people', 'People and access', [
     { slug: 'members', label: 'Members', icon: Users, keywords: 'roles access people', href: '/team', visible: (p) => p.canV2('members.read') },
@@ -65,6 +77,8 @@ export const SETTINGS: SettingsGroup[] = [
     { slug: 'approvals', label: 'Approval policies', icon: ShieldHalf, keywords: 'review approval stages', render: () => <ApprovalPoliciesSection /> },
     { slug: 'slots', label: 'Posting slots', icon: CalendarClock, keywords: 'queue times', render: () => <SlotsSettings /> },
     { slug: 'safety', label: 'Safety rules', icon: ShieldCheck, keywords: 'duplicate check collision', render: () => <SafetyRulesSection /> },
+    { slug: 'brand-rules', label: 'Brand rules', icon: BadgeCheck, keywords: 'prohibited phrases footer disclaimer links logos colours review mandatory advisory licence expiry', render: () => <BrandRulesSettings />, flag: 'v31.brand_rules' },
+    { slug: 'links', label: 'Campaign links', icon: Link2, keywords: 'utm tracking short links parameters source medium', render: () => <UtmDefaultsSettings />, flag: 'v31.tracked_links' },
   ]),
   G('connections', 'Connections', [
     { slug: 'social', label: 'Social accounts', icon: Plug, keywords: 'connect instagram facebook x telegram tiktok youtube linkedin threads pinterest bluesky', href: '/accounts' },
@@ -83,6 +97,7 @@ export const SETTINGS: SettingsGroup[] = [
   G('operations', 'Operations', [
     { slug: 'audit', label: 'Audit log', icon: ScrollText, keywords: 'activity events', href: '/activity', visible: (p) => p.can('workspace.settings') },
     { slug: 'usage', label: 'Usage and limits', icon: Gauge, keywords: 'budgets meters caps exports', render: () => <BudgetsSettings />, visible: (p) => p.can('workspace.settings') },
+    { slug: 'features', label: 'Feature flags', icon: ToggleRight, keywords: 'beta rollout enable features flags', render: () => <FeatureFlagsSettings />, visible: (p) => p.can('workspace.settings') },
     { slug: 'export', label: 'Data export', icon: FileDown, keywords: 'handover zip json download', render: () => <DataExportSection /> },
   ]),
 ];
@@ -90,7 +105,11 @@ export const SETTINGS: SettingsGroup[] = [
 export const itemHref = (i: SettingsItem) => i.href ?? `/settings/${i.group}/${i.slug}`;
 
 export function visibleSettings(p: Perms): SettingsGroup[] {
-  return SETTINGS.map((g) => ({ ...g, items: g.items.filter((i) => !i.visible || i.visible(p)) })).filter((g) => g.items.length);
+  return SETTINGS.map((g) => ({ ...g, items: g.items.filter((i) => itemAllowed(i, p)) })).filter((g) => g.items.length);
+}
+
+export function itemAllowed(i: SettingsItem, p: Perms): boolean {
+  return (!i.visible || i.visible(p)) && (!i.flag || !!p.flag?.(i.flag));
 }
 
 export function findItem(group: string, slug: string): SettingsItem | undefined {

@@ -100,3 +100,39 @@ code-defined data and contains no tenant or authorization state.
 Round 2 adds a **precomputed aggregate, not a cache**: `metric_rollup_days` (migration 025) is maintained in the same
 transaction as every rollup write (statement-level triggers), so it is never stale; it holds no authorization state, and
 readers apply exactly the same workspace/brand/connection scope, dataset (source) and permission checks as before.
+
+## Browser (V3.1 UI stream)
+
+Set after measuring the redesigned screens on a production build (`next build --webpack` + `next start`); results and
+conditions: `docs/PERFORMANCE_RESULTS.md` → "Browser". Machine-checked: `node scripts/v31-browser-perf.mjs --check`
+(exit 1 when a route's JS exceeds its budget).
+
+| Measure | Target | Notes |
+|---|---|---|
+| LCP | ≤ 2 s p75 (brief §3) | lab, cold cache, localhost; real-user field data needs a deployment |
+| INP | ≤ 200 ms p75 | lab proxy: max Event Timing duration of a scripted interaction (composer typing; Cmd+K open/type/close) |
+| CLS | ≤ 0.1 p75 | sum of shifts without recent input |
+| Warm navigation, useful content | ≤ 300 ms p95 | click in the persistent shell → route rendered with no skeleton left |
+| Composer typing | no network-dependent input | keystrokes only update local state; autosave is debounced (800 ms) and off the input path |
+
+Route JS budgets (compressed bytes of every script a cold visit loads; final p50 + ~5%, rounded up to 5 KB). About
+230 KB of each is the shared baseline (React DOM, Next runtime, and the app chunk with Radix, lucide and zod pulled in
+through the `@social-lite/core` barrel), so route-specific code is the remaining 55–140 KB:
+
+| Route | Budget (KB) | Measured p50 (KB) |
+|---|---|---|
+| Overview `/` | 310 | 292 |
+| Planner `/planner` | 315 | 300 |
+| Create `/compose` | 300 | 286 |
+| Composer `/posts/:id` | 370 | 352 |
+| Analytics `/analytics` | 305 | 289 |
+| Content library `/library` | 330 | 311 |
+| Approvals `/approvals` | 305 | 289 |
+| Connections `/accounts` | 315 | 296 |
+| History `/history` | 310 | 295 |
+| Settings `/settings/<group>/<item>` | 320 | 303 |
+| Trash `/trash` | 310 | 292 |
+
+Loaded on demand, never in a route's first load: each Settings section, the Content Hub panel (Library → Sources) and
+Content sources on Connections, the Google Picker module (Google's scripts were already fetched only on open). Charts are
+dependency-free SVG (`ui/data-viz.tsx`, ~16 KB source) and stay in the routes that draw them.

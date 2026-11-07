@@ -4,7 +4,7 @@
 // Settings pages render their own grouped left nav inside the content area (components/settings-shell).
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Suspense, useState, type ReactNode } from 'react';
+import { Suspense, useEffect, useState, type ReactNode } from 'react';
 import {
   Activity, CalendarDays, ChartColumn, CheckCheck, Ellipsis, Flag, FolderOpen, LayoutDashboard, Plug, Settings, ShieldCheck, SquarePen, Users, Wrench,
   type LucideIcon,
@@ -13,6 +13,8 @@ import type { Action, Permission } from '@social-lite/core';
 import { useSession } from '@/lib/client/session';
 import { useApi } from '@/lib/client/use-api';
 import { useHrefWithBrand } from '@/lib/client/hooks';
+import { pruneNamespace } from '@/lib/client/draft-recovery';
+import { FlagsProvider } from '@/lib/client/flags';
 import type { ApprovalSummary } from '@/lib/client/types';
 import { cn, Menu, MenuContent, MenuLabel, MenuLinkItem, MenuSeparator, MenuTrigger, Tooltip } from '@/components/ui';
 import { WorkspaceSwitcher } from './workspace-switcher';
@@ -22,6 +24,7 @@ import { NotificationBell } from './notification-bell';
 import { UserMenu } from './user-menu';
 import { ShellBanners } from './shell-banners';
 import { Logo } from './logo';
+import { CommandMenu, SearchTrigger } from './command-menu';
 
 interface NavItem {
   href: string; label: string; icon: LucideIcon; perm?: Action; badge?: 'approvals'; mobile?: boolean;
@@ -62,13 +65,18 @@ function useApprovalsCount(enabled: boolean) {
 export function AppShell({ children }: { children: ReactNode }) {
   return (
     <Suspense fallback={null}>
-      <ShellInner>{children}</ShellInner>
+      <FlagsProvider>
+        <ShellInner>{children}</ShellInner>
+      </FlagsProvider>
     </Suspense>
   );
 }
 
 function ShellInner({ children }: { children: ReactNode }) {
-  const { can, canV2 } = useSession();
+  const { can, canV2, session } = useSession();
+  // Drop expired browser copies of drafts (and all of them when the workspace turned local recovery off).
+  const recoveryPolicy = session.draft_recovery;
+  useEffect(() => { pruneNamespace(recoveryPolicy); }, [recoveryPolicy]);
   const pathname = usePathname();
   const withBrand = useHrefWithBrand();
   const approvals = useApprovalsCount(true);
@@ -121,12 +129,14 @@ function ShellInner({ children }: { children: ReactNode }) {
         {/* Top bar: scope (all widths), notifications, account */}
         <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border bg-[color-mix(in_srgb,var(--bg)_92%,transparent)] px-3 backdrop-blur sm:px-4 md:px-6">
           <span className="md:hidden"><Logo compact /></span>
-          <div className="min-w-0 max-w-[260px] flex-1 md:flex-none md:basis-[240px]"><BrandFilter compact /></div>
+          <div className="min-w-0 max-w-[260px] flex-1 max-[430px]:flex-none md:flex-none md:basis-[240px]"><BrandFilter compact /></div>
           <span className="flex-1" />
+          <SearchTrigger />
           <NotificationBell />
           <UserMenu compact />
         </header>
         <ShellBanners />
+        <CommandMenu />
         <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1320px] flex-1 px-4 pb-28 pt-6 focus:outline-none sm:px-6 md:px-8 md:pb-16 md:pt-8">
           {children}
         </main>

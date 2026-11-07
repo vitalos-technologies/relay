@@ -25,7 +25,7 @@ export function Dialog({ open, onOpenChange, title, description, children, foote
   return (
     <D.Root open={open} onOpenChange={(o) => (busy ? undefined : onOpenChange(o))}>
       <D.Portal>
-        <D.Overlay className="anim-fade fixed inset-0 z-50 bg-[var(--overlay)] backdrop-blur-[2px]" />
+        <D.Overlay className="anim-fade fixed inset-0 z-50 bg-[var(--overlay)]" />
         <D.Content
           className={cn(
             'anim-pop fixed left-1/2 top-1/2 z-50 flex max-h-[min(92dvh,900px)] w-[calc(100vw-24px)] -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl border border-border bg-surface shadow-[var(--shadow)]',

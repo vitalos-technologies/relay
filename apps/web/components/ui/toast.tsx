@@ -5,7 +5,13 @@ import { cn } from './cn';
 import { ToneIcon, type Tone } from './feedback';
 import { isApiError } from '@/lib/client/api';
 
-interface ToastItem { id: number; tone: Tone; title: string; body?: string; ref?: string | null }
+interface ToastItem {
+  id: number; tone: Tone; title: string; body?: string; ref?: string | null;
+  /** One inline action (e.g. Undo). The toast closes when it is used. */
+  action?: { label: string; onClick: () => void | Promise<void> };
+  /** ms before auto-dismiss (default 6000; errors stay). */
+  duration?: number;
+}
 interface ToastApi {
   show: (t: Omit<ToastItem, 'id'>) => void;
   success: (title: string, body?: string) => void;
@@ -23,7 +29,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     const id = ++n.current;
     setItems((xs) => [...xs.slice(-3), { ...t, id }]);
     // Errors stay until dismissed so they can be read and the reference copied.
-    if (t.tone !== 'danger') setTimeout(() => dismiss(id), 6000);
+    if (t.tone !== 'danger') setTimeout(() => dismiss(id), t.duration ?? (t.action ? 10_000 : 6000));
   }, [dismiss]);
   const api = useMemo<ToastApi>(() => ({
     show,
@@ -52,6 +58,15 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               {t.body ? <p className="mt-0.5 text-muted">{t.body}</p> : null}
               {t.ref ? <p className="mt-1 font-mono text-[11px] text-subtle">Reference {t.ref}</p> : null}
             </div>
+            {t.action ? (
+              <button
+                type="button"
+                onClick={() => { dismiss(t.id); void t.action!.onClick(); }}
+                className="touch-target -my-1 shrink-0 rounded-md px-2 py-1 text-[13px] font-semibold text-accent-text hover:bg-surface"
+              >
+                {t.action.label}
+              </button>
+            ) : null}
             <button type="button" aria-label="Dismiss notification" onClick={() => dismiss(t.id)} className="touch-target -mr-1 inline-flex size-7 items-center justify-center rounded-md text-muted hover:bg-surface hover:text-fg">
               <X aria-hidden className="size-4" />
             </button>

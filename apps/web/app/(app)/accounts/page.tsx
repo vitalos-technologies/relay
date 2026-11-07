@@ -2,8 +2,10 @@
 // V3 Connections: per-brand connected accounts with one capability state each (spec §6), publishing formats and
 // analytics shown independently, a "Connect a network" picker for all ten networks (Bluesky = handle + app password),
 // and the workspace's content sources (Content Hub components).
-import { useState } from 'react';
-import { ChartColumn, Ellipsis, FlaskConical, HeartPulse, Pause, Play, Plug, Plus, RefreshCw, Unplug } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { ChartColumn, Ellipsis, FlaskConical, HeartPulse, Pause, Play, Plug, Plus, RefreshCw, Stethoscope, Unplug } from 'lucide-react';
+import { useFlag } from '@/lib/client/flags';
+import { DiagnosticsDrawer } from '@/components/integrations/diagnostics';
 import { PROVIDERS, PROVIDER_LABEL, type ChannelCapabilities, type Provider } from '@social-lite/core';
 import { api, isApiError } from '@/lib/client/api';
 import { useSession } from '@/lib/client/session';
@@ -19,7 +21,9 @@ import {
   MenuLabel, MenuSeparator, MenuTrigger, PageHeader, PlatformIcon, SectionHeader, Select, SimulatedBadge, SkeletonRows, TimeWithZone, useToast, cn,
 } from '@/components/ui';
 import { BlueskyDialog, MOCK_SCENARIOS, MOCK_SCENARIO_LABEL, MockDialog, NotConfiguredDialog, TelegramDialog } from '@/components/accounts/connect-dialogs';
-import { SourceConnectionsSettings } from '@/components/content-hub/source-connections';
+import dynamic from 'next/dynamic';
+// Content sources (Google/Notion) render below the social accounts; their code loads after the page.
+const SourceConnectionsSettings = dynamic(() => import('@/components/content-hub/source-connections').then((m) => m.SourceConnectionsSettings));
 
 const CALLBACK_ERRORS: Record<string, string> = {
   access_denied: 'Cancelled. Nothing was connected.',
@@ -40,15 +44,21 @@ const CALLBACK_ERRORS: Record<string, string> = {
 export default function ConnectionsPage() {
   const { session, can, canV2 } = useSession();
   const [brand] = useBrandFilter();
+  const diagOn = useFlag('v31.integration_diagnostics');
   const [params, setParams] = useQueryState();
   const providers = useApi<{ items: ProviderStatus[] }>('/api/providers');
   const brands = brand ? session.brands.filter((b) => b.id === brand) : session.brands;
   const err = params.get('error');
   const connected = params.get('connected');
+  const [settled, setSettled] = useState<Set<string>>(() => new Set());
+  const markSettled = useCallback((id: string) => setSettled((s) => (s.has(id) ? s : new Set(s).add(id))), []);
 
   return (
     <>
-      <PageHeader title="Connections" actions={<LinkButton href={brand ? `/accounts/health?brand=${brand}` : '/accounts/health'} icon={<HeartPulse aria-hidden className="size-4" />}>Health</LinkButton>} />
+      <PageHeader title="Connections" actions={<>
+        {diagOn ? <LinkButton href={brand ? `/accounts/diagnostics?brand=${brand}` : '/accounts/diagnostics'} variant="ghost" icon={<Stethoscope aria-hidden className="size-4" />}>Test centre</LinkButton> : null}
+        <LinkButton href={brand ? `/accounts/health?brand=${brand}` : '/accounts/health'} icon={<HeartPulse aria-hidden className="size-4" />}>Health</LinkButton>
+      </>} />
       {err ? (
         <Banner tone="danger" role="alert" className="mb-6" title="Couldn’t connect" actions={<Button size="sm" variant="ghost" onClick={() => setParams({ error: null })}>Dismiss</Button>}>
           {CALLBACK_ERRORS[err] ?? 'Something went wrong.'} <span className="font-mono text-[11px] text-subtle">({err})</span>
@@ -61,12 +71,16 @@ export default function ConnectionsPage() {
       {!brands.length ? (
         <EmptyState icon={<Plug aria-hidden />} title="No brands yet" />
       ) : (
-        <div className="flex flex-col gap-10">
-          {brands.map((b) => <BrandConnections key={b.id} brand={b} providers={providers.data?.items ?? []} showHeading={brands.length > 1} />)}
-        </div>
+        <>
+          {/* Sections load in parallel; show them together so a finished brand never pushes the others down (CLS). */}
+          {settled.size < brands.length ? <SkeletonRows rows={4} /> : null}
+          <div className={settled.size < brands.length ? 'hidden' : 'flex flex-col gap-10'}>
+            {brands.map((b) => <BrandConnections key={b.id} brand={b} providers={providers.data?.items ?? []} showHeading={brands.length > 1} onSettled={markSettled} />)}
+          </div>
+        </>
       )}
       {/* The Content Hub component reads ?connected/?error itself; hide it while a social callback banner is showing. */}
-      {canV2('connections.read') && !err && !connected ? (
+      {canV2('connections.read') && !err && !connected && settled.size >= brands.length ? (
         <section aria-labelledby="h-sources" className="mt-12 border-t border-border pt-8">
           <SectionHeader id="h-sources" title="Content sources" />
           <SourceConnectionsSettings />
@@ -76,12 +90,13 @@ export default function ConnectionsPage() {
   );
 }
 
-function BrandConnections({ brand, providers, showHeading }: { brand: SessionBrand; providers: ProviderStatus[]; showHeading: boolean }) {
+function BrandConnections({ brand, providers, showHeading, onSettled }: { brand: SessionBrand; providers: ProviderStatus[]; showHeading: boolean; onSettled: (brandId: string) => void }) {
   const { session, can } = useSession();
   const toast = useToast();
   const { data, error, loading, refetch, setData } = useApi<{ items: Connection[] }>(`/api/brands/${brand.id}/connections`, {
     poll: (d) => (d?.items.some((c) => c.status === 'pending_verification') ? 5_000 : false),
   });
+  useEffect(() => { if (data || error) onSettled(brand.id); }, [data, error, brand.id, onSettled]);
   const [tg, setTg] = useState<{ reconnect: Connection | null } | null>(null);
   const [bsky, setBsky] = useState<{ reconnect: Connection | null } | null>(null);
   const [mockOpen, setMockOpen] = useState(false);
@@ -198,6 +213,8 @@ function ConnectionCard({
   const [disconnectOpen, setDisconnectOpen] = useState(false);
   const [pauseOpen, setPauseOpen] = useState(false);
   const [simOpen, setSimOpen] = useState(false);
+  const [diagOpen, setDiagOpen] = useState(false);
+  const diagOn = useFlag('v31.integration_diagnostics');
   const state = capabilityState(c);
   const caps = c.capabilities as Partial<ChannelCapabilities>;
   const formats = formatLabels(c);
@@ -253,6 +270,7 @@ function ConnectionCard({
           <MenuContent>
             <MenuLabel>{checking ? 'Checking…' : c.health?.checked_at ? `Checked ${fmtRelative(c.health.checked_at)}` : 'Not checked yet'}</MenuLabel>
             <MenuItem icon={<RefreshCw aria-hidden />} onSelect={() => void check()} disabled={disconnected}>Check now</MenuItem>
+            {diagOn ? <MenuItem icon={<Stethoscope aria-hidden />} onSelect={() => setDiagOpen(true)}>Diagnostics</MenuItem> : null}
             {!disconnected ? (
               c.paused
                 ? <MenuItem icon={<Play aria-hidden />} onSelect={() => setPauseOpen(true)}>Resume</MenuItem>
@@ -294,6 +312,7 @@ function ConnectionCard({
         </div>
       ) : null}
 
+      {diagOpen ? <DiagnosticsDrawer connectionId={c.id} open onOpenChange={setDiagOpen} /> : null}
       <Dialog open={simOpen} onOpenChange={setSimOpen} size="sm" title="Simulation outcome" footer={<Button onClick={() => setSimOpen(false)}>Done</Button>}>
         <label htmlFor={`sc-${c.id}`} className="sr-only">Simulation outcome</label>
         <Select id={`sc-${c.id}`} value={c.mock_scenario ?? 'success'} onChange={(e) => void setScenario(e.target.value as MockScenario)}>

@@ -20,6 +20,8 @@ export interface SessionInfo {
   app_env: 'development' | 'test' | 'production';
   /** Present in the implementation: whether this user may create a workspace (POST /api/workspaces). */
   can_create_workspace?: boolean;
+  /** V3.1 §9: browser-side draft recovery policy for this user + workspace. */
+  draft_recovery?: import('@social-lite/core/contracts/v31-data').DraftRecoveryPolicy | null;
 }
 
 export interface SessionBrand {
@@ -135,6 +137,8 @@ export interface PostDetail extends PostSummary {
 export interface ValidateResponse {
   ok: boolean; issues: ValidationIssue[];
   per_destination: Record<string, { ok: boolean; measured_length: number; limit: number }>;
+  /** V3.1 §12: brand rules / asset governance / TipSignal fact checks. Mandatory findings block submit/schedule/publish. */
+  brand_rules?: { ok: boolean; rules_version: number; mandatory: import('@social-lite/core/contracts/v31-gov').BrandFinding[]; advisory: import('@social-lite/core/contracts/v31-gov').BrandFinding[] } | null;
 }
 
 export interface PlannerItem {

@@ -3,7 +3,8 @@
 // its posts in the Planner (list view, campaign filter).
 import Link from 'next/link';
 import { useState } from 'react';
-import { Archive, ArchiveRestore, CalendarRange, Ellipsis, Flag, Plus } from 'lucide-react';
+import { Archive, ArchiveRestore, CalendarRange, ChartNoAxesColumn, Ellipsis, Flag, Plus } from 'lucide-react';
+import { CampaignMeasurementDrawer } from '@/components/links/links';
 import { api } from '@/lib/client/api';
 import { useSession } from '@/lib/client/session';
 import { useApi } from '@/lib/client/use-api';
@@ -44,6 +45,9 @@ function BrandCampaigns({ brand, archived, showHeading }: { brand: SessionBrand;
   const toast = useToast();
   const { data, error, loading, refetch } = useApi<{ items: Campaign[]; can_manage: boolean }>(`/api/brands/${brand.id}/campaigns${archived ? '?archived=1' : ''}`);
   const [editing, setEditing] = useState<Campaign | 'new' | null>(null);
+  const [measuring, setMeasuring] = useState<Campaign | null>(null);
+  const { canOn } = useSession();
+  const mayMeasure = canOn(brand.id, 'analytics.read');
   const today = new Date().toISOString().slice(0, 10);
   const setArchived = async (c: Campaign, a: boolean) => {
     try {
@@ -94,6 +98,7 @@ function BrandCampaigns({ brand, archived, showHeading }: { brand: SessionBrand;
                     <Menu>
                       <MenuTrigger asChild><IconButton label={`Actions for ${c.name}`} icon={<Ellipsis aria-hidden className="size-4" />} /></MenuTrigger>
                       <MenuContent>
+                        {mayMeasure ? <MenuItem icon={<ChartNoAxesColumn aria-hidden />} onSelect={() => setMeasuring(c)}>Measurement</MenuItem> : null}
                         {!c.archived ? <MenuItem onSelect={() => setEditing(c)}>Edit</MenuItem> : null}
                         {c.archived
                           ? <MenuItem icon={<ArchiveRestore aria-hidden />} onSelect={() => void setArchived(c, false)}>Restore</MenuItem>
@@ -113,6 +118,7 @@ function BrandCampaigns({ brand, archived, showHeading }: { brand: SessionBrand;
         </ul>
       )}
       <CampaignDialog brandId={brand.id} campaign={editing} onClose={() => setEditing(null)} onSaved={() => void refetch()} />
+      {measuring ? <CampaignMeasurementDrawer campaignId={measuring.id} name={measuring.name} open onOpenChange={(o) => !o && setMeasuring(null)} /> : null}
     </section>
   );
 }

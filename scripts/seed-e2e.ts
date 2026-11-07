@@ -14,11 +14,31 @@ async function main() {
   const db = getPool();
   const demo = await maybeOne<{ id: string }>(db, `SELECT id FROM workspaces WHERE name='Demo Workspace' AND is_demo`);
   if (!demo) throw new Error('Demo Workspace not found: run pnpm db:seed first (sign-in must default to it)');
+  await ensureOnboardingWorkspace();
   const existing = await maybeOne<{ id: string }>(db, `SELECT id FROM workspaces WHERE name='E2E Workspace' AND is_demo`);
   if (existing) { console.log(JSON.stringify({ msg: 'E2E workspace already present', workspaceId: existing.id })); return; }
   await ensureBucket();
   const r = await seedAgency('E2E Workspace', { tipsignalBinding: false });
   console.log(JSON.stringify({ msg: 'E2E workspace seeded', workspaceId: r.wsId }));
+}
+
+/**
+ * V3.1 §7: "E2E Onboarding" — a new, empty synthetic workspace (one brand, nothing connected, no posts) owned by the
+ * demo owner, for the onboarding checklist test and screenshots. Created after Demo Workspace, so sign-in still
+ * defaults to Demo. Idempotent.
+ */
+async function ensureOnboardingWorkspace() {
+  const db = getPool();
+  const have = await maybeOne<{ id: string }>(db, `SELECT id FROM workspaces WHERE name='E2E Onboarding' AND is_demo`);
+  if (have) return;
+  const owner = await maybeOne<{ id: string }>(db, `SELECT id FROM users WHERE email='owner@demo.social-lite.test'`);
+  if (!owner) throw new Error('owner@demo.social-lite.test not found: run pnpm db:seed first');
+  const ws = await maybeOne<{ id: string }>(db, `INSERT INTO workspaces(name, is_demo) VALUES ('E2E Onboarding', true) RETURNING id`);
+  await db.query(`INSERT INTO memberships(workspace_id, user_id, role) VALUES ($1,$2,'owner')`, [ws!.id, owner.id]);
+  await db.query(`INSERT INTO scoped_role_grants(workspace_id, principal_type, user_id, role, scope_type, granted_by, source)
+    VALUES ($1,'user',$2,'owner','workspace',$2,'seed')`, [ws!.id, owner.id]);
+  await db.query(`INSERT INTO brands(workspace_id, name, is_demo) VALUES ($1,'Northwind Bakery (demo)',true)`, [ws!.id]);
+  console.log(JSON.stringify({ msg: 'E2E onboarding workspace seeded', workspaceId: ws!.id }));
 }
 
 main().then(() => closePool()).catch(async (err) => { console.error(err); await closePool(); process.exit(1); });

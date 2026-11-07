@@ -23,6 +23,7 @@ import {
 } from '@/components/ui';
 import { DestinationDots } from '@/components/planner/agenda-item';
 import { PostDrawer } from '@/components/planner/post-drawer';
+import { OnboardingChecklist, ResumeOnboarding, useOnboarding } from '@/components/onboarding/checklist';
 
 const DAY = 86_400_000;
 // Severity: an unconfirmed send may already be live (reconcile first), then hard failures, then missed deadlines, then blocked.
@@ -66,6 +67,7 @@ export default function OverviewPage() {
     }
   };
 
+  const ob = useOnboarding();
   const dateLabel = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: tz }).format(new Date(now));
 
   return (
@@ -73,10 +75,14 @@ export default function OverviewPage() {
       <PageHeader
         title="Overview"
         meta={<span className="truncate">{dateLabel} · {zoneAbbr(new Date(now), tz)} · {brand ? brandName(brand) : 'All brands'}</span>}
-        actions={can('drafts.edit') && !noBrands ? (
-          <LinkButton href={withBrand('/compose')} variant="primary" icon={<Plus aria-hidden className="size-4" />}>Create post</LinkButton>
-        ) : null}
+        actions={<>
+          <ResumeOnboarding ob={ob} />
+          {can('drafts.edit') && !noBrands ? (
+            <LinkButton href={withBrand('/compose')} variant="primary" icon={<Plus aria-hidden className="size-4" />}>Create post</LinkButton>
+          ) : null}
+        </>}
       />
+      {ob.data && !ob.data.dismissed && !ob.data.complete ? <div className="mb-6"><OnboardingChecklist ob={ob} /></div> : null}
 
       {noBrands ? (
         <EmptyState icon={<Plug aria-hidden />} title="No brands yet" action={can('brands.manage') ? <LinkButton href="/settings/workspace/branding" variant="primary">Create brand</LinkButton> : null} />
