@@ -19,6 +19,9 @@ const PIPELINE_VIDEO = {
 /** Scopes requested at login and checked by health(). See docs/providers/meta.md. */
 export const FACEBOOK_SCOPES = ['pages_show_list', 'pages_read_engagement', 'pages_manage_posts'] as const;
 export const INSTAGRAM_SCOPES = ['pages_show_list', 'pages_read_engagement', 'instagram_basic', 'instagram_content_publish'] as const;
+/** Analytics-only permissions (need Meta app review). Optional: publishing works without them; analytics shows "permission missing". */
+export const FACEBOOK_INSIGHTS_SCOPES = ['read_insights'] as const;
+export const INSTAGRAM_INSIGHTS_SCOPES = ['instagram_manage_insights'] as const;
 
 /** Page tasks that allow creating content (verified: Pages API posts / photos references). */
 export const POSTING_TASKS = ['CREATE_CONTENT', 'MANAGE'];

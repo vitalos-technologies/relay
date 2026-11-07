@@ -90,3 +90,10 @@ Remaining:
 | V3 | Performance | Server-side analytics bench only. No browser metrics and no MCP latency figures (V3.1 PERF) |
 | V4 | Lint / production build | Not run in the V3 report; lint errors open (V2 G18) |
 | V5 | Type check | Not re-run here (streams reported clean at hand-off) |
+
+
+## Lead follow-ups (2026-11-07)
+- **Meta insights permissions:** fixed. `read_insights` / `instagram_manage_insights` are requested when the operator sets `META_REQUEST_INSIGHTS=true` (only after Meta app review, since unapproved permissions break login). They stay optional: publishing never requires them, and analytics shows "permission missing" without them.
+- **Google Picker CSP default:** kept on by design. CSP is built in the proxy, before database settings (where Picker keys live) are readable. The allowance only adds Google Picker origins to `frame-src`/`connect-src`/`img-src`. Operators can turn it off with `CONTENT_HUB_GOOGLE_PICKER=false`.
+- **MCP analytics:** `analytics_overview` uses the V3 analytics query service. `query_analytics` (per post) stays as is; it reads values the V3 pipeline also maintains.
+- **Setup readiness:** on/off and tier settings (Meta insights, LinkedIn organizations, Pinterest tier, TikTok audit) no longer count as missing for a provider's readiness.

@@ -127,7 +127,7 @@ export async function getSetup(ctx: Ctx, db: Queryable = getPool()): Promise<{ g
   for (const g of PROVIDER_GROUPS) {
     const keys = (Object.keys(SETTING_DEFS) as SettingKey[]).filter((k) => SETTING_DEFS[k].group === g.group);
     const items = await Promise.all(keys.map((k) => settingItem(k, db)));
-    groups.push({ id: g.id, title: g.title, required: false, ready: items.every((i) => i.is_set), items });
+    groups.push({ id: g.id, title: g.title, required: false, ready: items.every((i, n) => i.is_set || SETTING_DEFS[keys[n]!].optional === true), items });
   }
   return { groups };
 }

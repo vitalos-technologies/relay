@@ -14,7 +14,7 @@ import {
   AppError, type AdapterContext, type ConnectionHealth, type DestinationCandidate, type FinalizedDestination,
   type OAuthConnector, type ProviderAppConfig, type PublishConnection,
 } from '@social-lite/core';
-import { FACEBOOK_SCOPES, INSTAGRAM_SCOPES, POSTING_TASKS, missingScopes } from './common.js';
+import { FACEBOOK_INSIGHTS_SCOPES, FACEBOOK_SCOPES, INSTAGRAM_INSIGHTS_SCOPES, INSTAGRAM_SCOPES, POSTING_TASKS, missingScopes } from './common.js';
 import { normalizeGraphError, isTransportError } from './errors.js';
 import { DIALOG_HOST, graph, graphVersion, str, type GraphResult } from './graph.js';
 import { grantedFrom, grantedPermissions, metaHealth } from './health.js';
@@ -78,7 +78,8 @@ function makeConnector(provider: 'facebook' | 'instagram'): OAuthConnector {
       u.searchParams.set('redirect_uri', p.redirectUri);
       u.searchParams.set('state', p.state);
       u.searchParams.set('response_type', 'code');
-      u.searchParams.set('scope', requiredScopes.join(','));
+      const insights = config.features?.meta_insights === true ? [...(provider === 'facebook' ? FACEBOOK_INSIGHTS_SCOPES : INSTAGRAM_INSIGHTS_SCOPES)] : [];
+      u.searchParams.set('scope', [...requiredScopes, ...insights].join(','));
       return u.toString();
     },
 

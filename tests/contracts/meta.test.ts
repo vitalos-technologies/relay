@@ -536,6 +536,17 @@ describe('connectors', () => {
     expect(f.searchParams.get('scope')).toBe('pages_show_list,pages_read_engagement,pages_manage_posts');
   });
 
+  it('insights permissions are requested only when the operator enables them (they need Meta app review)', () => {
+    const on = { ...config, features: { meta_insights: true } };
+    const fb = new URL(facebookConnector.authorizationUrl(on, { state: 's', redirectUri: config.redirectUri }));
+    expect(fb.searchParams.get('scope')!.split(',')).toEqual(['pages_show_list', 'pages_read_engagement', 'pages_manage_posts', 'read_insights']);
+    const ig = new URL(instagramConnector.authorizationUrl(on, { state: 's', redirectUri: config.redirectUri }));
+    expect(ig.searchParams.get('scope')!.split(',')).toContain('instagram_manage_insights');
+    // still optional: publishing permissions are what a connection requires
+    expect(facebookConnector.requiredScopes).not.toContain('read_insights');
+    expect(instagramConnector.requiredScopes).not.toContain('instagram_manage_insights');
+  });
+
   it('exchangeCode: code ⇒ short-lived ⇒ long-lived (fb_exchange_token) ⇒ granted permissions only', async () => {
     const s = sim('facebook', 'missing_permission');
     s.ctx.config = config;
