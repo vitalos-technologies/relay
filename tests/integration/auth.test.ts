@@ -10,7 +10,7 @@ import { sha256, type SessionRecord } from '../../packages/services/src/auth/ses
 import { LoginError } from '../../packages/services/src/auth/users.js';
 import { resetIdpAdminCache } from '../../packages/services/src/auth/idp-admin.js';
 import { closeTestPool, tenant, testPool } from './helpers.js';
-import { KC_ISSUER, KcBrowser, OIDC_ENV } from './keycloak.js';
+import { KC_ISSUER, KcBrowser, OIDC_ENV, kcResetSecondFactors } from './keycloak.js';
 
 const saved: Record<string, string | undefined> = {};
 
@@ -21,6 +21,8 @@ beforeAll(async () => {
   resetIdpAdminCache();
   // Requires the local Keycloak from infra/compose.yaml (fails loudly when it is not running).
   expect((await fetch(`${KC_ISSUER}/.well-known/openid-configuration`)).ok).toBe(true);
+  // analyst@ is the "password only" fixture; an interrupted E2E enrolment run may have left factors behind.
+  await kcResetSecondFactors('analyst@demo.social-lite.test');
 });
 afterAll(async () => {
   for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }

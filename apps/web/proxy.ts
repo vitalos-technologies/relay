@@ -9,6 +9,8 @@ export function proxy(request: NextRequest) {
     dev: process.env.NODE_ENV === 'development',
     production: process.env.APP_ENV === 'production',
     storageOrigins: [originOf(process.env.S3_PUBLIC_ENDPOINT), originOf(process.env.S3_ENDPOINT)],
+    // V3 Content Hub: Google Picker (set CONTENT_HUB_GOOGLE_PICKER=false to keep frame-src 'none').
+    googlePicker: process.env.CONTENT_HUB_GOOGLE_PICKER !== 'false',
   });
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-nonce', nonce);

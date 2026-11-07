@@ -112,3 +112,16 @@ export async function kcUserId(email: string): Promise<string> {
   const r = await fetch(`${KC_ADMIN}/users?exact=true&email=${encodeURIComponent(email)}`, { headers: { authorization: `Bearer ${t}` } });
   return ((await r.json()) as Array<{ id: string }>)[0]!.id;
 }
+
+/**
+ * Test setup only: return a demo identity to "password only" (removes OTP/passkey/recovery credentials and any
+ * brute-force lockout). Makes tests independent of factors left behind by an interrupted E2E enrolment run.
+ */
+export async function kcResetSecondFactors(email: string): Promise<void> {
+  const t = await kcMasterToken();
+  const id = await kcUserId(email);
+  const h = { authorization: `Bearer ${t}` };
+  const creds = (await (await fetch(`${KC_ADMIN}/users/${id}/credentials`, { headers: h })).json()) as Array<{ id: string; type: string }>;
+  for (const c of creds.filter((x) => x.type !== 'password')) await fetch(`${KC_ADMIN}/users/${id}/credentials/${c.id}`, { method: 'DELETE', headers: h });
+  await fetch(`${KC_ADMIN}/attack-detection/brute-force/users/${id}`, { method: 'DELETE', headers: h });
+}

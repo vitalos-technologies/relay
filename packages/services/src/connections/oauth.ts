@@ -40,7 +40,8 @@ export function oauthConnectorFor(provider: Provider): OAuthConnector | null {
 export async function startOAuth(
   ctx: Ctx, brandId: string, provider: string, opts: { reconnectConnectionId?: string | null } = {},
 ): Promise<{ authorization_url: string }> {
-  requireAction(ctx, 'connections.manage', 'Only owners and admins can connect accounts.');
+  // Credential change: verified MFA AND a fresh verification (step-up window).
+  requireAction(ctx, 'connections.manage', { stepUp: true, message: 'Only owners and admins can connect accounts.' });
   await assertBrand(ctx, brandId);
   if (!isOAuthProvider(provider)) throw new AppError('validation_failed', 'This provider does not use an OAuth redirect. Telegram connects with a bot token, Bluesky with an app password.', { provider: 'Unsupported provider' });
   const connector = oauthConnectorFor(provider);

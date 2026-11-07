@@ -170,6 +170,25 @@ export async function disableServiceAccount(ctx: Ctx, serviceAccountId: string) 
   });
 }
 
+/**
+ * Offboarding: a removed member must not leave machine principals running under their name. Service accounts
+ * still owned by `ownerUserId` (i.e. not explicitly reassigned first) are disabled, their keys and grants revoked,
+ * and each is audited. Runs inside the caller's removal transaction.
+ */
+export async function disableServiceAccountsOwnedBy(tx: Queryable, ctx: Ctx, ownerUserId: string, reason: 'owner_removed'): Promise<number> {
+  const sas = await many<{ id: string; name: string; purpose: string }>(tx,
+    `UPDATE service_accounts SET disabled_at=now(), disabled_by=$3 WHERE workspace_id=$1 AND owner_user_id=$2 AND disabled_at IS NULL RETURNING id, name, purpose`,
+    [ctx.access.workspaceId, ownerUserId, ctx.actor.userId || null]);
+  for (const sa of sas) {
+    const keys = await tx.query(`UPDATE api_key_hashes SET revoked_at=now(), revoked_by=$2, revoked_reason=$3 WHERE service_account_id=$1 AND revoked_at IS NULL`, [sa.id, ctx.actor.userId || null, reason]);
+    await tx.query(`UPDATE scoped_role_grants SET revoked_at=now(), revoked_by=$2 WHERE service_account_id=$1 AND revoked_at IS NULL`, [sa.id, ctx.actor.userId || null]);
+    await audit(tx, { workspaceId: ctx.access.workspaceId, actorUserId: ctx.actor.userId || null, action: 'service_account.disabled', resourceType: 'service_account', resourceId: sa.id,
+      correlationId: ctx.correlationId, diff: { reason, owner_user_id: ownerUserId, name: sa.name, purpose: sa.purpose, keys_revoked: keys.rowCount ?? 0 } });
+  }
+  if (sas.length) await bumpPolicyVersion(tx, ctx.access.workspaceId);
+  return sas.length;
+}
+
 async function lockAccount(tx: Queryable, ctx: Ctx, id: string): Promise<SaRow> {
   const sa = await maybeOne<SaRow>(tx, `SELECT * FROM service_accounts WHERE id=$1 AND workspace_id=$2 FOR UPDATE`, [id, ctx.access.workspaceId]);
   if (!sa) throw notFound('Service account');
@@ -247,6 +266,9 @@ export async function authenticateApiKey(authorization: string | null | undefine
     `SELECT k.id, k.workspace_id, k.service_account_id, k.key_hash, k.last_used_at, sa.name
        FROM api_key_hashes k JOIN service_accounts sa ON sa.id=k.service_account_id AND sa.workspace_id=k.workspace_id
        JOIN workspaces w ON w.id=k.workspace_id AND w.state='active'
+       -- The named owner must still be an active, enabled member (suspension pauses the account's keys).
+       JOIN memberships om ON om.workspace_id=sa.workspace_id AND om.user_id=sa.owner_user_id AND om.status='active'
+       JOIN users ou ON ou.id=sa.owner_user_id AND ou.disabled_at IS NULL
       WHERE k.prefix=$1 AND k.revoked_at IS NULL AND (k.expires_at IS NULL OR k.expires_at > now())
         AND sa.disabled_at IS NULL AND (sa.expires_at IS NULL OR sa.expires_at > now())`, [prefix]);
   const presented = keyHash(key);
@@ -267,6 +289,9 @@ export async function authenticateApiKey(authorization: string | null | undefine
 export async function serviceAccountCtx(p: { serviceAccountId: string; workspaceId: string; name?: string; keyId?: string }, correlationId: string = randomUUID(), db: Queryable = getPool()): Promise<Ctx> {
   const authz = await loadServiceAccountAuthz(p.serviceAccountId, p.workspaceId, db);
   if (authz.subject.status !== 'active') throw new AppError('unauthenticated', 'Invalid or revoked API key');
+  const owner = await maybeOne(db, `SELECT 1 FROM service_accounts sa JOIN memberships m ON m.workspace_id=sa.workspace_id AND m.user_id=sa.owner_user_id AND m.status='active'
+      JOIN users u ON u.id=sa.owner_user_id AND u.disabled_at IS NULL WHERE sa.id=$1 AND sa.workspace_id=$2`, [p.serviceAccountId, p.workspaceId]);
+  if (!owner) throw new AppError('unauthenticated', 'This service account’s owner is no longer active');
   return {
     actor: { userId: '', email: `service-account:${p.serviceAccountId}`, name: p.name ?? 'Service account', sessionId: p.keyId ? `api-key:${p.keyId}` : 'service-account' },
     access: { workspaceId: p.workspaceId, role: 'viewer', brandIds: brandsVisible(authz), isDemo: false, authz },

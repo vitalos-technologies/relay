@@ -17,7 +17,7 @@ import {
 interface Credential { id: string; type: string; label: string | null; created_at: string | null }
 interface SessionView { id: string; current: boolean; created_at: string; last_seen_at: string; expires_at: string; user_agent: string | null; mfa_verified: boolean; acr: string | null; amr: string[]; auth_time: string | null }
 interface Overview {
-  assurance: { mfa_verified: boolean; acr: string | null; amr: string[]; auth_time: string | null; fresh_until: string | null };
+  assurance: { mfa_verified: boolean; acr: string | null; amr: string[]; auth_time: string | null; fresh_until: string | null; fresh: boolean };
   mfa_required: boolean;
   factors: { available: boolean; totp: Credential[]; passkeys: Credential[]; recovery_codes: Credential | null };
   sessions: SessionView[];
@@ -38,6 +38,7 @@ const EVENT_LABEL: Record<string, string> = {
   'user.login': 'Signed in', 'user.created': 'Account created', 'user.bound': 'Account linked',
   'auth.step_up': 'Verified', 'auth.step_up_cancelled': 'Verification cancelled', 'auth.step_up_subject_mismatch': 'Verification by another account refused',
   'auth.factor_action': 'Sign-in method changed', 'auth.factor_action_started': 'Sign-in method change started', 'auth.factor_action_cancelled': 'Sign-in method change cancelled',
+  'auth.recovery_code_used': 'Recovery code used · other sessions signed out', 'auth.factor_changed_followup': 'Other sessions signed out',
   'session.revoked': 'Session signed out', 'session.revoked_others': 'Other sessions signed out', 'session.signed_out': 'Signed out', 'session.idp_logout': 'Signed out by identity provider',
 };
 const ACTION_LABEL: Record<string, string> = {
@@ -80,6 +81,8 @@ export function SecurityPage() {
 
   const revoke = async (id: string, current: boolean) => {
     await api.del(`/api/security/sessions/${id}`);
+    // Full page load on purpose: this device's session is gone, drop all client state.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     if (current) { window.location.assign('/login'); return; }
     toast.success('Signed out');
     await refetch();
@@ -92,7 +95,6 @@ export function SecurityPage() {
   const f = data.factors;
   const hasFactor = f.totp.length > 0 || f.passkeys.length > 0 || !!f.recovery_codes;
   const a = data.assurance;
-  const fresh = a.fresh_until ? new Date(a.fresh_until).getTime() > Date.now() : false;
 
   return (
     <>
@@ -166,7 +168,7 @@ export function SecurityPage() {
         </Card>
 
         <Card aria-labelledby="ev-h">
-          <CardHeader id="ev-h" title="Recent activity" actions={a.auth_time ? <span className="text-xs text-muted">{fresh ? 'Verified recently' : `Signed in ${fmtRelative(a.auth_time)}`}</span> : null} />
+          <CardHeader id="ev-h" title="Recent activity" actions={a.auth_time ? <span className="text-xs text-muted">{a.fresh ? 'Verified recently' : `Signed in ${fmtRelative(a.auth_time)}`}</span> : null} />
           {data.events.length ? (
             <ul className="divide-y divide-border px-4 pb-2" data-testid="security-events">
               {data.events.slice(0, 12).map((e) => (

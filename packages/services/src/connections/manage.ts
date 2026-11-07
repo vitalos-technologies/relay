@@ -99,7 +99,8 @@ export const telegramConnectSchema = z.object({
 export async function connectTelegram(
   ctx: Ctx, brandId: string, body: unknown, opts: { reconnectConnectionId?: string | null } = {},
 ): Promise<ConnectionJson> {
-  requireAction(ctx, 'connections.manage', 'Only owners and admins can connect accounts.');
+  // Credential change: verified MFA AND a fresh verification (step-up window).
+  requireAction(ctx, 'connections.manage', { stepUp: true, message: 'Only owners and admins can connect accounts.' });
   await assertBrand(ctx, brandId);
   const input = telegramConnectSchema.parse(body);
   let dest;
@@ -143,7 +144,8 @@ function assertMockEnabled(): void {
 }
 
 export async function connectMock(ctx: Ctx, brandId: string, body: unknown): Promise<ConnectionJson> {
-  requireAction(ctx, 'connections.manage', 'Only owners and admins can connect accounts.');
+  // Credential change: verified MFA AND a fresh verification (step-up window).
+  requireAction(ctx, 'connections.manage', { stepUp: true, message: 'Only owners and admins can connect accounts.' });
   assertMockEnabled();
   await assertBrand(ctx, brandId);
   const input = mockConnectSchema.parse(body);
@@ -313,7 +315,8 @@ export async function setConnectionPaused(ctx: Ctx, id: string, body: unknown): 
 
 /** AC-05: stop dispatch, block queued work, delete the credential immediately (spec §14). */
 export async function disconnectConnection(ctx: Ctx, id: string): Promise<{ connection: ConnectionJson; blocked_deliveries: number }> {
-  requireAction(ctx, 'connections.manage', 'Only owners and admins can disconnect accounts.');
+  // Credential change: verified MFA AND a fresh verification (step-up window).
+  requireAction(ctx, 'connections.manage', { stepUp: true, message: 'Only owners and admins can disconnect accounts.' });
   // X: revoke the grant at the provider first (network call outside the transaction, best effort).
   let revoked: boolean | null = null;
   const pre = await loadConnection(ctx, id);
@@ -347,7 +350,8 @@ export const reconnectSchema = z.object({ bot_token: z.string().trim().min(1).ma
  * simulated => fresh token.
  */
 export async function reconnectConnection(ctx: Ctx, id: string, body: unknown): Promise<ConnectionJson | { authorization_url: string }> {
-  requireAction(ctx, 'connections.manage', 'Only owners and admins can reconnect accounts.');
+  // Credential change: verified MFA AND a fresh verification (step-up window).
+  requireAction(ctx, 'connections.manage', { stepUp: true, message: 'Only owners and admins can reconnect accounts.' });
   const input = reconnectSchema.parse(body ?? {});
   const c = await loadConnection(ctx, id);
   if (c.is_mock) return reconnectMock(ctx, c);

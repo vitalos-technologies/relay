@@ -1,0 +1,1658 @@
+{
+  "config": {
+    "argv": [
+      "/opt/node22/bin/node",
+      "/home/user/social-lite/node_modules/@playwright/test/cli.js",
+      "test",
+      "--trace",
+      "off",
+      "--reporter=list,json"
+    ],
+    "configFile": "/home/user/social-lite/playwright.config.ts",
+    "rootDir": "/home/user/social-lite/tests/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/home/user/social-lite/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "desktop",
+        "name": "desktop",
+        "testDir": "/home/user/social-lite/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "/home/user/social-lite/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "mobile",
+        "name": "mobile",
+        "testDir": "/home/user/social-lite/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 90000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list"
+      ],
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.63.0",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "publishing.spec.ts",
+      "file": "publishing.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "owner publishing journey",
+          "file": "publishing.spec.ts",
+          "line": 5,
+          "column": 6,
+          "specs": [
+            {
+              "title": "sign in, compose, publish to four simulated destinations, see honest results",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 88999,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 1\u001b[39m\n\n\u001b[2m  Array [\u001b[22m\n\u001b[32m-   \"published\",\u001b[39m\n\u001b[31m+   \"failed\",\u001b[39m\n\u001b[2m    \"published\",\u001b[22m\n\u001b[2m    \"published\",\u001b[22m\n\u001b[2m    \"published\",\u001b[22m\n\u001b[2m  ]\u001b[22m\n\nCall Log:\n- Test timeout of 90000ms exceeded",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 1\u001b[39m\n\n\u001b[2m  Array [\u001b[22m\n\u001b[32m-   \"published\",\u001b[39m\n\u001b[31m+   \"failed\",\u001b[39m\n\u001b[2m    \"published\",\u001b[22m\n\u001b[2m    \"published\",\u001b[22m\n\u001b[2m    \"published\",\u001b[22m\n\u001b[2m  ]\u001b[22m\n\nCall Log:\n- Test timeout of 90000ms exceeded\n    at /home/user/social-lite/tests/e2e/publishing.spec.ts:34:8",
+                        "location": {
+                          "file": "/home/user/social-lite/tests/e2e/publishing.spec.ts",
+                          "column": 8,
+                          "line": 34
+                        },
+                        "snippet": "  32 |     await page.goto(`/posts/${post.id}`);\n  33 |     await expect.poll(async () => (await a.get(`/api/posts/${post.id}/deliveries`)).body.items.map((d: any) => d.state).sort(), { timeout: 45_000 })\n> 34 |       .toEqual(['published', 'published', 'published', 'published']);\n     |        ^\n  35 |     await page.reload();\n  36 |     await expect(page.getByText(/Simulated/).first()).toBeVisible();\n  37 |     await expect(page.getByText(/^Published$/)).toHaveCount(0); // simulated results are never labelled Published"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/user/social-lite/tests/e2e/publishing.spec.ts",
+                            "column": 8,
+                            "line": 34
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 1\u001b[39m\n\n\u001b[2m  Array [\u001b[22m\n\u001b[32m-   \"published\",\u001b[39m\n\u001b[31m+   \"failed\",\u001b[39m\n\u001b[2m    \"published\",\u001b[22m\n\u001b[2m    \"published\",\u001b[22m\n\u001b[2m    \"published\",\u001b[22m\n\u001b[2m  ]\u001b[22m\n\nCall Log:\n- Test timeout of 90000ms exceeded\n\n  32 |     await page.goto(`/posts/${post.id}`);\n  33 |     await expect.poll(async () => (await a.get(`/api/posts/${post.id}/deliveries`)).body.items.map((d: any) => d.state).sort(), { timeout: 45_000 })\n> 34 |       .toEqual(['published', 'published', 'published', 'published']);\n     |        ^\n  35 |     await page.reload();\n  36 |     await expect(page.getByText(/Simulated/).first()).toBeVisible();\n  37 |     await expect(page.getByText(/^Published$/)).toHaveCount(0); // simulated results are never labelled Published\n    at /home/user/social-lite/tests/e2e/publishing.spec.ts:34:8"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T05:41:31.523Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/home/user/social-lite/test-results/publishing-owner-publishin-3aab2-inations-see-honest-results-desktop/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/home/user/social-lite/test-results/publishing-owner-publishin-3aab2-inations-see-honest-results-desktop/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/home/user/social-lite/tests/e2e/publishing.spec.ts",
+                        "column": 8,
+                        "line": 34
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "7670597a110c90863cfc-4da78324d3ced0db2e87",
+              "file": "publishing.spec.ts",
+              "line": 6,
+              "column": 7
+            },
+            {
+              "title": "partial failure: retry only the failed destination",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 28870,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T05:43:01.108Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7670597a110c90863cfc-6093bdcb0170f1da03e1",
+              "file": "publishing.spec.ts",
+              "line": 41,
+              "column": 7
+            },
+            {
+              "title": "Instagram text-only is rejected before scheduling",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 6737,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoMatch\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected pattern: \u001b[32m/^Instagram: an image is required/\u001b[39m\nReceived string:  \u001b[31m\"Instagram: an image or video is required. Add an image or video or remove this destination.\"\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoMatch\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected pattern: \u001b[32m/^Instagram: an image is required/\u001b[39m\nReceived string:  \u001b[31m\"Instagram: an image or video is required. Add an image or video or remove this destination.\"\u001b[39m\n    at /home/user/social-lite/tests/e2e/publishing.spec.ts:80:52",
+                        "location": {
+                          "file": "/home/user/social-lite/tests/e2e/publishing.spec.ts",
+                          "column": 52,
+                          "line": 80
+                        },
+                        "snippet": "  78 |     const r = await a.send('POST', `/api/posts/${p.id}/publish`, { expected_version: p.version, connection_ids: [ig.id] });\n  79 |     expect(r.status).toBe(422);\n> 80 |     expect(r.body.error.details.issues[0].message).toMatch(/^Instagram: an image is required/);\n     |                                                    ^\n  81 |   });\n  82 | });\n  83 |"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/user/social-lite/tests/e2e/publishing.spec.ts",
+                            "column": 52,
+                            "line": 80
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoMatch\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected pattern: \u001b[32m/^Instagram: an image is required/\u001b[39m\nReceived string:  \u001b[31m\"Instagram: an image or video is required. Add an image or video or remove this destination.\"\u001b[39m\n\n  78 |     const r = await a.send('POST', `/api/posts/${p.id}/publish`, { expected_version: p.version, connection_ids: [ig.id] });\n  79 |     expect(r.status).toBe(422);\n> 80 |     expect(r.body.error.details.issues[0].message).toMatch(/^Instagram: an image is required/);\n     |                                                    ^\n  81 |   });\n  82 | });\n  83 |\n    at /home/user/social-lite/tests/e2e/publishing.spec.ts:80:52"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T05:43:30.086Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/home/user/social-lite/test-results/publishing-owner-publishin-dbdee--rejected-before-scheduling-desktop/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/home/user/social-lite/test-results/publishing-owner-publishin-dbdee--rejected-before-scheduling-desktop/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/home/user/social-lite/tests/e2e/publishing.spec.ts",
+                        "column": 52,
+                        "line": 80
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "7670597a110c90863cfc-7fc1a4087dcfe79dd35d",
+              "file": "publishing.spec.ts",
+              "line": 72,
+              "column": 7
+            }
+          ]
+        },
+        {
+          "title": "security",
+          "file": "publishing.spec.ts",
+          "line": 84,
+          "column": 6,
+          "specs": [
+            {
+              "title": "mutations without the CSRF token are refused",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 29466,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T05:43:37.463Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7670597a110c90863cfc-7354617e91295d6706d6",
+              "file": "publishing.spec.ts",
+              "line": 85,
+              "column": 7
+            },
+            {
+              "title": "a user from another workspace cannot read demo posts",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 37128,
+                      "error": {
+                        "message": "Error: apiRequestContext.get: socket hang up\nCall log:\n\u001b[2m  - → GET http://localhost:3000/api/brands/d770ec5c-9d75-4ded-b733-74cdc4bd903f/assets\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - cookie: sl_session=kqtFdzNo8aK23PzlgLC70POVIC1DP2DL_LAv7beuRwg\u001b[22m\n",
+                        "stack": "Error: apiRequestContext.get: socket hang up\nCall log:\n\u001b[2m  - → GET http://localhost:3000/api/brands/d770ec5c-9d75-4ded-b733-74cdc4bd903f/assets\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - cookie: sl_session=kqtFdzNo8aK23PzlgLC70POVIC1DP2DL_LAv7beuRwg\u001b[22m\n\n    at Object.get (/home/user/social-lite/tests/e2e/helpers.ts:92:52)\n    at /home/user/social-lite/tests/e2e/publishing.spec.ts:103:21",
+                        "location": {
+                          "file": "/home/user/social-lite/tests/e2e/helpers.ts",
+                          "column": 52,
+                          "line": 92
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39mhelpers.ts:92\n\n  90 |   const origin = new URL(page.url()).origin;\n  91 |   return {\n> 92 |     async get(path) { const r = await page.request.get(path); return { status: r.status(), body: await r.json().catch(() => null) }; },\n     |                                                    ^\n  93 |     async send(method, path, body, opts = {}) {\n  94 |       const headers: Record<string, string> = { 'content-type': 'application/json', origin };\n  95 |       if (opts.csrf !== false) headers['x-csrf-token'] = csrf;"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/user/social-lite/tests/e2e/helpers.ts",
+                            "column": 52,
+                            "line": 92
+                          },
+                          "message": "Error: apiRequestContext.get: socket hang up\nCall log:\n\u001b[2m  - → GET http://localhost:3000/api/brands/d770ec5c-9d75-4ded-b733-74cdc4bd903f/assets\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - cookie: sl_session=kqtFdzNo8aK23PzlgLC70POVIC1DP2DL_LAv7beuRwg\u001b[22m\n\n\n   at helpers.ts:92\n\n  90 |   const origin = new URL(page.url()).origin;\n  91 |   return {\n> 92 |     async get(path) { const r = await page.request.get(path); return { status: r.status(), body: await r.json().catch(() => null) }; },\n     |                                                    ^\n  93 |     async send(method, path, body, opts = {}) {\n  94 |       const headers: Record<string, string> = { 'content-type': 'application/json', origin };\n  95 |       if (opts.csrf !== false) headers['x-csrf-token'] = csrf;\n    at Object.get (/home/user/social-lite/tests/e2e/helpers.ts:92:52)\n    at /home/user/social-lite/tests/e2e/publishing.spec.ts:103:21"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T05:44:07.057Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/home/user/social-lite/test-results/publishing-security-a-user-496fd-pace-cannot-read-demo-posts-desktop/test-failed-1.png"
+                        },
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/home/user/social-lite/test-results/publishing-security-a-user-496fd-pace-cannot-read-demo-posts-desktop/test-failed-2.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/home/user/social-lite/test-results/publishing-security-a-user-496fd-pace-cannot-read-demo-posts-desktop/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/home/user/social-lite/tests/e2e/helpers.ts",
+                        "column": 52,
+                        "line": 92
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "7670597a110c90863cfc-6bf8f362cdccbb4ba687",
+              "file": "publishing.spec.ts",
+              "line": 93,
+              "column": 7
+            },
+            {
+              "title": "viewer can read but cannot create or publish",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 53362,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T05:44:44.834Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7670597a110c90863cfc-18b7365fea429fd8d0a6",
+              "file": "publishing.spec.ts",
+              "line": 108,
+              "column": 7
+            },
+            {
+              "title": "signed-out users are sent to sign in",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 11750,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T05:45:38.316Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7670597a110c90863cfc-f7c042d035e4dd962404",
+              "file": "publishing.spec.ts",
+              "line": 118,
+              "column": 7
+            }
+          ]
+        },
+        {
+          "title": "screens",
+          "file": "publishing.spec.ts",
+          "line": 126,
+          "column": 6,
+          "specs": [
+            {
+              "title": "/ renders without errors @mobile",
+              "ok": true,
+              "tags": [
+                "mobile"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 11776,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T05:45:50.081Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7670597a110c90863cfc-5eb90650a688c5ed0b3d",
+              "file": "publishing.spec.ts",
+              "line": 128,
+              "column": 9
+            },
+            {
+              "title": "/planner renders without errors @mobile",
+              "ok": true,
+              "tags": [
+                "mobile"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 20120,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T05:46:01.867Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7670597a110c90863cfc-3b4c228bb1aad9cc247f",
+              "file": "publishing.spec.ts",
+              "line": 128,
+              "column": 9
+            },
+            {
+              "title": "/compose renders without errors @mobile",
+              "ok": true,
+              "tags": [
+                "mobile"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 26464,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T05:46:22.011Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7670597a110c90863cfc-26989a07240dd95e7288",
+              "file": "publishing.spec.ts",
+              "line": 128,
+              "column": 9
+            },
+            {
+              "title": "/approvals renders without errors @mobile",
+              "ok": true,
+              "tags": [
+                "mobile"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 19784,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T05:46:48.491Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7670597a110c90863cfc-3fc9ef39c371ee621fa3",
+              "file": "publishing.spec.ts",
+              "line": 128,
+              "column": 9
+            },
+            {
+              "title": "/library renders without errors @mobile",
+              "ok": false,
+              "tags": [
+                "mobile"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 100034,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 90000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 90000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 90000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "/home/user/social-lite/tests/e2e/publishing.spec.ts",
+                            "column": 18,
+                            "line": 132
+                          },
+                          "message": "Error: page.goto: net::ERR_ABORTED; maybe frame was detached?\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/library\", waiting until \"load\"\u001b[22m\n\n\n  130 |       page.on('pageerror', (e) => errors.push(e.message));\n  131 |       await signIn(page, 'owner@demo.social-lite.test');\n> 132 |       await page.goto(path);\n      |                  ^\n  133 |       await page.waitForLoadState('networkidle');\n  134 |       expect(errors).toEqual([]);\n  135 |       const overflow = await page.evaluate<number>('document.documentElement.scrollWidth - document.documentElement.clientWidth');\n    at /home/user/social-lite/tests/e2e/publishing.spec.ts:132:18"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T05:47:08.303Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/home/user/social-lite/test-results/publishing-screens-library-renders-without-errors-mobile-desktop/error-context.md"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "7670597a110c90863cfc-a6ae082618959ee55d84",
+              "file": "publishing.spec.ts",
+              "line": 128,
+              "column": 9
+            },
+            {
+              "title": "/history renders without errors @mobile",
+              "ok": true,
+              "tags": [
+                "mobile"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 37995,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T05:48:48.929Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7670597a110c90863cfc-66a8f1b11089992b230e",
+              "file": "publishing.spec.ts",
+              "line": 128,
+              "column": 9
+            },
+            {
+              "title": "/accounts renders without errors @mobile",
+              "ok": true,
+              "tags": [
+                "mobile"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 20420,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T05:49:27.079Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7670597a110c90863cfc-335574dd3456672e5208",
+              "file": "publishing.spec.ts",
+              "line": 128,
+              "column": 9
+            },
+            {
+              "title": "/settings renders without errors @mobile",
+              "ok": true,
+              "tags": [
+                "mobile"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 54208,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T05:49:47.514Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7670597a110c90863cfc-5ad0eebf24d2e0674e44",
+              "file": "publishing.spec.ts",
+              "line": 128,
+              "column": 9
+            },
+            {
+              "title": "/operations renders without errors @mobile",
+              "ok": true,
+              "tags": [
+                "mobile"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 18795,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T05:50:41.736Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7670597a110c90863cfc-ab5ea07a92a84f3a9c7d",
+              "file": "publishing.spec.ts",
+              "line": 128,
+              "column": 9
+            },
+            {
+              "title": "keyboard: skip to content and visible focus",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 17719,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T05:51:00.542Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7670597a110c90863cfc-c813fb0ece5c8b91c149",
+              "file": "publishing.spec.ts",
+              "line": 141,
+              "column": 7
+            },
+            {
+              "title": "/ renders without errors @mobile",
+              "ok": true,
+              "tags": [
+                "mobile"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "mobile",
+                  "projectName": "mobile",
+                  "results": [
+                    {
+                      "workerIndex": 6,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 12773,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T06:01:03.137Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7670597a110c90863cfc-8d89979ac95098f040a9",
+              "file": "publishing.spec.ts",
+              "line": 128,
+              "column": 9
+            },
+            {
+              "title": "/planner renders without errors @mobile",
+              "ok": true,
+              "tags": [
+                "mobile"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "mobile",
+                  "projectName": "mobile",
+                  "results": [
+                    {
+                      "workerIndex": 6,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 27608,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T06:01:16.032Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7670597a110c90863cfc-e231d4625536190080f1",
+              "file": "publishing.spec.ts",
+              "line": 128,
+              "column": 9
+            },
+            {
+              "title": "/compose renders without errors @mobile",
+              "ok": true,
+              "tags": [
+                "mobile"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "mobile",
+                  "projectName": "mobile",
+                  "results": [
+                    {
+                      "workerIndex": 6,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 29642,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T06:01:43.651Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7670597a110c90863cfc-60bc32040defbaa505ed",
+              "file": "publishing.spec.ts",
+              "line": 128,
+              "column": 9
+            },
+            {
+              "title": "/approvals renders without errors @mobile",
+              "ok": true,
+              "tags": [
+                "mobile"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "mobile",
+                  "projectName": "mobile",
+                  "results": [
+                    {
+                      "workerIndex": 6,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 25915,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T06:02:13.302Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7670597a110c90863cfc-ee693c605aba382b4f21",
+              "file": "publishing.spec.ts",
+              "line": 128,
+              "column": 9
+            },
+            {
+              "title": "/library renders without errors @mobile",
+              "ok": true,
+              "tags": [
+                "mobile"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "mobile",
+                  "projectName": "mobile",
+                  "results": [
+                    {
+                      "workerIndex": 6,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 33490,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T06:02:39.228Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7670597a110c90863cfc-d734120bbac45580d8fc",
+              "file": "publishing.spec.ts",
+              "line": 128,
+              "column": 9
+            },
+            {
+              "title": "/history renders without errors @mobile",
+              "ok": true,
+              "tags": [
+                "mobile"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "mobile",
+                  "projectName": "mobile",
+                  "results": [
+                    {
+                      "workerIndex": 6,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 29695,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T06:03:12.731Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7670597a110c90863cfc-cc1638030ef98734a40f",
+              "file": "publishing.spec.ts",
+              "line": 128,
+              "column": 9
+            },
+            {
+              "title": "/accounts renders without errors @mobile",
+              "ok": true,
+              "tags": [
+                "mobile"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "mobile",
+                  "projectName": "mobile",
+                  "results": [
+                    {
+                      "workerIndex": 6,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 31024,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T06:03:42.436Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7670597a110c90863cfc-e6a14741c2dc70d2808b",
+              "file": "publishing.spec.ts",
+              "line": 128,
+              "column": 9
+            },
+            {
+              "title": "/settings renders without errors @mobile",
+              "ok": true,
+              "tags": [
+                "mobile"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "mobile",
+                  "projectName": "mobile",
+                  "results": [
+                    {
+                      "workerIndex": 6,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 25036,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T06:04:13.473Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7670597a110c90863cfc-cf452720663785f53e37",
+              "file": "publishing.spec.ts",
+              "line": 128,
+              "column": 9
+            },
+            {
+              "title": "/operations renders without errors @mobile",
+              "ok": true,
+              "tags": [
+                "mobile"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "mobile",
+                  "projectName": "mobile",
+                  "results": [
+                    {
+                      "workerIndex": 6,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 34839,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T06:04:38.521Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7670597a110c90863cfc-3182f2cba9569fbd880f",
+              "file": "publishing.spec.ts",
+              "line": 128,
+              "column": 9
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "security.spec.ts",
+      "file": "security.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "identity & security (Keycloak)",
+          "file": "security.spec.ts",
+          "line": 61,
+          "column": 6,
+          "specs": [
+            {
+              "title": "owner signs in with password + TOTP; My Security shows two-step; CSP enforced without violations",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 240000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 29434,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T05:51:18.290Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "a7e9410bcc1ef00e9656-a00bbe41caf612b120e5",
+              "file": "security.spec.ts",
+              "line": 62,
+              "column": 7
+            },
+            {
+              "title": "CSP + security headers: theme boot script, composer and a presigned media upload work with no violations; sign-out",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 300000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 80165,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T05:51:47.736Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "a7e9410bcc1ef00e9656-732d72edd0fae85bcab9",
+              "file": "security.spec.ts",
+              "line": 82,
+              "column": 7
+            },
+            {
+              "title": "step-up re-authenticates at Keycloak (password + TOTP) and returns verified",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 240000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 24596,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T05:53:07.915Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "a7e9410bcc1ef00e9656-105686aa8959549b2bd6",
+              "file": "security.spec.ts",
+              "line": 136,
+              "column": 7
+            },
+            {
+              "title": "a user enrols TOTP, generates recovery codes (step-up), signs in with one, cannot reuse it, then removes factors",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 300000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 119825,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T05:53:32.536Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "a7e9410bcc1ef00e9656-27ab9d03bb7c548bc71b",
+              "file": "security.spec.ts",
+              "line": 150,
+              "column": 7
+            },
+            {
+              "title": "revoking another session signs it out on its next request",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 240000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 60377,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T05:55:32.381Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "a7e9410bcc1ef00e9656-053181e5c485aaf07bb0",
+              "file": "security.spec.ts",
+              "line": 236,
+              "column": 7
+            },
+            {
+              "title": "back-channel logout from Keycloak revokes the app session",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 240000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 20034,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T05:56:32.769Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "a7e9410bcc1ef00e9656-6b7335a7b1ff2b6ee4b9",
+              "file": "security.spec.ts",
+              "line": 255,
+              "column": 7
+            },
+            {
+              "title": "service account: key shown once, creates drafts on its brand only, never publishes, revoked key fails at once",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 300000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 77552,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T05:56:52.817Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "a7e9410bcc1ef00e9656-fefff6890081f82f0464",
+              "file": "security.spec.ts",
+              "line": 268,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "v2-product.spec.ts",
+      "file": "v2-product.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "V2 product & fairness",
+          "file": "v2-product.spec.ts",
+          "line": 40,
+          "column": 6,
+          "specs": [
+            {
+              "title": "account health centre explains problems, fixes and affected posts",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 38815,
+                      "error": {
+                        "message": "Error: page.waitForURL: net::ERR_CONNECTION_REFUSED\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================",
+                        "stack": "Error: page.waitForURL: net::ERR_CONNECTION_REFUSED\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================\n    at /home/user/social-lite/tests/e2e/v2-product.spec.ts:55:16",
+                        "location": {
+                          "file": "/home/user/social-lite/tests/e2e/v2-product.spec.ts",
+                          "column": 16,
+                          "line": 55
+                        },
+                        "snippet": "  53 |     await page.goto('/accounts');\n  54 |     await page.getByRole('link', { name: 'Health' }).click();\n> 55 |     await page.waitForURL(/\\/accounts\\/health/);\n     |                ^\n  56 |     const card = page.getByTestId(`health-${fb}`);\n  57 |     await expect(card).toContainText('Missing permission');\n  58 |     await expect(card).toContainText('1 upcoming post affected');"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/user/social-lite/tests/e2e/v2-product.spec.ts",
+                            "column": 16,
+                            "line": 55
+                          },
+                          "message": "Error: page.waitForURL: net::ERR_CONNECTION_REFUSED\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================\n\n  53 |     await page.goto('/accounts');\n  54 |     await page.getByRole('link', { name: 'Health' }).click();\n> 55 |     await page.waitForURL(/\\/accounts\\/health/);\n     |                ^\n  56 |     const card = page.getByTestId(`health-${fb}`);\n  57 |     await expect(card).toContainText('Missing permission');\n  58 |     await expect(card).toContainText('1 upcoming post affected');\n    at /home/user/social-lite/tests/e2e/v2-product.spec.ts:55:16"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T05:58:10.388Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/home/user/social-lite/test-results/v2-product-V2-product-fair-125c6-ms-fixes-and-affected-posts-desktop/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/home/user/social-lite/test-results/v2-product-V2-product-fair-125c6-ms-fixes-and-affected-posts-desktop/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/home/user/social-lite/tests/e2e/v2-product.spec.ts",
+                        "column": 16,
+                        "line": 55
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "a1222c92ae06b6722553-6fcc2764c0c8d794d08f",
+              "file": "v2-product.spec.ts",
+              "line": 41,
+              "column": 7
+            },
+            {
+              "title": "readiness preflight with a duplicate warning that must be acknowledged",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 74925,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T05:58:49.662Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "a1222c92ae06b6722553-ce15126efde60cc17eb9",
+              "file": "v2-product.spec.ts",
+              "line": 66,
+              "column": 7
+            },
+            {
+              "title": "activity centre filters and exports (CSV), budgets and client handover",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 45544,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T06:00:04.713Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "a1222c92ae06b6722553-1519342c548bdf761f4b",
+              "file": "v2-product.spec.ts",
+              "line": 92,
+              "column": 7
+            },
+            {
+              "title": "viewer: no activity centre, health is read-only @mobile",
+              "ok": true,
+              "tags": [
+                "mobile"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 12336,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T06:00:50.276Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "a1222c92ae06b6722553-6db2a0e3727ce40df6a1",
+              "file": "v2-product.spec.ts",
+              "line": 117,
+              "column": 7
+            },
+            {
+              "title": "viewer: no activity centre, health is read-only @mobile",
+              "ok": true,
+              "tags": [
+                "mobile"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "mobile",
+                  "projectName": "mobile",
+                  "results": [
+                    {
+                      "workerIndex": 6,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 21198,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-07T06:05:13.380Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "a1222c92ae06b6722553-d05ca5568e2090f23728",
+              "file": "v2-product.spec.ts",
+              "line": 117,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-11-07T05:41:30.863Z",
+    "duration": 1443806.9859999998,
+    "expected": 33,
+    "skipped": 0,
+    "unexpected": 5,
+    "flaky": 0
+  }
+}

@@ -48,9 +48,13 @@ async function kcUntil(page: Page, email: string, key: Buffer | undefined, targe
   await ui(target.first()).toBeVisible();
 }
 
+/** Collects CSP violations raised by OUR pages (Keycloak's own pages are a different origin with their own policy). */
 function trackCspViolations(page: Page): string[] {
   const v: string[] = [];
-  page.on('console', (m) => { if (/Content Security Policy|Refused to (load|execute|connect|apply)/i.test(m.text())) v.push(m.text()); });
+  const ours = () => new URL(page.url()).port === '3000';
+  void page.addInitScript({ content: "document.addEventListener('securitypolicyviolation', (e) => console.error('CSP violation: ' + e.violatedDirective + ' ' + e.blockedURI));" });
+  page.on('console', (m) => { if (ours() && /CSP violation|Content Security Policy|Refused to (load|execute|connect|apply|frame)/i.test(m.text())) v.push(m.text()); });
+  page.on('pageerror', (e) => { if (/Content Security Policy/i.test(e.message)) v.push(e.message); });
   return v;
 }
 
@@ -72,6 +76,60 @@ test.describe('identity & security (Keycloak)', () => {
     const s = await (await api(page)).get('/api/security');
     expect(s.body.assurance).toMatchObject({ mfa_verified: true, acr: 'mfa' });
     expect(s.body.assurance.amr).toEqual(expect.arrayContaining(['pwd', 'otp']));
+    expect(violations).toEqual([]);
+  });
+
+  test('CSP + security headers: theme boot script, composer and a presigned media upload work with no violations; sign-out', async ({ page }) => {
+    test.setTimeout(300_000);
+    const violations = trackCspViolations(page);
+    await signIn(page, 'owner@demo.social-lite.test');
+
+    // Headers on an HTML page and on an API response.
+    const res = await page.goto('/compose');
+    const h = res!.headers();
+    const csp = h['content-security-policy'] ?? '';
+    for (const d of ["default-src 'self'", "frame-ancestors 'none'", "object-src 'none'", "base-uri 'self'", "form-action 'self'"]) expect(csp).toContain(d);
+    expect(csp).toMatch(/connect-src 'self' [^;]*http:\/\/localhost:8333/); // presigned POST uploads go straight to object storage
+    expect(csp).not.toMatch(/script-src[^;]*'unsafe-inline'/);
+    expect(h['x-frame-options']).toBe('DENY');
+    expect(h['x-content-type-options']).toBe('nosniff');
+    expect(h['referrer-policy']).toBe('strict-origin-when-cross-origin');
+    expect(h['permissions-policy']).toContain('camera=()');
+    expect(h['strict-transport-security']).toBeUndefined(); // local http: HSTS only in production (unit-tested)
+    const apiRes = await page.request.get('/api/session');
+    expect(apiRes.headers()['content-security-policy']).toContain("default-src 'none'");
+
+    // The nonce'd inline theme boot script still runs before paint.
+    await page.evaluate(() => localStorage.setItem('sl-theme', 'dark'));
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await page.evaluate(() => localStorage.removeItem('sl-theme'));
+
+    // Composer: new draft, write text, upload an image through upload-intent → presigned POST → validation, attach it.
+    await page.getByRole('button', { name: 'Create draft' }).click();
+    await page.waitForURL(/\/posts\/[0-9a-f-]{36}/, { timeout: 60_000 });
+    await ui(page.getByPlaceholder('Write your post…')).toBeVisible();
+    await page.getByPlaceholder('Write your post…').fill(`CSP check ${Date.now()}`);
+    await page.getByRole('group', { name: 'Base media' }).getByRole('button', { name: 'Add' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Add media' });
+    await dialog.getByRole('tab', { name: 'Upload' }).click();
+    const png = await page.screenshot({ clip: { x: 0, y: 0, width: 1080, height: 1080 } });
+    await dialog.locator('input[type=file][accept*="image/png"]').setInputFiles({ name: `csp-upload-${Date.now()}.png`, mimeType: 'image/png', buffer: png });
+    await ui(dialog.getByLabel('Uploads').getByText('Ready')).toBeVisible({ timeout: 90_000 });
+    await dialog.getByRole('button', { name: 'Add', exact: true }).last().click();
+    const thumb = page.getByRole('group', { name: 'Base media' }).locator('img').first();
+    await ui(thumb).toBeVisible();
+    // The preview loads from the storage origin (img-src).
+    await expect.poll(() => thumb.evaluate((el) => { const i = el as unknown as { complete: boolean; naturalWidth: number }; return i.complete && i.naturalWidth > 0; })).toBe(true);
+    await page.screenshot({ path: 'evidence/v2/security-csp-composer-upload.png', fullPage: true });
+    const postId = /\/posts\/([0-9a-f-]{36})/.exec(page.url())![1]!;
+    expect((await (await api(page)).send('POST', `/api/posts/${postId}/archive`, {})).status).toBeLessThan(300); // tidy up the demo data
+
+    // Sign out (RP-initiated logout at Keycloak, back to /login) under the same policy.
+    await page.getByRole('button', { name: /Account menu/ }).first().click();
+    await page.getByRole('menuitem', { name: 'Sign out' }).click();
+    await page.waitForURL(/\/login/, { timeout: 60_000 });
+    expect((await page.request.get('/api/session')).status()).toBe(401);
     expect(violations).toEqual([]);
   });
 
@@ -144,15 +202,24 @@ test.describe('identity & security (Keycloak)', () => {
       await p.locator('#kc-login, [type=submit]').first().click();
       return { ctx, p };
     };
+    const alerts = async () => {
+      const r = await fetch(`http://localhost:8025/api/v1/search?query=${encodeURIComponent(`to:"${email}" subject:"recovery code"`)}`);
+      return ((await r.json()) as { messages_count?: number }).messages_count ?? 0;
+    };
+    const alertsBefore = await alerts();
     const first = await useRecovery(codes[0]!);
     await first.p.waitForURL((u) => u.port === '3000', { timeout: 30_000 });
     const s1 = (await (await api(first.p)).get('/api/security')).body.assurance;
     expect(s1.mfa_verified).toBe(true);
     expect(s1.amr).toContain('rc');
     await first.ctx.close();
+    // Recovery-code sign-in revokes the user's other sessions (this page) and emails them.
+    expect((await page.request.get('/api/session')).status()).toBe(401);
+    await expect.poll(alerts, { timeout: 15_000 }).toBeGreaterThan(alertsBefore);
+    await signIn(page, email, { totpKey: key });
     // Reusing the same code fails (Keycloak consumes codes in order and atomically).
     const again = await useRecovery(codes[0]!);
-    await ui(again.p.locator('#input-error-recovery-code-input, .kc-feedback-text, [id*=input-error]').first()).toBeVisible();
+    await ui(again.p.getByText(/Invalid recovery authentication code/i).first()).toBeVisible();
     expect(new URL(again.p.url()).port).toBe('5556');
     await again.p.screenshot({ path: 'evidence/v2/security-recovery-code-reuse-refused.png' });
     await again.ctx.close();
@@ -205,6 +272,25 @@ test.describe('identity & security (Keycloak)', () => {
     const r = await fetch(`${REALM_ADMIN}/users/${await kcUserId('approver@demo.social-lite.test')}/logout`, { method: 'POST', headers: { authorization: `Bearer ${t}` } });
     expect(r.status).toBe(204);
     await expect.poll(async () => (await page.request.get('/api/session')).status(), { timeout: 15_000 }).toBe(401);
+  });
+
+  test('Settings → Security: owner tightens and restores the workspace security policy (audited)', async ({ page }) => {
+    test.setTimeout(240_000);
+    await signIn(page, 'owner@demo.social-lite.test');
+    await page.goto('/settings?tab=security');
+    const card = page.getByTestId('security-policy');
+    await ui(card).toBeVisible();
+    const before = (await (await api(page)).get('/api/workspace/security-policy')).body.policy;
+    const everyone = card.getByRole('switch', { name: 'Require two-step for everyone' });
+    await everyone.click();
+    await card.getByTestId('policy-save').click();
+    await ui(page.getByText('Security policy saved')).toBeVisible();
+    expect((await (await api(page)).get('/api/workspace/security-policy')).body.policy.mfa_required_all).toBe(!before.mfa_required_all);
+    await page.screenshot({ path: 'evidence/v2/security-policy-settings.png', fullPage: true });
+    // Restore (weakening if it was turned on: allowed because this sign-in is fresh).
+    await card.getByRole('switch', { name: 'Require two-step for everyone' }).click();
+    await card.getByTestId('policy-save').click();
+    await expect.poll(async () => (await (await api(page)).get('/api/workspace/security-policy')).body.policy.mfa_required_all).toBe(before.mfa_required_all);
   });
 
   test('service account: key shown once, creates drafts on its brand only, never publishes, revoked key fails at once', async ({ page }) => {

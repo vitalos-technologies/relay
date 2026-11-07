@@ -24,6 +24,7 @@ import { idpFactors, type IdpAction } from './idp-admin.js';
 import { jwksResolver, verifyJwt, type Jwk, type KeyResolver } from './jwt.js';
 import { SECOND_FACTOR_AMR, createSession, randomToken, revokeSession, rotateSession, sha256, type SessionAssurance, type SessionRecord } from './session.js';
 import { LoginError, resolveOidcUser } from './users.js';
+import { afterSensitiveAuthEvent } from './security-events.js';
 
 export const LOGIN_STATE_TTL_MS = 10 * 60 * 1000;
 export const LOGIN_BINDING_COOKIE = process.env.APP_ENV === 'production' ? '__Host-sl_login' : 'sl_login';
@@ -295,6 +296,8 @@ export async function completeLogin(
   if (invitation && !invitation.accepted && secret.invite) {
     redirectTo = `/invite/${encodeURIComponent(secret.invite)}?error=${encodeURIComponent(invitation.error ?? 'invitation_invalid')}`;
   }
+  // Signed in with a recovery code: the other sessions go, and the user is told (spec §5 recovery).
+  if (assurance.amr.includes('rc')) await afterSensitiveAuthEvent(db, { userId: user.userId, keepSessionId: session.id, kind: 'recovery_code' });
   let needsSecondFactor = false;
   if (!assurance.mfaVerified) {
     const f = await idpFactors(sub).catch(() => null);
@@ -342,6 +345,12 @@ async function completeSessionUpgrade(
   const { token } = await rotateSession(db, current.id, { ...assurance, idpSessionId: a.sid, idTokenEnc: encryptSecret(idToken, idTokenAad) });
   const action = row.purpose === 'step_up' ? 'auth.step_up' : `auth.factor_action`;
   await audit(db, { ...auditBase, action, diff: { action: row.idp_action, status: actionStatus ?? 'success', acr: a.acr, amr: a.amr, mfa: assurance.mfaVerified } });
+  // A completed factor change, or a verification that used a recovery code: revoke the other sessions + notify.
+  if (row.purpose === 'idp_action' && (actionStatus ?? 'success') === 'success') {
+    await afterSensitiveAuthEvent(db, { userId: current.userId, keepSessionId: current.id, kind: 'factor_change', action: row.idp_action });
+  } else if (a.amr.includes('rc')) {
+    await afterSensitiveAuthEvent(db, { userId: current.userId, keepSessionId: current.id, kind: 'recovery_code' });
+  }
   return { purpose: row.purpose, token, session: { id: current.id }, userId: current.userId, redirectTo: withStatus(redirectTo, actionStatus ?? 'success'), actionStatus: actionStatus ?? 'success' };
 }
 

@@ -19,7 +19,8 @@ export const blueskyConnectSchema = z.object({
 });
 
 export async function connectBluesky(ctx: Ctx, brandId: string, body: unknown, opts: { reconnectConnectionId?: string | null } = {}): Promise<ConnectionJson> {
-  requireAction(ctx, 'connections.manage', 'Only owners and admins can connect accounts.');
+  // Credential change: verified MFA AND a fresh verification (step-up window).
+  requireAction(ctx, 'connections.manage', { stepUp: true, message: 'Only owners and admins can connect accounts.' });
   await assertBrand(ctx, brandId);
   const input = blueskyConnectSchema.parse(body);
   // Self-hosted servers must be allow-listed by the operator first (no user-supplied outbound hosts).

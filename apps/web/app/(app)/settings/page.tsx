@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { BellRing, Bot, Building, CalendarClock, Gauge, OctagonPause, Play, Plug, Plus, Tag, Users } from 'lucide-react';
+import { BellRing, Bot, Building, CalendarClock, Gauge, OctagonPause, Play, Plug, Plus, ShieldCheck, Tag, Users, FolderInput } from 'lucide-react';
 import { useSession } from '@/lib/client/session';
 import { useBrandFilter, useQueryState } from '@/lib/client/hooks';
 import { useApi } from '@/lib/client/use-api';
@@ -16,6 +16,8 @@ import { SlotsSettings } from '@/components/slots/slots-settings';
 import { IntegrationsSettings } from '@/components/integrations/integrations-settings';
 import { BudgetsSettings } from '@/components/integrations/budgets-settings';
 import { ServiceAccountsSettings } from '@/components/settings/service-accounts';
+import { SourceConnectionsSettings } from '@/components/content-hub/source-connections';
+import { SecurityPolicySettings } from '@/components/settings/security-policy';
 import { ApprovalPolicyCard } from '@/components/collab/approval-policy-card';
 import { NotificationPrefs } from '@/components/collab/notification-prefs';
 import { BrandProductSettings } from '@/components/product/brand-product-settings';
@@ -37,6 +39,8 @@ export default function SettingsPage() {
           {can('workspace.settings') ? <TabsTrigger value="budgets"><Gauge aria-hidden className="size-4" /> Budgets</TabsTrigger> : null}
           {can('setup.manage') ? <TabsTrigger value="integrations"><Plug aria-hidden className="size-4" /> Integrations</TabsTrigger> : null}
           {canV2('service_accounts.manage') ? <TabsTrigger value="service-accounts"><Bot aria-hidden className="size-4" /> Service accounts</TabsTrigger> : null}
+          {canV2('connections.read') ? <TabsTrigger value="sources"><FolderInput aria-hidden className="size-4" /> Sources</TabsTrigger> : null}
+          {canV2('security.manage') ? <TabsTrigger value="security"><ShieldCheck aria-hidden className="size-4" /> Security</TabsTrigger> : null}
         </TabsList>
         <TabsContent value="workspace"><WorkspaceTab /></TabsContent>
         <TabsContent value="brand"><BrandTab /></TabsContent>
@@ -46,6 +50,8 @@ export default function SettingsPage() {
         <TabsContent value="budgets"><BudgetsSettings /></TabsContent>
         <TabsContent value="integrations"><IntegrationsSettings /></TabsContent>
         <TabsContent value="service-accounts"><ServiceAccountsSettings /></TabsContent>
+        <TabsContent value="sources"><SourceConnectionsSettings /></TabsContent>
+        <TabsContent value="security"><SecurityPolicySettings /></TabsContent>
       </Tabs>
     </>
   );

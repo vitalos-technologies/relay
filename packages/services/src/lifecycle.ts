@@ -17,6 +17,7 @@ import { authorize, loadUserAuthz } from './authz.js';
 import { actorIsOwner, activeOwnerIds, commitPolicyChange, lockWorkspace, mayDelegate, upsertGrant } from './grants.js';
 import { assertMayActOn, loadMemberRow } from './members.js';
 import { transferAuthorities } from './engine/authority.js';
+import { disableServiceAccountsOwnedBy } from './service-accounts.js';
 import { assertUuid, isUuid, requireAction } from './tenancy.js';
 
 const columnCache = new Map<string, boolean>();
@@ -274,6 +275,8 @@ export async function removeMember(ctx: Ctx, userId: string, opts: { reassign_to
                                      WHERE workspace_id=$1 AND user_id=$2 AND revoked_at IS NULL`, [ws, userId, ctx.actor.userId]);
     const teams = await many<{ team_id: string }>(tx, `DELETE FROM team_memberships WHERE workspace_id=$1 AND user_id=$2 RETURNING team_id`, [ws, userId]);
     await tx.query(`DELETE FROM membership_brand_grants WHERE workspace_id=$1 AND user_id=$2`, [ws, userId]);
+    // Service accounts not reassigned above stop now (disabled + keys revoked + audited); never left ownerless.
+    const serviceAccountsDisabled = await disableServiceAccountsOwnedBy(tx, ctx, userId, 'owner_removed');
     const flagged = await tx.query(
       `UPDATE connections SET verification_requested_at=now(),
               verification_reason='Connected by a member who left this workspace. Check the account still works for this brand, or reconnect it.'
@@ -286,7 +289,7 @@ export async function removeMember(ctx: Ctx, userId: string, opts: { reassign_to
     const pc = await commitPolicyChange(tx, ws, [userId]);
     await audit(tx, { workspaceId: ws, actorUserId: ctx.actor.userId, action: 'member.removed', resourceType: 'member', resourceId: userId,
       diff: { email: m.email, role: m.role, grants_revoked: revoked.rowCount ?? 0, teams: teams.map((t) => t.team_id), drafts: impact.drafts.count,
-        scheduled: impact.scheduled.count, held_publications: pc.held, flagged_connections: flagged.rowCount ?? 0, reassigned, policy_version: pc.policyVersion },
+        scheduled: impact.scheduled.count, held_publications: pc.held, flagged_connections: flagged.rowCount ?? 0, reassigned, service_accounts_disabled: serviceAccountsDisabled, policy_version: pc.policyVersion },
       correlationId: ctx.correlationId });
     return { ok: true as const, impact, reassigned, held_publications: pc.held, flagged_connections: flagged.rowCount ?? 0 };
   });

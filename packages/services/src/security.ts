@@ -13,7 +13,7 @@ import { listUserSessions, revokeOtherSessions, revokeUserSession, type SessionR
 export const DEFAULT_STEP_UP_SECONDS = 300;
 
 export interface SecurityOverview {
-  assurance: { mfa_verified: boolean; acr: string | null; amr: string[]; auth_time: string | null; fresh_until: string | null };
+  assurance: { mfa_verified: boolean; acr: string | null; amr: string[]; auth_time: string | null; fresh_until: string | null; fresh: boolean };
   mfa_required: boolean;
   factors: { available: boolean; totp: IdpFactors['totp']; passkeys: IdpFactors['passkeys']; recovery_codes: IdpFactors['recoveryCodes'] };
   sessions: SessionView[];
@@ -52,6 +52,7 @@ export async function securityOverview(userId: string, session: SessionRecord, d
     assurance: {
       mfa_verified: session.mfaVerified, acr: session.acr, amr: session.amr, auth_time: session.authTime?.toISOString() ?? null,
       fresh_until: session.mfaVerified && session.authTime ? new Date(session.authTime.getTime() + window * 1000).toISOString() : null,
+      fresh: !!session.mfaVerified && !!session.authTime && Date.now() - session.authTime.getTime() <= window * 1000,
     },
     mfa_required: mfaRequired,
     factors: { available: !!factors?.available, totp: factors?.totp ?? [], passkeys: factors?.passkeys ?? [], recovery_codes: factors?.recoveryCodes ?? null },

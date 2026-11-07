@@ -1,7 +1,7 @@
 'use client';
 // Settings → Integrations (owner): bind TipSignal to one brand. V2: events create drafts as the TipSignal SERVICE
 // ACCOUNT (create drafts only, on that brand); the owner is its named owner. Signing secret: status only.
-import { useEffect, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { KeyRound, Plug } from 'lucide-react';
 import { useApi } from '@/lib/client/use-api';
 import { api } from '@/lib/client/api';
@@ -23,14 +23,12 @@ export function IntegrationsSettings() {
   const { can, session } = useSession();
   const toast = useToast();
   const { data, error, loading, refetch, setData } = useApi<BindingView>(can('setup.manage') ? '/api/integrations/tipsignal/binding' : null);
-  const [brandId, setBrandId] = useState('');
+  const [picked, setBrandId] = useState('');
   const [busy, setBusy] = useState(false);
   const [saveErr, setSaveErr] = useState<unknown>(null);
   const [unbindOpen, setUnbindOpen] = useState(false);
-  useEffect(() => {
-    if (!data) return;
-    setBrandId(data.binding?.brand_id ?? data.brands[0]?.id ?? '');
-  }, [data]);
+  // Until the owner picks one, the selection follows the current binding (or the first brand).
+  const brandId = picked || data?.binding?.brand_id || data?.brands[0]?.id || '';
 
   if (!can('setup.manage')) return <EmptyState icon={<Plug aria-hidden />} title="Owner only" />;
   if (error && !data) return <ErrorState error={error} onRetry={refetch} />;

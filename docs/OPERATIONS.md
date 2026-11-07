@@ -49,3 +49,20 @@ Stateless; run one or more. Restart is safe: leases expire (90 s), preparation r
 ## Retention (worker, hourly)
 
 Webhook bodies 7 days · idempotency keys 24 h · OAuth states / connection flows 1 day after expiry · sessions 7 days after expiry · dispatched outbox 30 days. Disconnected credentials are deleted immediately.
+
+## Identity, MFA and owner lockout (Keycloak)
+
+- Sign-in is OIDC (code + PKCE + nonce) against Keycloak. The session's assurance (`acr`, `amr`, `auth_time`) comes only from the verified ID token. Privileged roles (default: owner, admin, publisher, brand manager) need two-step verification (`mfa_required_for` in the workspace security policy); sensitive actions also need a verification within `step_up_seconds` (default 300 s): **Verify now** re-authenticates at Keycloak with password + second factor (`acr_values=mfa`, `max_age=0`, `prompt=login`).
+- Factors are Keycloak's: authenticator app (TOTP), passkeys (WebAuthn) and recovery codes (one-time, consumed in order). Users change them on **Security** through Keycloak application-initiated actions; removing a factor or regenerating codes needs a fresh verification first. The app's client account holds only `realm-management/view-users`: the app can list a user's factors but cannot remove anyone's MFA, and no workspace admin endpoint can.
+- After a sign-in with a **recovery code**, or any completed factor change (authenticator app / passkey added or removed, recovery codes generated or removed), Relay revokes the user's other sessions, audits it (`auth.recovery_code_used` / `auth.factor_changed_followup`) and emails the user's IdP-verified address.
+- Connecting, reconnecting or disconnecting an account and creating service-account keys need a fresh verification (step-up window), not just MFA.
+- **Settings → Security** (owners): require two-step for everyone or for chosen roles (owners always), the re-verify window, invitation lifetime and guest access limits. Every change is audited and bumps the policy version; anything less strict needs a fresh verification.
+- Service accounts belong to a named member: while that member is suspended their keys are refused; removing the member disables any service account not reassigned in the removal dialog (keys revoked, audited).
+- Sessions: 30 min idle, 12 h absolute, token rotated on sign-in/step-up. **Security → Sessions** lists and revokes them; ending a user's Keycloak sessions (admin console → Users → *user* → Sessions → Sign out, or the user signing out) sends a signed back-channel logout that revokes the matching app sessions at once.
+- **Owner lockout** (lost authenticator and recovery codes): handled only through the identity provider — there is no master password or bypass endpoint in Relay.
+  1. Verify the person out of band (known phone/video call with a second workspace owner or the account's verified contact); record the ticket.
+  2. Keycloak admin console → realm → Users → *user* → **Credentials**: delete the lost OTP/passkey/recovery credentials (password stays), then **Required user actions** → *Configure OTP*.
+  3. **Sessions → Sign out** for the user (back-channel logout revokes their Relay sessions).
+  4. The user signs in, enrols a new factor at Keycloak, then generates new recovery codes on **Security**. Their Activity shows the factor changes.
+  5. Keycloak admin events (enabled in the realm) and the Relay audit log keep the trail; notify the workspace's other owners.
+- Service-account API keys (**Settings → Service accounts**): shown once, stored as hashes, revocation is immediate; a leaked key is revoked there (or the account disabled), never edited.

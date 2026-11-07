@@ -19,6 +19,10 @@ Copy `.env.example` names into the secret manager. Key custody: prefer `KMS_KEY_
 `APP_ENV=production`, `APP_BASE_URL=https://…`, `SESSION_SECRET`, `KEY_ENCRYPTION_KEYS` (not the dev key), a non-local `OIDC_ISSUER` + client, `S3_*` (not local defaults), `SMTP_URL` (not Mailpit), `ENABLE_MOCK_PROVIDERS=false`, `OIDC_ALLOW_INSECURE_HTTP=false`.
 Provider app settings (Meta, X, Telegram webhook secret) can be set in env or on **/setup** by the owner (stored encrypted, write-only).
 
+Identity provider (Keycloak or another OIDC IdP; the local realm `infra/keycloak/social-lite-realm.json` is the reference): confidential client, standard flow + PKCE S256, redirect `<APP_BASE_URL>/api/auth/callback`, post-logout redirect `<APP_BASE_URL>/login`, back-channel logout URL `<APP_BASE_URL>/api/auth/backchannel-logout` with *session required*; browser flow with a conditional second-factor level (`acr` `mfa` → OTP / WebAuthn / recovery codes; `amr` mapper); recovery codes + WebAuthn required actions enabled; the client's service account gets **only** `realm-management/view-users`. With a non-Keycloak IdP, factor management on **Security** is unavailable (shown as such) and step-up relies on `acr_values`/`max_age`.
+
+Security headers come from the app: nonce-based CSP per page request (`apps/web/proxy.ts`, `'strict-dynamic'`, `frame-ancestors 'none'`, `connect-src`/`img-src` include the `S3_PUBLIC_ENDPOINT`/`S3_ENDPOINT` origin for presigned uploads and previews), `default-src 'none'` on API responses, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`, and HSTS when `APP_ENV=production`. Do not strip or override them at the proxy.
+
 Reverse proxy: TLS, HSTS, forward `X-Forwarded-*`, body limit ≥ 1 MB for API (uploads go directly to storage), `/api/webhooks/*` reachable publicly.
 Storage CORS: allow `POST` from `APP_BASE_URL` (browser presigned uploads). Providers fetch media via short-lived signed URLs, so `S3_PUBLIC_ENDPOINT` must be publicly reachable.
 
