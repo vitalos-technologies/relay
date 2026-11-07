@@ -1,4 +1,5 @@
 # Resumable progress (read first after any context reset)
+> Entry point for a new session: `HANDOFF.md` (lead updates it after every milestone).
 
 ## Queue (user-ordered)
 

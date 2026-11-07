@@ -60,9 +60,9 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
   - Migrations through 014, plus 019, are applied.
   - 015–017 are NOT applied; apply them together once their streams land.
   - Because of that, `/api/ready` reports `not_ready`.
-- **Lead work in progress (uncommitted):**
-  - G14 runtime DB-role guard: `packages/db/src/runtime-role.ts`, wired into `apps/worker/src/main.ts` and `apps/web/instrumentation.ts`. Tested in `tests/integration/db-roles.test.ts`.
-  - G7 expired-grant sweep: `packages/services/src/grant-expiry.ts`. Still needs a worker `every()` line + a test.
+- **Lead work in progress:**
+  - G14 runtime DB-role guard: committed (web). The two worker lines in `apps/worker/src/main.ts` (`assertRuntimeDbRole`) are uncommitted because that file also holds AN/CH/MCP edits; commit them with the stream integration.
+  - G7 expired-grant sweep: `packages/services/src/grant-expiry.ts` (uncommitted). Still needs a worker `every()` line + a test.
 - **Lead checklist after streams land:**
   1. Integrate and commit each stream's files.
   2. Apply 015–017 to dev.
