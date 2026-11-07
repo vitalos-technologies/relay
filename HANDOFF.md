@@ -51,7 +51,7 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
 4. V3.1 → 5. V3.1 Admin → 6. Collaboration → 7. **V3.5** → 8. Copy cleanup → 9. Docs + Help Centre.
 
 ## Current state (keep updated)
-- **Background agents** (a new session will NOT have them): V2-A only.
+- **Background agents** (a new session will NOT have them): V2-A (finishing), UX redesign (started 07:5x; brief `docs/queue/018_UX_REDESIGN_BRIEF.md`, progress `docs/v3-progress/ux.md`; told to avoid A's files until A lands, then tell it A landed so it can switch Settings to the new left-nav routes + redirects).
 - **CH follow-ups:** CH's edits to `apps/web/lib/csp.ts`, `apps/web/proxy.ts`, `tests/unit/security-headers.test.ts`, `apps/web/app/(app)/settings/page.tsx` are uncommitted (mixed with A's); commit with A. Live Google/Notion apps + browser Picker untested (activation).
 - **MCP follow-ups:** recreate Keycloak (`docker compose -f infra/compose.yaml up -d --force-recreate oidc`) after A lands to load the `relay-mcp` client/scopes; place MCP settings in the redesigned Settings nav (now `/mcp/settings`). Real MCP clients need public HTTPS (activation checklist).
   - If they're gone, re-launch each from its progress note. Each note lists what is done and what's next:
