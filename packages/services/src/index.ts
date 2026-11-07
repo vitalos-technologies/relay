@@ -18,3 +18,4 @@ export * from './posts/service.js';
 export * from './posts/scheduling.js';
 export * from './posts/serialize.js';
 export * from './posts/shared.js';
+export * from './authz.js';

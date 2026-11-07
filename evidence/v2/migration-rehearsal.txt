@@ -1,0 +1,19 @@
+# Migration rehearsal 2026-11-07T03:37:05Z from backup-20261106T233102Z.dump
+NOTICE:  database "socialite_migration_rehearsal" does not exist, skipping
+UPDATE 1
+before: migrations=3 members=6 posts=5 deliveries=12 published=7
+{"msg":"migrations","applied":["004_tipsignal.sql","005_ai.sql","006_media_expansion.sql","007_slots_crops_analytics.sql","008_rate_limits_and_deletion.sql","009_v2_authz.sql","011_v2_tenancy.sql"],"alreadyApplied":3}
+after:  migrations=10 members=6 posts=5 deliveries=12 published=7
+PASS posts preserved (5)
+PASS deliveries preserved (12)
+PASS published history preserved (7)
+PASS memberships preserved (6)
+PASS dispatch still disabled (false)
+PASS every active member has a grant (0)
+PASS no broadened owner/admin grants (0)
+PASS brand-restricted members not widened to workspace (0)
+PASS no publisher grants created by backfill (0)
+PASS every workspace keeps an owner (0)
+review items: v1_approver_scheduling=1 
+Rollback: application images roll back freely; schema is additive (no destructive down-migrations). Rehearsal DB kept: socialite_migration_rehearsal
+RESULT: PASS
