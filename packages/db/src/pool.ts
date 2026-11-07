@@ -16,14 +16,15 @@ export function databaseUrl(): string {
   return url;
 }
 
-export function createPool(connectionString = databaseUrl(), max = Number(process.env.DATABASE_POOL_MAX ?? 10)): pg.Pool {
+export function createPool(connectionString = databaseUrl(), max = Number(process.env.DATABASE_POOL_MAX ?? 10),
+  o: { connectionTimeoutMillis?: number; applicationName?: string } = {}): pg.Pool {
   const pool = new pg.Pool({
     connectionString,
     max,
     idleTimeoutMillis: 30_000,
-    connectionTimeoutMillis: 5_000,
+    connectionTimeoutMillis: o.connectionTimeoutMillis ?? 5_000,
     statement_timeout: 30_000,
-    application_name: process.env.SERVICE_NAME ?? 'social-lite',
+    application_name: o.applicationName ?? process.env.SERVICE_NAME ?? 'social-lite',
   });
   pool.on('error', (err) => {
     // Idle client errors must not crash the process; log a safe category only.

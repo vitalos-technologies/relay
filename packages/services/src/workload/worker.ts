@@ -1,5 +1,5 @@
 // Worker wiring for workload isolation (V3.1 brief §6), kept out of apps/worker/src/main.ts so the shared file only
-// gains a few calls. Creates the bulk pool (WORKER_BULK_POOL_MAX, default 4), the publishing-pressure source, the sample
+// gains a few calls. Creates the bulk pool (WORKER_BULK_POOL_MAX, default 6), the publishing-pressure source, the sample
 // recorder and the runner. The main pool (DATABASE_POOL_MAX, default 10) stays with the claim loops / publishing.
 import type { WorkloadClass } from '@social-lite/core/contracts/v31-perf';
 import { createPool, type Pool } from '@social-lite/db';
@@ -22,8 +22,9 @@ export interface WorkerWorkload {
 }
 
 export function createWorkerWorkload(o: { workerId: string; publishingSlots: number }): WorkerWorkload {
-  const n = Number(process.env.WORKER_BULK_POOL_MAX ?? 4);
-  const bulkPool = createPool(undefined, Number.isInteger(n) && n >= 1 ? n : 4);
+  const n = Number(process.env.WORKER_BULK_POOL_MAX ?? 6);
+  // Bulk items queue for a connection rather than fail fast: a full bulk pool must slow bulk work, not error it.
+  const bulkPool = createPool(undefined, Number.isInteger(n) && n >= 1 ? n : 6, { connectionTimeoutMillis: 120_000, applicationName: 'worker-bulk' });
   const recorder = new SampleRecorder();
   // eslint-disable-next-line prefer-const
   let runner: WorkloadRunner;

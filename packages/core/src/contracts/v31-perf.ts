@@ -27,8 +27,8 @@ export interface WorkloadClassPolicy {
   per_workspace: number;
   /** Bulk classes wait (bounded) while publishing is under pressure. */
   defers_under_publishing_pressure: boolean;
-  /** Which DB pool the class uses: publishing work has a reserved pool bulk work can never take. */
-  pool: 'publishing' | 'bulk';
+  /** DB pool: 'main' (claim loops/publishing + light essential work) or 'bulk' (separate, smaller pool; can never take main connections). */
+  pool: 'main' | 'bulk';
 }
 
 export interface Percentiles { n: number; p50_ms: number | null; p95_ms: number | null; max_ms: number | null }

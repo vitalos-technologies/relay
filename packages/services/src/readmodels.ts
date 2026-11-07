@@ -178,12 +178,14 @@ export async function dashboard(ctx: Ctx, q: { brand_id?: string }) {
   // V3.1 PERF: the five attention lists in ONE query (top 20 per state, newest first); was five sequential queries.
   const ap: unknown[] = [];
   const aw = scope(ctx, 'd', ap, q.brand_id);
+  // The literal state list (same as the array) lets the planner prove the partial index deliveries_ws_attention_idx (110 ms → 1 ms, Medium).
   ap.push(['blocked', 'unknown', 'failed', 'expired', 'handoff']);
   const attRows = await many<DeliveryRow & { post_title: string | null; sort_at?: Date }>(getPool(),
     `SELECT x.* FROM unnest($${ap.length}::delivery_state[]) st(state) CROSS JOIN LATERAL (
        SELECT ${DELIVERY_SELECT}, p.title AS post_title, d.updated_at AS sort_at FROM deliveries d JOIN connections c ON c.id=d.connection_id JOIN posts p ON p.id=d.post_id
          JOIN schedules s ON s.id=d.schedule_id
-        WHERE ${aw} AND d.state = st.state AND s.generation = p.schedule_generation
+        WHERE ${aw} AND d.state = st.state AND d.state IN ('blocked','unknown','failed','expired','handoff')
+          AND s.generation = p.schedule_generation
           AND d.updated_at > now() - interval '14 days' ORDER BY d.updated_at DESC LIMIT 20) x ORDER BY x.sort_at DESC, x.id`, ap);
   const attention = (state: string) => attRows.filter((r) => r.state === state).map(({ sort_at: _s, ...r }) => ({ ...deliveryJson(r), post_title: r.post_title }));
   const params: unknown[] = [];

@@ -11,7 +11,8 @@
 //  - V3.1 per-provider cap: at most N live leases per provider across all workers (DISPATCH_PROVIDER_CONCURRENCY,
 //    default 8; per provider DISPATCH_PROVIDER_CONCURRENCY_<PROVIDER>, e.g. _X=2). Exact under concurrency: claims for a
 //    provider serialize on a transaction advisory lock (taken after the workspace row lock — one fixed order) and
-//    re-count. Polls of 'processing' deliveries count too (they call the provider).
+//    re-count. Polls of 'processing' deliveries count too (they call the provider). A provider found at its cap is
+//    excluded for the rest of this claim; the candidate query itself is unchanged (no extra planning/round trip when idle).
 import type { DeliveryState } from '@social-lite/core';
 import { maybeOne, one, type Queryable } from '@social-lite/db';
 
@@ -49,21 +50,17 @@ export async function selectFairCandidate(tx: Queryable, deliveryId: string | nu
   const excludedProviders: string[] = [];
   const fallbackCap = defaultWorkspaceConcurrency();
   const pc = providerConcurrency();
+  const capFor = (provider: string) => pc.caps[provider] ?? pc.fallback;
   for (let attempt = 0; attempt < 4; attempt++) {
-    const cand = await maybeOne<FairCandidate & { cap: number; provider: string; pcap: number }>(tx,
+    const cand = await maybeOne<FairCandidate & { cap: number; provider: string }>(tx,
       `WITH live AS (
          SELECT workspace_id, count(*)::int n FROM deliveries
-          WHERE lease_owner IS NOT NULL AND lease_expires_at > now() GROUP BY workspace_id),
-       plive AS (
-         SELECT provider, count(*)::int n FROM deliveries
-          WHERE lease_owner IS NOT NULL AND lease_expires_at > now() GROUP BY provider)
-       SELECT d.id, d.state, d.workspace_id, d.provider::text AS provider, ${CAP_SQL('$3')} AS cap,
-              coalesce(($4::jsonb ->> d.provider::text)::int, $5::int) AS pcap FROM deliveries d
+          WHERE lease_owner IS NOT NULL AND lease_expires_at > now() GROUP BY workspace_id)
+       SELECT d.id, d.state, d.workspace_id, d.provider::text AS provider, ${CAP_SQL('$3')} AS cap FROM deliveries d
          JOIN connections c ON c.id = d.connection_id
          JOIN workspaces w ON w.id = d.workspace_id
          LEFT JOIN provider_circuits pc ON pc.provider = d.provider
          LEFT JOIN live ON live.workspace_id = d.workspace_id
-         LEFT JOIN plive ON plive.provider = d.provider
          LEFT JOIN workspace_dispatch_state ds ON ds.workspace_id = d.workspace_id
         WHERE d.state IN ('scheduled','retry_wait','processing') AND d.next_attempt_at <= now()
           AND (d.lease_owner IS NULL OR d.lease_expires_at < now() AND d.phase = 'awaiting_provider')
@@ -74,29 +71,35 @@ export async function selectFairCandidate(tx: Queryable, deliveryId: string | nu
                             AND x.lease_owner IS NOT NULL AND x.lease_expires_at > now() AND x.phase IN ('preparing','sending'))
           AND coalesce(live.n, 0) < ${CAP_SQL('$3')}
           AND NOT (d.workspace_id = ANY($2::uuid[]))
-          AND coalesce(plive.n, 0) < coalesce(($4::jsonb ->> d.provider::text)::int, $5::int)
-          AND NOT (d.provider::text = ANY($6::text[]))
+          AND NOT (d.provider::text = ANY($4::text[]))
         ORDER BY ${fairOrdering() ? 'coalesce(live.n, 0), ds.last_claimed_at NULLS FIRST,' : ''} d.next_attempt_at, d.id
-        LIMIT 1 FOR UPDATE OF d SKIP LOCKED`, [deliveryId, excluded, fallbackCap, JSON.stringify(pc.caps), pc.fallback, excludedProviders]);
+        LIMIT 1 FOR UPDATE OF d SKIP LOCKED`, [deliveryId, excluded, fallbackCap, excludedProviders]);
     if (!cand) return null;
+    // V3.1: the cap checks run under a savepoint; a rejected attempt rolls back to it, which releases that attempt's
+    // workspace row lock and provider advisory lock — no lock is held while the next attempt waits for one.
+    // (The rejected candidate row stays locked until commit; other claimers SKIP LOCKED it, as before.)
+    await tx.query('SAVEPOINT fair_attempt');
     // Serialize claims per workspace, then re-count with a fresh snapshot (READ COMMITTED): a
     // concurrent claimer that committed first is visible now, so the cap is never exceeded.
     await tx.query(`INSERT INTO workspace_dispatch_state(workspace_id) VALUES ($1) ON CONFLICT DO NOTHING`, [cand.workspace_id]);
     await tx.query(`SELECT 1 FROM workspace_dispatch_state WHERE workspace_id = $1 FOR UPDATE`, [cand.workspace_id]);
+    // Workspace re-count (snapshot after the row lock) + V3.1 per-provider serialization lock in one round trip.
     const live = await one<{ n: number }>(tx,
-      `SELECT count(*)::int n FROM deliveries WHERE workspace_id = $1 AND lease_owner IS NOT NULL AND lease_expires_at > now() AND id <> $2`,
-      [cand.workspace_id, cand.id]);
+      `SELECT (SELECT count(*)::int FROM deliveries WHERE workspace_id = $1 AND lease_owner IS NOT NULL AND lease_expires_at > now() AND id <> $2) AS n,
+              pg_advisory_xact_lock(hashtextextended('dispatch-provider:' || $3, 0)) IS NULL AS locked`,
+      [cand.workspace_id, cand.id, cand.provider]);
     if (live.n >= cand.cap) {
+      await tx.query('ROLLBACK TO SAVEPOINT fair_attempt');
       excluded.push(cand.workspace_id);
       if (deliveryId) return null;
       continue;
     }
-    // V3.1 per-provider cap (exact): serialize claims per provider, then re-count with a fresh snapshot.
-    await tx.query(`SELECT pg_advisory_xact_lock(hashtextextended('dispatch-provider:' || $1, 0))`, [cand.provider]);
+    // V3.1 per-provider cap (exact): the provider lock is held (above); re-count with a fresh snapshot.
     const plive = await one<{ n: number }>(tx,
       `SELECT count(*)::int n FROM deliveries WHERE provider = $1::provider_kind AND lease_owner IS NOT NULL AND lease_expires_at > now() AND id <> $2`,
       [cand.provider, cand.id]);
-    if (plive.n >= cand.pcap) {
+    if (plive.n >= capFor(cand.provider)) {
+      await tx.query('ROLLBACK TO SAVEPOINT fair_attempt');
       excludedProviders.push(cand.provider);
       if (deliveryId) return null;
       continue;

@@ -20,7 +20,7 @@ const ARGS = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const JOBS = Number(ARGS[0] ?? 100);
 const DESTS = Number(ARGS[1] ?? 25);
 if (config().APP_ENV === 'production') throw new Error('never in production');
-const db = FAIRNESS ? (undefined as unknown as ReturnType<typeof getPool>) : getPool();
+const db = FAIRNESS || process.argv.includes('--isolation') ? (undefined as unknown as ReturnType<typeof getPool>) : getPool();
 
 async function main() {
   const owner = await one<{ id: string }>(db, `INSERT INTO users(oidc_issuer, oidc_subject, email, name) VALUES ('pending',$1,$2,'Load test') RETURNING id`, [`lt:${randomUUID()}`, `load-${randomUUID().slice(0, 8)}@loadtest.social-lite.test`]);
@@ -67,7 +67,12 @@ async function main() {
   writeFileSync(`evidence/load/load-${JOBS}-${Date.now()}.json`, JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result, null, 2));
 }
-if (FAIRNESS) {
+if (process.argv.includes('--isolation')) {
+  // V3.1 workload isolation (scripts/load-test-isolation.ts): publishing waves during a bulk burst, shared vs isolated.
+  // Usage: pnpm tsx --env-file=.env scripts/load-test.ts --isolation [publishJobs=180] [bulkPerClass=6] [slots=4] [providerLatencyMs=150] [repeats=3]
+  import('./load-test-isolation.js').then((m) => m.runIsolation({ publishJobs: Number(ARGS[0] ?? 180), bulkPerClass: Number(ARGS[1] ?? 6), slots: Number(ARGS[2] ?? 4), latencyMs: Number(ARGS[3] ?? 150), repeats: Number(ARGS[4] ?? 3) }))
+    .then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); });
+} else if (FAIRNESS) {
   import('./load-test-fairness.js').then((m) => m.runFairness({ bulkJobs: Number(ARGS[0] ?? 360), otherJobs: Number(ARGS[1] ?? 30), slots: Number(ARGS[2] ?? 8) })).then(() => process.exit(0))
     .catch((e) => { console.error(e); process.exit(1); });
 } else {

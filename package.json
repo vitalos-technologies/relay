@@ -23,7 +23,10 @@
     "test:contracts": "vitest run --project contracts",
     "test:integration": "vitest run --project integration",
     "test:e2e": "playwright test --trace off",
-    "test:all": "pnpm test && pnpm test:integration"
+    "test:all": "pnpm test && pnpm test:integration",
+    "bench": "tsx scripts/bench/run.ts",
+    "bench:compare": "tsx scripts/bench/compare.ts",
+    "load:isolation": "tsx --env-file=.env scripts/load-test.ts --isolation"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",

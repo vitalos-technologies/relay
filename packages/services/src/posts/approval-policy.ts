@@ -65,6 +65,47 @@ export async function loadPolicy(db: Queryable, workspaceId: string, brandId: st
   };
 }
 
+/**
+ * loadPolicy() for many (brand, generation) pairs in three statements (V3.1 PERF: approval inbox). Same semantics:
+ * a brand without a policy row fails closed to one review stage; generation defaults to the brand's current one.
+ */
+export async function loadPoliciesMany(db: Queryable, workspaceId: string, keys: Array<{ brandId: string; generation?: number | null }>): Promise<Map<string, PolicyDef>> {
+  const out = new Map<string, PolicyDef>();
+  if (!keys.length) return out;
+  const brands = [...new Set(keys.map((k) => k.brandId))];
+  const cur = await many<{ brand_id: string; generation: number; updated_at: Date; email: string | null }>(db,
+    `SELECT p.brand_id, p.generation, p.updated_at, u.email FROM approval_policies p LEFT JOIN users u ON u.id=p.updated_by
+      WHERE p.workspace_id=$1 AND p.brand_id = ANY($2::uuid[])`, [workspaceId, brands]);
+  const curBy = new Map(cur.map((c) => [c.brand_id, c]));
+  const wanted = keys.filter((k) => curBy.has(k.brandId)).map((k) => ({ brandId: k.brandId, gen: k.generation ?? curBy.get(k.brandId)!.generation }));
+  const vb = wanted.map((w) => w.brandId); const vg = wanted.map((w) => w.gen);
+  const versions = wanted.length ? await many<{ brand_id: string; generation: number; separation_of_duties: boolean }>(db,
+    `SELECT v.brand_id, v.generation, v.separation_of_duties FROM approval_policy_versions v
+       JOIN unnest($1::uuid[], $2::int[]) k(b, g) ON v.brand_id = k.b AND v.generation = k.g`, [vb, vg]) : [];
+  const stages = wanted.length ? await many<{ brand_id: string; generation: number; position: 1 | 2; name: string; quorum: number; eligible_roles: StageRole[]; eligible_team_ids: string[]; allow_guests: boolean }>(db,
+    `SELECT s.brand_id, s.generation, s.position, s.name, s.quorum, s.eligible_roles, s.eligible_team_ids, s.allow_guests FROM approval_stages s
+       JOIN unnest($1::uuid[], $2::int[]) k(b, g) ON s.brand_id = k.b AND s.generation = k.g ORDER BY s.position`, [vb, vg]) : [];
+  for (const k of keys) {
+    const key = `${k.brandId}:${k.generation ?? null}`;
+    if (out.has(key)) continue;
+    const c = curBy.get(k.brandId);
+    if (!c) {
+      out.set(key, { brand_id: k.brandId, generation: 0, separation_of_duties: false, updated_at: null, updated_by_email: null,
+        stages: [{ position: 1, name: 'Review', quorum: 1, eligible_roles: [], eligible_team_ids: [], allow_guests: false }] });
+      continue;
+    }
+    const gen = k.generation ?? c.generation;
+    const v = versions.find((x) => x.brand_id === k.brandId && x.generation === gen);
+    out.set(key, {
+      brand_id: k.brandId, generation: gen, separation_of_duties: v?.separation_of_duties ?? false,
+      updated_at: c.updated_at.toISOString(), updated_by_email: c.email,
+      stages: stages.filter((x) => x.brand_id === k.brandId && x.generation === gen)
+        .map(({ position, name, quorum, eligible_roles, eligible_team_ids, allow_guests }) => ({ position, name, quorum, eligible_roles, eligible_team_ids, allow_guests })),
+    });
+  }
+  return out;
+}
+
 /** True when the brand's CURRENT policy requires review before anything can be scheduled. */
 export async function approvalRequiredFor(db: Queryable, workspaceId: string, brandId: string): Promise<boolean> {
   return (await loadPolicy(db, workspaceId, brandId)).stages.length > 0;

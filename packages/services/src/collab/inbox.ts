@@ -8,7 +8,7 @@ import { loadUserAuthz } from '../authz.js';
 import { authorizeCtx, requireAction } from '../tenancy.js';
 import { approvalDetail } from '../posts/scheduling.js';
 import { approvalJson, type ApprovalRow } from '../posts/serialize.js';
-import { evaluateStages, loadPolicy, reviewState, reviewerFacts, reviewerFactsMany, stageEligibility, stageProgressFrom, type PolicyDef, type ReviewRequestRow } from '../posts/approval-policy.js';
+import { evaluateStages, loadPoliciesMany, loadPolicy, reviewState, reviewerFacts, reviewerFactsMany, stageEligibility, stageProgressFrom, type PolicyDef, type ReviewRequestRow } from '../posts/approval-policy.js';
 import { staffAllowed } from './access.js';
 import { deliverNotification } from './notifications.js';
 
@@ -38,12 +38,9 @@ export async function approvalInbox(ctx: Ctx, q: { status?: string | null; brand
       ORDER BY ${status === 'pending' ? 'coalesce(a.due_at, s.due_at) ASC NULLS LAST' : 'a.decided_at DESC NULLS LAST'}, a.requested_at DESC LIMIT 150`, params);
   // V3.1 PERF: batched (was ~8 queries per row). Policies per brand+generation, decisions for all pending requests,
   // reviewer facts per distinct user (fresh for this request) — same eligibility rules as evaluateStages().
-  const policies = new Map<string, PolicyDef>();
   const pendingRows = rows.filter((r) => r.decision === 'pending');
-  for (const r of pendingRows) {
-    const key = `${r.brand_id}:${r.policy_generation}`;
-    if (!policies.has(key)) policies.set(key, await loadPolicy(db, r.workspace_id, r.brand_id, r.policy_generation ?? undefined));
-  }
+  const policies: Map<string, PolicyDef> = await loadPoliciesMany(db, ctx.access.workspaceId,
+    pendingRows.map((r) => ({ brandId: r.brand_id, generation: r.policy_generation })));
   const decisions = pendingRows.length ? await many<{ approval_id: string; stage: number; user_id: string; decision: string }>(db,
     `SELECT approval_id, stage, user_id, decision FROM approval_decisions WHERE approval_id = ANY($1::uuid[])`, [pendingRows.map((r) => r.id)]) : [];
   const decisionsBy = new Map<string, typeof decisions>();
@@ -58,7 +55,7 @@ export async function approvalInbox(ctx: Ctx, q: { status?: string | null; brand
     let stageName: string | null = null;
     let progress: { approvals: number; quorum: number } | null = null;
     if (r.decision === 'pending') {
-      const policy = policies.get(`${r.brand_id}:${r.policy_generation}`)!;
+      const policy = policies.get(`${r.brand_id}:${r.policy_generation ?? null}`)!;
       const mine = decisionsBy.get(r.id) ?? [];
       const stages = stageProgressFrom(mine.filter((d) => d.decision === 'approved'), (uid) => facts(uid, r.post_id), r, policy);
       const cur = stages.find((s) => !s.met);
