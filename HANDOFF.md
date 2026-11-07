@@ -62,7 +62,7 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
   - Because of that, `/api/ready` reports `not_ready`.
 - **Lead work in progress:**
   - G14 runtime DB-role guard: committed (web). The two worker lines in `apps/worker/src/main.ts` (`assertRuntimeDbRole`) are uncommitted because that file also holds AN/CH/MCP edits; commit them with the stream integration.
-  - G7 expired-grant sweep: `packages/services/src/grant-expiry.ts` (uncommitted). Still needs a worker `every()` line + a test.
+  - G7 expired-grant sweep: committed + tested; its worker `every('grant-expiry')` line is in uncommitted `apps/worker/src/main.ts` (commit with stream integration).
 - **Lead checklist after streams land:**
   1. Integrate and commit each stream's files.
   2. Apply 015–017 to dev.
@@ -72,7 +72,7 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
   6. Tag v2.
   7. Launch UX.
   8. Write the V3 docs.
-- **Known gaps:** `docs/V2_IMPLEMENTATION_GAPS.md`. G3/G4/G5/G6/G8 were sent to stream A. G19 is done.
+- **Known gaps:** `docs/V2_IMPLEMENTATION_GAPS.md`. G3/G4/G5/G6/G8 sent to stream A. Done by lead: G7, G14, G19 (update that doc at integration).
 
 ## Uncommitted work (who owns what)
 `git status` shows files from the running streams. **Never commit or revert another stream's files mid-flight.** Commit only files you changed, by explicit path.
