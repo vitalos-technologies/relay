@@ -4,6 +4,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type pg from 'pg';
 import { applyRoleGrants, ensureLoginRoles } from '../../packages/db/src/roles.js';
+import { assertRuntimeDbRole, checkRuntimeDbRole } from '../../packages/db/src/runtime-role.js';
 import { closeTestPool, testPool } from './helpers.js';
 
 let client: pg.PoolClient;
@@ -79,5 +80,19 @@ describe('database roles', () => {
     } finally {
       await client.query('ROLLBACK');
     }
+  });
+
+  it('runtime role guard: least-privilege roles pass; the owner/superuser is refused in production (G14)', async () => {
+    for (const role of ['socialite_app', 'socialite_worker']) {
+      await client.query('BEGIN');
+      try {
+        await client.query(`SET LOCAL ROLE ${role}`);
+        expect(await checkRuntimeDbRole(client)).toEqual({ role, problems: [] });
+      } finally { await client.query('ROLLBACK'); }
+    }
+    const owner = await checkRuntimeDbRole(client);
+    expect(owner.problems.length).toBeGreaterThan(0);
+    await expect(assertRuntimeDbRole(client, { production: true, component: 'web' })).rejects.toThrow(/Refusing to start web/);
+    await expect(assertRuntimeDbRole(client, { production: false, component: 'web' })).resolves.toMatchObject({ problems: owner.problems });
   });
 });
