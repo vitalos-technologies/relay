@@ -66,7 +66,7 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
    - Lead engine gaps: done.
    - MCP (017), CH content hub (016), AN analytics (015) **all done and integrated** (864cf18, 57e056b, 523c1dd; MCP source + analytics tools 18b5c53, ed9aa1f).
    - Next: UX redesign (018 brief), launched when V2-A finishes. Then the V3 docs.
-4. V3.1 (backend streams running) → 5. V3.1 Admin → 6. Collaboration → 7. **V3.5** → 8. Copy cleanup → 9. Docs + Help Centre.
+4. V3.1 **done** → 5. V3.1 Admin (running) → 6. Collaboration → 7. **V3.5** → 8. Copy cleanup → 9. Docs + Help Centre.
 
 ## Current state (keep updated)
 - **V3.1 started early (backend only)** while UX owns screens: streams PERF (020), DATA (021), GOV (022); contract `docs/V3_1_WORKSTREAMS.md`, progress `docs/v3-1-progress/{perf,data,gov}.md`. Plus a V3 docs agent (V3_REQUIREMENTS_MATRIX, BUILD_STATUS, GAPS, ACTIVATION, PLATFORM_CAPABILITIES, SECURITY_AND_TEST_REPORT). V3.1 UI comes after UX lands.
@@ -77,7 +77,9 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
 - **V3 UX redesign: done and committed** (3e5e3f2). E2E now uses its own seeded "E2E Workspace" (`pnpm db:seed:e2e`; Playwright globalSetup). Dev web now runs as a production build (`next build --webpack` + `next start --port 3000`) to avoid dev-server OOM during E2E.
 - **V3 done:** full E2E 39/39 on a production build, tag v3.0.0. V3 docs being updated for the redesign (docs agent).
 - **Running:** V3.1 UI stream (brief `docs/queue/031_V3_1_UI_BRIEF.md`, progress `docs/v3-1-progress/ui.md`, checkpoints `evidence/v3-1/ui/checkpoints/`). Previously planned: (screens for V3.1 backend: autosave states, trash/undo, bulk, Cmd+K search, brand rules + reviews, queues, links, diagnostics, onboarding, feature flags, release notes, support) and V3.1 docs.
-- **Background agents** (a new session will NOT have them): V3.1 UI, V3 docs update. Relaunch any missing one from its progress note + brief (started 07:5x; brief `docs/queue/018_UX_REDESIGN_BRIEF.md`, progress `docs/v3-progress/ux.md`; A has landed and UX was told it may now edit Settings).
+- **V3.1 done** (screens 0064d92; lead fixes 89286a7: reschedule enforces mandatory brand rules, specific bulk skip reasons, onboarding links). Full E2E 45/45 on a production build. V3.1 docs being written (docs agent); tag v3.1.0 after.
+- **Running:** V3.1 Admin application (brief `docs/queue/03c_V3_1_ADMIN_PROMPT.md`, progress `docs/v3-1-progress/admin.md`, checkpoints `evidence/v3-1/admin/checkpoints/`, migration 026).
+- **Background agents** (a new session will NOT have them): V3.1 Admin, V3.1 docs. Relaunch any missing one from its progress note + brief (started 07:5x; brief `docs/queue/018_UX_REDESIGN_BRIEF.md`, progress `docs/v3-progress/ux.md`; A has landed and UX was told it may now edit Settings).
 - **CH follow-ups:** CH's edits to `apps/web/lib/csp.ts`, `apps/web/proxy.ts`, `tests/unit/security-headers.test.ts`, `apps/web/app/(app)/settings/page.tsx` are uncommitted (mixed with A's); commit with A. Live Google/Notion apps + browser Picker untested (activation).
 - **MCP follow-ups:** recreate Keycloak (`docker compose -f infra/compose.yaml up -d --force-recreate oidc`) after A lands to load the `relay-mcp` client/scopes; place MCP settings in the redesigned Settings nav (now `/mcp/settings`). Real MCP clients need public HTTPS (activation checklist).
   - If they're gone, re-launch each from its progress note. Each note lists what is done and what's next:
