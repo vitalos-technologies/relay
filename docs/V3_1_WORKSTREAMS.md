@@ -16,6 +16,7 @@ All V2/V3 contracts still apply (`docs/V2_WORKSTREAMS.md`, `docs/V3_WORKSTREAMS.
 ## Rules for every V3.1 stream
 - **Ownership:** backend only (services, migrations, API routes, worker wiring, tests, docs). Do not edit `apps/web/app/(app)/**` pages or `apps/web/components/**` (UX owns them). Expose typed contracts in `packages/core/src/contracts/v31-<area>.ts` and API routes, for the UI stream.
 - **Migrations:** one file per stream (below); never edit an applied migration. Don't apply to the dev DB; the lead applies.
+- **Shared dev server:** it runs the shared working tree live. Code in shared read paths must only reference applied schema. **021 and 022 were applied to dev on 2026-11-07 ~08:35 UTC and are frozen**; further changes go in `023_v31_data_more.sql` (DATA) and `024_v31_gov_more.sql` (GOV).
 - **Shared files** (`apps/worker/src/main.ts`, `packages/services/src/outbox.ts`, `engine/outbox-dispatcher.ts`, `services/index.ts`): re-read before editing, keep diffs small and additive.
 - **Git and dependencies:** no git commits/stash/checkout/reset; the lead commits. No new dependencies without stating why in the report.
 - **Measurement:** measure before optimising; report sample counts and conditions. No performance claims from one run.

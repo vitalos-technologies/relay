@@ -69,7 +69,7 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
     - `docs/v3-progress/{analytics,content-hub,mcp}.md`
   - Stream contracts: `docs/V2_WORKSTREAMS.md`, `docs/V3_WORKSTREAMS.md`.
 - **Dev DB:**
-  - All migrations 001–019 applied; `/api/ready` = ready. Worker rebuilt and restarted on the new code.
+  - All migrations 001–019 + 021 + 022 applied (021/022 frozen early because their streams' live code broke the dev server; follow-ups go in 023/024). 020 (PERF) pending. Worker rebuilt and restarted on the new code.
   - Because of that, `/api/ready` reports `not_ready`.
 - **Lead work in progress:**
   - G7 + G14: committed incl. worker wiring.
