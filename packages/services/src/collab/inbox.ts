@@ -27,15 +27,22 @@ export async function approvalInbox(ctx: Ctx, q: { status?: string | null; brand
     if (!/^[0-9a-f-]{36}$/i.test(q.brand_id)) throw new AppError('validation_failed', 'Invalid brand');
     params.push(q.brand_id); extra = ` AND a.brand_id=$${params.length}`;
   }
+  // V3.1 PERF: two stages in one statement — pick the 150 ids on a narrow join (approvals + schedule due), then join the
+  // display columns for those rows only. Same order (+ id as a deterministic tie-break); planning ~3× cheaper.
+  const pending = status === 'pending';
   const rows = await many<InboxRow>(db,
-    `SELECT a.*, ru.email AS requested_by_email, rv.email AS reviewer_email, p.title, r.base_text, r.revision_number, s.due_at AS schedule_due, s.is_immediate,
+    `WITH top AS (
+       SELECT a.id, ${pending ? 'coalesce(a.due_at, s.due_at)' : 'a.decided_at'} AS k, a.requested_at
+         FROM approvals a ${pending ? 'JOIN schedules s ON s.id=a.schedule_id' : ''}
+        WHERE a.workspace_id=$1 AND ($2::uuid[] IS NULL OR a.brand_id = ANY($2::uuid[])) AND ${pending ? `a.decision='pending'` : `a.decision<>'pending'`}${extra}
+        ORDER BY k ${pending ? 'ASC' : 'DESC'} NULLS LAST, a.requested_at DESC, a.id LIMIT 150)
+     SELECT a.*, ru.email AS requested_by_email, rv.email AS reviewer_email, p.title, r.base_text, r.revision_number, s.due_at AS schedule_due, s.is_immediate,
             s.input_timezone, b.name AS brand_name, au.email AS assignee_email, au.name AS assignee_name, c.name AS campaign_name,
             (SELECT array_agg(cn.provider::text ORDER BY cn.provider) FROM variants v JOIN connections cn ON cn.id=v.connection_id WHERE v.revision_id=a.revision_id) AS providers
-       FROM approvals a JOIN posts p ON p.id=a.post_id JOIN post_revisions r ON r.id=a.revision_id JOIN schedules s ON s.id=a.schedule_id
+       FROM top JOIN approvals a ON a.id=top.id JOIN posts p ON p.id=a.post_id JOIN post_revisions r ON r.id=a.revision_id JOIN schedules s ON s.id=a.schedule_id
        JOIN brands b ON b.id=a.brand_id LEFT JOIN users ru ON ru.id=a.requested_by LEFT JOIN users rv ON rv.id=a.reviewer_id
        LEFT JOIN users au ON au.id=a.assignee_user_id LEFT JOIN campaigns c ON c.id=p.campaign_id
-      WHERE a.workspace_id=$1 AND ($2::uuid[] IS NULL OR a.brand_id = ANY($2::uuid[])) AND ${status === 'pending' ? `a.decision='pending'` : `a.decision<>'pending'`}${extra}
-      ORDER BY ${status === 'pending' ? 'coalesce(a.due_at, s.due_at) ASC NULLS LAST' : 'a.decided_at DESC NULLS LAST'}, a.requested_at DESC LIMIT 150`, params);
+      ORDER BY top.k ${pending ? 'ASC' : 'DESC'} NULLS LAST, top.requested_at DESC, a.id`, params);
   // V3.1 PERF: batched (was ~8 queries per row). Policies per brand+generation, decisions for all pending requests,
   // reviewer facts per distinct user (fresh for this request) — same eligibility rules as evaluateStages().
   const pendingRows = rows.filter((r) => r.decision === 'pending');

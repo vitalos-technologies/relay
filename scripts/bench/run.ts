@@ -110,6 +110,11 @@ async function runProfile(p: Profile) {
     const { generateLargeHistory } = await import('@social-lite/services/analytics/demo');
     const hist = await generateLargeHistory({ workspaceId: main.workspaceId, anchor: new Date().toISOString().slice(0, 10), ...p.analytics });
     timings.generate_analytics_ms = Date.now() - t;
+    // V3.1: what the analytics worker does after deploy — backfill tracked per-day summary zones (no-op before 025).
+    t = Date.now();
+    { const { backfillSummaryZones } = await import('@social-lite/services/analytics/summary');
+      for (let i = 0; i < 50 && (await backfillSummaryZones({ maxCells: 10_000 })).cells > 0; i++) { /* until no pending zone */ } }
+    timings.summary_backfill_ms = Date.now() - t;
     t = Date.now();
     { const v = await pool.connect(); try { await v.query('SET statement_timeout = 0'); await v.query('VACUUM ANALYZE'); } finally { v.release(); } }
     timings.analyze_ms = Date.now() - t;

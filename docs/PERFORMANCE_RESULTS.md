@@ -207,13 +207,58 @@ What made the difference (no new infrastructure; Postgres + pg-boss only):
 1. **Planner payload** (all brands, Medium/Large): ~1 KB per item × up to 1,000 items. Options for the UI stream: default
    the calendar to one brand or a week at scale, or a compact field set (ids, time, status, provider list) with details
    fetched per visible item. The API now reports `truncated: true` instead of silently cutting at 1,000.
-2. **Analytics overview over long ranges**: the remaining cost is parsing ~100k per-day aggregate rows (timestamp
-   parsing) plus per-day health in Node. Next step: a precomputed per-day, per-connection summary maintained by the
-   analytics worker (or SQL-side day aggregation for health), so 365 days reads ~10× fewer rows.
-3. **Approval inbox p95 at Medium** (111 ms vs 100 ms budget, p50 47 ms): the remaining cost is the single 150-row
-   listing query (ordering by `coalesce(a.due_at, s.due_at)` across pending requests).
+2. ~~Analytics overview over long ranges~~ — within budget after round 2 (Medium 415 ms, Large 1,538 ms p95). What is
+   left on Large is the per-post state scan (≈ 400 ms for 14.5k posts) and per-day health in Node.
+3. ~~Approval inbox p95 at Medium~~ — fixed in round 2 (57 ms p95).
 4. **HTTP layer** (Next.js routing, session lookup, JSON over the network) and all browser metrics are not measured here
    (UI stream, on the redesigned screens).
+
+## Round 2 (lead follow-up): analytics 365-day overview and approval inbox
+
+Same harness, same generator, all three profiles, n = 30 per scenario. Before = `evidence/perf/after-*.json` (round 1),
+after = `evidence/perf/after2-*.json` (adds migration `025_v31_perf_more.sql`). Full table: `pnpm bench:compare after after2`;
+budget check: `pnpm bench:compare baseline after2 --check`. The only remaining budget violations are the planner payload and
+Medium planner-week p95 (left alone: needs a UI decision).
+
+| Scenario (p50 / p95 ms) | Medium round 1 → 2 | Large round 1 → 2 | Large V3 baseline |
+|---|---|---|---|
+| analytics overview, 365 days | 727 / 839 → **337 / 415** | 1,695 / 2,052 → **1,272 / 1,538** (budget 1,600) | 3,999 / 5,476 |
+| analytics overview, 28 days | 182 / 231 → 141 / 191 | 371 / 450 → 290 / 435 | 555 / 785 |
+| approval inbox, pending | 47 / 111 → **38 / 57** (budget 100) | 48 / 75 → 33 / 64 | 683 / 1,094 |
+| approval inbox, decided | 25 / 39 → 21 / 37 | 30 / 76 → 12 / 14 | 101 / 147 |
+
+What changed:
+- **Precomputed per-local-day summary** (`metric_rollup_days`, migration 025): the same rows `aggregate()` computes from the
+  15-minute rollups, keyed by (workspace, time zone, source, local date, connection, metric key, version, dimension).
+  Maintained **incrementally by statement-level triggers on `metric_rollups`** (every writer: ingest's per-bucket recompute,
+  bulk rebuilds, cascades), recomputing only the changed (zone, connection, source, day range) under an advisory lock per
+  (workspace, zone, connection, source). Local days use the query's own expression (`(bucket_start AT TIME ZONE tz)::date`),
+  so 23/25-hour DST days and :30/:45 offsets bucket identically. `source` is in the key → live / simulated / demo never
+  mix. Zones = workspace + brand time zones (tracked by triggers on `workspaces`/`brands`); a zone is read only after the
+  analytics worker has backfilled it (`status = 'ready'`); any other time zone reads the rollups as before.
+- **Fewer rows for the overview**: KPIs/channels read one row per (connection, key) for the period; only the trend
+  measure is read per day (one statement per period). Large 365 d: 95,817 → 6,689 rows returned.
+- **Post scope**: index `deliveries (connection_id, published_at) WHERE state='published'` (Large 365 d read 191,822 rows
+  to keep 14,568) and post families from one grouped scan instead of a correlated subquery per post.
+- **Approval inbox**: the 150 rows are picked on a narrow approvals + schedule-due join, then display columns are joined
+  for those rows only (planning ~20–34 ms → ~10 ms on Large; it dominated execution).
+- Statement count for the overview went 15 → 16 (one readiness check per request; within budget).
+
+Equality proofs (`tests/integration/v31-analytics-summary.test.ts`, real PostgreSQL):
+- summary rows == rollup rows for six zones (London, New York, Kathmandu +5:45, St John's −3:30, Lord Howe with a
+  30-minute DST shift, Santiago) over both 2026 DST transitions and a 260-day range, for zones added after the data
+  existed (backfill);
+- the whole overview response is identical (except `generated_at`) to the pre-V3.1 data path (`overview(…, { reference: true })`)
+  for three measures and two zones;
+- after the zones are ready, real `ingestPoints` (incl. a correction) keeps live and simulated summaries equal to the
+  rollups, each containing only its own connection; a 00:30 UTC post lands on the 29th in London and the 28th in New York;
+- a bulk rebuild keeps it equal; demo rows never appear in live queries; deleting a connection leaves no summary rows.
+
+Got worse / variance in round 2: the host was busier (1-minute load average at the end of each run 6.3–7.7 vs 5.6–6.6 in round 1) and many
+unchanged paths show higher p95 with identical statement counts (e.g. Large post detail 6.8 → 13.1 ms, worker claim p95
+17 → 25 ms); all within budget and treated as variance. Analytics writes do slightly more work (each rollup statement
+recomputes the affected summary days): the Large bench's synthetic analytics generation took 133 → 148 s (round 1 → 2) and the zone backfill
+14 s; per-ingest overhead is one day per tracked zone.
 
 ## Caching decision
 
@@ -222,12 +267,13 @@ straight from PostgreSQL on Medium (except the open items above, which a cache w
 every request (`loadAccess`, reviewer facts in the approval inbox) — `tests/integration/v31-perf.test.ts` shows a revoked
 approver losing `can_decide` immediately even with an old request context. The only memoisation added is the analytics
 metric registry (`definitionsFor`, `fetchedPostDefinitions`, `providerSupports`), which is a pure function of
-code-defined definitions with no tenant, user or authorization dimension.
+code-defined definitions with no tenant, user or authorization dimension. Round 2's `metric_rollup_days` is a precomputed aggregate maintained in the same transaction as each rollup
+write (never stale, no authorization data; readers keep the same scope and permission checks).
 
 ## Verification
 
 - Root `npx tsc -p tsconfig.json --noEmit`: clean. Web `tsc`: clean. Worker bundle builds.
 - `pnpm test`: 490 passed (incl. `tests/unit/v31-perf.test.ts`, 11 tests).
-- `npx vitest run --project integration`: 47 files, 369 tests passed (incl. `tests/integration/v31-perf.test.ts`: provider
+- `npx vitest run --project integration`: 47 files, 369 tests passed (round 2: 49 files, 374 tests) (incl. `tests/integration/v31-perf.test.ts`: provider
   cap exact under 8 concurrent claimers with no duplicate sends; batched inbox + immediate revocation; planner/dashboard
   truncation flags; workload samples per workspace + `diagnostics.read` gate).

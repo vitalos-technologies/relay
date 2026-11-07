@@ -13,10 +13,11 @@ Backend only (no `apps/web/app/(app)/**`, no `apps/web/components/**`).
 | 5 | Docs: PERFORMANCE_BASELINE, PERFORMANCE_BUDGETS (+ `scripts/bench/budgets.ts`, `pnpm bench:compare … --check`), PERFORMANCE_RESULTS | done |
 | 6 | Verify: root tsc clean, web tsc clean, worker builds, pnpm test 490, integration 369 (47 files) | done |
 
+| 7 | Round 2 (lead): `025_v31_perf_more.sql` (metric_rollup_days + zones + triggers, deliveries (connection_id, published_at) index), `analytics/summary.ts` (readiness + worker backfill in analyticsTick), overview totals + trend-only days, set-based post families, two-stage approval inbox; tests `tests/integration/v31-analytics-summary.test.ts`; bench `evidence/perf/after2-*.json` | done — 025 NOT applied to dev (lead applies) |
+
 ## Next (open items, see PERFORMANCE_RESULTS.md)
 - Planner payload at scale (UI: brand/week default or compact fields).
-- Analytics overview 365 d: precomputed per-day summary in the analytics worker.
-- Approval inbox listing query p95 at Medium (111 ms vs 100).
+- (done in round 2: analytics 365 d, approval inbox)
 
 ## Notes
 - Bench DBs are `relay_bench_*`, dropped at the end unless `--keep`. Disk is tight (~4 GB free): Large needs ~2 GB.

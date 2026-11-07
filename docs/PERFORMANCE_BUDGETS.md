@@ -96,3 +96,7 @@ every query dimension; permission-sensitive results are never served stale (revo
 approval, publishing authority and security state are never cached as authorization; SWR only where staleness is
 acceptable and labelled. The analytics registry memo (`providerSupports`, `definitionsFor`) is a pure function of
 code-defined data and contains no tenant or authorization state.
+
+Round 2 adds a **precomputed aggregate, not a cache**: `metric_rollup_days` (migration 025) is maintained in the same
+transaction as every rollup write (statement-level triggers), so it is never stale; it holds no authorization state, and
+readers apply exactly the same workspace/brand/connection scope, dataset (source) and permission checks as before.

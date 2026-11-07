@@ -20,6 +20,7 @@ import { signedGetUrl } from '../storage.js';
 import { assertUuid, brandAllowed, requireAction } from '../tenancy.js';
 import { brandForPermission, brandsWith } from '../product/scope.js';
 import { serializeFilters } from './filters.js';
+import { summaryReady } from './summary.js';
 import { rollupSelectSql, type DataSource } from './ingest.js';
 import {
   DERIVED, ENGAGEMENT_FAMILIES, FAMILIES, MEASURES, METRIC_DEFINITIONS, definition, definitionsFor, ensureMetricRegistry, familyKey, fetchedPostDefinitions,
@@ -154,20 +155,42 @@ export interface Agg {
  * Aggregates per (connection, local publish date, metric key). Rollup path (cached 15-minute buckets) unless post-level
  * filters are present; the per-post path computes identical rows from metric_resource_latest.
  */
-export async function aggregate(scope: Scope, period: Period, o: PostScopeOpts & { forcePerPost?: boolean } = {}): Promise<Agg[]> {
+export async function aggregate(scope: Scope, period: Period,
+  o: PostScopeOpts & {
+    forcePerPost?: boolean; forceRollups?: boolean;
+    /** V3.1: one row per key for the whole period (local_date = ''), family/derived keys only… */
+    totals?: boolean;
+    /** …plus, in the same statement, per-day rows for these keys only (rows with local_date ≠ ''). */
+    dayKeys?: string[];
+  } = {}): Promise<Agg[]> {
   if (!scope.connections.length) return [];
   const q = new Params();
   let sql: string;
-  if (!scope.perPost && !o.videoOnly && !o.deliveryIds && !o.forcePerPost) {
-    const tz = q.p(period.timezone);
-    sql = `SELECT connection_id, provider::text AS provider, (bucket_start AT TIME ZONE ${tz})::date::text AS local_date, metric_key, definition_version, dimension,
+  const rollupPath = !scope.perPost && !o.videoOnly && !o.deliveryIds && !o.forcePerPost;
+  if (rollupPath) {
+    // V3.1 PERF: the precomputed per-local-day summary (migration 025) when this zone is ready, else the 15-minute rollups.
+    // Both produce identical rows (tests/integration/v31-analytics-summary.test.ts). Totals are the same sums/min/max as
+    // adding up the per-day rows in measureFromAggs.
+    const summary = !o.forceRollups && await zoneReady(scope, period.timezone);
+    const ws = q.p(scope.workspaceId); const src = q.p(scope.sources); const conns = q.p(scope.connections.map((c) => c.id));
+    let tzp: string | null = null;
+    const tz = () => (tzp ??= q.p(period.timezone)); // allocated only when referenced (no unused, untyped parameter)
+    const where = summary
+      ? `workspace_id = ${ws} AND tz = ${tz()} AND source = ANY(${src}::text[]) AND local_date >= ${q.p(period.from)}::date AND local_date <= ${q.p(period.to)}::date
+         AND connection_id IN (SELECT unnest(${conns}::uuid[]))`
+      : `workspace_id = ${ws} AND source = ANY(${src}::text[]) AND connection_id IN (SELECT unnest(${conns}::uuid[]))
+         AND bucket_start >= ${q.p(period.start_utc)}::timestamptz AND bucket_start < ${q.p(period.end_utc)}::timestamptz`;
+    const day = () => (summary ? 'local_date::text' : `(bucket_start AT TIME ZONE ${tz()})::date::text`);
+    const select = (dateCol: string, keyFilter: string) => `SELECT connection_id, provider::text AS provider, ${dateCol} AS local_date, metric_key, definition_version, dimension,
                   sum(value_sum)::float8 AS value, sum(resources)::int AS resources, min(min_through_at) AS min_through, min(min_observed_at) AS min_observed,
                   max(max_observed_at) AS max_observed
-             FROM metric_rollups
-            WHERE workspace_id = ${q.p(scope.workspaceId)} AND source = ANY(${q.p(scope.sources)}::text[])
-              AND connection_id = ANY(${q.p(scope.connections.map((c) => c.id))}::uuid[])
-              AND bucket_start >= ${q.p(period.start_utc)}::timestamptz AND bucket_start < ${q.p(period.end_utc)}::timestamptz
-            GROUP BY 1,2,3,4,5,6`;
+             FROM ${summary ? 'metric_rollup_days' : 'metric_rollups'} WHERE ${where}${keyFilter} GROUP BY 1,2,3,4,5,6`;
+    if (o.totals) {
+      sql = select(`''`, ` AND left(metric_key, 1) = '_'`);
+      if (o.dayKeys?.length) sql += `\n UNION ALL ${select(day(), ` AND metric_key = ANY(${q.p(o.dayKeys)}::text[])`)}`;
+    } else {
+      sql = select(day(), '');
+    }
   } else {
     const tz = q.p(period.timezone);
     const fam = q.p([...ENGAGEMENT_FAMILIES]);
@@ -194,19 +217,25 @@ export async function postStates(scope: Scope, period: Period, o: PostScopeOpts 
   const q = new Params();
   const tz = q.p(period.timezone);
   const src = q.p(scope.sources);
+  const ws = q.p(scope.workspaceId);
   const scopeSql = postScopeSql(scope, period, q, o);
   const rows = await many<{ id: string; connection_id: string; provider: Provider; local_date: string; fams: string[] | null; cov: Record<string, FetchState> | null; any_state: FetchState | null }>(getPool(),
-    `SELECT sp.id, sp.connection_id, sp.provider::text AS provider, (sp.published_at AT TIME ZONE ${tz})::date::text AS local_date,
-            (SELECT array_agg(DISTINCT md.family) FROM metric_resource_latest l JOIN metric_definitions md ON md.metric_id = l.metric_id AND md.version = l.definition_version
-              WHERE l.workspace_id = d0.workspace_id AND l.connection_id = sp.connection_id AND l.resource_type = 'post' AND l.resource_id = sp.id AND l.source = ANY(${src}::text[])) AS fams,
+    // V3.1 PERF: families per post from ONE grouped scan of metric_resource_latest (was a correlated subquery per post).
+    `WITH sp AS MATERIALIZED (${scopeSql}),
+     fams AS (
+       SELECT l.connection_id, l.resource_id, array_agg(DISTINCT md.family) AS fams
+         FROM metric_resource_latest l JOIN metric_definitions md ON md.metric_id = l.metric_id AND md.version = l.definition_version
+        WHERE l.workspace_id = ${ws} AND l.resource_type = 'post' AND l.source = ANY(${src}::text[]) AND l.resource_id IN (SELECT id FROM sp)
+        GROUP BY 1, 2)
+     SELECT sp.id, sp.connection_id, sp.provider::text AS provider, (sp.published_at AT TIME ZONE ${tz})::date::text AS local_date, f.fams,
             (SELECT jsonb_object_agg(family, status) FROM (
                SELECT md.family, (array_agg(dc.status ORDER BY ${SEVERITY}))[1] AS status
                  FROM data_coverage dc JOIN (SELECT DISTINCT metric_id, family FROM metric_definitions) md ON md.metric_id = dc.metric_id
-                WHERE dc.workspace_id = d0.workspace_id AND dc.connection_id = sp.connection_id AND dc.resource_type = 'post' AND dc.resource_id = sp.id
+                WHERE dc.workspace_id = ${ws} AND dc.connection_id = sp.connection_id AND dc.resource_type = 'post' AND dc.resource_id = sp.id
                 GROUP BY md.family) x) AS cov,
-            (SELECT dc.status FROM data_coverage dc WHERE dc.workspace_id = d0.workspace_id AND dc.connection_id = sp.connection_id AND dc.resource_type = 'post'
+            (SELECT dc.status FROM data_coverage dc WHERE dc.workspace_id = ${ws} AND dc.connection_id = sp.connection_id AND dc.resource_type = 'post'
                 AND dc.resource_id = sp.id AND dc.metric_id = '*') AS any_state
-       FROM (${scopeSql}) sp JOIN deliveries d0 ON d0.id = sp.id
+       FROM sp LEFT JOIN fams f ON f.connection_id = sp.connection_id AND f.resource_id = sp.id
       LIMIT ${MAX_POST_STATES}`, q.values);
   return rows.map((r) => ({ id: r.id, connection_id: r.connection_id, provider: r.provider, local_date: r.local_date, families: new Set(r.fams ?? []),
     cov: new Map(Object.entries(r.cov ?? {})), any: r.any_state }));
@@ -436,7 +465,47 @@ function sufficient(h: SeriesHealth): boolean {
 
 interface Bundle { aggs: Agg[]; posts: PostState[]; prevAggs: Agg[]; prevPosts: PostState[]; cur: Map<string, CursorInfo> }
 
-async function bundle(scope: Scope, o: PostScopeOpts = {}): Promise<Bundle> {
+/** Summary readiness, checked once per request scope + time zone. */
+const zoneMemo = new WeakMap<Scope, Map<string, Promise<boolean>>>();
+function zoneReady(scope: Scope, tz: string): Promise<boolean> {
+  let m = zoneMemo.get(scope);
+  if (!m) { m = new Map(); zoneMemo.set(scope, m); }
+  let p = m.get(tz);
+  if (!p) { p = summaryReady(scope.workspaceId, tz); m.set(tz, p); }
+  return p;
+}
+
+/** Metric keys measureFromAggs reads for a measure (family/derived rollup keys). */
+function measureKeys(m: MeasureKey): string[] {
+  const M = MEASURES[m];
+  switch (M.kind) {
+    case 'family': return [familyKey(M.families[0]!)];
+    case 'engagements': return [DERIVED.engagements];
+    case 'rate': return M.denominator === 'views' ? [DERIVED.erViewsNum, DERIVED.erViewsDen] : [DERIVED.erImprNum, DERIVED.erImprDen];
+    case 'ratio': return [DERIVED.avdNum, DERIVED.avdDen];
+    default: return [];
+  }
+}
+
+/**
+ * V3.1 PERF bundle for the overview: period totals of the family/derived keys (KPIs, channels, per-network values —
+ * measureFromAggs only sums them) + per-day rows only for the trend measure. Same results as bundle() with ~10× fewer
+ * rows on long ranges. Filtered (per-post) scopes keep the full per-day rows for both.
+ */
+async function overviewBundle(scope: Scope, trend: MeasureKey): Promise<Bundle & { dayAggs: Agg[]; prevDayAggs: Agg[] }> {
+  if (scope.perPost) { const b = await bundle(scope); return { ...b, dayAggs: b.aggs, prevDayAggs: b.prevAggs }; }
+  const dayKeys = measureKeys(trend);
+  const split = async (p: Period) => {
+    const rows = await aggregate(scope, p, { totals: true, dayKeys });
+    return [rows.filter((r) => r.local_date === ''), rows.filter((r) => r.local_date !== '')] as [Agg[], Agg[]];
+  };
+  const [[aggs, dayAggs], posts, cur] = await Promise.all([split(scope.period), postStates(scope, scope.period), cursors(scope)]);
+  const [[prevAggs, prevDayAggs], prevPosts] = scope.previous
+    ? await Promise.all([split(scope.previous), postStates(scope, scope.previous)]) : [[[], []] as [Agg[], Agg[]], [] as PostState[]];
+  return { aggs, dayAggs, posts, prevAggs, prevDayAggs, prevPosts, cur };
+}
+
+async function bundle(scope: Scope, o: PostScopeOpts & { forceRollups?: boolean } = {}): Promise<Bundle> {
   const [aggs, posts, cur] = await Promise.all([aggregate(scope, scope.period, o), postStates(scope, scope.period, o), cursors(scope)]);
   const [prevAggs, prevPosts] = scope.previous ? await Promise.all([aggregate(scope, scope.previous, o), postStates(scope, scope.previous, o)]) : [[], []];
   return { aggs, posts, prevAggs, prevPosts, cur };
@@ -715,11 +784,14 @@ function dataHealth(scope: Scope, b: Bundle, eng: SeriesHealth): DataHealth {
 // ------------------------------------------------------------------ views
 const DEFAULT_TREND: MeasureKey = 'engagements';
 
-export async function overview(ctx: Ctx, filters: AnalyticsFilters, opts: { measure?: string | null } = {}): Promise<OverviewResponse> {
+export async function overview(ctx: Ctx, filters: AnalyticsFilters,
+  opts: { measure?: string | null; /** verification only (tests/bench): pre-V3.1 data path — full per-day rows from the 15-minute rollups */ reference?: boolean } = {}): Promise<OverviewResponse> {
   const scope = await resolveScope(ctx, filters);
-  const b = await bundle(scope);
-  const providers = [...new Set(scope.connections.map((c) => c.provider))];
   const measure = (opts.measure && (MEASURE_KEYS as readonly string[]).includes(opts.measure) && opts.measure !== 'followers' ? opts.measure : DEFAULT_TREND) as MeasureKey;
+  const b = opts.reference
+    ? await (async () => { const x = await bundle(scope, { forceRollups: true }); return { ...x, dayAggs: x.aggs, prevDayAggs: x.prevAggs }; })()
+    : await overviewBundle(scope, measure);
+  const providers = [...new Set(scope.connections.map((c) => c.provider))];
   // KPIs (≤ 4, context-appropriate)
   const kpis: Kpi[] = [kpi('posts_published', scope, b)];
   if (providers.some((p) => providerSupports(p, 'engagements'))) kpis.push(kpi('engagements', scope, b));
@@ -732,8 +804,8 @@ export async function overview(ctx: Ctx, filters: AnalyticsFilters, opts: { meas
   else if (providers.length === 1 && providerSupports(providers[0]!, 'impressions')) kpis.push(kpi('impressions', scope, b));
   else if (providers.some((p) => providerSupports(p, 'watch_time'))) kpis.push(kpi('watch_time', scope, b));
   // Trend
-  const t = trendFor(measure, scope, scope.period, b.aggs, b.posts, b.cur);
-  const prev = scope.previous ? trendFor(measure, scope, scope.previous, b.prevAggs, b.prevPosts, b.cur) : null;
+  const t = trendFor(measure, scope, scope.period, b.dayAggs, b.posts, b.cur);
+  const prev = scope.previous ? trendFor(measure, scope, scope.previous, b.prevDayAggs, b.prevPosts, b.cur) : null;
   const basis = basisFor(measure);
   const trend: Trend = {
     measure, basis: basis.basis, basis_label: basis.label, definition: measureDefinition(measure, providers), available_measures: availableMeasures(scope),

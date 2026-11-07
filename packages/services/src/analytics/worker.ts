@@ -13,6 +13,7 @@ import { QUEUE_ANALYTICS_SYNC, dueSyncJobs, ensureSyncCursors, runConnectionSync
 import { QUEUE_REPORT_EXPORT, queuedExports, runReportExport, sweepExpiredExports } from './reports.js';
 import { backfillLegacySnapshots } from './backfill.js';
 import { purgeAnalyticsRetention } from './retention.js';
+import { backfillSummaryZones } from './summary.js';
 
 const NS = '0c6f4f8e-3b3d-4a35-9c1e-5a2b7f0d9e21';
 
@@ -62,6 +63,9 @@ export async function analyticsTick(boss: Pick<PgBoss, 'send'>): Promise<{ syncJ
   }
   const ex = await queuedExports(20);
   for (const e of ex) await boss.send(QUEUE_REPORT_EXPORT, { exportId: e.id }, { id: e.id, group: { id: e.workspace_id } });
+  // V3.1 PERF: backfill newly tracked per-day summary zones (migration 025); readers fall back to rollups until ready.
+  const z = await backfillSummaryZones().catch((err) => { log.warn('analytics_summary_backfill_failed', { err: err as Error }); return null; });
+  if (z?.ready) log.info('analytics_summary_zones_ready', { ...z });
   if (ticks % 10 === 1) {
     const b = await backfillLegacySnapshots({ batch: 500 }).catch((err) => { log.warn('analytics_backfill_failed', { err: err as Error }); return null; });
     if (b && (b.snapshots || b.coverageRows)) log.info('analytics_backfill', { ...b });
