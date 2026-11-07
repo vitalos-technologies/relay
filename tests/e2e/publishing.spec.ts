@@ -140,7 +140,10 @@ test.describe('screens', () => {
 
   test('keyboard: skip to content and visible focus', async ({ page }) => {
     await signIn(page, 'owner@demo.social-lite.test');
+    await page.goto('/history');
+    await page.waitForLoadState('networkidle');
     await page.keyboard.press('Tab');
+    await expect(page.locator(':focus')).toHaveText(/Skip to content/);
     const focused = await page.evaluate<{ tag: string; outline: boolean } | null>(`(() => {
       const el = document.activeElement; if (!el) return null;
       const s = getComputedStyle(el);

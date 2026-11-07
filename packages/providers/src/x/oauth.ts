@@ -133,3 +133,20 @@ export const xConnector: OAuthConnector = {
   listDestinations,
   finalize,
 };
+
+/**
+ * Revoke an X OAuth 2.0 token (POST /2/oauth2/revoke). Best effort: returns false on any failure.
+ * Revoking the refresh token also invalidates its access tokens.
+ */
+export async function revokeXToken(ctx: AdapterContext, credentials: ProviderCredentials): Promise<boolean> {
+  if (credentials.kind !== 'oauth2') return false;
+  const token = credentials.refreshToken ?? credentials.accessToken;
+  const auth = clientAuth(ctx.config);
+  try {
+    await xCall(ctx, { method: 'POST', path: '/2/oauth2/revoke', basic: auth.basic, op: 'x.oauth.revoke',
+      form: { token, token_type_hint: credentials.refreshToken ? 'refresh_token' : 'access_token', client_id: auth.clientIdInBody } });
+    return true;
+  } catch {
+    return false;
+  }
+}

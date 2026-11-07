@@ -163,3 +163,10 @@ export async function getUsableCredentials(
   }
   return { credentials: creds, connection: usable(row) };
 }
+
+/** Decrypt stored credentials WITHOUT refreshing (used for best-effort revocation on disconnect). */
+export async function peekCredentials(connectionId: string): Promise<{ credentials: ProviderCredentials; connection: UsableConnection } | null> {
+  const row = await readRow(connectionId);
+  if (!row || !row.encrypted_blob) return null;
+  try { return { credentials: decrypt(row as never), connection: usable(row as never) }; } catch { return null; }
+}

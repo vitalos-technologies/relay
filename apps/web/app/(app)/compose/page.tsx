@@ -6,6 +6,7 @@ import { ArrowRight, FileText, SquarePen } from 'lucide-react';
 import { api } from '@/lib/client/api';
 import { useSession } from '@/lib/client/session';
 import { useApi } from '@/lib/client/use-api';
+import { CsvImportDialog } from '@/components/import/csv-import-dialog';
 import { useBrandFilter } from '@/lib/client/hooks';
 import { fmtRelative, postTitle } from '@/lib/client/format';
 import type { Page, PostDetail, PostSummary, Template } from '@/lib/client/types';
@@ -83,9 +84,12 @@ export default function ComposePage() {
               </Select>
             </Field>
             {error ? <ErrorNotice error={error} /> : null}
-            <Button variant="primary" onClick={create} loading={busy} disabledReason={!brandId ? 'Choose a brand.' : null} className="self-start">
-              Create draft <ArrowRight aria-hidden className="size-4" />
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="primary" onClick={create} loading={busy} disabledReason={!brandId ? 'Choose a brand.' : null}>
+                Create draft <ArrowRight aria-hidden className="size-4" />
+              </Button>
+              <CsvImportDialog brandId={brandId} />
+            </div>
           </div>
         </Card>
 

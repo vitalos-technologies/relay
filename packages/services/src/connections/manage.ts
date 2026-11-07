@@ -15,7 +15,8 @@ import { audit } from '../audit.js';
 import { writeOutbox } from '../outbox.js';
 import { log } from '../log.js';
 import { blockDeliveriesForConnection, onConnectionRestored, onScopePaused, onScopeResumed } from '../engine/hooks.js';
-import { CredentialUnavailableError, getUsableCredentials } from './credentials.js';
+import { CredentialUnavailableError, getUsableCredentials, peekCredentials } from './credentials.js';
+import { revokeXToken } from '@social-lite/providers/x/index';
 import { oauthConnectorFor, startOAuth } from './oauth.js';
 import { buildAdapterContext, isOAuthProvider, oauthRedirectUri, providerAppConfig, setupContext } from './runtime.js';
 import {
@@ -311,6 +312,13 @@ export async function setConnectionPaused(ctx: Ctx, id: string, body: unknown): 
 /** AC-05: stop dispatch, block queued work, delete the credential immediately (spec §14). */
 export async function disconnectConnection(ctx: Ctx, id: string): Promise<{ connection: ConnectionJson; blocked_deliveries: number }> {
   requireAction(ctx, 'connections.manage', 'Only owners and admins can disconnect accounts.');
+  // X: revoke the grant at the provider first (network call outside the transaction, best effort).
+  let revoked: boolean | null = null;
+  const pre = await loadConnection(ctx, id);
+  if (pre.provider === 'x' && !pre.is_mock && !pre.disconnected_at) {
+    const peek = await peekCredentials(id);
+    if (peek) revoked = await revokeXToken(await buildAdapterContext('x', peek.connection), peek.credentials);
+  }
   return withTx(async (tx) => {
     const c = await loadConnection(ctx, id, tx, true);
     if (c.disconnected_at) return { connection: toConnectionJson(c), blocked_deliveries: 0 };
@@ -323,7 +331,7 @@ export async function disconnectConnection(ctx: Ctx, id: string): Promise<{ conn
     await writeOutbox(tx, { workspaceId: c.workspace_id, aggregateType: 'connection', aggregateId: id, eventType: 'connection.health_changed',
       payload: { from: c.status, to: 'disconnected', blockedDeliveries: blocked } });
     await audit(tx, { workspaceId: c.workspace_id, brandId: c.brand_id, actorUserId: ctx.actor.userId, action: 'connection.disconnected',
-      resourceType: 'connection', resourceId: id, diff: { provider: c.provider, provider_account_id: c.provider_account_id, blocked_deliveries: blocked },
+      resourceType: 'connection', resourceId: id, diff: { provider: c.provider, provider_account_id: c.provider_account_id, blocked_deliveries: blocked, provider_token_revoked: revoked },
       correlationId: ctx.correlationId });
     return { connection: toConnectionJson(r), blocked_deliveries: blocked };
   });
