@@ -29,7 +29,7 @@ Product is now **Relay** (brand kit: docs/brand/relay-brand-kit.webp; decisions 
 - V3-P providers DONE (adapters, connectors, fakes, metrics, 164 contract tests, docs; migration 014 applied to dev). Gaps for V3 streams: Bluesky connect route/UI; composer per-provider required fields (TikTok privacy+consent, YouTube title/privacy/madeForKids, Pinterest board, LinkedIn org); YouTube native scheduling needs early upload dispatch before publishAt; dedicated `manual_handoff` delivery state (TikTok inbox drafts currently Unknown + handoff text); self-hosted Bluesky PDS allow-list.
 - V3 streams RUNNING (contracts: docs/V3_WORKSTREAMS.md): AN analytics (015), CH content hub (016), MCP (017). Progress notes docs/v3-progress/{analytics,content-hub,mcp}.md.
 - UX redesign stream (018) starts when V2-A finishes (A relaunched to finish CSP/scans/security UI/Keycloak test fixes; docs/v2-progress/A.md).
-- Lead V3 engine gaps DONE (commit 0c57bae): `handoff` delivery state (migration 019; TikTok inbox), YouTube early upload (engine/provider-scheduling.ts; 180 min early, publishAt = due time, <15 min lead → app-owned at due time). Tests: engine-handoff, v3-youtube-early-upload. Migration 019 NOT yet applied to dev: apply 015–019 together once AN/CH/MCP land (migrator locks checksums).
+- Lead V3 engine gaps DONE (commit 0c57bae): `handoff` delivery state (migration 019; TikTok inbox), YouTube early upload (engine/provider-scheduling.ts; 180 min early, publishAt = due time, <15 min lead → app-owned at due time). Tests: engine-handoff, v3-youtube-early-upload. Migration 019 applied to dev on its own (Home queries the handoff state); 015–017 still pending on dev — apply once AN/CH/MCP land (migrator locks checksums). Web /api/ready reports not_ready until then.
 - Lead V3 next: V3 docs (matrix, build status, gaps, activation).
 
 ## Environment recovery
@@ -40,7 +40,8 @@ Docker stops on container restart: if `/var/run/docker.pid` points at a non-dock
 
 - Reset dev DB + re-seed: stream test fixtures leaked into the demo workspace ("Health FB e63a", "Affected launch e63a"); tests must use per-run test DBs only.
 - Demo identities: Keycloak issuer replaced Dex → existing dev users are bound to the Dex issuer (`account_conflict` on sign-in). Fresh seed with `oidc_issuer='pending'` users fixes dev; document for real deployments (no re-binding by email).
-- Health centre lists overdue "scheduled" items when the worker is down — label overdue explicitly.
+- ✅ Overdue label (commit db2a023): deliveries >2 min past dispatch show Overdue; Home banner with publisher state (evidence/v2/home-overdue-*.png).
+- V2 docs set delegated to a docs agent (V2_REQUIREMENTS_MATRIX, CHANGELOG, USER_LIFECYCLE, MIGRATION_RUNBOOK, GAPS, ACTIVATION, TEST_REPORT) — lead reviews + commits.
 - Sweep remaining user-facing "Social Lite" strings (e.g. scripts/dev.sh banner) → Relay (V3.1 also requires this).
 - tests/integration/setup.test.ts still expects the Dex issuer (stream A to fix).
 - Run full suite + E2E (Keycloak TOTP sign-in) + migration rehearsal with migrations 010–014.
