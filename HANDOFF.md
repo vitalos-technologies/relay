@@ -70,7 +70,7 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
   - Verified: tsc clean; unit 495/495; integration 400/401 (`v31-analytics-summary` timing flake under load, passes alone); **full E2E 51/51 on a production build** (covers lead fixes 89286a7); mobile 30 routes × 8 widths no overflow; perf within budget; secret scan clean.
   - Docs: `docs/admin/*` (12). Open decisions: G-A1 (Instance setup still owner-gated), G-A5 (optional pg-boss read grant for the web role). Left: large-dataset admin benchmark, screen-reader pass, real-device/RUM.
 - **Dev environment:** all migrations 001–017, 019–022, 025, 026 applied. Web runs as a production build on :3000 (`next build --webpack` + `next start`); a stale `next dev` on :3000 makes `next start` fail — check the process. Worker rebuilt with the worker DB role. E2E uses its own seeded workspaces (`pnpm db:seed:e2e`).
-- **Background agents** (a new session will NOT have them): none yet — Collaboration launching next (progress `docs/collaboration-progress.md`). Relaunch from its progress note + brief if missing.
+- **Background agents** (a new session will NOT have them): Collaboration (running since 19:15 UTC) (progress `docs/collaboration-progress.md`). Relaunch from its progress note + brief if missing.
 - **Known gaps carried forward:** `docs/V2_IMPLEMENTATION_GAPS.md`, `docs/V3_IMPLEMENTATION_GAPS.md`, `docs/V3_1_IMPLEMENTATION_GAPS.md`, `docs/admin/IMPLEMENTATION_GAPS.md` (planner payload, Zod in browser bundles, flags gate UI only, storage orphans, no follower data, TikTok handoff download, lint).
 
 ## Uncommitted work (who owns what)
