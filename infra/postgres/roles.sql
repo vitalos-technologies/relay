@@ -16,6 +16,11 @@ BEGIN
   EXECUTE format('REVOKE CREATE ON DATABASE %I FROM socialite_app', current_database());
 END $$;
 
+-- Extensions used by the migrations (001_core.sql). Creating an extension needs the database owner, so this owner-run
+-- file installs them; the migrator's own CREATE EXTENSION IF NOT EXISTS then becomes a no-op.
+CREATE EXTENSION IF NOT EXISTS citext;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- Application schema: only the migrator may create objects in it.
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 GRANT USAGE, CREATE ON SCHEMA public TO socialite_migrator;
@@ -83,6 +88,17 @@ ALTER DEFAULT PRIVILEGES FOR ROLE socialite_migrator IN SCHEMA public GRANT EXEC
 
 -- Audit log: append-only for application roles (INSERT + SELECT). A database superuser can still rewrite it;
 -- see docs/V2_THREAT_MODEL.md (no external immutable sink is configured).
-REVOKE UPDATE, DELETE, TRUNCATE ON audit_events FROM socialite_app, socialite_worker;
+-- (table statements are guarded: on a brand-new database this file runs before the migrations create the tables)
+DO $$
+BEGIN
+  IF to_regclass('public.audit_events') IS NOT NULL THEN
+    EXECUTE 'REVOKE UPDATE, DELETE, TRUNCATE ON audit_events FROM socialite_app, socialite_worker';
+  END IF;
+END $$;
 -- Migration bookkeeping is read-only outside the migrator.
-REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON schema_migrations FROM socialite_app, socialite_worker;
+DO $$
+BEGIN
+  IF to_regclass('public.schema_migrations') IS NOT NULL THEN
+    EXECUTE 'REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON schema_migrations FROM socialite_app, socialite_worker';
+  END IF;
+END $$;
