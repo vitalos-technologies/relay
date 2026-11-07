@@ -49,11 +49,11 @@ export function MenuRadioItem({ value, children, icon }: { value: string; childr
   return (
     <M.RadioItem
       value={value}
-      className="touch-target flex h-9 cursor-pointer select-none items-center gap-2.5 rounded-lg px-2.5 text-[13px] outline-none data-[highlighted]:bg-surface data-[state=checked]:text-accent-text [&>svg]:size-4"
+      className="touch-target flex h-9 cursor-pointer select-none items-center gap-2.5 rounded-lg px-2.5 text-[13px] outline-none data-[highlighted]:bg-surface data-[state=checked]:font-medium [&>svg]:size-4"
     >
       {icon}
       <span className="flex-1">{children}</span>
-      <M.ItemIndicator><span aria-hidden className="size-1.5 rounded-full bg-[var(--accent-text)] inline-block" /></M.ItemIndicator>
+      <M.ItemIndicator><span aria-hidden className="size-1.5 rounded-full bg-[var(--text)] inline-block" /></M.ItemIndicator>
     </M.RadioItem>
   );
 }
@@ -64,7 +64,7 @@ export function MenuLinkItem({ href, children, icon, active }: { href: string; c
       <Link
         href={href}
         aria-current={active ? 'page' : undefined}
-        className="touch-target flex h-10 cursor-pointer select-none items-center gap-2.5 rounded-lg px-2.5 text-[13px] outline-none data-[highlighted]:bg-surface aria-[current=page]:text-accent-text [&>svg]:size-4 [&>svg]:text-muted"
+        className="touch-target flex h-10 cursor-pointer select-none items-center gap-2.5 rounded-lg px-2.5 text-[13px] outline-none data-[highlighted]:bg-surface aria-[current=page]:font-semibold [&>svg]:size-4 [&>svg]:text-muted"
       >
         {icon}
         {children}

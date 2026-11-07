@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { Building, Gauge, OctagonPause, Play, Plus, Users } from 'lucide-react';
+import { Building, Gauge, OctagonPause, Play, Plus, Tag, Users } from 'lucide-react';
 import { useSession } from '@/lib/client/session';
 import { useBrandFilter, useQueryState } from '@/lib/client/hooks';
 import { useApi } from '@/lib/client/use-api';
@@ -8,7 +8,7 @@ import { api, isApiError } from '@/lib/client/api';
 import { allTimeZones } from '@/lib/client/format';
 import type { Brand, Workspace } from '@/lib/client/types';
 import {
-  Banner, Button, Card, CardHeader, ConfirmDialog, Dialog, EmptyState, ErrorNotice, ErrorState, Facts, Field, Input, PageHeader,
+  Banner, Button, Card, CardHeader, ConfirmDialog, Dialog, EmptyState, ErrorNotice, ErrorState, Facts, Field, Input, MetaChip, PageHeader,
   Select, Skeleton, Switch, Tabs, TabsContent, TabsList, TabsTrigger, Textarea, TimeWithZone, useToast,
 } from '@/components/ui';
 import { TeamTab } from '@/components/settings/team-tab';
@@ -18,11 +18,11 @@ export default function SettingsPage() {
   const tab = params.get('tab') ?? 'workspace';
   return (
     <>
-      <PageHeader title="Settings" description="Workspace defaults, brand policy and voice, your team, and usage limits." />
+      <PageHeader title="Settings" />
       <Tabs value={tab} onValueChange={(v) => setParams({ tab: v === 'workspace' ? null : v })}>
         <TabsList label="Settings sections">
           <TabsTrigger value="workspace"><Building aria-hidden className="size-4" /> Workspace</TabsTrigger>
-          <TabsTrigger value="brand"><Building aria-hidden className="size-4" /> Brand</TabsTrigger>
+          <TabsTrigger value="brand"><Tag aria-hidden className="size-4" /> Brand</TabsTrigger>
           <TabsTrigger value="team"><Users aria-hidden className="size-4" /> Team</TabsTrigger>
           <TabsTrigger value="budgets"><Gauge aria-hidden className="size-4" /> Budgets</TabsTrigger>
         </TabsList>
@@ -77,18 +77,18 @@ function WorkspaceTab() {
 
   return (
     <Card className="max-w-2xl">
-      <CardHeader title="Workspace" description={editable ? undefined : 'Only owners and admins can change these settings.'} />
-      <div className="flex flex-col gap-5 p-5">
+      <CardHeader title="Workspace" actions={editable ? null : <MetaChip>View only</MetaChip>} />
+      <div className="flex flex-col gap-6 p-4">
         <Field label="Name"><Input value={name} onChange={(e) => setName(e.target.value)} readOnly={!editable} maxLength={120} /></Field>
-        <Field label="Default time zone" hint="Used for new brands and for display. Existing schedules keep their exact UTC instant and their own zone — changing this never moves a scheduled post.">
+        <Field label="Default time zone" info="For new brands and display. Never moves an existing scheduled post.">
           <Select value={tz} onChange={(e) => setTz(e.target.value)} disabled={!editable}>
             {zones.map((z) => <option key={z} value={z}>{z.replace(/_/g, ' ')}</option>)}
           </Select>
         </Field>
-        {tz !== data.timezone ? <Banner tone="info">Scheduled posts stay at their original times. Only defaults and display change.</Banner> : null}
-        <Facts items={[['Created', <TimeWithZone key="c" instant={data.created_at} tz={data.timezone} format="date" />], ['Type', data.is_demo ? 'Demo workspace (simulated destinations)' : 'Standard']]} />
+        {tz !== data.timezone ? <Banner tone="info" title="Scheduled posts keep their times" /> : null}
+        <Facts items={[['Created', <TimeWithZone key="c" instant={data.created_at} tz={data.timezone} format="date" />], ['Type', data.is_demo ? 'Demo (simulated)' : 'Standard']]} />
         {saveErr ? <ErrorNotice error={saveErr} /> : null}
-        {editable ? <div><Button variant="primary" onClick={save} loading={busy} disabled={!changed} disabledReason={changed && !name.trim() ? 'Name can’t be empty.' : null}>Save changes</Button></div> : null}
+        {editable ? <div><Button variant="primary" onClick={save} loading={busy} disabled={!changed} disabledReason={changed && !name.trim() ? 'Name can’t be empty.' : null}>Save</Button></div> : null}
       </div>
     </Card>
   );
@@ -107,21 +107,19 @@ function BrandTab() {
   }, [brandFilter]);
 
   return (
-    <div className="flex max-w-3xl flex-col gap-5">
-      <div className="flex flex-wrap items-end gap-3">
+    <div className="flex max-w-3xl flex-col gap-6">
+      <div className="flex flex-wrap items-end gap-2">
         {session.brands.length ? (
-          <Field label="Brand" className="min-w-[240px] flex-1">
+          <Field label="Brand" labelHidden className="min-w-[200px] flex-1">
             <Select value={selected} onChange={(e) => setSelected(e.target.value)}>
               {session.brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
             </Select>
           </Field>
         ) : null}
-        {can('brands.manage') ? <Button icon={<Plus aria-hidden className="size-4" />} onClick={() => setCreateOpen(true)}>New brand</Button> : null}
+        {can('brands.manage') ? <Button variant="ghost" icon={<Plus aria-hidden className="size-4" />} onClick={() => setCreateOpen(true)}>New<span className="sr-only"> brand</span></Button> : null}
       </div>
       {!session.brands.length ? (
-        <EmptyState icon={<Building aria-hidden />} title="No brands yet" action={can('brands.manage') ? <Button variant="primary" onClick={() => setCreateOpen(true)}>Create your first brand</Button> : null}>
-          A brand groups connected accounts, posts, media and approval policy.
-        </EmptyState>
+        <EmptyState icon={<Building aria-hidden />} title="No brands yet" action={can('brands.manage') ? <Button variant="primary" onClick={() => setCreateOpen(true)}>Create brand</Button> : null} />
       ) : selected ? <BrandForm key={selected} brandId={selected} /> : null}
       <CreateBrandDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={async (b) => { await refresh(); setSelected(b.id); }} />
     </div>
@@ -183,54 +181,54 @@ function BrandForm({ brandId }: { brandId: string }) {
   return (
     <>
       {data.publishing_paused ? (
-        <Banner tone="warn" title="Publishing is paused for this brand" actions={can('pause.emergency') ? <Button size="sm" icon={<Play aria-hidden className="size-4" />} onClick={() => setPauseOpen(true)}>Resume</Button> : null}>
-          {data.paused_reason ? `“${data.paused_reason}”` : 'Nothing for this brand will send until resumed.'}
+        <Banner tone="warn" title="Brand paused" actions={can('pause.emergency') ? <Button size="sm" icon={<Play aria-hidden className="size-4" />} onClick={() => setPauseOpen(true)}>Resume</Button> : null}>
+          {data.paused_reason ? `“${data.paused_reason}”` : null}
           {data.paused_at ? <span className="block text-xs text-muted">Since <TimeWithZone instant={data.paused_at} tz={data.timezone} /></span> : null}
         </Banner>
       ) : null}
       <Card>
-        <CardHeader title="Brand details and policy" description={editable ? undefined : 'Only owners and admins can change brand settings.'} />
-        <div className="grid grid-cols-1 gap-5 p-5 sm:grid-cols-2">
+        <CardHeader title="Details" actions={editable ? null : <MetaChip>View only</MetaChip>} />
+        <div className="grid grid-cols-1 gap-6 p-4 sm:grid-cols-2">
           <Field label="Name" error={fe?.name}><Input value={f.name} onChange={(e) => set({ name: e.target.value })} readOnly={!editable} /></Field>
-          <Field label="Time zone" hint="Default zone for this brand’s schedules. Existing schedules keep their UTC instant.">
+          <Field label="Time zone" info="Default for new schedules. Existing ones keep their time.">
             <Select value={f.timezone} onChange={(e) => set({ timezone: e.target.value })} disabled={!editable}>
               {zones.map((z) => <option key={z} value={z}>{z.replace(/_/g, ' ')}</option>)}
             </Select>
           </Field>
-          <div className="sm:col-span-2 flex flex-col gap-4 rounded-lg border border-border p-4">
-            <Switch checked={f.approval_required} onCheckedChange={(v) => set({ approval_required: v })} disabled={!editable} label="Require approval before publishing" description="An approver must approve the exact content, destinations and time. Any change after approval needs approval again." />
-            <Switch checked={f.editors_can_publish} onCheckedChange={(v) => set({ editors_can_publish: v })} disabled={!editable} label="Editors can schedule and publish" description="When off, editors submit posts for review instead." />
+          <div className="sm:col-span-2 flex flex-col gap-4">
+            <Switch checked={f.approval_required} onCheckedChange={(v) => set({ approval_required: v })} disabled={!editable} label="Require approval" description="Any change needs re-approval." />
+            <Switch checked={f.editors_can_publish} onCheckedChange={(v) => set({ editors_can_publish: v })} disabled={!editable} label="Editors can publish" description="Off: editors submit for review." />
           </div>
-          <Field label="Default publish-before deadline (minutes)" hint="If a post can’t send within this window it expires instead of posting late." error={dlBad ? 'Enter a whole number from 1 to 10080.' : fe?.default_deadline_minutes}>
+          <Field label="Deadline (minutes)" info="If a post can’t send within this window it expires instead of posting late." error={dlBad ? 'Whole number, 1–10080.' : fe?.default_deadline_minutes}>
             <Input type="number" inputMode="numeric" min={1} max={10080} value={f.deadline} onChange={(e) => set({ deadline: e.target.value })} readOnly={!editable} />
           </Field>
         </div>
       </Card>
       <Card>
-        <CardHeader title="Voice" description="Guidance shown to writers in the composer." />
-        <div className="grid grid-cols-1 gap-5 p-5 sm:grid-cols-2">
-          <Field label="Tone" className="sm:col-span-2"><Textarea value={f.tone} onChange={(e) => set({ tone: e.target.value })} rows={2} readOnly={!editable} className="min-h-16" placeholder="e.g. Warm, plain-spoken, never salesy" /></Field>
-          <Field label="Preferred terms" hint="Separate with commas."><Input value={f.terminology} onChange={(e) => set({ terminology: e.target.value })} readOnly={!editable} /></Field>
-          <Field label="Avoid these terms" hint="The composer warns when these appear."><Input value={f.prohibited} onChange={(e) => set({ prohibited: e.target.value })} readOnly={!editable} /></Field>
-          <Field label="Default call to action"><Input value={f.cta} onChange={(e) => set({ cta: e.target.value })} readOnly={!editable} /></Field>
-          <Field label="Hashtags" hint="Separate with commas."><Input value={f.hashtags} onChange={(e) => set({ hashtags: e.target.value })} readOnly={!editable} /></Field>
+        <CardHeader title="Voice" />
+        <div className="grid grid-cols-1 gap-6 p-4 sm:grid-cols-2">
+          <Field label="Tone" className="sm:col-span-2"><Textarea value={f.tone} onChange={(e) => set({ tone: e.target.value })} rows={2} readOnly={!editable} className="min-h-16" placeholder="Warm, plain-spoken" /></Field>
+          <Field label="Preferred terms"><Input value={f.terminology} onChange={(e) => set({ terminology: e.target.value })} readOnly={!editable} placeholder="Comma-separated" /></Field>
+          <Field label="Avoid terms" hint="Composer warns on these."><Input value={f.prohibited} onChange={(e) => set({ prohibited: e.target.value })} readOnly={!editable} placeholder="Comma-separated" /></Field>
+          <Field label="Call to action"><Input value={f.cta} onChange={(e) => set({ cta: e.target.value })} readOnly={!editable} /></Field>
+          <Field label="Hashtags"><Input value={f.hashtags} onChange={(e) => set({ hashtags: e.target.value })} readOnly={!editable} placeholder="Comma-separated" /></Field>
           <Field label="Footer" className="sm:col-span-2"><Textarea value={f.footer} onChange={(e) => set({ footer: e.target.value })} rows={2} readOnly={!editable} className="min-h-16" /></Field>
         </div>
       </Card>
       {saveErr && !fe ? <ErrorNotice error={saveErr} /> : null}
       <div className="flex flex-wrap items-center gap-2">
-        {editable ? <Button variant="primary" onClick={save} loading={busy} disabledReason={!f.name.trim() ? 'Name can’t be empty.' : dlBad ? 'Fix the deadline.' : null}>Save brand</Button> : null}
+        {editable ? <Button variant="primary" onClick={save} loading={busy} disabledReason={!f.name.trim() ? 'Name can’t be empty.' : dlBad ? 'Fix the deadline.' : null}>Save</Button> : null}
         {can('pause.emergency') && !data.publishing_paused ? (
-          <Button variant="danger" icon={<OctagonPause aria-hidden className="size-4" />} onClick={() => setPauseOpen(true)}>Pause this brand</Button>
+          <Button variant="quiet" className="text-danger!" icon={<OctagonPause aria-hidden className="size-4" />} onClick={() => setPauseOpen(true)}>Pause brand</Button>
         ) : null}
       </div>
       <ConfirmDialog
         open={pauseOpen}
         onOpenChange={setPauseOpen}
-        title={data.publishing_paused ? `Resume ${data.name}?` : `Pause publishing for ${data.name}?`}
+        title={data.publishing_paused ? `Resume ${data.name}?` : `Pause ${data.name}?`}
         description={data.publishing_paused
-          ? 'Scheduled posts still within their publish-before deadline will send. Missed ones expire and appear in Needs attention.'
-          : 'No posts for this brand will send until resumed. Posts already being sent may still complete. Other brands are unaffected.'}
+          ? 'Posts past their deadline expire — never sent late.'
+          : 'Posts already sending may complete. Other brands unaffected.'}
         confirmLabel={data.publishing_paused ? 'Resume' : 'Pause brand'}
         confirmVariant={data.publishing_paused ? 'primary' : 'danger'}
         onConfirm={async () => {
@@ -245,7 +243,7 @@ function BrandForm({ brandId }: { brandId: string }) {
           <Field label="Reason" optional><Textarea value={pauseReason} onChange={(e) => setPauseReason(e.target.value)} rows={2} className="min-h-16" /></Field>
         ) : null}
       </ConfirmDialog>
-      {session.workspace?.publishing_paused ? <Banner tone="info">The whole workspace is also paused; resume it from the sidebar.</Banner> : null}
+      {session.workspace?.publishing_paused ? <Banner tone="info" title="Workspace also paused" /> : null}
     </>
   );
 }
@@ -280,7 +278,7 @@ function CreateBrandDialog({ open, onOpenChange, onCreated }: { open: boolean; o
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-          <Button variant="primary" onClick={submit} loading={busy} disabledReason={!name.trim() ? 'Enter a name.' : null}>Create brand</Button>
+          <Button variant="primary" onClick={submit} loading={busy} disabledReason={!name.trim() ? 'Enter a name.' : null}>Create</Button>
         </>
       }
     >
@@ -305,14 +303,13 @@ function BudgetsTab() {
   const entries = Object.entries(data.limits ?? {});
   return (
     <Card className="max-w-2xl">
-      <CardHeader title="Usage limits" description="Limits configured for this workspace. Read only — they’re set by the workspace owner’s plan and deployment." />
-      <div className="p-5">
+      <CardHeader title="Usage limits" actions={<MetaChip>Read only</MetaChip>} />
+      <div className="px-4 pb-4">
         {!entries.length ? (
-          <p className="text-[13px] text-muted">No limits are configured for this workspace.</p>
+          <p className="text-[13px] text-muted">No limits set</p>
         ) : (
           <Facts items={entries.map(([k, v]) => [humanKey(k), <span key={k} className="font-mono text-[12px]">{formatValue(v)}</span>])} />
         )}
-        <p className="mt-4 text-xs text-muted">When a limit is reached, affected posts are blocked with a clear reason rather than failing silently.</p>
       </div>
     </Card>
   );

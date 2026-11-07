@@ -63,20 +63,20 @@ export default function HistoryPage() {
   const rangeBad = fromDate && toDate && fromDate > toDate;
 
   if (!can('history.read')) {
-    return <><PageHeader title="History" /><EmptyState icon={<FileClock aria-hidden />} title="You don’t have access to history" /></>;
+    return <><PageHeader title="History" /><EmptyState icon={<FileClock aria-hidden />} title="No access" /></>;
   }
 
   return (
     <>
       <PageHeader
         title="History"
-        description="Every destination’s result, with its scheduled time, attempts and provider links."
+        meta={<span className="truncate">{tz.replace(/_/g, ' ')}</span>}
         actions={can('history.export') ? (
-          <LinkButton href={exportHref} external download variant="secondary" icon={<Download aria-hidden className="size-4" />}>Export CSV</LinkButton>
+          <LinkButton href={exportHref} external download variant="secondary" icon={<Download aria-hidden className="size-4" />}>CSV<span className="sr-only"> export</span></LinkButton>
         ) : null}
       />
 
-      <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Field label="Network">
           <Select value={provider} onChange={(e) => setParams({ provider: e.target.value })}>
             <option value="">All networks</option>
@@ -89,7 +89,7 @@ export default function HistoryPage() {
             {DELIVERY_STATES.map((s) => <option key={s} value={s}>{DELIVERY_STATE_LABEL[s]}</option>)}
           </Select>
         </Field>
-        <Field label="From" hint={`Dates in ${tz}`}>
+        <Field label="From">
           <Input type="date" value={fromDate} onChange={(e) => setParams({ from: e.target.value })} />
         </Field>
         <Field label="To" error={rangeBad ? '“To” is before “From”.' : null}>
@@ -98,9 +98,7 @@ export default function HistoryPage() {
       </div>
 
       {error && !data ? <ErrorState error={error} onRetry={refetch} /> : loading ? <SkeletonRows rows={6} /> : !data?.items.length ? (
-        <EmptyState icon={<FileClock aria-hidden />} title="No results match">
-          {filterKey ? 'Try widening the date range or clearing filters.' : 'Once posts are sent, each destination’s result is recorded here.'}
-        </EmptyState>
+        <EmptyState icon={<FileClock aria-hidden />} title={filterKey ? 'No matches' : 'No results yet'} />
       ) : (
         <>
           {refreshing ? <p className="mb-2 text-xs text-subtle" role="status">Updating…</p> : null}
@@ -124,13 +122,13 @@ export default function HistoryPage() {
                       <button type="button" onClick={() => setSelected(r)} className="block max-w-full truncate text-left font-medium hover:underline">
                         {postTitle(r)}
                       </button>
-                      <span className="block truncate text-xs text-muted">{r.brand_name} · rev {r.revision_number}</span>
+                      <span className="block truncate text-xs text-muted">{r.brand_name}</span>
                     </Td>
                     <Td>
                       <span className="flex items-center gap-2">
                         <PlatformIcon provider={r.provider} size="xs" />
-                        <span className="truncate">{r.display_name}</span>
-                        {r.is_mock ? <SimulatedBadge /> : null}
+                        <span className="max-w-[200px] truncate">{r.display_name}</span>
+                        {r.is_mock ? <SimulatedBadge className="shrink-0" /> : null}
                       </span>
                     </Td>
                     <Td><DeliveryStateBadge state={r.state} isMock={r.is_mock} size="sm" /></Td>
@@ -143,20 +141,17 @@ export default function HistoryPage() {
             </Table>
           </div>
           {/* Mobile cards */}
-          <ul className="flex flex-col gap-2 md:hidden">
+          <ul className="flex flex-col divide-y divide-border md:hidden">
             {data.items.map((r) => (
               <li key={r.id}>
-                <button type="button" onClick={() => setSelected(r)} className="w-full rounded-xl border border-border bg-surface p-3.5 text-left">
-                  <div className="flex items-center gap-2.5">
+                <button type="button" onClick={() => setSelected(r)} className="w-full py-3 text-left">
+                  <div className="flex items-center gap-3">
                     <PlatformIcon provider={r.provider} size="sm" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[13px] font-medium">{postTitle(r)}</p>
-                      <p className="truncate text-xs text-muted">{r.display_name}{r.is_mock ? ' · Simulated' : ''}</p>
+                      <p className="truncate text-xs text-muted"><TimeWithZone instant={r.published_at ?? r.due_at} tz={r.input_timezone || tz} /> · {r.display_name}</p>
                     </div>
-                  </div>
-                  <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
-                    <DeliveryStateBadge state={r.state} isMock={r.is_mock} size="sm" />
-                    <span className="text-xs text-muted"><TimeWithZone instant={r.published_at ?? r.due_at} tz={r.input_timezone || tz} /></span>
+                    <DeliveryStateBadge state={r.state} isMock={r.is_mock} size="sm" className="shrink-0" />
                   </div>
                 </button>
               </li>
@@ -186,19 +181,19 @@ function HistoryDrawer({ row, onClose, onChanged }: { row: HistoryRow | null; on
   const full = (data?.items.find((d) => d.id === row.id) ?? row) as Delivery;
   const tz = row.input_timezone;
   return (
-    <Drawer open={!!row} onOpenChange={(o) => !o && onClose()} title={postTitle(row)} description={`${row.brand_name} · revision ${row.revision_number}`}>
+    <Drawer open={!!row} onOpenChange={(o) => !o && onClose()} title={postTitle(row)} description={`${row.brand_name} · r${row.revision_number}`}>
       <div className="flex flex-col gap-5">
         <Facts
           items={[
-            ['Scheduled input', <span key="s" className="tabular">{row.scheduled_input?.replace('T', ' ')} <span className="text-muted">{row.input_timezone}</span></span>],
+            ['Scheduled', <span key="s" className="tabular">{row.scheduled_input?.replace('T', ' ')} <span className="text-muted">{row.input_timezone}</span></span>],
             ['Due (UTC)', <span key="u" className="font-mono text-[12px]">{row.due_at}</span>],
             ['Published (UTC)', row.published_at ? <span key="p" className="font-mono text-[12px]">{row.published_at}</span> : '—'],
             ['Provider IDs', row.provider_ids.length ? <code key="i" className="font-mono text-[12px]">{row.provider_ids.join(', ')}</code> : '—'],
           ]}
         />
-        {loading ? <Spinner label="Loading attempts" /> : null}
+        {loading ? <Spinner label="Loading" /> : null}
         <DeliveryCard key={full.attempts ? 'a' : 'n'} delivery={{ ...row, ...full }} tz={tz} onChanged={onChanged} expandAttempts />
-        <Link href={`/posts/${row.post_id}`} className="text-[13px] text-accent-text hover:underline">Open the post</Link>
+        <Link href={`/posts/${row.post_id}`} className="text-[13px] font-medium underline-offset-2 hover:underline">Open post</Link>
       </div>
     </Drawer>
   );

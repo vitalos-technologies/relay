@@ -19,9 +19,9 @@ export function Switch({
         onCheckedChange={onCheckedChange}
         disabled={disabled}
         aria-describedby={description ? `${id}-d` : undefined}
-        className="relative mt-0.5 inline-flex h-6 w-10 shrink-0 cursor-pointer items-center rounded-full border border-border-strong bg-sunken transition-colors data-[state=checked]:border-transparent data-[state=checked]:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+        className="relative mt-0.5 inline-flex h-6 w-10 shrink-0 cursor-pointer items-center rounded-full border border-border-strong bg-sunken transition-colors data-[state=checked]:border-transparent data-[state=checked]:bg-[var(--text)] disabled:cursor-not-allowed disabled:opacity-50"
       >
-        <S.Thumb className="block size-[18px] translate-x-[2px] rounded-full bg-[var(--muted)] transition-transform data-[state=checked]:translate-x-[18px] data-[state=checked]:bg-[var(--on-accent)]" />
+        <S.Thumb className="block size-[18px] translate-x-[2px] rounded-full bg-[var(--muted)] transition-transform data-[state=checked]:translate-x-[18px] data-[state=checked]:bg-[var(--bg)]" />
       </S.Root>
     </div>
   );

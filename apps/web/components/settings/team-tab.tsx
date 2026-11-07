@@ -13,11 +13,11 @@ import {
 } from '@/components/ui';
 
 const ROLE_HELP: Record<Role, string> = {
-  owner: 'Everything, including ownership and setup',
-  admin: 'Manage team, brands and accounts; publish',
-  editor: 'Write drafts; publish only if the brand allows',
-  approver: 'Approve or reject; schedule approved content',
-  viewer: 'Read-only access to content and history',
+  owner: 'Everything',
+  admin: 'Team, brands, accounts, publish',
+  editor: 'Drafts; publish if allowed',
+  approver: 'Approve and schedule',
+  viewer: 'Read only',
 };
 
 export function TeamTab() {
@@ -52,11 +52,10 @@ export function TeamTab() {
       <Card aria-labelledby="h-members">
         <CardHeader
           id="h-members"
-          title="Members"
-          description={`${data.members.length} member${data.members.length === 1 ? '' : 's'}`}
+          title={<>Members <span className="ml-1 font-normal text-muted tabular">{data.members.length}</span></>}
           actions={can('members.invite') ? <Button variant="primary" icon={<UserPlus aria-hidden className="size-4" />} onClick={() => setInviteOpen(true)}>Invite</Button> : null}
         />
-        <div className="hidden md:block">
+        <div className="mt-4 hidden md:block">
           <Table caption="Workspace members" className="rounded-none border-0">
             <THead><tr><Th>Person</Th><Th>Role</Th><Th>Brand access</Th><Th>Joined</Th><Th className="sr-only">Actions</Th></tr></THead>
             <tbody>
@@ -111,8 +110,8 @@ export function TeamTab() {
                 <p className="text-xs text-muted">{m.brand_ids === null ? 'All brands' : m.brand_ids.map(brandName).join(', ') || 'No brands'}</p>
                 {mayChange ? (
                   <div className="flex gap-2">
-                    <Button size="sm" onClick={() => setAccess(m)}>Edit access</Button>
-                    {can('members.remove') ? <Button size="sm" variant="danger" onClick={() => setRemoving(m)}>Remove</Button> : null}
+                    <Button size="sm" onClick={() => setAccess(m)}>Access</Button>
+                    {can('members.remove') ? <Button size="sm" variant="quiet" className="text-danger!" onClick={() => setRemoving(m)}>Remove</Button> : null}
                   </div>
                 ) : null}
               </li>
@@ -122,22 +121,22 @@ export function TeamTab() {
       </Card>
 
       <Card aria-labelledby="h-invites">
-        <CardHeader id="h-invites" title="Invitations" description="Invitations are bound to the invited email address and expire." />
-        <div className="p-4">
-          {!data.invitations.length ? <p className="text-[13px] text-muted">No open invitations.</p> : (
-            <ul className="flex flex-col gap-2">
+        <CardHeader id="h-invites" title="Invitations" />
+        <div className="px-4 pb-4">
+          {!data.invitations.length ? <p className="text-[13px] text-muted">None open</p> : (
+            <ul className="flex flex-col divide-y divide-border">
               {data.invitations.map((i) => (
-                <li key={i.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-sunken px-3 py-2.5">
+                <li key={i.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
                   <MailPlus aria-hidden className="size-4 text-muted" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[13px] font-medium">{i.email}</p>
-                    <p className="text-xs text-muted">
+                    <p className="truncate text-xs text-muted">
                       {ROLE_LABEL[i.role]} · {i.brand_ids?.length ? i.brand_ids.map(brandName).join(', ') : 'All brands'}
-                      {i.invited_by_email ? ` · invited by ${i.invited_by_email}` : ''}
+                      {i.invited_by_email ? ` · by ${i.invited_by_email}` : ''}
                     </p>
                   </div>
                   {i.status === 'expired' ? <Badge tone="warn">Expired</Badge> : (
-                    <span className="text-xs text-muted">Expires <TimeWithZone instant={i.expires_at} tz={session.workspace?.timezone ?? 'UTC'} format="date" /></span>
+                    <span className="hidden text-xs text-muted sm:inline">Expires <TimeWithZone instant={i.expires_at} tz={session.workspace?.timezone ?? 'UTC'} format="date" /></span>
                   )}
                   {can('members.invite') ? <IconButton label={`Revoke invitation for ${i.email}`} icon={<Trash2 aria-hidden className="size-4" />} onClick={() => setRevoking(i)} /> : null}
                 </li>
@@ -154,7 +153,7 @@ export function TeamTab() {
         open={!!revoking}
         onOpenChange={(o) => !o && setRevoking(null)}
         title={`Revoke invitation for ${revoking?.email ?? ''}?`}
-        description="The invitation link stops working immediately."
+        description="The link stops working now."
         confirmLabel="Revoke"
         confirmVariant="danger"
         onConfirm={async () => {
@@ -183,15 +182,15 @@ function InviteLink({ inv, onDismiss }: { inv: Invitation; onDismiss: () => void
           <label htmlFor="invite-link" className="sr-only">Invitation link</label>
           <Input id="invite-link" readOnly value={link} className="h-8 max-w-[440px] font-mono text-[12px]" onFocus={(e) => e.currentTarget.select()} />
           <Button size="sm" icon={<Copy aria-hidden className="size-4" />} onClick={() => void navigator.clipboard?.writeText(link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); })}>
-            {copied ? 'Copied' : 'Copy link'}
+            {copied ? 'Copied' : 'Copy'}<span className="sr-only"> link</span>
           </Button>
           <p className="w-full text-xs text-muted">
-            {inv.email_sent === false ? 'The email couldn’t be sent — share this link with them directly. ' : inv.email_sent ? 'An email with this link was sent. ' : ''}
-            Only {inv.email} can accept it. It expires <TimeWithZone instant={inv.expires_at} tz="UTC" />.
+            {inv.email_sent === false ? 'Email not sent — share the link. ' : ''}
+            Only {inv.email} can accept. Expires <TimeWithZone instant={inv.expires_at} tz="UTC" />.
           </p>
         </div>
       ) : (
-        <p>{inv.email_sent === false ? 'The invitation was created but the email couldn’t be sent. Revoke it and try again later, or check email setup.' : 'They’ll receive an email with a link to join. Only that address can accept it.'}</p>
+        <p>{inv.email_sent === false ? 'Email not sent. Revoke and retry later.' : 'Only that address can accept.'}</p>
       )}
     </Banner>
   );
@@ -206,7 +205,7 @@ function BrandAccess({ value, onChange }: { value: string[] | null; onChange: (v
         legend="Brand access"
         value={value === null ? 'all' : 'some'}
         onChange={(v) => onChange(v === 'all' ? null : value ?? [])}
-        options={[{ value: 'all', label: 'All brands', description: 'Including brands added later' }, { value: 'some', label: 'Only selected brands' }]}
+        options={[{ value: 'all', label: 'All brands', description: 'Including future brands' }, { value: 'some', label: 'Selected brands' }]}
       />
       {value !== null ? (
         <fieldset className="flex flex-col gap-2 pl-1">
@@ -255,16 +254,16 @@ function InviteDialog({ open, onOpenChange, onDone }: { open: boolean; onOpenCha
       open={open}
       onOpenChange={onOpenChange}
       busy={busy}
-      title="Invite a teammate"
+      title="Invite"
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-          <Button variant="primary" onClick={submit} loading={busy} disabledReason={!email.trim() || emailBad ? 'Enter a valid email address.' : brands !== null && !brands.length ? 'Choose at least one brand.' : null}>Send invitation</Button>
+          <Button variant="primary" onClick={submit} loading={busy} disabledReason={!email.trim() || emailBad ? 'Enter a valid email.' : brands !== null && !brands.length ? 'Pick a brand.' : null}>Send</Button>
         </>
       }
     >
       <div className="flex flex-col gap-5">
-        <Field label="Email" error={emailBad ? 'Enter a valid email address.' : null}><Input type="email" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
+        <Field label="Email" error={emailBad ? 'Enter a valid email.' : null}><Input type="email" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
         <RadioGroup name="role" legend="Role" value={role} onChange={setRole} options={roles.map((r) => ({ value: r, label: ROLE_LABEL[r]!, description: ROLE_HELP[r] }))} />
         <BrandAccess value={brands} onChange={setBrands} />
         {error ? <ErrorNotice error={error} /> : null}
@@ -281,10 +280,10 @@ function AccessDialog({ member, onClose, onDone }: { member: Member | null; onCl
       open={!!member}
       onOpenChange={(o) => !o && onClose()}
       title={`Brand access for ${member?.name || member?.email || ''}`}
-      description="Removing a brand immediately removes access to its unapproved drafts. Approved schedules stay in place."
-      confirmLabel="Save access"
+      description="Approved schedules stay in place."
+      confirmLabel="Save"
       size="md"
-      confirmDisabledReason={brands !== null && !brands.length ? 'Choose at least one brand.' : null}
+      confirmDisabledReason={brands !== null && !brands.length ? 'Pick a brand.' : null}
       onConfirm={async () => {
         if (!member) return;
         await api.patch(`/api/members/${member.user_id}`, { brand_ids: brands });
@@ -303,12 +302,12 @@ function RemoveDialog({ member, onClose, onDone }: { member: Member | null; onCl
     <ConfirmDialog
       open={!!member}
       onOpenChange={(o) => !o && onClose()}
-      title={`Remove ${member?.name || member?.email || ''} from the workspace?`}
-      description="They lose access immediately and can’t take any new action."
-      confirmLabel="Remove member"
+      title={`Remove ${member?.name || member?.email || ''}?`}
+      description="Access ends immediately."
+      confirmLabel="Remove"
       confirmVariant="danger"
       size="md"
-      confirmDisabledReason={loading ? 'Checking what changes…' : null}
+      confirmDisabledReason={loading ? 'Checking…' : null}
       onConfirm={async () => {
         if (!member) return;
         await api.del(`/api/members/${member.user_id}`);
@@ -316,11 +315,11 @@ function RemoveDialog({ member, onClose, onDone }: { member: Member | null; onCl
         onDone();
       }}
     >
-      {loading ? <Spinner label="Checking what changes" /> : error ? <ErrorNotice error={error} title="Couldn’t load the impact" /> : data ? (
-        <ul className="flex flex-col gap-2 text-[13px]">
-          <li className="rounded-lg border border-border bg-sunken px-3 py-2"><strong className="tabular">{data.approved_schedules_remaining}</strong> approved schedule{data.approved_schedules_remaining === 1 ? '' : 's'} they created will <strong>stay scheduled</strong> and still publish.</li>
-          <li className="rounded-lg border border-border bg-sunken px-3 py-2"><strong className="tabular">{data.drafts_losing_access}</strong> unapproved draft{data.drafts_losing_access === 1 ? '' : 's'} will no longer be accessible to them.</li>
-          <li className="rounded-lg border border-border bg-sunken px-3 py-2"><strong className="tabular">{data.pending_approvals}</strong> pending approval{data.pending_approvals === 1 ? '' : 's'} they requested or must decide will need someone else.</li>
+      {loading ? <Spinner label="Checking" /> : error ? <ErrorNotice error={error} title="Couldn’t load impact" /> : data ? (
+        <ul className="flex flex-col gap-1 text-[13px]">
+          <li><strong className="tabular">{data.approved_schedules_remaining}</strong> approved schedule{data.approved_schedules_remaining === 1 ? '' : 's'} still publish</li>
+          <li><strong className="tabular">{data.drafts_losing_access}</strong> draft{data.drafts_losing_access === 1 ? '' : 's'} no longer accessible</li>
+          <li><strong className="tabular">{data.pending_approvals}</strong> pending approval{data.pending_approvals === 1 ? '' : 's'} need someone else</li>
         </ul>
       ) : null}
     </ConfirmDialog>

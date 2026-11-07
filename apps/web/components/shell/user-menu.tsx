@@ -62,7 +62,7 @@ export function UserMenu({ compact }: { compact?: boolean }) {
       <MenuContent align={compact ? 'end' : 'start'} className="w-[240px]">
         <MenuLabel>Appearance</MenuLabel>
         <MenuRadioGroup value={theme} onValueChange={(v) => { const t = v as Theme; setTheme(t); applyTheme(t); }}>
-          <MenuRadioItem value="system" icon={<Monitor aria-hidden />}>Match system</MenuRadioItem>
+          <MenuRadioItem value="system" icon={<Monitor aria-hidden />}>System</MenuRadioItem>
           <MenuRadioItem value="dark" icon={<Moon aria-hidden />}>Dark</MenuRadioItem>
           <MenuRadioItem value="light" icon={<Sun aria-hidden />}>Light</MenuRadioItem>
         </MenuRadioGroup>

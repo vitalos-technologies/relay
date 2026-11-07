@@ -58,15 +58,12 @@ export function UploadDropzone({ brandId, onUploaded, compact, disabledReason }:
         className={cn(
           'flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed text-center transition-colors',
           compact ? 'px-4 py-5' : 'px-6 py-10',
-          over ? 'border-[var(--focus)] bg-accent-soft' : 'border-border-strong bg-sunken',
+          over ? 'border-[var(--focus)] bg-raised' : 'border-border-strong',
         )}
       >
         <ImageUp aria-hidden className="size-6 text-muted" />
-        <p className="text-[13px]">
-          Drag images here, or{' '}
-          <Button size="sm" variant="secondary" className="ml-1" onClick={() => input.current?.click()} disabledReason={disabledReason}>Choose files</Button>
-        </p>
-        <p className="text-xs text-muted">JPEG or PNG. Files are checked before they can be used.</p>
+        <Button size="sm" variant="secondary" onClick={() => input.current?.click()} disabledReason={disabledReason}>Choose files</Button>
+        <p className="text-xs text-muted">or drop JPEG / PNG</p>
         <input
           ref={input}
           type="file"
@@ -84,7 +81,7 @@ export function UploadDropzone({ brandId, onUploaded, compact, disabledReason }:
       {rows.length ? (
         <ul className="flex flex-col gap-1.5" aria-live="polite" aria-label="Uploads">
           {rows.map((r) => (
-            <li key={r.key} className="flex items-start gap-2.5 rounded-lg border border-border bg-surface px-3 py-2 text-[13px]">
+            <li key={r.key} className="flex items-start gap-2 px-1 py-1 text-[13px]">
               {r.phase === 'ready' ? <CircleCheck aria-hidden className="mt-0.5 size-4 text-success" />
                 : r.phase === 'rejected' || r.phase === 'error' ? <OctagonX aria-hidden className="mt-0.5 size-4 text-danger" />
                   : <LoaderCircle aria-hidden className="mt-0.5 size-4 anim-spin text-info" />}

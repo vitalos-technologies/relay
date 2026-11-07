@@ -5,7 +5,7 @@ import { PROVIDER_LABEL, type Provider } from '@social-lite/core';
 import { api, isApiError } from '@/lib/client/api';
 import { useSession } from '@/lib/client/session';
 import type { Connection, MockScenario, ProviderStatus } from '@/lib/client/types';
-import { Banner, Button, Dialog, ErrorNotice, Field, Input, PlatformIcon, Select } from '@/components/ui';
+import { Banner, Button, buttonClass, Dialog, ErrorNotice, Field, Input, Select } from '@/components/ui';
 
 export const MOCK_SCENARIO_LABEL: Record<MockScenario, string> = {
   success: 'Always succeeds',
@@ -27,11 +27,10 @@ export function NotConfiguredDialog({ provider, status, open, onOpenChange }: { 
     <Dialog
       open={open}
       onOpenChange={onOpenChange}
-      title={`${PROVIDER_LABEL[provider]} isn’t set up yet`}
-      description="Connecting accounts needs the app credentials for this network to be configured for Social Lite first."
+      title={`${PROVIDER_LABEL[provider]} isn’t set up`}
       footer={
         can('setup.manage') ? (
-          <Link href="/setup" className="touch-target inline-flex h-9 items-center rounded-lg bg-accent px-3.5 text-sm font-medium text-on-accent hover:bg-accent-hover">Open Setup</Link>
+          <Link href="/setup" className={buttonClass('primary')}>Open Setup</Link>
         ) : <Button onClick={() => onOpenChange(false)}>Close</Button>
       }
     >
@@ -40,7 +39,7 @@ export function NotConfiguredDialog({ provider, status, open, onOpenChange }: { 
           <p>Missing: {status.missing.map((m) => <code key={m} className="mr-1.5 rounded bg-raised px-1.5 py-0.5 font-mono text-[11px]">{m}</code>)}</p>
         ) : null}
         {status?.notes ? <p className="text-muted">{status.notes}</p> : null}
-        {can('setup.manage') ? <p>As the workspace owner, you can add these in Setup.</p> : <p>Ask the workspace owner to configure {PROVIDER_LABEL[provider]} in Setup.</p>}
+        {can('setup.manage') ? null : <p className="text-muted">Ask the workspace owner.</p>}
       </div>
     </Dialog>
   );
@@ -84,32 +83,29 @@ export function TelegramDialog({
       onOpenChange={onOpenChange}
       busy={busy}
       size="md"
-      title={reconnect ? `Reconnect ${reconnect.display_name}` : 'Connect a Telegram channel'}
-      description="We verify the bot and its posting rights before the channel is marked Ready."
+      title={reconnect ? `Reconnect ${reconnect.display_name}` : 'Connect Telegram'}
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
           <Button variant="primary" onClick={submit} loading={busy} disabledReason={!token.trim() ? 'Enter the bot token.' : !reconnect && !channel.trim() ? 'Enter the channel.' : channelBad ? 'Fix the channel format.' : null}>
-            {busy ? 'Verifying…' : reconnect ? 'Verify and reconnect' : 'Verify and connect'}
+            {busy ? 'Verifying…' : reconnect ? 'Reconnect' : 'Connect'}
           </Button>
         </>
       }
     >
       <div className="flex flex-col gap-4">
-        <ol className="list-decimal space-y-1 rounded-lg border border-border bg-sunken py-3 pl-8 pr-4 text-[13px] text-muted">
-          <li>Create a bot with <span className="text-fg">@BotFather</span> (a dedicated bot is best) and copy its token.</li>
-          <li>Add the bot to your channel as an <span className="text-fg">administrator</span> with <span className="text-fg">“Post messages”</span> enabled.</li>
-          <li>Enter the token and the channel’s public @username or numeric ID below.</li>
+        <ol className="list-decimal space-y-1 pl-5 text-[13px] text-muted">
+          <li>Create a bot with <span className="text-fg">@BotFather</span>.</li>
+          <li>Make it a channel <span className="text-fg">admin</span> with <span className="text-fg">“Post messages”</span>.</li>
         </ol>
-        <Field label="Bot token" hint="Sent once over a protected connection and stored encrypted. It is never shown again." error={fe?.bot_token}>
+        <Field label="Bot token" hint="Stored encrypted. Never shown again." error={fe?.bot_token}>
           <Input type="password" autoComplete="off" spellCheck={false} value={token} onChange={(e) => setToken(e.target.value)} placeholder="123456789:AA…" />
         </Field>
         {!reconnect ? (
-          <Field label="Channel" hint="@channelname, or the numeric ID starting with -100" error={fe?.channel ?? (channelBad ? 'Use @name (at least 4 characters) or -100… ID.' : null)}>
+          <Field label="Channel" hint="@name or -100… ID" error={fe?.channel ?? (channelBad ? 'Use @name (4+ chars) or -100… ID.' : null)}>
             <Input value={channel} onChange={(e) => setChannel(e.target.value)} placeholder="@yourchannel" autoComplete="off" spellCheck={false} />
           </Field>
         ) : null}
-        <p className="text-xs text-muted">Social Lite only sends messages. It does not change the bot’s webhook or read its updates, so existing bot integrations keep working.</p>
         {error && !fe ? <ErrorNotice error={error} /> : null}
       </div>
     </Dialog>
@@ -141,12 +137,12 @@ export function MockDialog({ open, onOpenChange, brandId, onDone }: { open: bool
       open={open}
       onOpenChange={onOpenChange}
       busy={busy}
-      title="Add simulated destination"
-      description="Simulated destinations behave like the real network’s API but never post anything. Results are always labelled “Simulated”."
+      title="Simulated destination"
+      description="Never posts. Always labelled “Simulated”."
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-          <Button variant="primary" onClick={submit} loading={busy} disabledReason={!name.trim() ? 'Enter a display name.' : null}>Add simulated destination</Button>
+          <Button variant="primary" onClick={submit} loading={busy} disabledReason={!name.trim() ? 'Enter a name.' : null}>Add</Button>
         </>
       }
     >
@@ -156,13 +152,12 @@ export function MockDialog({ open, onOpenChange, brandId, onDone }: { open: bool
             {(['instagram', 'facebook', 'telegram', 'x'] as Provider[]).map((p) => <option key={p} value={p}>{PROVIDER_LABEL[p]}</option>)}
           </Select>
         </Field>
-        <Field label="Display name"><Input value={name} onChange={(e) => setName(e.target.value)} placeholder={`Demo ${PROVIDER_LABEL[provider]}`} maxLength={80} /></Field>
-        <Field label="Behaviour" hint="Use failure scenarios to rehearse how your team handles problems.">
+        <Field label="Name"><Input value={name} onChange={(e) => setName(e.target.value)} placeholder={`Demo ${PROVIDER_LABEL[provider]}`} maxLength={80} /></Field>
+        <Field label="Behaviour">
           <Select value={scenario} onChange={(e) => setScenario(e.target.value as MockScenario)}>
             {MOCK_SCENARIOS.map((s) => <option key={s} value={s}>{MOCK_SCENARIO_LABEL[s]}</option>)}
           </Select>
         </Field>
-        <div className="flex items-center gap-2 text-xs text-muted"><PlatformIcon provider={provider} size="xs" decorative /> Will appear with a “Simulated” label everywhere.</div>
         {error ? <ErrorNotice error={error} /> : null}
       </div>
     </Dialog>
@@ -171,5 +166,5 @@ export function MockDialog({ open, onOpenChange, brandId, onDone }: { open: bool
 
 export function DisconnectBlockedBanner({ count }: { count: number }) {
   if (!count) return null;
-  return <Banner tone="warn">{count} scheduled deliver{count === 1 ? 'y was' : 'ies were'} blocked. Reconnect this destination or remove it from those posts.</Banner>;
+  return <Banner tone="warn">{count} scheduled deliver{count === 1 ? 'y' : 'ies'} blocked. Reconnect or remove it.</Banner>;
 }

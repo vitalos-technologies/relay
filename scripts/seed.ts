@@ -116,6 +116,9 @@ async function main() {
   // 5) TipSignal brand requires approval: a draft awaiting review is created by the editor in the UI flow; here a draft only.
   await createPost(ctx(ids.editor!, ws.id, 'editor'), brandB.id, { title: 'Draft: weekend preview', draft: draft('Weekend preview: fixtures and form guide. Probabilities are not promises.', imgB, brandB.id) }, randomUUID());
 
+  // TipSignal (demo) receives signed source events as drafts (V1.1). Drafts are attributed to the editor.
+  await db.query(`INSERT INTO integration_bindings(kind, workspace_id, brand_id, acting_user_id) VALUES ('tipsignal',$1,$2,$3) ON CONFLICT (kind) DO NOTHING`, [ws.id, brandB.id, ids.editor]);
+
   // Isolation demo tenant
   const other = await one<{ id: string }>(db, `INSERT INTO workspaces(name, is_demo) VALUES ('Other Workspace', true) RETURNING id`);
   await db.query(`INSERT INTO memberships(workspace_id, user_id, role) VALUES ($1,$2,'owner')`, [other.id, outsider]);

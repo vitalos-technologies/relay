@@ -7,18 +7,18 @@ export function connectionFix(c: Pick<Connection, 'status' | 'provider' | 'healt
   const missing = c.health?.missing_permissions?.length ? ` (${c.health.missing_permissions.join(', ')})` : '';
   const map: Record<ConnectionStatus, string | null> = {
     ready: null,
-    pending_verification: 'We’re verifying this destination. It can publish once it shows Ready.',
+    pending_verification: 'Verifying…',
     missing_permission:
       c.provider === 'telegram'
-        ? 'Make the bot an administrator of the channel with “Post messages” enabled, then run Check.'
-        : `Reconnect and approve every requested ${p} permission${missing}.`,
-    expiring: `Access expires soon. Reconnect ${p} to keep publishing without interruption.`,
+        ? 'Make the bot a channel admin (“Post messages”), then Check.'
+        : `Reconnect and approve all ${p} permissions${missing}.`,
+    expiring: `Reconnect ${p} soon.`,
     reconnect_required:
       c.provider === 'telegram'
-        ? 'The bot token no longer works. Reconnect with a valid token from @BotFather.'
-        : `${p} access was revoked or expired. Reconnect to resume publishing.`,
-    paused: 'Paused — scheduled posts for this destination won’t send. Resume it to continue.',
-    disconnected: 'Disconnected. Queued posts for it are blocked. Connect it again to publish here.',
+        ? 'Reconnect with a new @BotFather token.'
+        : `Reconnect ${p} to resume.`,
+    paused: 'Resume to send.',
+    disconnected: 'Connect again to publish.',
   };
   return map[c.status] ?? null;
 }

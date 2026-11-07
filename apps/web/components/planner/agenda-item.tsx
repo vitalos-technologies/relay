@@ -11,22 +11,21 @@ export function AgendaItem({ item, brandName, actions, href }: { item: PlannerIt
   const due = new Date(item.due_at);
   const allMock = item.destinations.length > 0 && item.destinations.every((d) => d.is_mock);
   return (
-    <div className="group flex items-center gap-3 rounded-xl border border-border bg-surface px-3 py-3 hover:border-border-strong sm:gap-4 sm:px-4">
-      <div className="w-[64px] shrink-0 text-right tabular">
-        <div className="text-[15px] font-semibold leading-tight">{fmtTime(due, item.input_timezone)}</div>
-        <div className="text-[11px] text-muted" title={item.input_timezone}>{zoneAbbr(due, item.input_timezone)}</div>
+    <div className="group flex items-center gap-4 rounded-lg px-2 py-2 hover:bg-raised/60">
+      <div className="w-12 shrink-0 tabular">
+        <div className="text-sm font-semibold leading-tight">{fmtTime(due, item.input_timezone)}</div>
+        <div className="text-[11px] text-subtle" title={item.input_timezone}>{zoneAbbr(due, item.input_timezone)}</div>
       </div>
-      <div className="h-9 w-px shrink-0 bg-border" aria-hidden />
       <div className="min-w-0 flex-1">
         <Link href={href ?? `/posts/${item.post_id}`} className="block truncate text-sm font-medium hover:underline">
           {postTitle(item)}
         </Link>
-        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
-          {brandName ? <span className="truncate">{brandName}</span> : null}
+        <div className="mt-1 flex min-w-0 items-center gap-2 text-xs text-muted">
+          {brandName ? <span className="min-w-0 truncate">{brandName}</span> : null}
           <DestinationDots destinations={item.destinations} />
         </div>
       </div>
-      <PostStatusBadge status={item.status} simulated={allMock} className="hidden sm:inline-flex" />
+      <span className="hidden shrink-0 sm:block"><PostStatusBadge status={item.status} simulated={allMock} size="sm" /></span>
       {actions}
     </div>
   );
@@ -40,7 +39,7 @@ const DOT: Record<string, string> = {
 /** Platform tiles with a tiny state marker; state is also in the accessible label (never colour alone). */
 export function DestinationDots({ destinations, size = 'xs' }: { destinations: PlannerItem['destinations']; size?: 'xs' | 'sm' }) {
   return (
-    <ul className="flex items-center gap-1" aria-label="Destinations">
+    <ul className="flex shrink-0 items-center gap-1" aria-label="Destinations">
       {destinations.map((d) => {
         const label = `${PROVIDER_LABEL[d.provider]}${d.is_mock ? ' (simulated)' : ''}: ${d.state === 'published' && d.is_mock ? 'Simulated · delivered' : DELIVERY_STATE_LABEL[d.state]}`;
         return (

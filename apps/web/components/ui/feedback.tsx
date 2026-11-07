@@ -44,7 +44,7 @@ export function SkeletonRows({ rows = 4, className }: { rows?: number; className
   return (
     <div className={cn('flex flex-col gap-3', className)} role="status" aria-label="Loading">
       {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className="flex items-center gap-3 rounded-lg border border-border bg-surface p-4">
+        <div key={i} className="flex items-center gap-3 rounded-lg p-2">
           <Skeleton className="size-9 rounded-lg" />
           <div className="flex flex-1 flex-col gap-2">
             <Skeleton className="h-3.5 w-2/5" />
@@ -67,15 +67,15 @@ export function Spinner({ label = 'Loading', className }: { label?: string; clas
   );
 }
 
+/** Icon + short title (≤ 5 words) + one action. No paragraphs. */
 export function EmptyState({
-  icon, title, children, action, className, compact,
-}: { icon?: ReactNode; title: ReactNode; children?: ReactNode; action?: ReactNode; className?: string; compact?: boolean }) {
+  icon, title, action, className, compact,
+}: { icon?: ReactNode; title: ReactNode; action?: ReactNode; className?: string; compact?: boolean }) {
   return (
-    <div className={cn('flex flex-col items-center justify-center rounded-xl border border-dashed border-border text-center', compact ? 'px-4 py-8' : 'px-6 py-14', className)}>
-      {icon ? <div className="mb-3 flex size-11 items-center justify-center rounded-xl border border-border bg-raised text-muted [&>svg]:size-5">{icon}</div> : null}
-      <h3 className="text-[15px] font-semibold">{title}</h3>
-      {children ? <div className="mt-1.5 max-w-[46ch] text-[13px] text-muted">{children}</div> : null}
-      {action ? <div className="mt-5 flex flex-wrap justify-center gap-2">{action}</div> : null}
+    <div className={cn('flex flex-col items-center justify-center text-center', compact ? 'px-4 py-8' : 'px-6 py-16', className)}>
+      {icon ? <div className="mb-4 flex size-10 items-center justify-center rounded-full bg-raised text-muted [&>svg]:size-5">{icon}</div> : null}
+      <h3 className="text-[14px] font-medium">{title}</h3>
+      {action ? <div className="mt-4 flex flex-wrap justify-center gap-2">{action}</div> : null}
     </div>
   );
 }

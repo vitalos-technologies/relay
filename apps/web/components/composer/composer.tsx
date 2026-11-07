@@ -13,7 +13,7 @@ import { fmtTime, zoneAbbr } from '@/lib/client/format';
 import { constraintsOf, localChecks } from '@/lib/client/variants';
 import type { Asset, Connection, PostDetail, ValidateResponse } from '@/lib/client/types';
 import {
-  Banner, Button, Card, CardHeader, cn, ConfirmDialog, EmptyState, ErrorState, IconButton, LinkButton, Menu, MenuContent, MenuItem,
+  Banner, Button, Card, CardHeader, ConfirmDialog, EmptyState, ErrorState, IconButton, InfoTip, LinkButton, Menu, MenuContent, MenuItem,
   MenuTrigger, PlatformIcon, PostStatusBadge, Select, Skeleton, Tabs, TabsContent, TabsList, TabsTrigger, ToneIcon, useToast,
 } from '@/components/ui';
 import { BaseEditor, DestinationPicker, VariantEditor } from './editors';
@@ -30,8 +30,8 @@ export function Composer({ postId }: { postId: string }) {
   if (error && !data) {
     return (
       <div className="mx-auto max-w-xl py-10">
-        <ErrorState error={error} onRetry={refetch} title="This post couldn’t be opened" />
-        <LinkButton href="/planner" className="mt-4" variant="ghost">Back to planner</LinkButton>
+        <ErrorState error={error} onRetry={refetch} title="Couldn’t open post" />
+        <LinkButton href="/planner" className="mt-4" variant="ghost">Planner</LinkButton>
       </div>
     );
   }
@@ -255,7 +255,7 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
     try {
       await flush();
       const p = await api.post<PostDetail>(`/api/posts/${post.id}/duplicate`, {}, { idempotent: true });
-      toast.success('Duplicated as a new draft');
+      toast.success('Duplicated');
       router.push(`/posts/${p.id}`);
     } catch (e) {
       toast.error(e, 'Could not duplicate');
@@ -278,9 +278,9 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
 
   // ---------------------------------------------------------------- render helpers
   const blockReason =
-    saveState === 'conflict' ? 'Resolve the editing conflict first.'
-      : !connectionIds.length ? 'Choose at least one destination.'
-        : issues.length ? `Fix ${issues.length} issue${issues.length === 1 ? '' : 's'} in Checks first.`
+    saveState === 'conflict' ? 'Resolve the conflict first.'
+      : !connectionIds.length ? 'Pick a destination.'
+        : issues.length ? `Fix ${issues.length} issue${issues.length === 1 ? '' : 's'} first.`
           : null;
   const tz = post.brand.timezone;
   const workspaceTz = session.workspace?.timezone;
@@ -292,9 +292,9 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
   return (
     <div className="pb-24">
       {/* Header */}
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
-          <p className="mb-1 text-xs font-medium uppercase tracking-[0.08em] text-subtle">{post.brand.name}</p>
+          <p className="mb-1 flex items-center gap-1 truncate text-xs text-subtle">{post.brand.name}<InfoTip label="About the title">Internal title — never published.</InfoTip></p>
           <h1 className="sr-only">Edit post{title.trim() ? `: ${title.trim()}` : ''}</h1>
           <label htmlFor="post-title" className="sr-only">Post title (internal)</label>
           <input
@@ -304,32 +304,31 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
             onChange={(e) => edit({ title: e.target.value })}
             placeholder="Untitled post"
             maxLength={200}
-            className="w-full rounded-md bg-transparent text-[22px] font-semibold tracking-[-0.01em] placeholder:text-subtle sm:text-[26px]"
+            className="w-full rounded-md bg-transparent text-[22px] font-semibold tracking-[-0.01em] placeholder:text-subtle sm:text-[24px]"
           />
-          <p className="mt-1 text-xs text-muted">Internal title — not published.</p>
         </div>
         <div className="flex items-center gap-2">
           <PostStatusBadge status={post.status} simulated={allMock} />
           <Menu>
             <MenuTrigger asChild>
-              <IconButton variant="secondary" label="More post actions" icon={<Ellipsis aria-hidden className="size-4" />} />
+              <IconButton label="More post actions" icon={<Ellipsis aria-hidden className="size-4" />} />
             </MenuTrigger>
             <MenuContent>
-              {can('drafts.edit') ? <MenuItem icon={<Copy aria-hidden />} onSelect={() => void duplicate()}>Duplicate as new draft</MenuItem> : null}
-              {post.can.edit ? <MenuItem icon={<Archive aria-hidden />} danger onSelect={() => setArchiveOpen(true)}>Archive post</MenuItem> : null}
+              {can('drafts.edit') ? <MenuItem icon={<Copy aria-hidden />} onSelect={() => void duplicate()}>Duplicate</MenuItem> : null}
+              {post.can.edit ? <MenuItem icon={<Archive aria-hidden />} danger onSelect={() => setArchiveOpen(true)}>Archive</MenuItem> : null}
             </MenuContent>
           </Menu>
         </div>
       </div>
 
-      {readOnly ? <Banner tone="info" className="mb-5">You can view this post but not edit it{post.status !== 'draft' ? ' in its current state' : ''}.</Banner> : null}
-      {paused ? <Banner tone="warn" className="mb-5" title="Publishing is paused">{session.workspace?.publishing_paused ? 'The workspace' : post.brand.name} is paused. You can still schedule; nothing will send until it’s resumed.</Banner> : null}
+      {readOnly ? <Banner tone="info" className="mb-6" title="View only" /> : null}
+      {paused ? <Banner tone="warn" className="mb-6" title={`${session.workspace?.publishing_paused ? 'Workspace' : post.brand.name} paused — nothing will send`} /> : null}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="flex min-w-0 flex-col gap-6">
           <Card aria-label="Content">
             <Tabs value={tab} onValueChange={setTab}>
-              <div className="px-4 pt-2 sm:px-5">
+              <div className="px-4 pt-2"> 
                 <TabsList label="Content per destination">
                   <TabsTrigger value="base">Base</TabsTrigger>
                   {selectedConns.map((c) => {
@@ -347,7 +346,7 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
                   })}
                 </TabsList>
               </div>
-              <div className="px-4 pb-5 sm:px-5">
+              <div className="px-4 pb-6">
                 <TabsContent value="base">
                   <BaseEditor
                     draft={draft}
@@ -390,12 +389,10 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
 
         <aside className="flex min-w-0 flex-col gap-6" aria-label="Destinations, checks and preview">
           <Card aria-labelledby="h-dest">
-            <CardHeader id="h-dest" title="Destinations" description={`${connectionIds.length} selected`} />
-            <div className="p-4">
+            <CardHeader id="h-dest" title={<>Destinations <span className="ml-1 font-normal text-muted tabular">{connectionIds.length}<span className="sr-only"> selected</span></span></>} />
+            <div className="px-2 pb-2">
               {post.connections.length === 0 ? (
-                <EmptyState compact title="No connected accounts" action={can('connections.manage') ? <LinkButton href={`/accounts?brand=${post.brand_id}`} size="sm" variant="primary">Connect an account</LinkButton> : null}>
-                  {can('connections.manage') ? 'Connect Instagram, Facebook, Telegram or X for this brand.' : 'Ask an admin to connect accounts for this brand.'}
-                </EmptyState>
+                <EmptyState compact title="No accounts" action={can('connections.manage') ? <LinkButton href={`/accounts?brand=${post.brand_id}`} size="sm" variant="secondary">Connect</LinkButton> : null} />
               ) : (
                 <DestinationPicker connections={post.connections} selected={connectionIds} onToggle={toggleDestination} readOnly={readOnly} />
               )}
@@ -406,11 +403,11 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
             <CardHeader
               id="h-checks"
               title="Checks"
-              description={serverFresh ? 'Checked by the server for the saved version.' : validating ? 'Checking…' : 'Live check while you type. The server confirms after saving.'}
+              actions={<span className="text-xs text-subtle">{validating ? 'Checking…' : serverFresh ? 'Verified' : 'Live'}</span>}
             />
-            <div className="p-4" aria-live="polite">
-              {!connectionIds.length ? <p className="text-[13px] text-muted">Choose destinations to see what each network needs.</p> : issues.length === 0 ? (
-                <p className="flex items-center gap-2 text-[13px] text-muted"><CircleCheck aria-hidden className="size-4 text-success" /> Ready for {connectionIds.length} destination{connectionIds.length === 1 ? '' : 's'}.</p>
+            <div className="px-4 pb-4" aria-live="polite">
+              {!connectionIds.length ? <p className="text-[13px] text-muted">No destinations</p> : issues.length === 0 ? (
+                <p className="flex items-center gap-2 text-[13px] text-muted"><CircleCheck aria-hidden className="size-4 text-success" /> Ready</p>
               ) : (
                 <ul className="flex flex-col gap-3">
                   {generalIssues.map((i, n) => <IssueRow key={`g${n}`} issue={i} />)}
@@ -432,35 +429,36 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
               <CardHeader
                 id="h-preview"
                 title="Preview"
-                description="Approximate — each network renders posts its own way."
-                actions={tab === 'base' && selectedConns.length > 1 ? (
+                actions={<>
+                  {tab === 'base' && selectedConns.length > 1 ? (
                   <div className="w-[170px]">
                     <label className="sr-only" htmlFor="preview-as">Preview destination</label>
                     <Select id="preview-as" value={previewConn.id} onChange={(e) => setPreviewId(e.target.value)}>
                       {selectedConns.map((c) => <option key={c.id} value={c.id}>{PROVIDER_LABEL[c.provider]} · {c.display_name}</option>)}
                     </Select>
                   </div>
-                ) : null}
+                  ) : null}
+                </>}
               />
-              <div className="p-4"><VariantPreview variant={previewVariant} connection={previewConn} assets={assets} /></div>
+              <div className="px-4 pb-4"><VariantPreview variant={previewVariant} connection={previewConn} assets={assets} /></div>
             </Card>
           ) : null}
         </aside>
       </div>
 
       {/* Sticky action bar */}
-      <div className="fixed inset-x-0 bottom-16 z-20 border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:bottom-0 md:left-[248px]">
-        <div className="mx-auto flex max-w-[1280px] flex-wrap items-center gap-2 px-4 py-2.5 sm:px-6 md:px-8">
+      <div className="fixed inset-x-0 bottom-16 z-20 border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:bottom-0 md:left-[224px]">
+        <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-2 px-4 py-2 sm:px-6 md:px-8">
           <SaveStatus state={saveState} savedAt={savedAt} tz={tz} error={saveError} onRetry={() => void save()} onConflict={() => setConflictOpen(true)} readOnly={readOnly} />
           <span className="flex-1" />
           {!readOnly ? (
             <Button variant="ghost" size="md" icon={<Save aria-hidden className="size-4" />} onClick={() => void flush()} disabled={saveState === 'saved' || saveState === 'saving' || saveState === 'conflict'}>
-              Save<span className="sr-only"> draft now</span>
+              <span className="sr-only sm:not-sr-only">Save</span><span className="sr-only"> draft now</span>
             </Button>
           ) : null}
           {post.can.submit ? (
             <Button variant={post.can.schedule ? 'secondary' : 'primary'} icon={<Send aria-hidden className="size-4" />} onClick={() => setDialog('submit')} disabledReason={blockReason}>
-              Submit for review
+              Submit<span className="sr-only"> for review</span>
             </Button>
           ) : null}
           {can('drafts.edit') || post.can.schedule ? (
@@ -470,12 +468,12 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
               onClick={() => setDialog('schedule')}
               disabledReason={!post.can.schedule ? (post.can.schedule_reason ?? 'You can’t schedule this post.') : blockReason}
             >
-              {post.current_schedule && (post.current_schedule.status === 'active' || post.current_schedule.status === 'pending_approval') ? 'Update schedule' : 'Schedule'}
+              {post.current_schedule && (post.current_schedule.status === 'active' || post.current_schedule.status === 'pending_approval') ? 'Reschedule' : 'Schedule'}
             </Button>
           ) : null}
           {post.can.publish_now ? (
             <Button variant="secondary" icon={<SendHorizontal aria-hidden className="size-4" />} onClick={() => setDialog('publish')} disabledReason={blockReason}>
-              Publish now
+              Publish<span className="sr-only"> now</span>
             </Button>
           ) : null}
         </div>
@@ -500,7 +498,7 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
         flush={flush}
         workspaceTz={workspaceTz}
         onConflict={(e) => { setConflict(((isApiError(e) ? e.details?.current : null) ?? {}) as ConflictDetails); setSaveState('conflict'); setConflictOpen(true); }}
-        onDone={() => void afterAction('Submitted for review', 'Approvers have been notified.')}
+        onDone={() => void afterAction('Submitted for review')}
       />
       <PublishNowDialog
         open={dialog === 'publish'}
@@ -510,7 +508,7 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
         assets={assets}
         flush={flush}
         onConflict={(e) => { setConflict(((isApiError(e) ? e.details?.current : null) ?? {}) as ConflictDetails); setSaveState('conflict'); setConflictOpen(true); }}
-        onDone={(r) => void afterAction(allMockOf(r.deliveries) ? 'Simulated publish started' : 'Publishing started', 'Progress for each destination is shown below.')}
+        onDone={(r) => void afterAction(allMockOf(r.deliveries) ? 'Simulated publish started' : 'Publishing started')}
       />
       <ConflictDialog
         open={conflictOpen}
@@ -523,8 +521,8 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
         open={!!pendingRemove}
         onOpenChange={(o) => !o && setPendingRemove(null)}
         title={`Remove ${pendingRemove?.display_name ?? 'destination'}?`}
-        description="This destination has custom text, media, link or buttons. Removing it discards those customisations."
-        confirmLabel="Remove destination"
+        description="Its custom content will be discarded."
+        confirmLabel="Remove"
         confirmVariant="danger"
         onConfirm={() => { if (pendingRemove) removeDestination(pendingRemove.id); }}
       />
@@ -532,7 +530,7 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
         open={archiveOpen}
         onOpenChange={setArchiveOpen}
         title="Archive this post?"
-        description="Archived posts are hidden from the planner. A post with an active schedule can’t be archived — cancel the schedule first."
+        description="Hidden from the planner. Cancel any active schedule first."
         confirmLabel="Archive"
         confirmVariant="danger"
         onConfirm={async () => {
@@ -577,7 +575,7 @@ function SaveStatus({
       {state === 'saving' ? (
         <><LoaderCircle aria-hidden className="size-4 anim-spin text-info" /><span className="text-muted">Saving…</span></>
       ) : state === 'dirty' ? (
-        <><span aria-hidden className="size-2 rounded-full bg-[var(--warn)]" /><span className="text-muted">Unsaved changes</span></>
+        <><span aria-hidden className="size-2 rounded-full bg-[var(--warn)]" /><span className="text-muted">Unsaved</span></>
       ) : state === 'failed' ? (
         <>
           <CloudAlert aria-hidden className="size-4 text-danger" />
@@ -587,11 +585,11 @@ function SaveStatus({
       ) : state === 'conflict' ? (
         <>
           <ToneIcon tone="warn" />
-          <span className="text-warn">Not saved — edited elsewhere</span>
+          <span className="text-warn">Edited elsewhere</span>
           <Button size="sm" variant="quiet" onClick={onConflict}>Resolve</Button>
         </>
       ) : (
-        <><CircleCheck aria-hidden className="size-4 text-success" /><span className={cn('text-muted')}>Saved {fmtTime(savedAt, tz)} {zoneAbbr(savedAt, tz)}</span></>
+        <><CircleCheck aria-hidden className="size-4 text-success" /><span className="sr-only text-muted sm:not-sr-only">Saved {fmtTime(savedAt, tz)} {zoneAbbr(savedAt, tz)}</span></>
       )}
     </div>
   );

@@ -2,6 +2,7 @@
 import { cloneElement, forwardRef, isValidElement, useId, type InputHTMLAttributes, type ReactElement, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 import { ChevronDown, CircleExclamationPoint } from 'lucide-react';
 import { cn } from './cn';
+import { InfoTip } from './tooltip';
 
 const control =
   'w-full rounded-lg border border-border bg-sunken px-3 text-sm text-fg placeholder:text-subtle transition-colors hover:border-border-strong focus-visible:border-[var(--focus)] disabled:opacity-60 disabled:cursor-not-allowed aria-[invalid=true]:border-danger';
@@ -29,9 +30,9 @@ export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSel
  * Label + control + hint + error. The single child control receives id, aria-describedby and aria-invalid.
  */
 export function Field({
-  label, hint, error, children, className, required, optional, labelHidden,
+  label, hint, info, error, children, className, required, optional, labelHidden,
 }: {
-  label: ReactNode; hint?: ReactNode; error?: ReactNode; children: ReactElement; className?: string;
+  label: ReactNode; hint?: ReactNode; info?: ReactNode; error?: ReactNode; children: ReactElement; className?: string;
   required?: boolean; optional?: boolean; labelHidden?: boolean;
 }) {
   const id = useId();
@@ -47,11 +48,14 @@ export function Field({
       })
     : children;
   return (
-    <div className={cn('flex flex-col gap-1.5', className)}>
-      <label htmlFor={id} className={cn('text-[13px] font-medium text-fg', labelHidden && 'sr-only')}>
-        {label}
-        {optional ? <span className="ml-1.5 font-normal text-subtle">Optional</span> : null}
-      </label>
+    <div className={cn('flex flex-col gap-2', className)}>
+      <div className={cn('flex items-center gap-1', labelHidden && 'sr-only')}>
+        <label htmlFor={id} className="text-[13px] font-medium text-fg">
+          {label}
+          {optional ? <span className="ml-1.5 font-normal text-subtle">Optional</span> : null}
+        </label>
+        {info ? <InfoTip>{info}</InfoTip> : null}
+      </div>
       {child}
       {hint ? <p id={hintId} className="text-xs text-muted">{hint}</p> : null}
       {error ? (
@@ -73,7 +77,7 @@ export function Checkbox({
       <input
         id={id}
         type="checkbox"
-        className="mt-0.5 size-[18px] shrink-0 cursor-pointer accent-[var(--accent)] disabled:cursor-not-allowed"
+        className="mt-0.5 size-[18px] shrink-0 cursor-pointer accent-[var(--text)] disabled:cursor-not-allowed"
         aria-describedby={description ? `${id}-d` : undefined}
         {...rest}
       />
@@ -99,8 +103,8 @@ export function RadioGroup<T extends string>({
         <label
           key={o.value}
           className={cn(
-            'flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 transition-colors',
-            value === o.value ? 'border-[var(--focus)] bg-accent-soft' : 'border-border hover:border-border-strong',
+            'flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2 transition-colors',
+            value === o.value ? 'border-border-strong bg-raised' : 'border-border hover:border-border-strong',
             o.disabled && 'cursor-not-allowed opacity-60',
           )}
         >
@@ -111,7 +115,7 @@ export function RadioGroup<T extends string>({
             checked={value === o.value}
             disabled={o.disabled}
             onChange={() => onChange(o.value)}
-            className="mt-1 size-4 shrink-0 accent-[var(--accent)]"
+            className="mt-1 size-4 shrink-0 accent-[var(--text)]"
           />
           <span className="min-w-0">
             <span className="block text-sm">{o.label}</span>

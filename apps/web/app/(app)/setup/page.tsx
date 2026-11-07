@@ -11,7 +11,7 @@ export default function SetupPage() {
   const { can } = useSession();
   const { data, error, loading, refetch, setData } = useApi<{ groups: SetupGroup[] }>(can('setup.manage') ? '/api/setup' : null);
   if (!can('setup.manage')) {
-    return <><PageHeader title="Setup" /><EmptyState icon={<Wrench aria-hidden />} title="Only the workspace owner can change setup">Ask the owner to configure networks, storage, email and sign-in.</EmptyState></>;
+    return <><PageHeader title="Setup" /><EmptyState icon={<Wrench aria-hidden />} title="Owner only" /></>;
   }
   const total = data?.groups.reduce((n, g) => n + g.items.length, 0) ?? 0;
   const done = data?.groups.reduce((n, g) => n + g.items.filter((i) => i.is_set).length, 0) ?? 0;
@@ -21,8 +21,7 @@ export default function SetupPage() {
     <>
       <PageHeader
         title="Setup"
-        description="Connect Social Lite to the services it needs. Secret values are write-only: once saved they’re never shown again."
-        actions={data ? <span className="text-[13px] text-muted tabular">{done} of {total} configured</span> : null}
+        meta={data ? <span className="tabular">{done}/{total} set</span> : undefined}
       />
       {error && !data ? <ErrorState error={error} onRetry={refetch} /> : loading || !data ? <SkeletonRows rows={5} /> : (
         <div className="flex max-w-3xl flex-col gap-6">
@@ -77,7 +76,7 @@ function SetupRow({ item, onSaved }: { item: SetupItem; onSaved: (i: SetupItem) 
   };
 
   return (
-    <li className="flex flex-col gap-3 px-5 py-4">
+    <li className="flex flex-col gap-2 px-4 py-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <label htmlFor={id} className="flex items-center gap-2 text-[13px] font-medium">
@@ -89,20 +88,20 @@ function SetupRow({ item, onSaved }: { item: SetupItem; onSaved: (i: SetupItem) 
         </div>
         <div className="flex items-center gap-2">
           {item.is_set
-            ? <Badge tone="success" icon={<CircleCheck aria-hidden className="size-3.5" />}>{fromEnv ? 'Set by environment' : 'Set'}</Badge>
+            ? <Badge tone="success" icon={<CircleCheck aria-hidden className="size-3.5" />}>{fromEnv ? 'Env' : 'Set'}</Badge>
             : <Badge tone="warn" icon={<CircleDashed aria-hidden className="size-3.5" />}>Not set</Badge>}
           {item.docs_url ? (
-            <a href={item.docs_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-accent-text hover:underline">
+            <a href={item.docs_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-muted hover:text-fg">
               Guide <ExternalLink aria-hidden className="size-3" /><span className="sr-only">(opens in a new tab)</span>
             </a>
           ) : null}
         </div>
       </div>
-      {item.warning ? <p role="alert" className="rounded-lg border border-[color-mix(in_srgb,var(--warn)_35%,transparent)] bg-warn-soft px-3 py-2 text-xs">{item.warning}</p> : null}
+      {item.warning ? <p role="alert" className="rounded-lg bg-warn-soft px-3 py-2 text-xs">{item.warning}</p> : null}
       {locked ? (
-        <p className="flex items-center gap-2 text-xs text-muted"><Server aria-hidden className="size-3.5" /> Can only be set through the deployment’s environment variables.</p>
+        <p className="flex items-center gap-2 text-xs text-muted"><Server aria-hidden className="size-3.5" /> Environment only</p>
       ) : fromEnv ? (
-        <p className="flex items-center gap-2 text-xs text-muted"><Server aria-hidden className="size-3.5" /> Provided by the deployment’s environment variables. Change it there.</p>
+        <p className="flex items-center gap-2 text-xs text-muted"><Server aria-hidden className="size-3.5" /> From environment</p>
       ) : editing ? (
         <div className="flex flex-wrap gap-2">
           <Input
@@ -112,15 +111,15 @@ function SetupRow({ item, onSaved }: { item: SetupItem; onSaved: (i: SetupItem) 
             spellCheck={false}
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder={item.secret ? (item.is_set ? 'Enter a new value to replace the saved one' : 'Paste the value') : ''}
-            className="min-w-[240px] flex-1 font-mono text-[13px]"
+            placeholder={item.secret ? (item.is_set ? 'New value' : 'Paste value') : ''}
+            className="min-w-0 flex-1 basis-[200px] font-mono text-[13px]"
           />
           <Button variant="primary" onClick={save} loading={busy} disabledReason={!value.trim() ? 'Enter a value.' : null}>Save</Button>
           {item.is_set ? <Button variant="ghost" onClick={() => { setEditing(false); setValue(item.secret ? '' : item.value ?? ''); setError(null); }}>Cancel</Button> : null}
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-3">
-          <span id={id} className="font-mono text-[13px] text-muted">{item.secret ? '•••••••• (hidden)' : item.value || '—'}</span>
+          <span id={id} className="font-mono text-[13px] text-muted">{item.secret ? '••••••••' : item.value || '—'}<span className="sr-only">{item.secret ? ' (hidden)' : ''}</span></span>
           <Button size="sm" onClick={() => setEditing(true)}>{item.secret ? 'Replace' : 'Edit'}</Button>
         </div>
       )}

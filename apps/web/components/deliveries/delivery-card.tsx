@@ -22,50 +22,50 @@ export function DeliveryCard({ delivery: d, tz, onChanged, canAct = true, expand
   const attempts = d.attempts ?? [];
 
   return (
-    <article className="rounded-xl border border-border bg-surface" aria-label={`${PROVIDER_LABEL[d.provider]} — ${d.display_name}`}>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3.5">
+    <article className="py-2" aria-label={`${PROVIDER_LABEL[d.provider]} — ${d.display_name}`}>
+      <div className="flex items-center gap-3 py-2">
         <PlatformIcon provider={d.provider} size="md" />
-        <div className="min-w-0 flex-1 basis-[55%]">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-2">
             <span className="truncate text-sm font-medium">{d.display_name}</span>
-            {d.is_mock ? <SimulatedBadge /> : null}
+            {d.is_mock ? <SimulatedBadge className="shrink-0" /> : null}
           </div>
-          <p className="text-xs text-muted tabular">
+          <p className="truncate text-xs text-muted tabular">
             {d.state === 'published' && d.published_at ? (
               <>{d.is_mock ? 'Simulated delivery' : 'Published'} <TimeWithZone instant={d.published_at} tz={tz} /></>
             ) : (
               <>Due <TimeWithZone instant={d.due_at} tz={tz} /></>
             )}
-            {d.attempt_count ? <> · Attempt {d.attempt_count} of {d.max_attempts}</> : null}
+            {d.attempt_count ? <> · {d.attempt_count}/{d.max_attempts}<span className="sr-only"> attempts</span></> : null}
           </p>
         </div>
-        <DeliveryStateBadge state={d.state} isMock={d.is_mock} />
+        <DeliveryStateBadge state={d.state} isMock={d.is_mock} size="sm" />
       </div>
 
       <DeliveryExplanation d={d} tz={tz} />
 
-      <div className="flex flex-wrap items-center gap-2 border-t border-border px-4 py-2.5">
+      <div className="flex flex-wrap items-center gap-2 pl-11">
         {d.provider_url ? (
           <a
             href={d.provider_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="touch-target inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium text-accent-text hover:bg-raised"
+            className="touch-target -ml-2 inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-[13px] font-medium text-fg underline-offset-2 hover:underline"
           >
-            {d.is_mock ? 'Open simulated result' : `View on ${PROVIDER_LABEL[d.provider]}`}
+            {d.is_mock ? 'Simulated result' : `View on ${PROVIDER_LABEL[d.provider]}`}
             <ExternalLink aria-hidden className="size-3.5" />
             <span className="sr-only">(opens in a new tab)</span>
           </a>
         ) : null}
         {d.provider_ids.length ? (
-          <span className="text-xs text-muted">
-            ID <code className="font-mono text-[11px] text-fg">{d.provider_ids.join(', ')}</code>
+          <span className="min-w-0 max-w-[40%] truncate text-xs text-subtle" title={d.provider_ids.join(', ')}>
+            ID <code className="font-mono text-[11px]">{d.provider_ids.join(', ')}</code>
           </span>
         ) : null}
         <span className="flex-1" />
         {attempts.length ? (
           <Button size="sm" variant="quiet" aria-expanded={showAttempts} onClick={() => setShowAttempts((s) => !s)}>
-            {showAttempts ? 'Hide' : 'Show'} {attempts.length} attempt{attempts.length === 1 ? '' : 's'}
+            Attempts <span className="tabular text-subtle">{attempts.length}</span>
             <ChevronDown aria-hidden className={cn('size-4 transition-transform', showAttempts && 'rotate-180')} />
           </Button>
         ) : null}
@@ -96,8 +96,8 @@ function DeliveryExplanation({ d, tz }: { d: Delivery; tz: string }) {
   switch (d.state) {
     case 'unknown':
       tone = 'warn';
-      title = 'We sent this but didn’t get a confirmation';
-      body = `It may or may not have been posted${d.unknown_since ? '' : ''}. Check ${d.display_name} on ${PROVIDER_LABEL[d.provider]}, then use Resolve to record what happened. Retrying without checking could create a duplicate.`;
+      title = 'Sent, not confirmed';
+      body = `Check ${PROVIDER_LABEL[d.provider]} first, then Resolve. Retrying may post twice.`;
       break;
     case 'failed':
       tone = 'danger';
@@ -106,35 +106,35 @@ function DeliveryExplanation({ d, tz }: { d: Delivery; tz: string }) {
       break;
     case 'expired':
       tone = 'danger';
-      title = 'Missed its publish-before deadline';
-      body = 'It was not sent, to avoid posting late. Retry to send it now, or reschedule.';
+      title = 'Missed deadline';
+      body = 'Not sent late. Retry or reschedule.';
       break;
     case 'blocked':
       tone = 'warn';
       title = 'Blocked';
-      body = d.blocked_reason ?? d.last_error_message ?? 'This destination needs attention before it can publish.';
+      body = d.blocked_reason ?? d.last_error_message ?? 'Fix the account to publish.';
       break;
     case 'retry_wait':
       tone = 'info';
-      title = 'Temporary problem — retrying automatically';
+      title = 'Retrying automatically';
       body = d.last_error_message ?? null;
       break;
     case 'paused':
       tone = 'info';
       title = 'Paused';
-      body = 'Publishing is paused for this workspace, brand or account. It will send when resumed if still before its deadline.';
+      body = 'Sends on resume if before its deadline.';
       break;
     default:
       return null;
   }
   return (
-    <div className="px-4 pb-3.5">
+    <div className="pb-2 pl-11">
       <Banner tone={tone} title={title}>
         {body ? <p>{body}</p> : null}
         {d.last_error_code && (d.state === 'failed' || d.state === 'blocked') ? <p className="mt-1 font-mono text-[11px] text-subtle">Code: {d.last_error_code}</p> : null}
         {d.state === 'retry_wait' && d.next_attempt_at ? <p className="mt-1 text-xs text-muted">Next attempt <TimeWithZone instant={d.next_attempt_at} tz={tz} format="time" /></p> : null}
         {d.state === 'unknown' && d.unknown_since ? <p className="mt-1 text-xs text-muted">Since <TimeWithZone instant={d.unknown_since} tz={tz} /></p> : null}
-        {d.publish_before && (d.state === 'paused' || d.state === 'blocked') ? <p className="mt-1 text-xs text-muted">Publish-before deadline <TimeWithZone instant={d.publish_before} tz={tz} /></p> : null}
+        {d.publish_before && (d.state === 'paused' || d.state === 'blocked') ? <p className="mt-1 text-xs text-muted">Deadline <TimeWithZone instant={d.publish_before} tz={tz} /></p> : null}
       </Banner>
     </div>
   );
@@ -142,13 +142,13 @@ function DeliveryExplanation({ d, tz }: { d: Delivery; tz: string }) {
 
 export function AttemptList({ attempts, tz }: { attempts: NonNullable<Delivery['attempts']>; tz: string }) {
   return (
-    <ol className="border-t border-border px-4 py-3" aria-label="Attempts">
+    <ol className="ml-11 mt-2" aria-label="Attempts">
       {attempts.map((a) => (
         <li key={a.attempt_number} className="relative border-l border-border py-2 pl-4 text-[13px]">
           <span aria-hidden className="absolute -left-[4.5px] top-3.5 size-2 rounded-full bg-[var(--border-strong)]" />
           <div className="flex flex-wrap items-center gap-x-2">
             <span className="font-medium">#{a.attempt_number}</span>
-            <span className="text-muted">{a.kind === 'manual' ? 'Manual retry' : a.kind === 'reconcile' ? 'Reconciliation' : 'Automatic'}</span>
+            <span className="text-muted">{a.kind === 'manual' ? 'Manual' : a.kind === 'reconcile' ? 'Reconcile' : 'Auto'}</span>
             <span>· {a.outcome ? ATTEMPT_OUTCOME[a.outcome] ?? a.outcome : 'In progress'}</span>
           </div>
           <p className="text-xs text-muted">
@@ -173,21 +173,21 @@ export function RetryDialog({ open, onOpenChange, delivery: d, onDone }: { open:
       onOpenChange={(o) => { if (!o) setAck(false); onOpenChange(o); }}
       title={`Retry ${PROVIDER_LABEL[d.provider]} — ${d.display_name}?`}
       description={needsAck
-        ? 'We don’t know whether the previous attempt was posted. Retrying may publish this a second time.'
-        : 'Only this destination is retried. Destinations that already succeeded are never re-sent.'}
-      confirmLabel={d.is_mock ? 'Retry (simulated)' : 'Retry now'}
+        ? 'The last attempt may have posted. Retrying may post twice.'
+        : 'Only this destination is retried.'}
+      confirmLabel={d.is_mock ? 'Retry (simulated)' : 'Retry'}
       confirmVariant={needsAck ? 'danger' : 'primary'}
-      confirmDisabledReason={needsAck && !ack ? 'Confirm you understand the duplicate risk first.' : null}
+      confirmDisabledReason={needsAck && !ack ? 'Tick the duplicate-risk box first.' : null}
       onConfirm={async () => {
         const res = await api.post<Delivery>(`/api/deliveries/${d.id}/retry`, needsAck ? { acknowledge_duplicate_risk: true } : {});
-        toast.success('Retry queued', `${d.display_name} will be attempted again shortly.`);
+        toast.success('Retry queued');
         onDone?.(res);
       }}
     >
       {needsAck ? (
         <div className="flex flex-col gap-3">
-          <Banner tone="warn">Check {d.display_name} on {PROVIDER_LABEL[d.provider]} first. If the post is there, use Resolve instead of retrying.</Banner>
-          <Checkbox checked={ack} onChange={(e) => setAck(e.target.checked)} label="I understand this may create a duplicate post" description="This manual attempt is recorded in the audit log with your name." />
+          <Banner tone="warn">Check {PROVIDER_LABEL[d.provider]} first. If it’s there, use Resolve.</Banner>
+          <Checkbox checked={ack} onChange={(e) => setAck(e.target.checked)} label="I understand this may create a duplicate post" description="Logged with your name." />
         </div>
       ) : null}
     </ConfirmDialog>
@@ -231,13 +231,13 @@ export function ResolveDialog({ open, onOpenChange, delivery: d, onDone }: { ope
       open={open}
       onOpenChange={onOpenChange}
       busy={busy}
-      title={`Resolve unknown result — ${d.display_name}`}
-      description={`Look for this post on ${PROVIDER_LABEL[d.provider]}${d.is_mock ? ' (simulated destination)' : ''}, then record what you found.`}
+      title={`Resolve — ${d.display_name}`}
+      description={`Check ${PROVIDER_LABEL[d.provider]}${d.is_mock ? ' (simulated)' : ''}, then record what you found.`}
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-          <Button variant="primary" onClick={submit} loading={busy} disabledReason={!outcome ? 'Choose what you found.' : urlInvalid ? 'Fix the post link.' : null}>
-            Record outcome
+          <Button variant="primary" onClick={submit} loading={busy} disabledReason={!outcome ? 'Choose an outcome.' : urlInvalid ? 'Fix the link.' : null}>
+            Record
           </Button>
         </>
       }
@@ -245,20 +245,20 @@ export function ResolveDialog({ open, onOpenChange, delivery: d, onDone }: { ope
       <div className="flex flex-col gap-4">
         <RadioGroup
           name="outcome"
-          legend="What did you find?"
+          legend="Outcome"
           value={outcome}
           onChange={setOutcome}
           options={[
-            { value: 'published', label: 'It was posted', description: 'Mark as published. It will not be sent again.' },
-            { value: 'not_published', label: 'It was not posted', description: 'Mark as not published. You can then retry safely.' },
+            { value: 'published', label: 'It was posted', description: 'Won’t be sent again.' },
+            { value: 'not_published', label: 'It wasn’t posted', description: 'Safe to retry.' },
           ]}
         />
         {outcome === 'published' ? (
-          <Field label="Link to the post" optional error={urlInvalid ? 'Use a full https:// link.' : null}>
+          <Field label="Post link" optional error={urlInvalid ? 'Use a full https:// link.' : null}>
             <Input type="url" inputMode="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://" />
           </Field>
         ) : null}
-        <Field label="Note" optional hint="Saved to the audit log.">
+        <Field label="Note" optional>
           <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={1000} className="min-h-16" />
         </Field>
         {error ? <ErrorNotice error={error} /> : null}

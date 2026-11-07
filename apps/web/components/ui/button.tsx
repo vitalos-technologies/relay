@@ -12,7 +12,7 @@ const base =
   'touch-target inline-flex items-center justify-center gap-2 rounded-lg font-medium whitespace-nowrap select-none transition-colors duration-100 disabled:cursor-not-allowed disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-50';
 const variants: Record<ButtonVariant, string> = {
   primary: 'bg-accent text-on-accent hover:bg-accent-hover shadow-[0_0_0_1px_rgba(0,0,0,0.12)_inset]',
-  secondary: 'bg-raised text-fg border border-border hover:border-border-strong hover:bg-sunken',
+  secondary: 'bg-transparent text-fg border border-border hover:bg-raised',
   ghost: 'text-fg hover:bg-raised',
   quiet: 'text-muted hover:text-fg hover:bg-raised',
   danger: 'bg-danger-soft text-danger border border-[color-mix(in_srgb,var(--danger)_40%,transparent)] hover:bg-[color-mix(in_srgb,var(--danger)_18%,transparent)]',

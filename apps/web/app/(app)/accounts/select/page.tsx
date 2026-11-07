@@ -25,7 +25,7 @@ export default function SelectDestinationsPage() {
   const [submitError, setSubmitError] = useState<unknown>(null);
 
   if (!flow) {
-    return <><PageHeader title="Choose destinations" /><EmptyState icon={<Plug aria-hidden />} title="No connection in progress" action={<LinkButton href="/accounts" variant="primary">Go to Accounts</LinkButton>}>Start connecting from the Accounts page.</EmptyState></>;
+    return <><PageHeader title="Choose destinations" /><EmptyState icon={<Plug aria-hidden />} title="Nothing in progress" action={<LinkButton href="/accounts" variant="primary">Accounts</LinkButton>} /></>;
   }
   const brandName = data ? session.brands.find((b) => b.id === data.brand_id)?.name : undefined;
   const expired = data && new Date(data.expires_at).getTime() < Date.now();
@@ -45,26 +45,26 @@ export default function SelectDestinationsPage() {
   return (
     <>
       <PageHeader
-        title={data ? `Choose ${PROVIDER_LABEL[data.provider]} destinations` : 'Choose destinations'}
-        description={data ? <>Select exactly which ones to add{brandName ? <> to <span className="text-fg">{brandName}</span></> : null}. Nothing is added unless you tick it.</> : undefined}
+        title={data ? `Add ${PROVIDER_LABEL[data.provider]}` : 'Choose destinations'}
+        meta={brandName ? <span className="truncate">{brandName}</span> : undefined}
       />
-      {error && !data ? <ErrorState error={error} onRetry={refetch} title="This connection link can’t be used" /> : loading || !data ? <SkeletonRows rows={3} /> : (
+      {error && !data ? <ErrorState error={error} onRetry={refetch} title="Link can’t be used" /> : loading || !data ? <SkeletonRows rows={3} /> : (
         <Card className="max-w-2xl">
-          <div className="p-5">
-            {expired ? <ErrorNotice error={new Error('This selection expired. Start connecting again from Accounts.')} className="mb-4" /> : (
-              <p className="mb-4 text-xs text-muted">Selection expires <TimeWithZone instant={data.expires_at} tz={session.workspace?.timezone ?? 'UTC'} format="time" />.</p>
+          <div className="p-4">
+            {expired ? <ErrorNotice error={new Error('Expired. Start again from Accounts.')} className="mb-4" /> : (
+              <p className="mb-4 text-xs text-muted">Expires <TimeWithZone instant={data.expires_at} tz={session.workspace?.timezone ?? 'UTC'} format="time" />.</p>
             )}
             {!data.candidates.length ? (
-              <EmptyState compact title="Nothing available to add">The account you authorised has no pages or profiles you can publish to.</EmptyState>
+              <EmptyState compact title="Nothing to add" />
             ) : (
               <fieldset>
                 <legend className="sr-only">Destinations</legend>
-                <ul className="flex flex-col gap-2">
+                <ul className="flex flex-col divide-y divide-border">
                   {data.candidates.map((c) => {
                     const id = idOf(c);
                     const reason = reasonOf(c);
                     return (
-                      <li key={id} className="flex items-start gap-3 rounded-lg border border-border px-3 py-3">
+                      <li key={id} className="flex items-start gap-3 py-3">
                         <PlatformIcon provider={c.provider} size="sm" />
                         <Checkbox
                           className="flex-1"
@@ -81,10 +81,10 @@ export default function SelectDestinationsPage() {
               </fieldset>
             )}
             {submitError ? <ErrorNotice error={submitError} className="mt-4" /> : null}
-            <div className="mt-5 flex flex-wrap justify-end gap-2">
+            <div className="mt-6 flex flex-wrap justify-end gap-2">
               <LinkButton href="/accounts" variant="ghost">Cancel</LinkButton>
-              <Button variant="primary" onClick={submit} loading={busy} disabledReason={!picked.length ? 'Tick at least one destination.' : expired ? 'This selection expired.' : null}>
-                Add {picked.length || ''} destination{picked.length === 1 ? '' : 's'}
+              <Button variant="primary" onClick={submit} loading={busy} disabledReason={!picked.length ? 'Tick a destination.' : expired ? 'Expired.' : null}>
+                Add{picked.length ? ` ${picked.length}` : ''}
               </Button>
             </div>
           </div>

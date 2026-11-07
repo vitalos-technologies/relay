@@ -25,23 +25,23 @@ export default function OperationsPage() {
     <>
       <PageHeader
         title="Operations"
-        description={<>Live figures reported by the server. Nothing here is estimated. Last refreshed <TimeWithZone instant={at} tz={tz} format="time" />.</>}
+        meta={<TimeWithZone instant={at} tz={tz} format="time" />}
         actions={<Button icon={<RefreshCw aria-hidden className="size-4" />} loading={ops.refreshing || diag.refreshing} onClick={async () => { await Promise.all([ops.refetch(), diag.refetch()]); setAt(new Date().toISOString()); }}>Refresh</Button>}
       />
       <div className="flex flex-col gap-6">
         {typeof dispatch === 'boolean' ? (
           dispatch
-            ? <Banner tone="success" title="Dispatch is enabled">The worker sends due posts.</Banner>
-            : <Banner tone="danger" title="Dispatch is disabled">No posts are being sent by the worker. This is a deployment-level switch.</Banner>
+            ? <Banner tone="success" title="Dispatch on" />
+            : <Banner tone="danger" title="Dispatch off — nothing is sending" />
         ) : null}
 
         <Card aria-labelledby="h-diag">
-          <CardHeader id="h-diag" title="Diagnostics" description="Connectivity and configuration checks." />
-          <div className="p-4">
-            {diag.error && !diag.data ? <ErrorState error={diag.error} onRetry={diag.refetch} /> : diag.loading ? <SkeletonRows rows={3} /> : !diag.data?.checks.length ? <p className="text-[13px] text-muted">No checks reported.</p> : (
+          <CardHeader id="h-diag" title="Diagnostics" />
+          <div className="px-4 pb-4">
+            {diag.error && !diag.data ? <ErrorState error={diag.error} onRetry={diag.refetch} /> : diag.loading ? <SkeletonRows rows={3} /> : !diag.data?.checks.length ? <p className="text-[13px] text-muted">No checks</p> : (
               <ul className="grid grid-cols-1 gap-2 md:grid-cols-2">
                 {diag.data.checks.map((c) => (
-                  <li key={c.name} className="flex items-start gap-3 rounded-lg border border-border bg-sunken px-3 py-2.5">
+                  <li key={c.name} className="flex items-start gap-3 py-2">
                     {c.ok ? <CircleCheck aria-hidden className="mt-0.5 size-4 text-success" /> : <OctagonX aria-hidden className="mt-0.5 size-4 text-danger" />}
                     <div className="min-w-0">
                       <p className="text-[13px] font-medium">{c.name} <span className={c.ok ? 'text-success' : 'text-danger'}>· {c.ok ? 'OK' : 'Failing'}</span></p>
@@ -59,7 +59,7 @@ export default function OperationsPage() {
             {rest.map(([k, v]) => (
               <Card key={k} aria-label={label(k)}>
                 <CardHeader title={label(k)} />
-                <div className="p-4"><Value v={v} tz={tz} /></div>
+                <div className="px-4 pb-4"><Value v={v} tz={tz} /></div>
               </Card>
             ))}
           </div>

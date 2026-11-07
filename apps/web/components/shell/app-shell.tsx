@@ -70,15 +70,15 @@ function ShellInner({ children }: { children: ReactNode }) {
     n.badge === 'approvals' && approvals && approvals.count > 0 ? `${approvals.count}${approvals.more ? '+' : ''}` : null;
 
   return (
-    <div className="min-h-dvh md:grid md:grid-cols-[248px_minmax(0,1fr)]">
+    <div className="min-h-dvh md:grid md:grid-cols-[224px_minmax(0,1fr)]">
       <a href="#main" className="sr-only-focusable fixed left-3 top-3 z-[80] rounded-lg bg-accent px-3 py-2 text-on-accent">Skip to content</a>
 
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-dvh flex-col border-r border-border bg-surface md:flex" aria-label="Primary">
-        <div className="flex h-14 items-center gap-2.5 px-4">
+        <div className="flex h-16 items-center px-4">
           <Logo />
         </div>
-        <div className="flex flex-col gap-2 px-3 pb-3">
+        <div className="flex flex-col gap-2 px-3 pb-4">
           <WorkspaceSwitcher />
           <BrandFilter />
         </div>
@@ -90,7 +90,7 @@ function ShellInner({ children }: { children: ReactNode }) {
           </ul>
           {admin.length ? (
             <>
-              <p className="mb-1 mt-5 px-2.5 text-[11px] font-medium uppercase tracking-[0.08em] text-subtle">Administration</p>
+              <p className="mb-1 mt-6 px-2 text-[11px] font-medium text-subtle">Admin</p>
               <ul className="flex flex-col gap-0.5">
                 {admin.map((n) => (
                   <NavLink key={n.href} item={n} href={n.href} active={isActive(pathname, n.href)} badge={null} />
@@ -99,7 +99,7 @@ function ShellInner({ children }: { children: ReactNode }) {
             </>
           ) : null}
         </nav>
-        <div className="flex flex-col gap-2 border-t border-border p-3">
+        <div className="flex flex-col gap-2 p-3">
           <EmergencyPause />
           <div className="flex items-center gap-1">
             <UserMenu />
@@ -118,7 +118,7 @@ function ShellInner({ children }: { children: ReactNode }) {
 
       <div className="flex min-w-0 flex-col">
         <ShellBanners />
-        <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1280px] flex-1 px-4 pb-28 pt-6 focus:outline-none sm:px-6 md:px-8 md:pb-12 md:pt-8">
+        <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1200px] flex-1 px-4 pb-28 pt-6 focus:outline-none sm:px-6 md:px-8 md:pb-16 md:pt-8">
           {children}
         </main>
       </div>
@@ -136,9 +136,9 @@ function ShellInner({ children }: { children: ReactNode }) {
                   aria-current={active ? 'page' : undefined}
                   className={cn('relative flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium', active ? 'text-fg' : 'text-muted')}
                 >
-                  <span className={cn('relative flex h-7 w-12 items-center justify-center rounded-full', active && 'bg-accent-soft text-accent-text')}>
+                  <span className={cn('relative flex h-7 w-12 items-center justify-center rounded-full', active && 'bg-raised text-fg')}>
                     <n.icon aria-hidden className="size-[18px]" />
-                    {b ? <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-accent px-1 text-center text-[10px] leading-4 text-on-accent">{b}<span className="sr-only"> pending</span></span> : null}
+                    {b ? <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-[var(--text)] px-1 text-center text-[10px] leading-4 text-bg">{b}<span className="sr-only"> pending</span></span> : null}
                   </span>
                   {n.label}
                 </Link>
@@ -161,7 +161,7 @@ function MobileMore({ items, pathname, withBrand }: { items: NavItem[]; pathname
     <Menu open={open} onOpenChange={setOpen}>
       <MenuTrigger asChild>
         <button type="button" className={cn('flex h-16 w-full flex-col items-center justify-center gap-1 text-[11px] font-medium', active ? 'text-fg' : 'text-muted')}>
-          <span className={cn('flex h-7 w-12 items-center justify-center rounded-full', active && 'bg-accent-soft text-accent-text')}>
+          <span className={cn('flex h-7 w-12 items-center justify-center rounded-full', active && 'bg-raised text-fg')}>
             <Ellipsis aria-hidden className="size-[18px]" />
           </span>
           More
@@ -186,15 +186,14 @@ function NavLink({ item, href, active, badge }: { item: NavItem; href: string; a
         href={href}
         aria-current={active ? 'page' : undefined}
         className={cn(
-          'group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13px] font-medium transition-colors',
+          'group relative flex h-9 items-center gap-3 rounded-lg px-2 text-[13px] font-medium transition-colors',
           active ? 'bg-raised text-fg' : 'text-muted hover:bg-raised/60 hover:text-fg',
         )}
       >
-        {active ? <span aria-hidden className="absolute -left-3 top-2 h-5 w-[3px] rounded-r bg-accent" /> : null}
-        <Icon aria-hidden className={cn('size-4', active ? 'text-accent-text' : 'text-subtle group-hover:text-muted')} />
+        <Icon aria-hidden className={cn('size-4', active ? 'text-fg' : 'text-subtle group-hover:text-muted')} />
         <span className="flex-1">{item.label}</span>
         {badge ? (
-          <span className="rounded-full bg-accent px-1.5 text-[11px] font-semibold leading-5 text-on-accent tabular">
+          <span className="rounded-full bg-raised px-1.5 text-[11px] font-semibold leading-5 text-fg tabular">
             {badge}
             <span className="sr-only"> pending</span>
           </span>

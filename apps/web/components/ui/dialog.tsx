@@ -35,7 +35,7 @@ export function Dialog({ open, onOpenChange, title, description, children, foote
           onPointerDownOutside={(e) => busy && e.preventDefault()}
           {...(description ? {} : { 'aria-describedby': undefined })}
         >
-          <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
+          <div className="flex items-start justify-between gap-4 px-6 pb-2 pt-6">
             <div className="min-w-0">
               <D.Title className="text-[15px] font-semibold leading-snug">{title}</D.Title>
               {description ? <D.Description className="mt-1 text-[13px] text-muted">{description}</D.Description> : null}
@@ -46,8 +46,8 @@ export function Dialog({ open, onOpenChange, title, description, children, foote
               </button>
             </D.Close>
           </div>
-          {children ? <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div> : null}
-          {footer ? <div className={cn('flex flex-wrap items-center justify-end gap-2 px-5 py-3.5', children ? 'border-t border-border' : '')}>{footer}</div> : null}
+          {children ? <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">{children}</div> : null}
+          {footer ? <div className="flex flex-wrap items-center justify-end gap-2 px-6 pb-6 pt-4">{footer}</div> : null}
         </D.Content>
       </D.Portal>
     </D.Root>

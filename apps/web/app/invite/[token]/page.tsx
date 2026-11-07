@@ -9,12 +9,12 @@ import { Banner, ErrorState, Facts, Skeleton, TimeWithZone, TooltipProvider } fr
 import { Logo } from '@/components/shell/logo';
 
 const INVITE_ERRORS: Record<string, string> = {
-  email_mismatch: 'You signed in with a different email address from the one invited. Sign in with the invited address.',
-  invite_email_mismatch: 'You signed in with a different email address from the one invited. Sign in with the invited address.',
-  expired: 'This invitation has expired. Ask the workspace admin to send a new one.',
-  invite_expired: 'This invitation has expired. Ask the workspace admin to send a new one.',
-  revoked: 'This invitation was revoked.',
-  already_accepted: 'This invitation has already been accepted.',
+  email_mismatch: 'Sign in with the invited email.',
+  invite_email_mismatch: 'Sign in with the invited email.',
+  expired: 'Expired. Ask for a new one.',
+  invite_expired: 'Expired. Ask for a new one.',
+  revoked: 'Revoked.',
+  already_accepted: 'Already accepted.',
 };
 
 export default function InvitePage() {
@@ -45,7 +45,7 @@ function Invite() {
 
   return (
     <section className="rounded-2xl border border-border bg-surface p-6 sm:p-8">
-      <div className="mb-4 flex size-10 items-center justify-center rounded-xl border border-border bg-raised text-accent-text">
+      <div className="mb-4 flex size-10 items-center justify-center rounded-full bg-raised text-muted">
         <MailCheck aria-hidden className="size-5" />
       </div>
       {loading ? (
@@ -55,12 +55,11 @@ function Invite() {
           <Skeleton className="mt-4 h-24 w-full" />
         </div>
       ) : error ? (
-        <ErrorState error={error} onRetry={refetch} title="This invitation can’t be shown" />
+        <ErrorState error={error} onRetry={refetch} title="Invitation unavailable" />
       ) : data ? (
         <>
           <h1 className="text-[20px] font-semibold">Join {data.workspace_name}</h1>
-          <p className="mt-1.5 text-[13px] text-muted">You’ve been invited to collaborate on Social Lite.</p>
-          {err ? <Banner tone="danger" className="mt-5" role="alert" title="Couldn’t accept the invitation">{INVITE_ERRORS[err] ?? 'Something went wrong while accepting. Try again.'}</Banner> : null}
+          {err ? <Banner tone="danger" className="mt-5" role="alert" title="Couldn’t accept">{INVITE_ERRORS[err] ?? 'Try again.'}</Banner> : null}
           <Facts
             className="mt-6"
             items={[
@@ -73,14 +72,12 @@ function Invite() {
           {usable ? (
             <>
               <a href={signIn} className="touch-target mt-7 flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-accent text-[15px] font-medium text-on-accent hover:bg-accent-hover">
-                Sign in to accept <ArrowRight aria-hidden className="size-4" />
+                Accept <ArrowRight aria-hidden className="size-4" />
               </a>
-              <p className="mt-3 text-xs text-muted">Sign in with the invited email address. The invitation is bound to it.</p>
+              <p className="mt-3 text-xs text-muted">Use the invited email.</p>
             </>
           ) : (
-            <Banner tone="warn" className="mt-6" title="This invitation can no longer be used">
-              Ask the person who invited you to send a new invitation.
-            </Banner>
+            <Banner tone="warn" className="mt-6" title="No longer valid — ask for a new one" />
           )}
         </>
       ) : null}

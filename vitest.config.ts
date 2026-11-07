@@ -2,12 +2,11 @@ import { defineConfig } from 'vitest/config';
 import { fileURLToPath } from 'node:url';
 
 const r = (p: string) => fileURLToPath(new URL(p, import.meta.url));
-const alias = {
-  '@social-lite/core': r('./packages/core/src/index.ts'),
-  '@social-lite/db': r('./packages/db/src/index.ts'),
-  '@social-lite/providers': r('./packages/providers/src/index.ts'),
-  '@social-lite/services': r('./packages/services/src/index.ts'),
-};
+const alias = [
+  // subpath imports (e.g. @social-lite/services/imports) map to src/<path>.ts
+  { find: /^@social-lite\/(core|db|providers|services)\/(.+)$/, replacement: r('./packages') + '/$1/src/$2.ts' },
+  { find: /^@social-lite\/(core|db|providers|services)$/, replacement: r('./packages') + '/$1/src/index.ts' },
+];
 
 export default defineConfig({
   test: {

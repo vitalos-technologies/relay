@@ -34,7 +34,7 @@ export default function ComposePage() {
     return (
       <>
         <PageHeader title="Compose" />
-        <EmptyState icon={<SquarePen aria-hidden />} title="You can’t create posts">Your role can view content but not create drafts. Ask a workspace admin if you need editor access.</EmptyState>
+        <EmptyState icon={<SquarePen aria-hidden />} title="View-only access" />
       </>
     );
   }
@@ -42,9 +42,7 @@ export default function ComposePage() {
     return (
       <>
         <PageHeader title="Compose" />
-        <EmptyState icon={<SquarePen aria-hidden />} title="Create a brand first" action={can('brands.manage') ? <LinkButton href="/settings?tab=brand" variant="primary">Create a brand</LinkButton> : null}>
-          Posts belong to a brand, which holds its connected accounts and media.
-        </EmptyState>
+        <EmptyState icon={<SquarePen aria-hidden />} title="No brands yet" action={can('brands.manage') ? <LinkButton href="/settings?tab=brand" variant="primary">Create brand</LinkButton> : null} />
       </>
     );
   }
@@ -66,47 +64,47 @@ export default function ComposePage() {
 
   return (
     <>
-      <PageHeader title="Compose" description="Start a post for one brand. You’ll choose destinations and tailor each one next." />
+      <PageHeader title="Compose" />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Card aria-labelledby="h-new">
           <CardHeader id="h-new" title="New post" />
-          <div className="flex flex-col gap-5 p-5">
+          <div className="flex flex-col gap-4 p-4">
             <Field label="Brand">
               <Select value={brandId} onChange={(e) => setBrandId(e.target.value)}>
                 {session.brands.map((b) => <option key={b.id} value={b.id}>{b.name}{b.publishing_paused ? ' (paused)' : ''}</option>)}
               </Select>
             </Field>
-            {brand?.publishing_paused ? <Banner tone="warn">Publishing is paused for {brand.name}. You can still write and schedule.</Banner> : null}
-            {brand?.approval_required ? <Banner tone="info">{brand.name} requires approval before anything is published.</Banner> : null}
-            <Field label="Start from a template" optional hint={templates.error ? 'Templates couldn’t be loaded.' : undefined}>
+            {brand?.publishing_paused ? <Banner tone="warn" title="Brand paused" /> : null}
+            {brand?.approval_required ? <Banner tone="info" title="Approval required" /> : null}
+            <Field label="Template" optional error={templates.error ? 'Templates couldn’t load.' : undefined}>
               <Select value={templateId} onChange={(e) => setTemplateId(e.target.value)} disabled={!templates.data?.items.length}>
-                <option value="">{templates.loading ? 'Loading…' : templates.data?.items.length ? 'Blank post' : 'No templates for this brand'}</option>
+                <option value="">{templates.loading ? 'Loading…' : templates.data?.items.length ? 'Blank post' : 'No templates'}</option>
                 {templates.data?.items.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </Select>
             </Field>
             {error ? <ErrorNotice error={error} /> : null}
-            <Button variant="primary" size="lg" onClick={create} loading={busy} disabledReason={!brandId ? 'Choose a brand.' : null}>
+            <Button variant="primary" onClick={create} loading={busy} disabledReason={!brandId ? 'Choose a brand.' : null} className="self-start">
               Create draft <ArrowRight aria-hidden className="size-4" />
             </Button>
           </div>
         </Card>
 
         <Card aria-labelledby="h-drafts">
-          <CardHeader id="h-drafts" title="Continue a draft" description={brand ? brand.name : undefined} />
-          <div className="p-4">
+          <CardHeader id="h-drafts" title="Drafts" />
+          <div className="px-2 pb-2">
             {drafts.error && !drafts.data ? <ErrorState error={drafts.error} onRetry={drafts.refetch} /> : drafts.loading ? <SkeletonRows rows={3} /> : !drafts.data?.items.length ? (
-              <EmptyState compact icon={<FileText aria-hidden />} title="No drafts yet">Drafts you start are saved automatically and listed here.</EmptyState>
+              <EmptyState compact icon={<FileText aria-hidden />} title="No drafts yet" />
             ) : (
-              <ul className="flex flex-col gap-2">
+              <ul className="flex flex-col">
                 {drafts.data.items.slice(0, 10).map((p) => (
                   <li key={p.id}>
-                    <Link href={`/posts/${p.id}`} className="flex items-center gap-3 rounded-lg border border-border bg-sunken px-3 py-2.5 hover:border-border-strong">
+                    <Link href={`/posts/${p.id}`} className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-raised/60">
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-[13px] font-medium">{postTitle(p)}</p>
                         <p className="text-xs text-muted">Edited {fmtRelative(p.updated_at)}</p>
                       </div>
                       {p.destinations.length ? <PlatformStack providers={p.destinations.map((d) => d.provider)} /> : null}
-                      <PostStatusBadge status={p.status} size="sm" />
+                      <span className="hidden shrink-0 sm:block"><PostStatusBadge status={p.status} size="sm" /></span>
                     </Link>
                   </li>
                 ))}

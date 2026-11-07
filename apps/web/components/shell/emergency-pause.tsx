@@ -17,7 +17,7 @@ export function EmergencyPause({ variant = 'sidebar' }: { variant?: 'sidebar' | 
   const submit = async () => {
     await api.post('/api/workspace/pause', paused ? { paused: false } : { paused: true, reason: reason.trim() || undefined });
     await refresh();
-    toast.success(paused ? 'Publishing resumed' : 'Publishing paused', paused ? 'Due posts will be dispatched again.' : 'Nothing will be sent until you resume.');
+    toast.success(paused ? 'Publishing resumed' : 'Publishing paused');
     setReason('');
   };
 
@@ -25,13 +25,13 @@ export function EmergencyPause({ variant = 'sidebar' }: { variant?: 'sidebar' | 
     <>
       {variant === 'sidebar' ? (
         <Button
-          variant={paused ? 'secondary' : 'danger'}
+          variant="quiet"
           size="md"
-          className="w-full justify-start"
+          className={paused ? 'w-full justify-start' : 'w-full justify-start text-danger!'}
           icon={paused ? <Play aria-hidden className="size-4" /> : <OctagonPause aria-hidden className="size-4" />}
           onClick={() => setOpen(true)}
         >
-          {paused ? 'Resume publishing' : 'Pause all publishing'}
+          {paused ? 'Resume publishing' : 'Pause publishing'}
         </Button>
       ) : (
         <Button size="sm" variant="secondary" icon={<Play aria-hidden className="size-4" />} onClick={() => setOpen(true)}>
@@ -41,18 +41,18 @@ export function EmergencyPause({ variant = 'sidebar' }: { variant?: 'sidebar' | 
       <ConfirmDialog
         open={open}
         onOpenChange={setOpen}
-        title={paused ? 'Resume publishing for this workspace?' : 'Pause all publishing?'}
+        title={paused ? 'Resume publishing?' : `Pause all of “${session.workspace.name}”?`}
         description={
           paused
-            ? 'Scheduled posts that are still within their publish-before deadline will be dispatched. Posts whose deadline passed while paused will expire and appear in Needs attention — they are never sent in a burst.'
-            : `Stops every brand in “${session.workspace.name}” from sending. Posts already being sent to a network may still complete. Schedules are kept; anything that passes its deadline while paused will expire rather than send late.`
+            ? 'Posts past their deadline expire — never sent late.'
+            : 'Posts already sending may complete. Missed deadlines expire.'
         }
-        confirmLabel={paused ? 'Resume publishing' : 'Pause publishing'}
+        confirmLabel={paused ? 'Resume' : 'Pause'}
         confirmVariant={paused ? 'primary' : 'danger'}
         onConfirm={submit}
       >
         {paused ? null : (
-          <Field label="Reason" optional hint="Shown to your team on the paused banner.">
+          <Field label="Reason" optional hint="Shown to your team.">
             <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} maxLength={500} className="min-h-16" />
           </Field>
         )}

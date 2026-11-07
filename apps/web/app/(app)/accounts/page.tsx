@@ -17,19 +17,19 @@ import { MOCK_SCENARIOS, MOCK_SCENARIO_LABEL, MockDialog, NotConfiguredDialog, T
 
 const OAUTH: Provider[] = ['facebook', 'instagram', 'x'];
 const CALLBACK_ERRORS: Record<string, string> = {
-  access_denied: 'Authorisation was cancelled on the network’s site. Nothing was connected.',
-  invalid_state: 'The connection link expired or was already used. Start again.',
-  state_mismatch: 'The connection link expired or was already used. Start again.',
-  no_destinations: 'The account you authorised has no pages or profiles you can publish to.',
-  provider_error: 'The network returned an error while connecting. Try again in a few minutes.',
-  provider_not_configured: 'This network isn’t configured yet. The workspace owner can add it in Setup.',
-  session_required: 'Your session ended during authorisation. Sign in and start connecting again.',
-  session_mismatch: 'This connection was started by a different signed-in user. Start again from this account.',
-  authorization_failed: 'The network didn’t complete authorisation. Start again.',
-  token_exchange_failed: 'The network didn’t confirm access. Start again in a few minutes.',
-  destinations_failed: 'We couldn’t list the pages or profiles for this account. Try again in a few minutes.',
-  invalid_provider: 'That network isn’t supported.',
-  forbidden: 'You don’t have permission to connect accounts for this brand.',
+  access_denied: 'Cancelled. Nothing was connected.',
+  invalid_state: 'Link expired. Start again.',
+  state_mismatch: 'Link expired. Start again.',
+  no_destinations: 'No pages or profiles to publish to.',
+  provider_error: 'Network error. Try again shortly.',
+  provider_not_configured: 'Network not set up. See Setup.',
+  session_required: 'Session ended. Sign in and retry.',
+  session_mismatch: 'Started by another user. Start again.',
+  authorization_failed: 'Authorisation incomplete. Start again.',
+  token_exchange_failed: 'Access not confirmed. Try again shortly.',
+  destinations_failed: 'Couldn’t list pages. Try again shortly.',
+  invalid_provider: 'Network not supported.',
+  forbidden: 'No permission for this brand.',
 };
 
 export default function AccountsPage() {
@@ -43,20 +43,18 @@ export default function AccountsPage() {
 
   return (
     <>
-      <PageHeader title="Accounts" description="Connected destinations for each brand, their health and exactly what to fix." />
+      <PageHeader title="Accounts" />
       {err ? (
-        <Banner tone="danger" role="alert" className="mb-5" title="Couldn’t connect the account" actions={<Button size="sm" variant="ghost" onClick={() => setParams({ error: null })}>Dismiss</Button>}>
-          {CALLBACK_ERRORS[err] ?? 'Something went wrong while connecting.'} <span className="font-mono text-[11px] text-subtle">({err})</span>
+        <Banner tone="danger" role="alert" className="mb-6" title="Couldn’t connect" actions={<Button size="sm" variant="ghost" onClick={() => setParams({ error: null })}>Dismiss</Button>}>
+          {CALLBACK_ERRORS[err] ?? 'Something went wrong.'} <span className="font-mono text-[11px] text-subtle">({err})</span>
         </Banner>
       ) : null}
       {connected ? (
-        <Banner tone="success" role="status" className="mb-5" title={`${plural(Number(connected) || 0, 'destination')} connected`} actions={<Button size="sm" variant="ghost" onClick={() => setParams({ connected: null })}>Dismiss</Button>}>
-          Each one shows Ready only after its permissions are verified.
-        </Banner>
+        <Banner tone="success" role="status" className="mb-6" title={`${plural(Number(connected) || 0, 'destination')} connected`} actions={<Button size="sm" variant="ghost" onClick={() => setParams({ connected: null })}>Dismiss</Button>} />
       ) : null}
-      {!can('connections.manage') ? <Banner tone="info" className="mb-5">Only owners and admins can connect or change accounts. You can see their status here.</Banner> : null}
+      {!can('connections.manage') ? <Banner tone="info" className="mb-6" title="View only" /> : null}
       {!brands.length ? (
-        <EmptyState icon={<Plug aria-hidden />} title="No brands yet">Create a brand in Settings, then connect its accounts here.</EmptyState>
+        <EmptyState icon={<Plug aria-hidden />} title="No brands yet" />
       ) : (
         <div className="flex flex-col gap-10">
           {brands.map((b) => <BrandConnections key={b.id} brand={b} providers={providers.data?.items ?? []} showHeading={brands.length > 1} />)}
@@ -105,12 +103,12 @@ function BrandConnections({ brand, providers, showHeading }: { brand: SessionBra
     <section aria-labelledby={`b-${brand.id}`}>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 id={`b-${brand.id}`} className={showHeading ? 'text-[17px] font-semibold' : 'sr-only'}>
-          {brand.name}{brand.publishing_paused ? <span className="ml-2 text-xs font-normal text-warn">Publishing paused</span> : null}
+          {brand.name}{brand.publishing_paused ? <span className="ml-2 text-xs font-normal text-warn">Paused</span> : null}
         </h2>
         {manage ? (
           <Menu>
             <MenuTrigger asChild>
-              <Button variant="primary" icon={<Plus aria-hidden className="size-4" />} loading={!!starting}>{starting ? `Opening ${PROVIDER_LABEL[starting]}…` : 'Connect account'}</Button>
+              <Button variant="primary" icon={<Plus aria-hidden className="size-4" />} loading={!!starting}>{starting ? `Opening ${PROVIDER_LABEL[starting]}…` : 'Connect'}</Button>
             </MenuTrigger>
             <MenuContent>
               <MenuLabel>Connect to {brand.name}</MenuLabel>
@@ -123,7 +121,7 @@ function BrandConnections({ brand, providers, showHeading }: { brand: SessionBra
               {session.mock_providers_enabled ? (
                 <>
                   <MenuSeparator />
-                  <MenuItem icon={<FlaskConical aria-hidden />} onSelect={() => setMockOpen(true)}>Add simulated destination</MenuItem>
+                  <MenuItem icon={<FlaskConical aria-hidden />} onSelect={() => setMockOpen(true)}>Simulated destination</MenuItem>
                 </>
               ) : null}
             </MenuContent>
@@ -132,14 +130,12 @@ function BrandConnections({ brand, providers, showHeading }: { brand: SessionBra
       </div>
 
       {error && !data ? <ErrorState error={error} onRetry={refetch} /> : loading ? <SkeletonRows rows={2} /> : !grouped.length ? (
-        <EmptyState icon={<Plug aria-hidden />} title="No accounts connected" compact>
-          {manage ? 'Connect Instagram, Facebook, Telegram or X. You’ll explicitly choose which pages or profiles to add.' : 'An owner or admin can connect accounts for this brand.'}
-        </EmptyState>
+        <EmptyState icon={<Plug aria-hidden />} title="No accounts yet" compact />
       ) : (
         <div className="flex flex-col gap-6">
           {grouped.map(({ p, list }) => (
             <div key={p}>
-              <h3 className="mb-2 flex items-center gap-2 text-[13px] font-medium text-muted">
+              <h3 className="mb-3 flex items-center gap-2 text-[13px] font-medium text-muted">
                 <PlatformIcon provider={p} size="xs" decorative /> {PROVIDER_LABEL[p]} <span className="tabular">({list.length})</span>
               </h3>
               <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
@@ -175,6 +171,7 @@ function ConnectionCard({
   const [pauseOpen, setPauseOpen] = useState(false);
   const fix = connectionFix(c);
   const disconnected = c.status === 'disconnected';
+  const healthNote = c.status !== 'ready' && c.health?.message && c.health.message !== fix ? c.health.message : null;
 
   const check = async () => {
     setChecking(true);
@@ -211,18 +208,18 @@ function ConnectionCard({
   return (
     <Card as="li" className="flex flex-col" aria-label={`${PROVIDER_LABEL[c.provider]} ${c.display_name}`}>
       <div className="flex items-start gap-3 p-4">
-        <PlatformIcon provider={c.provider} size="lg" />
+        <PlatformIcon provider={c.provider} size="md" />
         <div className="min-w-0 flex-1">
-          <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
+          <p className="flex min-w-0 items-center gap-2 text-sm font-medium">
             <span className="truncate">{c.display_name}</span>
-            {c.is_mock ? <SimulatedBadge /> : null}
+            {c.is_mock ? <SimulatedBadge className="shrink-0" /> : null}
           </p>
-          <p className="truncate text-xs text-muted">
+          <p className="truncate text-xs text-subtle" title={c.provider_account_id}>
             {c.username ? `@${c.username.replace(/^@/, '')} · ` : ''}ID <code className="font-mono text-[11px]">{c.provider_account_id}</code>
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <ConnectionStatusBadge status={c.status} label={c.status_label} />
-            {c.paused && c.status !== 'paused' ? <ConnectionStatusBadge status="paused" /> : null}
+            <ConnectionStatusBadge status={c.status} label={c.status_label} size="sm" />
+            {c.paused && c.status !== 'paused' ? <ConnectionStatusBadge status="paused" size="sm" /> : null}
           </div>
         </div>
         {manage ? (
@@ -231,11 +228,11 @@ function ConnectionCard({
               <IconButton label={`Actions for ${c.display_name}`} icon={<Ellipsis aria-hidden className="size-4" />} />
             </MenuTrigger>
             <MenuContent>
-              <MenuItem icon={<RefreshCw aria-hidden />} onSelect={() => void check()} disabled={disconnected}>Check now</MenuItem>
+              <MenuItem icon={<RefreshCw aria-hidden />} onSelect={() => void check()} disabled={disconnected}>Check</MenuItem>
               {!disconnected ? (
                 c.paused
-                  ? <MenuItem icon={<Play aria-hidden />} onSelect={() => setPauseOpen(true)}>Resume publishing</MenuItem>
-                  : <MenuItem icon={<Pause aria-hidden />} onSelect={() => setPauseOpen(true)}>Pause publishing</MenuItem>
+                  ? <MenuItem icon={<Play aria-hidden />} onSelect={() => setPauseOpen(true)}>Resume</MenuItem>
+                  : <MenuItem icon={<Pause aria-hidden />} onSelect={() => setPauseOpen(true)}>Pause</MenuItem>
               ) : null}
               <MenuItem icon={<Plug aria-hidden />} onSelect={() => void reconnect()}>Reconnect</MenuItem>
               {!disconnected ? (
@@ -249,23 +246,21 @@ function ConnectionCard({
         ) : null}
       </div>
 
-      {fix || c.health?.message ? (
-        <div className="px-4 pb-3">
-          <p className="rounded-lg bg-sunken px-3 py-2 text-xs leading-relaxed">
-            {fix ? <span className="text-fg">{fix}</span> : null}
-            {c.health?.message && c.health.message !== fix ? <span className="mt-0.5 block text-muted">{c.health.message}</span> : null}
-          </p>
-        </div>
+      {fix || healthNote ? (
+        <p className="px-4 pb-2 pl-[60px] text-xs">
+          {fix ? <span className="text-fg">{fix}</span> : null}
+          {healthNote ? <span className="block truncate text-muted" title={healthNote}>{healthNote}</span> : null}
+        </p>
       ) : null}
 
-      <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border px-4 py-2.5 text-xs text-muted">
-        <span>{checking ? 'Checking…' : c.health?.checked_at ? <>Checked {fmtRelative(c.health.checked_at)}</> : 'Not checked yet'}</span>
-        {c.health?.expires_at ? <span>Access expires <TimeWithZone instant={c.health.expires_at} tz="UTC" format="date" /></span> : null}
+      <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 px-4 pb-4 pl-[60px] text-xs text-subtle">
+        <span>{checking ? 'Checking…' : c.health?.checked_at ? <>Checked {fmtRelative(c.health.checked_at)}</> : 'Not checked'}</span>
+        {c.health?.expires_at ? <span>Expires <TimeWithZone instant={c.health.expires_at} tz="UTC" format="date" /></span> : null}
         {c.throttled_until && new Date(c.throttled_until).getTime() > Date.now() ? <span className="text-warn">Rate limited until <TimeWithZone instant={c.throttled_until} tz="UTC" format="time" /></span> : null}
         {c.is_mock && manage && !disconnected ? (
-          <span className="ml-auto flex items-center gap-2">
-            <label htmlFor={`sc-${c.id}`}>Behaviour</label>
-            <Select id={`sc-${c.id}`} value={c.mock_scenario ?? 'success'} onChange={(e) => void setScenario(e.target.value as MockScenario)} className="w-[220px]">
+          <span className="flex min-w-0 items-center gap-2 sm:ml-auto">
+            <label htmlFor={`sc-${c.id}`} className="sr-only">Simulated behaviour</label>
+            <Select id={`sc-${c.id}`} value={c.mock_scenario ?? 'success'} onChange={(e) => void setScenario(e.target.value as MockScenario)} className="w-[200px] max-w-full">
               {MOCK_SCENARIOS.map((s) => <option key={s} value={s}>{MOCK_SCENARIO_LABEL[s]}</option>)}
             </Select>
           </span>
@@ -277,8 +272,8 @@ function ConnectionCard({
         onOpenChange={setPauseOpen}
         title={c.paused ? `Resume ${c.display_name}?` : `Pause ${c.display_name}?`}
         description={c.paused
-          ? 'Scheduled posts for this destination will send again if they are still before their publish-before deadline.'
-          : 'Scheduled posts for this destination won’t send while paused. Anything that passes its deadline while paused expires instead of posting late. Other destinations are unaffected.'}
+          ? 'Posts still before their deadline will send.'
+          : 'Posts here won’t send. Missed deadlines expire. Others unaffected.'}
         confirmLabel={c.paused ? 'Resume' : 'Pause'}
         confirmVariant={c.paused ? 'primary' : 'danger'}
         onConfirm={async () => {
@@ -295,14 +290,12 @@ function ConnectionCard({
         onConfirm={async () => {
           const r = await api.post<{ connection: Connection; blocked_deliveries: number }>(`/api/connections/${c.id}/disconnect`, {});
           onChanged(r.connection);
-          toast.success('Disconnected', r.blocked_deliveries ? `${plural(r.blocked_deliveries, 'scheduled delivery', 'scheduled deliveries')} to this destination ${r.blocked_deliveries === 1 ? 'is' : 'are'} now blocked.` : 'No scheduled posts were affected.');
+          toast.success('Disconnected', r.blocked_deliveries ? `${plural(r.blocked_deliveries, 'scheduled delivery', 'scheduled deliveries')} blocked` : undefined);
         }}
       >
-        <ul className="list-disc space-y-1.5 pl-4 text-[13px] text-muted">
-          <li>Stored access for this destination is removed and nothing new will be sent to it.</li>
-          <li>Posts already scheduled to it become <span className="text-fg">Blocked</span> — they won’t send, and other destinations on the same posts are unaffected.</li>
-          <li>Posts already published stay on {PROVIDER_LABEL[c.provider]}.</li>
-          <li>Connecting a different account later creates a new destination; old schedules are never silently redirected.</li>
+        <ul className="list-disc space-y-1 pl-4 text-[13px] text-muted">
+          <li>Scheduled posts to it become <span className="text-fg">Blocked</span>.</li>
+          <li>Published posts stay on {PROVIDER_LABEL[c.provider]}.</li>
         </ul>
       </ConfirmDialog>
     </Card>

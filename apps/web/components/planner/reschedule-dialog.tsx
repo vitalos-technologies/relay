@@ -4,7 +4,7 @@ import { toLocalInput } from '@social-lite/core';
 import { api, isApiError } from '@/lib/client/api';
 import { fmtDateTime, zoneAbbr, postTitle } from '@/lib/client/format';
 import type { Delivery, PlannerItem, PostDetail, Schedule } from '@/lib/client/types';
-import { Banner, Button, Dialog, ErrorNotice, Spinner } from '@/components/ui';
+import { Button, Dialog, ErrorNotice, Spinner } from '@/components/ui';
 import { ScheduleTimeField, ambiguityFromError, resolvedInstant, wallTimeReady, type WallTimeValue } from '@/components/schedule/schedule-time-field';
 
 export interface RescheduleResult {
@@ -48,7 +48,7 @@ export function RescheduleDialog({
       (p) => {
         if (cancelled) return;
         if (!p.current_schedule || p.current_schedule.id !== item.schedule_id) {
-          setLoadError(new Error('This schedule has changed since the planner loaded. Close this dialog and refresh.'));
+          setLoadError(new Error('Schedule changed. Close and refresh.'));
           return;
         }
         setGeneration(p.current_schedule.generation);
@@ -89,7 +89,7 @@ export function RescheduleDialog({
     }
   };
 
-  const reason = generation === null ? 'Loading the current schedule…' : !wallTimeReady(value) ? 'Choose a valid future time.' : unchanged ? 'Pick a different time.' : null;
+  const reason = generation === null ? 'Loading…' : !wallTimeReady(value) ? 'Pick a future time.' : unchanged ? 'Pick a different time.' : null;
 
   return (
     <Dialog
@@ -98,23 +98,22 @@ export function RescheduleDialog({
       busy={busy}
       size="md"
       title={`Reschedule “${postTitle(item)}”`}
-      description={<>Currently {fmtDateTime(oldDue, item.input_timezone)} {zoneAbbr(oldDue, item.input_timezone)} ({item.input_timezone})</>}
+      description={<>Now {fmtDateTime(oldDue, item.input_timezone)} {zoneAbbr(oldDue, item.input_timezone)}</>}
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
           <Button variant="primary" onClick={submit} loading={busy} disabledReason={reason}>
-            {newInstant ? `Move to ${fmtDateTime(newInstant, value.tz)} ${zoneAbbr(newInstant, value.tz)}` : 'Reschedule'}
+            {newInstant ? `Move to ${fmtDateTime(newInstant, value.tz)} ${zoneAbbr(newInstant, value.tz)}` : 'Move'}
           </Button>
         </>
       }
     >
       <div className="flex flex-col gap-4">
-        {loadError ? <ErrorNotice error={loadError} /> : generation === null ? <Spinner label="Checking the current schedule" /> : null}
+        {loadError ? <ErrorNotice error={loadError} /> : generation === null ? <Spinner label="Loading" /> : null}
         <ScheduleTimeField value={value} onChange={(v) => { setValue(v); setError(null); }} preferredZones={[{ tz: item.input_timezone, label: `${item.input_timezone} (this schedule)` }, ...preferredZones]} serverAmbiguity={serverAmb} />
-        <Banner tone="info">
-          Rescheduling creates a new schedule version; the old one can no longer send.
-          {item.schedule_status === 'pending_approval' || item.status === 'pending_approval' ? ' The pending approval request will need to be reviewed again.' : ' If this post was approved, it will need approval again before it can publish.'}
-        </Banner>
+        <p className="text-xs text-muted">
+          {item.schedule_status === 'pending_approval' || item.status === 'pending_approval' ? 'Approval will be re-requested.' : 'Approved posts need re-approval.'}
+        </p>
         {error && !(isApiError(error) && ambiguityFromError(error, value)) ? <ErrorNotice error={error} /> : null}
       </div>
     </Dialog>

@@ -11,7 +11,7 @@ import { diffWords } from '@/lib/client/diff';
 import { outgoingText } from '@/lib/client/variants';
 import type { Approval, ApprovalDetail, Asset } from '@/lib/client/types';
 import {
-  Badge, Banner, Button, Card, CardHeader, ConfirmDialog, Dialog, ErrorNotice, ErrorState, Facts, Field, PageHeader, PlatformIcon,
+  Badge, Banner, Button, Card, CardHeader, ConfirmDialog, Dialog, ErrorNotice, ErrorState, Facts, Field, InfoTip, PageHeader, PlatformIcon,
   SimulatedBadge, Skeleton, Textarea, TimeWithZone, ToneIcon, useToast,
 } from '@/components/ui';
 import { VariantPreview } from '@/components/composer/preview';
@@ -24,7 +24,7 @@ export default function ApprovalDetailPage() {
   const [approveOpen, setApproveOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
 
-  if (error && !data) return <div className="max-w-xl"><BackLink /><ErrorState error={error} onRetry={refetch} title="This approval couldn’t be loaded" /></div>;
+  if (error && !data) return <div className="max-w-xl"><BackLink /><ErrorState error={error} onRetry={refetch} title="Couldn’t load approval" /></div>;
   if (loading || !data) {
     return (
       <div role="status" aria-label="Loading approval">
@@ -46,9 +46,9 @@ export default function ApprovalDetailPage() {
       <BackLink />
       <PageHeader
         eyebrow={data.brand.name}
-        title={data.post_title?.trim() || 'Review post'}
-        description={<>Requested by {data.requested_by_email ?? 'a teammate'}. Approval covers this exact text, media, links, destinations and time — any change needs a new approval.</>}
-        actions={<Link href={`/posts/${data.post_id}`} className="inline-flex items-center gap-1.5 text-[13px] text-accent-text hover:underline">Open post <ExternalLink aria-hidden className="size-3.5" /></Link>}
+        title={data.post_title?.trim() || 'Review'}
+        meta={<span className="truncate">by {data.requested_by_email ?? 'a teammate'}</span>}
+        actions={<Link href={`/posts/${data.post_id}`} className="inline-flex items-center gap-1.5 rounded text-[13px] text-muted hover:text-fg">Open post <ExternalLink aria-hidden className="size-3.5" /></Link>}
       />
 
       <DecisionBanner a={data} />
@@ -57,11 +57,11 @@ export default function ApprovalDetailPage() {
         <div className="flex min-w-0 flex-col gap-6">
           {data.diff.previous_revision_number !== null ? (
             <Card aria-labelledby="h-diff">
-              <CardHeader id="h-diff" title={`Changes since revision ${data.diff.previous_revision_number}`} description={changed.size ? `${changed.size} destination${changed.size === 1 ? '' : 's'} changed` : undefined} />
-              <div className="p-5">
+              <CardHeader id="h-diff" title={<>Changes since r{data.diff.previous_revision_number}{changed.size ? <span className="ml-2 font-normal text-muted">{changed.size} destination{changed.size === 1 ? '' : 's'}</span> : null}</>} />
+              <div className="px-4 pb-4">
                 {bt ? (
                   <>
-                    <p className="mb-2 text-xs text-muted">Base text — <span className="rounded bg-success-soft px-1 text-success">added</span> and <span className="rounded bg-danger-soft px-1 text-danger line-through">removed</span> words</p>
+                    <p className="mb-2 flex gap-2 text-xs"><span className="rounded bg-success-soft px-1 text-success">added</span><span className="rounded bg-danger-soft px-1 text-danger line-through">removed</span></p>
                     <p className="whitespace-pre-wrap break-words rounded-lg bg-sunken px-3 py-2.5 text-[13px] leading-relaxed">
                       {diffWords(bt.before, bt.after).map((p, i) =>
                         p.kind === 'same' ? <span key={i}>{p.text}</span>
@@ -70,29 +70,27 @@ export default function ApprovalDetailPage() {
                       )}
                     </p>
                   </>
-                ) : <p className="text-[13px] text-muted">Base text unchanged.</p>}
+                ) : <p className="text-[13px] text-muted">Text unchanged</p>}
               </div>
             </Card>
           ) : (
-            <Banner tone="info">First revision submitted for review — there is no earlier version to compare.</Banner>
+            null
           )}
 
           <section aria-labelledby="h-variants" className="flex flex-col gap-4">
-            <h2 id="h-variants" className="text-[15px] font-semibold">Exactly what will be sent</h2>
+            <h2 id="h-variants" className="text-[15px] font-semibold">What will be sent</h2>
             {data.variants.map((v) => (
               <Card key={v.connectionId} as="article" aria-label={`${PROVIDER_LABEL[v.provider]} ${v.connection.display_name}`}>
-                <div className="flex flex-wrap items-center gap-3 border-b border-border px-5 py-3.5">
+                <div className="flex items-center gap-3 px-4 pt-4">
                   <PlatformIcon provider={v.provider} size="md" />
                   <div className="min-w-0 flex-1">
-                    <p className="flex items-center gap-2 text-sm font-medium">{v.connection.display_name}{v.connection.is_mock ? <SimulatedBadge /> : null}</p>
-                    <p className="text-xs text-muted">{PROVIDER_LABEL[v.provider]}{v.connection.username ? ` · @${v.connection.username.replace(/^@/, '')}` : ''}</p>
+                    <p className="flex min-w-0 items-center gap-2 text-sm font-medium"><span className="truncate">{v.connection.display_name}</span>{v.connection.is_mock ? <SimulatedBadge className="shrink-0" /> : null}</p>
+                    <p className="truncate text-xs text-muted">{PROVIDER_LABEL[v.provider]}{v.connection.username ? ` · @${v.connection.username.replace(/^@/, '')}` : ''}{v.inheritText ? '' : ' · Custom text'}</p>
                   </div>
-                  {changed.has(v.connectionId) ? <Badge tone="warn">Changed</Badge> : null}
-                  <Badge>{v.inheritText ? 'Base text' : 'Custom text'}</Badge>
+                  {changed.has(v.connectionId) ? <Badge tone="warn" icon={<ToneIcon tone="warn" className="size-3.5" />}>Changed</Badge> : null}
                 </div>
-                <div className="grid grid-cols-1 gap-5 p-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,300px)]">
+                <div className="grid grid-cols-1 gap-4 p-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,300px)]">
                   <div className="min-w-0">
-                    <p className="mb-1.5 text-xs font-medium text-muted">Outgoing text</p>
                     <p className="whitespace-pre-wrap break-words rounded-lg bg-sunken px-3 py-2.5 font-mono text-[12.5px] leading-relaxed">{outgoingText(v, v.connection) || <span className="italic text-subtle">(no text)</span>}</p>
                     <Facts
                       className="mt-4"
@@ -113,12 +111,12 @@ export default function ApprovalDetailPage() {
         <aside className="flex flex-col gap-6">
           <Card aria-labelledby="h-when">
             <CardHeader id="h-when" title="Schedule" />
-            <div className="p-5">
+            <div className="px-4 pb-4">
               <Facts
                 items={[
-                  [s.is_immediate ? 'Publishes' : 'Scheduled for', s.is_immediate ? 'As soon as approved' : <TimeWithZone key="t" instant={s.due_at} tz={s.input_timezone} showBrowser />],
-                  ['Time zone', s.input_timezone],
-                  ...(s.publish_before ? [['Publish before', <TimeWithZone key="pb" instant={s.publish_before} tz={s.input_timezone} />] as [string, React.ReactNode]] : []),
+                  [s.is_immediate ? 'Publishes' : 'Scheduled', s.is_immediate ? 'On approval' : <TimeWithZone key="t" instant={s.due_at} tz={s.input_timezone} showBrowser />],
+                  ['Zone', s.input_timezone],
+                  ...(s.publish_before ? [[<span key="pbl" className="inline-flex items-center gap-1">Deadline<InfoTip label="About the deadline">Not sent after this time — it expires instead of posting late.</InfoTip></span>, <TimeWithZone key="pb" instant={s.publish_before} tz={s.input_timezone} />] as [React.ReactNode, React.ReactNode]] : []),
                   ['Revision', String(s.revision_number)],
                   ['Destinations', String(data.variants.length)],
                 ]}
@@ -129,10 +127,10 @@ export default function ApprovalDetailPage() {
       </div>
 
       {mayDecide ? (
-        <div className="fixed inset-x-0 bottom-16 z-20 border-t border-border bg-surface/95 backdrop-blur md:bottom-0 md:left-[248px]">
-          <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-end gap-2 px-4 py-2.5 sm:px-6 md:px-8">
-            <span className="mr-auto text-[13px] text-muted">Your decision applies to this exact revision.</span>
-            <Button variant="danger" icon={<X aria-hidden className="size-4" />} onClick={() => setRejectOpen(true)}>Request changes</Button>
+        <div className="fixed inset-x-0 bottom-16 z-20 border-t border-border bg-surface/95 backdrop-blur md:bottom-0 md:left-[224px]">
+          <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-end gap-2 px-4 py-2 sm:px-6 md:px-8">
+            <span className="mr-auto text-xs text-muted">Revision {s.revision_number}</span>
+            <Button variant="secondary" icon={<X aria-hidden className="size-4" />} onClick={() => setRejectOpen(true)}>Request changes</Button>
             <Button variant="primary" icon={<Check aria-hidden className="size-4" />} onClick={() => setApproveOpen(true)}>Approve</Button>
           </div>
         </div>
@@ -141,8 +139,8 @@ export default function ApprovalDetailPage() {
       <ConfirmDialog
         open={approveOpen}
         onOpenChange={setApproveOpen}
-        title="Approve this post?"
-        description={s.is_immediate ? 'It will be published as soon as you approve.' : 'It will be published at the scheduled time.'}
+        title="Approve?"
+        description={s.is_immediate ? 'Publishes immediately.' : 'Publishes at the scheduled time.'}
         confirmLabel="Approve"
         onConfirm={async () => {
           await api.post(`/api/approvals/${data.id}/approve`, { expected_fingerprint: data.fingerprint });
@@ -150,7 +148,6 @@ export default function ApprovalDetailPage() {
           await refetch();
         }}
       >
-        <p className="text-[13px] text-muted">If the post was changed after you opened this page, approval is refused and you’ll see the new version.</p>
       </ConfirmDialog>
       <RejectDialog open={rejectOpen} onOpenChange={setRejectOpen} approvalId={data.id} onDone={async () => { toast.success('Changes requested'); await refetch(); }} />
     </div>
@@ -168,7 +165,7 @@ function BackLink() {
 function DecisionBanner({ a }: { a: Approval }) {
   if (a.decision === 'pending') return null;
   const tone = a.decision === 'approved' ? 'success' : a.decision === 'rejected' ? 'danger' : 'neutral';
-  const title = a.decision === 'approved' ? 'Approved' : a.decision === 'rejected' ? 'Changes requested' : 'No longer valid — the post changed after this request';
+  const title = a.decision === 'approved' ? 'Approved' : a.decision === 'rejected' ? 'Changes requested' : 'Invalidated — post changed';
   return (
     <Banner tone={tone} className="mb-6" icon={<ToneIcon tone={tone} />} title={title}>
       {a.reviewer_email ? <>By {a.reviewer_email}{a.decided_at ? <> · <TimeWithZone instant={a.decided_at} tz="UTC" /></> : null}. </> : null}
@@ -201,7 +198,7 @@ function RejectDialog({ open, onOpenChange, approvalId, onDone }: { open: boolea
       onOpenChange={onOpenChange}
       busy={busy}
       title="Request changes"
-      description="The author sees your reason. Be specific about what needs to change."
+      description="The author will see this."
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
@@ -209,7 +206,7 @@ function RejectDialog({ open, onOpenChange, approvalId, onDone }: { open: boolea
         </>
       }
     >
-      <Field label="Reason" required hint="Required.">
+      <Field label="Reason" required>
         <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={4} maxLength={2000} autoFocus />
       </Field>
       {error ? <ErrorNotice error={error} className="mt-3" /> : null}

@@ -32,8 +32,8 @@ function Onboarding() {
   if (mode === 'create' && session.can_create_workspace === false) {
     return (
       <section className="rounded-2xl border border-border bg-surface p-6 sm:p-8">
-        <h1 className="text-[22px] font-semibold">You’re not in a workspace yet</h1>
-        <p className="mt-2 text-[13px] text-muted">Signed in as {session.user.email}. Ask a workspace admin to invite this email address, then open the invitation link.</p>
+        <h1 className="text-[22px] font-semibold">No workspace yet</h1>
+        <p className="mt-2 truncate text-[13px] text-muted">{session.user.email} · ask an admin to invite you</p>
       </section>
     );
   }
@@ -59,7 +59,7 @@ function PickWorkspace({ session, onCreate }: { session: SessionInfo; onCreate: 
   return (
     <section className="rounded-2xl border border-border bg-surface p-6 sm:p-8">
       <h1 className="text-[22px] font-semibold">Choose a workspace</h1>
-      <p className="mt-1.5 text-[13px] text-muted">Signed in as {session.user.email}.</p>
+      <p className="mt-1 truncate text-[13px] text-muted">{session.user.email}</p>
       <ul className="mt-6 flex flex-col gap-2">
         {session.workspaces.map((w) => (
           <li key={w.id}>
@@ -67,7 +67,7 @@ function PickWorkspace({ session, onCreate }: { session: SessionInfo; onCreate: 
               type="button"
               onClick={() => void pick(w.id)}
               disabled={!!busy}
-              className="flex h-14 w-full items-center justify-between rounded-lg border border-border bg-raised px-4 text-left hover:border-border-strong"
+              className="flex h-14 w-full items-center justify-between rounded-lg border border-border px-4 text-left hover:bg-raised"
             >
               <span>
                 <span className="block text-sm font-medium">{w.name}</span>
@@ -79,7 +79,7 @@ function PickWorkspace({ session, onCreate }: { session: SessionInfo; onCreate: 
         ))}
       </ul>
       {error ? <ErrorNotice error={error} className="mt-4" /> : null}
-      {onCreate ? <Button variant="ghost" className="mt-4" onClick={onCreate}>Create a new workspace instead</Button> : null}
+      {onCreate ? <Button variant="ghost" className="mt-4" onClick={onCreate}>New workspace</Button> : null}
     </section>
   );
 }
@@ -96,7 +96,7 @@ function CreateWorkspace({ firstTime }: { firstTime: boolean }) {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      setFieldError('Give your workspace a name.');
+      setFieldError('Enter a name.');
       return;
     }
     setFieldError(null);
@@ -127,23 +127,20 @@ function CreateWorkspace({ firstTime }: { firstTime: boolean }) {
   return (
     <section className="rounded-2xl border border-border bg-surface p-6 sm:p-8">
       <h1 className="text-[22px] font-semibold">{firstTime ? 'Create your workspace' : 'Create a workspace'}</h1>
-      <p className="mt-1.5 text-[13px] text-muted">
-        A workspace holds your brands, connected accounts, team and schedules.
-      </p>
       <form onSubmit={submit} className="mt-6 flex flex-col gap-5" noValidate>
         <Field label="Workspace name" error={fieldError}>
-          <Input value={name} onChange={(e) => setName(e.target.value)} autoComplete="organization" maxLength={120} autoFocus placeholder="e.g. Northwind Studio" />
+          <Input value={name} onChange={(e) => setName(e.target.value)} autoComplete="organization" maxLength={120} autoFocus placeholder="Northwind Studio" />
         </Field>
-        <Field label="First brand" optional hint="The brand you’ll publish for, e.g. a client or product. You can add more later.">
-          <Input value={brandName} onChange={(e) => setBrandName(e.target.value)} maxLength={120} placeholder="e.g. Northwind Coffee" />
+        <Field label="First brand" optional>
+          <Input value={brandName} onChange={(e) => setBrandName(e.target.value)} maxLength={120} placeholder="Northwind Coffee" />
         </Field>
-        <Field label="Default time zone" hint="Used as the default for new brands and for display. Each schedule stores its own zone.">
+        <Field label="Time zone">
           <Select value={tz} onChange={(e) => setTz(e.target.value)}>
             {zones.map((z) => <option key={z} value={z}>{z.replace(/_/g, ' ')}</option>)}
           </Select>
         </Field>
         {error ? <ErrorNotice error={error} /> : null}
-        <Button type="submit" variant="primary" size="lg" loading={busy}>Create workspace</Button>
+        <Button type="submit" variant="primary" size="lg" loading={busy}>Create</Button>
       </form>
     </section>
   );

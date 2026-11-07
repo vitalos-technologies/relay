@@ -53,24 +53,24 @@ export function NotificationBell() {
         >
           <Bell aria-hidden className="size-[18px]" />
           {unread ? (
-            <span aria-hidden className="absolute right-1 top-1 min-w-4 rounded-full bg-accent px-1 text-center text-[10px] font-semibold leading-4 text-on-accent tabular">
+            <span aria-hidden className="absolute right-1 top-1 min-w-4 rounded-full bg-[var(--text)] px-1 text-center text-[10px] font-semibold leading-4 text-bg tabular">
               {unread > 99 ? '99+' : unread}
             </span>
           ) : null}
         </button>
       </PopoverTrigger>
       <PopoverContent label="Notifications" align="end">
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+        <div className="flex items-center justify-between px-4 py-3">
           <h2 className="text-[13px] font-semibold">Notifications</h2>
           <Button size="sm" variant="quiet" icon={<CheckCheck aria-hidden className="size-4" />} onClick={readAll} disabled={!unread}>
-            Mark all read
+            Read all<span className="sr-only"> — mark all notifications read</span>
           </Button>
         </div>
         <div className="max-h-[420px] overflow-y-auto">
           {loading ? <div className="p-4"><Spinner /></div> : error ? (
             <div className="p-4"><ErrorState error={error} onRetry={refetch} /></div>
           ) : !data?.items.length ? (
-            <p className="px-4 py-8 text-center text-[13px] text-muted">You’re all caught up. Failures, blocked posts and account problems will appear here.</p>
+            <p className="px-4 py-8 text-center text-[13px] text-muted">All caught up</p>
           ) : (
             <ul>
               {data.items.map((n) => {
@@ -88,7 +88,7 @@ export function NotificationBell() {
                       <p className="mt-1 text-[11px] text-subtle">
                         <span className="sr-only">{n.severity}. </span>
                         {fmtRelative(n.last_seen_at ?? n.created_at)}
-                        {n.read_at ? null : <span className="ml-2 text-accent-text">Unread</span>}
+                        {n.read_at ? null : <span className="ml-2 font-medium text-fg">Unread</span>}
                       </p>
                     </div>
                   </div>

@@ -20,7 +20,7 @@ export function TabsTrigger({ value, children, className, disabled }: { value: s
       disabled={disabled}
       className={cn(
         'focus-inset touch-target relative -mb-px inline-flex h-10 shrink-0 items-center gap-2 border-b-2 border-transparent px-3 text-[13px] font-medium text-muted transition-colors hover:text-fg disabled:opacity-50',
-        'data-[state=active]:border-[var(--accent)] data-[state=active]:text-fg',
+        'data-[state=active]:border-[var(--text)] data-[state=active]:text-fg',
         className,
       )}
     >
@@ -31,7 +31,7 @@ export function TabsTrigger({ value, children, className, disabled }: { value: s
 
 export function TabsContent({ value, children, className }: { value: string; children: ReactNode; className?: string }) {
   return (
-    <T.Content value={value} className={cn('pt-5 focus-visible:outline-none', className)}>
+    <T.Content value={value} className={cn('pt-6 focus-visible:outline-none', className)}>
       {children}
     </T.Content>
   );

@@ -6,7 +6,7 @@ import { UNIT_LABEL, constraintsOf, type LocalCheck } from '@/lib/client/variant
 import { connectionFix, isDispatchable } from '@/lib/client/connection-fix';
 import type { Asset, Brand, Connection } from '@/lib/client/types';
 import {
-  Banner, Button, Checkbox, cn, ConnectionStatusBadge, Field, IconButton, Input, PlatformIcon, RadioGroup, Segmented,
+  Banner, Button, Checkbox, cn, ConnectionStatusBadge, Field, IconButton, InfoTip, Input, PlatformIcon, RadioGroup, Segmented,
   SimulatedBadge, Textarea,
 } from '@/components/ui';
 import { MediaPicker } from './media-picker';
@@ -79,8 +79,8 @@ export function BaseEditor({
   return (
     <div className="flex flex-col gap-5">
       <Field
-        label="Base text"
-        hint="Used by every destination set to “Inherited”. Each destination counts characters its own way — see the counters."
+        label="Text"
+        info="Shared by every destination set to “Inherited”. Each network counts length its own way."
       >
         <Textarea
           value={draft.baseText}
@@ -104,16 +104,15 @@ export function BaseEditor({
       ) : null}
       {!readOnly && (voice.default_cta || voice.hashtags?.length || voice.footer) ? (
         <div className="-mt-2 flex flex-wrap items-center gap-2">
-          <span className="text-xs text-muted">Brand voice:</span>
-          {voice.default_cta ? <Button size="sm" variant="quiet" icon={<Plus aria-hidden className="size-3.5" />} onClick={() => append(voice.default_cta!)}>Call to action</Button> : null}
+          {voice.default_cta ? <Button size="sm" variant="quiet" icon={<Plus aria-hidden className="size-3.5" />} onClick={() => append(voice.default_cta!)}>CTA<span className="sr-only"> (brand call to action)</span></Button> : null}
           {voice.hashtags?.length ? <Button size="sm" variant="quiet" icon={<Plus aria-hidden className="size-3.5" />} onClick={() => append(voice.hashtags!.map((h) => (h.startsWith('#') ? h : `#${h}`)).join(' '))}>Hashtags</Button> : null}
           {voice.footer ? <Button size="sm" variant="quiet" icon={<Plus aria-hidden className="size-3.5" />} onClick={() => append(voice.footer!)}>Footer</Button> : null}
         </div>
       ) : null}
       {prohibited.length ? (
-        <Banner tone="warn" title="Contains terms this brand avoids">{prohibited.join(', ')}. Check the brand voice in Settings.</Banner>
+        <Banner tone="warn" title={`Avoided terms: ${prohibited.join(', ')}`} />
       ) : null}
-      <Field label="Link" optional hint="Appended to the text where the network has no separate link field." error={linkInvalid ? 'Use a full https:// link.' : null}>
+      <Field label="Link" optional info="Appended to the text where a network has no link field." error={linkInvalid ? 'Use a full https:// link.' : null}>
         <Input type="url" inputMode="url" value={draft.baseLink ?? ''} readOnly={readOnly} onChange={(e) => onChange({ ...draft, baseLink: e.target.value || null })} placeholder="https://" />
       </Field>
       <div>
@@ -161,7 +160,7 @@ export function VariantEditor({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-sunken px-3 py-2.5">
+      <div className="flex flex-wrap items-center gap-3">
         <PlatformIcon provider={connection.provider} size="md" />
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-2 truncate text-sm font-medium">{connection.display_name} {connection.is_mock ? <SimulatedBadge /> : null}</p>
@@ -169,8 +168,8 @@ export function VariantEditor({
         </div>
         <ConnectionStatusBadge status={connection.status} label={connection.status_label} size="sm" />
       </div>
-      {!isDispatchable(connection) ? <Banner tone="warn" title="This destination can’t publish right now">{connectionFix(connection) ?? connection.health?.message}</Banner> : null}
-      {!k ? <Banner tone="info">Limits for this destination aren’t known yet. Run “Check” on the Accounts page so counters and checks can be shown here; the server still validates before scheduling.</Banner> : null}
+      {!isDispatchable(connection) ? <Banner tone="warn" title="Can’t publish">{connectionFix(connection) ?? connection.health?.message}</Banner> : null}
+      {!k ? <p className="flex items-center gap-1 text-xs text-muted">Limits unknown<InfoTip label="About limits">Run Check on Accounts to load limits. The server still validates.</InfoTip></p> : null}
 
       <section aria-labelledby={`txt-${connection.id}`} className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -188,12 +187,11 @@ export function VariantEditor({
           />
         </div>
         {variant.inheritText ? (
-          <div className="rounded-lg border border-dashed border-border bg-sunken px-3 py-2.5">
-            <p className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.06em] text-subtle">Inherited from base text</p>
-            <p className="whitespace-pre-wrap break-words text-[13px] text-muted">{draft.baseText || 'Base text is empty.'}</p>
+          <div className="rounded-lg bg-sunken px-4 py-3">
+            <p className="whitespace-pre-wrap break-words text-[13px] text-muted">{draft.baseText || 'Empty'}</p>
           </div>
         ) : (
-          <Field label={`Custom text for ${connection.display_name}`} labelHidden hint="Changes to the base text no longer affect this destination.">
+          <Field label={`Custom text for ${connection.display_name}`} labelHidden>
             <Textarea
               value={variant.text ?? ''}
               readOnly={readOnly}
@@ -221,8 +219,8 @@ export function VariantEditor({
             else onChange({ ...variant, link: variant.link ?? draft.baseLink ?? '' });
           }}
           options={[
-            { value: 'inherit', label: 'Use the base link', description: draft.baseLink || 'Base link is empty', disabled: readOnly },
-            { value: 'custom', label: 'Use a different link', disabled: readOnly },
+            { value: 'inherit', label: 'Inherited', description: draft.baseLink || 'None', disabled: readOnly },
+            { value: 'custom', label: 'Custom', disabled: readOnly },
             { value: 'none', label: 'No link', disabled: readOnly },
           ]}
         />
@@ -231,7 +229,7 @@ export function VariantEditor({
             <Input type="url" inputMode="url" value={variant.link ?? ''} readOnly={readOnly} onChange={(e) => onChange({ ...variant, link: e.target.value })} placeholder="https://" />
           </Field>
         ) : null}
-        {k && !k.supportsLink ? <p className="text-xs text-warn">{PROVIDER_LABEL[connection.provider]} doesn’t make links in posts clickable.</p> : null}
+        {k && !k.supportsLink ? <p className="text-xs text-warn">Links aren’t clickable on {PROVIDER_LABEL[connection.provider]}.</p> : null}
       </section>
 
       <section aria-labelledby={`med-${connection.id}`} className="flex flex-col gap-3">
@@ -257,7 +255,7 @@ export function VariantEditor({
           onAdd={() => setPicker(true)}
           onRemove={(id) => onChange({ ...variant, assetIds: (variant.assetIds ?? []).filter((x) => x !== id) })}
         />
-        {k?.requiresMedia ? <p className="text-xs text-muted">{PROVIDER_LABEL[connection.provider]} requires an image.</p> : null}
+        {k?.requiresMedia ? <p className="text-xs text-muted">Image required</p> : null}
         <MediaPicker
           open={picker}
           onOpenChange={setPicker}
@@ -275,15 +273,15 @@ export function VariantEditor({
           <div className="flex items-center justify-between gap-3">
             <h3 id={`btn-${connection.id}`} className="text-[13px] font-medium">URL buttons <span className="font-normal text-muted">({buttons.length}/{maxButtons})</span></h3>
             {!readOnly ? (
-              <Button size="sm" variant="secondary" icon={<Plus aria-hidden className="size-4" />} onClick={() => setButtons([...buttons, { text: '', url: '' }])} disabled={buttons.length >= maxButtons}>
-                Add button
+              <Button size="sm" variant="ghost" icon={<Plus aria-hidden className="size-4" />} onClick={() => setButtons([...buttons, { text: '', url: '' }])} disabled={buttons.length >= maxButtons}>
+                Add<span className="sr-only"> button</span>
               </Button>
             ) : null}
           </div>
-          {buttons.length === 0 ? <p className="text-xs text-muted">Buttons appear under the message in {PROVIDER_LABEL[connection.provider]}.</p> : (
+          {buttons.length === 0 ? null : (
             <ul className="flex flex-col gap-3">
               {buttons.map((b, i) => (
-                <li key={i} className="grid grid-cols-[1fr_auto] gap-2 rounded-lg border border-border p-3 sm:grid-cols-[1fr_1.4fr_auto]">
+                <li key={i} className="grid grid-cols-[1fr_auto] gap-2 sm:grid-cols-[1fr_1.4fr_auto]">
                   <Field label={`Button ${i + 1} label`} error={!b.text.trim() && b.url ? 'Add a label.' : null}>
                     <Input value={b.text} readOnly={readOnly} maxLength={64} onChange={(e) => setButtons(buttons.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))} />
                   </Field>
@@ -312,30 +310,26 @@ export function DestinationPicker({
   const live = connections.filter((c) => c.status !== 'disconnected' || selected.includes(c.id));
   if (!live.length) return null;
   return (
-    <ul className="flex flex-col gap-2">
+    <ul className="flex flex-col">
       {live.map((c) => {
         const on = selected.includes(c.id);
         // Paused destinations can still be scheduled (they send once resumed); others must be fixed first.
         const ok = isDispatchable(c) || c.status === 'paused' || (c.paused && (c.status === 'ready' || c.status === 'expiring'));
         const reason = isDispatchable(c) ? null : connectionFix(c) ?? c.health?.message ?? c.status_label;
         return (
-          <li key={c.id} className={cn('rounded-lg border px-3 py-2.5 transition-colors', on ? 'border-border-strong bg-raised' : 'border-border')}>
-            <div className="flex items-start gap-3">
-              <PlatformIcon provider={c.provider} size="sm" className="mt-0.5" />
+          <li key={c.id} className={cn('rounded-lg px-2 py-2 transition-colors', on ? 'bg-raised/60' : '')}>
+            <div className="flex items-center gap-3">
               <Checkbox
                 className="min-w-0 flex-1 [&_label]:block [&_label]:truncate"
                 checked={on}
                 disabled={readOnly || (!ok && !on)}
                 onChange={(e) => onToggle(c, e.target.checked)}
-                label={<span className="font-medium">{c.display_name}</span>}
-                description={`${PROVIDER_LABEL[c.provider]}${c.username ? ` · @${c.username.replace(/^@/, '')}` : ''}`}
+                label={<span className="flex min-w-0 items-center gap-2"><PlatformIcon provider={c.provider} size="xs" decorative /><span className="truncate font-medium">{c.display_name}</span><span className="sr-only"> ({PROVIDER_LABEL[c.provider]})</span></span>}
               />
+              {c.status !== 'ready' ? <ConnectionStatusBadge status={c.status} label={c.status_label} size="sm" /> : null}
+              {c.is_mock ? <SimulatedBadge className="shrink-0" /> : null}
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-10">
-              <ConnectionStatusBadge status={c.status} label={c.status_label} size="sm" />
-              {c.is_mock ? <SimulatedBadge /> : null}
-            </div>
-            {reason ? <p className="mt-1.5 pl-10 text-xs text-muted">{ok ? '' : on ? 'Selected, but can’t publish: ' : 'Unavailable: '}{reason}</p> : null}
+            {reason ? <p className="mt-1 truncate pl-8 text-xs text-muted" title={reason}>{ok ? '' : on ? 'Can’t publish: ' : 'Unavailable: '}{reason}</p> : null}
           </li>
         );
       })}

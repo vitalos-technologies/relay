@@ -100,7 +100,7 @@ export function PostStatusBadge({ status, simulated, size, className }: { status
 
 export function SimulatedBadge({ className }: { className?: string }) {
   return (
-    <Badge tone="accent" className={cn('h-5 px-1.5 text-[11px]', className)} icon={<FlaskConical aria-hidden className="size-3" />} title="Simulated destination — nothing is sent to a real network">
+    <Badge tone="neutral" className={cn('h-5 px-1.5 text-[11px]', className)} icon={<FlaskConical aria-hidden className="size-3" />} title="Simulated — nothing is sent">
       Simulated
     </Badge>
   );

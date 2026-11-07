@@ -72,10 +72,10 @@ export function ScheduleTimeField({
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label={label} hint={`Wall-clock time in ${value.tz}`}>
+        <Field label={label}>
           <Input type="datetime-local" value={value.local} onChange={(e) => onChange({ ...value, local: e.target.value, offset: null })} />
         </Field>
-        <Field label="Time zone" hint="The schedule keeps this zone; your browser’s zone is never assumed.">
+        <Field label="Time zone" info="The schedule keeps this zone — your browser’s zone is never assumed.">
           <Select value={value.tz} onChange={(e) => onChange({ ...value, tz: e.target.value, offset: null })}>
             {preferred.length ? (
               <optgroup label="Suggested">
@@ -96,15 +96,15 @@ export function ScheduleTimeField({
       ) : null}
 
       {ambOptions ? (
-        <div className="rounded-lg border border-[color-mix(in_srgb,var(--warn)_35%,transparent)] bg-warn-soft p-3.5">
+        <div className="rounded-lg bg-warn-soft p-4">
           <RadioGroup
             name="offset"
-            legend={`${value.local.replace('T', ' ')} happens twice in ${value.tz} because clocks go back. Which one do you mean?`}
+            legend={`${value.local.replace('T', ' ')} occurs twice (clocks go back). Which one?`}
             value={value.offset ?? ''}
             onChange={(o) => onChange({ ...value, offset: o })}
             options={ambOptions.map((o, i) => ({
               value: o.offset,
-              label: `${i === 0 ? 'First' : 'Second'} occurrence — UTC${o.offset}${o.instant ? ` (${zoneAbbr(o.instant, value.tz)})` : ''}`,
+              label: `${i === 0 ? 'First' : 'Second'} · UTC${o.offset}${o.instant ? ` (${zoneAbbr(o.instant, value.tz)})` : ''}`,
               description: o.instant ? `${o.instant.toISOString().slice(11, 16)} UTC` : undefined,
             }))}
           />
@@ -113,17 +113,15 @@ export function ScheduleTimeField({
 
       {instant ? (
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]" aria-live="polite">
-          <CalendarClock aria-hidden className="size-4 text-accent-text" />
-          <span>
-            Scheduled for <strong className="font-semibold">{fmtDateTime(instant, value.tz)} {zoneAbbr(instant, value.tz)}</strong>
-          </span>
-          <span className="text-muted">· {instant.toISOString().slice(0, 16).replace('T', ' ')} UTC</span>
+          <CalendarClock aria-hidden className="size-4 text-muted" />
+          <strong className="font-semibold">{fmtDateTime(instant, value.tz)} {zoneAbbr(instant, value.tz)}</strong>
+          <span className="text-muted">· {instant.toISOString().slice(11, 16)} UTC</span>
           {browser && browser !== value.tz && offsetMinutes(instant, browser) !== offsetMinutes(instant, value.tz) ? (
-            <span className="text-subtle">· {fmtTime(instant, browser)} {zoneAbbr(instant, browser)} in your browser’s zone</span>
+            <span className="text-subtle">· {fmtTime(instant, browser)} {zoneAbbr(instant, browser)} yours</span>
           ) : null}
         </p>
       ) : null}
-      {past ? <Banner tone="warn" role="alert">This time is in the past. Choose a future time or use Publish now.</Banner> : null}
+      {past ? <Banner tone="warn" role="alert">That time has passed.</Banner> : null}
     </div>
   );
 }

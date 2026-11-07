@@ -12,14 +12,14 @@ import {
 } from '@/components/ui';
 
 const DECISION: Record<string, { label: string; tone: 'info' | 'success' | 'danger' | 'neutral' }> = {
-  pending: { label: 'Waiting for review', tone: 'info' },
+  pending: { label: 'Waiting', tone: 'info' },
   approved: { label: 'Approved', tone: 'success' },
   rejected: { label: 'Changes requested', tone: 'danger' },
   invalidated: { label: 'Superseded', tone: 'neutral' },
 };
 
 export default function ApprovalsPage() {
-  const { session, can } = useSession();
+  const { session } = useSession();
   const [params, setParams] = useQueryState();
   const status = params.get('status') === 'decided' ? 'decided' : 'pending';
   const [cursors, setCursors] = useState<Array<string | null>>([null]);
@@ -36,7 +36,6 @@ export default function ApprovalsPage() {
     <>
       <PageHeader
         title="Approvals"
-        description={can('approvals.decide') ? 'Review the exact content each destination will receive, then approve or request changes.' : 'Posts waiting for review. Approvers and admins can decide.'}
         actions={
           <Segmented
             label="Approval status"
@@ -47,12 +46,10 @@ export default function ApprovalsPage() {
         }
       />
       {error && !data ? <ErrorState error={error} onRetry={refetch} /> : loading ? <SkeletonRows rows={4} /> : !items.length ? (
-        <EmptyState icon={<CheckCheck aria-hidden />} title={status === 'pending' ? 'Nothing waiting for review' : 'No decisions yet'}>
-          {status === 'pending' ? 'When someone submits a post for review, it appears here.' : 'Approved and rejected posts will be listed here.'}
-        </EmptyState>
+        <EmptyState icon={<CheckCheck aria-hidden />} title={status === 'pending' ? 'All caught up' : 'No decisions yet'} />
       ) : (
         <>
-          <ul className="flex flex-col gap-2">
+          <ul className="flex flex-col divide-y divide-border rounded-xl border border-border bg-surface">
             {items.map((a) => {
               const d = DECISION[a.decision ?? 'pending'] ?? DECISION.pending!;
               const due = a.due_at ?? a.schedule?.due_at ?? null;
@@ -60,22 +57,19 @@ export default function ApprovalsPage() {
               const requested = a.requested_at ?? a.created_at;
               return (
                 <li key={a.id}>
-                  <Link href={`/approvals/${a.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-border bg-surface px-4 py-3.5 hover:border-border-strong">
+                  <Link href={`/approvals/${a.id}`} className="focus-inset flex items-center gap-4 px-4 py-4 hover:bg-raised/50">
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{postTitle({ title: a.post_title ?? a.title, excerpt: a.excerpt })}</p>
-                      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted">
-                        {brandName(a) ? <span>{brandName(a)}</span> : null}
-                        {a.requested_by_email ? <span>· by {a.requested_by_email}</span> : null}
-                        {requested ? <span>· {fmtRelative(requested)}</span> : null}
+                      <p className="mt-1 truncate text-xs text-muted">
+                        {due ? <TimeWithZone instant={due} tz={tz} /> : 'On approval'}
+                        {brandName(a) ? <> · {brandName(a)}</> : null}
+                        {a.requested_by_email ? <> · {a.requested_by_email}</> : null}
+                        {requested ? <> · {fmtRelative(requested)}</> : null}
                       </p>
                     </div>
-                    {a.destinations?.length ? <PlatformStack providers={a.destinations.map((x) => x.provider)} size="sm" /> : null}
-                    <div className="text-right text-xs">
-                      <span className="block text-muted">{due ? 'Publishes' : 'Publishes on approval'}</span>
-                      {due ? <TimeWithZone instant={due} tz={tz} /> : null}
-                    </div>
-                    <Badge tone={d.tone} icon={<ToneIcon tone={d.tone === 'neutral' ? 'neutral' : d.tone} className="size-3.5" />}>{d.label}</Badge>
-                    <ArrowRight aria-hidden className="size-4 text-muted" />
+                    {a.destinations?.length ? <span className="hidden sm:block"><PlatformStack providers={a.destinations.map((x) => x.provider)} size="sm" /></span> : null}
+                    <Badge tone={d.tone} className="shrink-0" icon={<ToneIcon tone={d.tone === 'neutral' ? 'neutral' : d.tone} className="size-3.5" />}>{d.label}</Badge>
+                    <ArrowRight aria-hidden className="hidden size-4 shrink-0 text-subtle sm:block" />
                   </Link>
                 </li>
               );

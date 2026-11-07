@@ -10,6 +10,7 @@ import { audit } from '../audit.js';
 import { writeOutbox } from '../outbox.js';
 import { assertBrand, assertUuid, brandAllowed, requireAction, type BrandRow } from '../tenancy.js';
 import { beginIdempotent, completeIdempotent } from '../idempotency.js';
+import { assetsByIds } from '../media/assets.js';
 import { brandConnections, contentHash, scheduleFingerprint, type ConnectionRow } from './shared.js';
 import { loadPost, validateDraft, deliveriesForSchedule, type PostRow } from './service.js';
 import { approvalJson, deliveryJson, scheduleJson, type ApprovalRow, type ScheduleRow } from './serialize.js';
@@ -251,7 +252,7 @@ export async function approvalDetail(ctx: Ctx, approvalId: string) {
   const variants = await many<{ connection_id: string; inherit_text: boolean; rendered_text: string; link: string | null; format: string; asset_ids: string[]; buttons: unknown; options: unknown }>(db,
     `SELECT * FROM variants WHERE revision_id=$1`, [a.revision_id]);
   const assetIds = [...new Set(variants.flatMap((v) => v.asset_ids))];
-  const assets = assetIds.length ? await many<Record<string, unknown>>(db, `SELECT id, status, mime, width, height, alt_text, original_filename FROM assets WHERE id = ANY($1::uuid[])`, [assetIds]) : [];
+  const assets = await assetsByIds(ctx, assetIds, db);
   // Diff against the previous approved/published revision of this post (AP-03).
   const prev = await maybeOne<{ revision_number: number; base_text: string; conns: string[] }>(db,
     `SELECT r.revision_number, r.base_text, (SELECT array_agg(v.connection_id::text) FROM variants v WHERE v.revision_id=r.id) conns
@@ -266,7 +267,7 @@ export async function approvalDetail(ctx: Ctx, approvalId: string) {
     variants: variants.map((v) => {
       const c = conns.find((x) => x.id === v.connection_id)!;
       return { connectionId: v.connection_id, provider: c.provider, inheritText: v.inherit_text, text: v.rendered_text, link: v.link, format: v.format,
-        assetIds: v.asset_ids, buttons: v.buttons, options: v.options, connection: connectionJson(c), assets: assets.filter((x) => v.asset_ids.includes(x.id as string)) };
+        assetIds: v.asset_ids, buttons: v.buttons, options: v.options, connection: connectionJson(c), assets: assets.filter((x) => v.asset_ids.includes(x.id)) };
     }),
     diff: {
       previous_revision_number: prev?.revision_number ?? null,

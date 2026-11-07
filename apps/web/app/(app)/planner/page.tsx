@@ -11,7 +11,7 @@ import { useBrandFilter, useHrefWithBrand, useMediaQuery, useQueryState } from '
 import { fmtDateTime, fmtTime, localDateKey, postTitle, zoneAbbr } from '@/lib/client/format';
 import type { Connection, PlannerItem, PostDetail } from '@/lib/client/types';
 import {
-  Banner, Button, cn, EmptyState, ErrorState, IconButton, LinkButton, Menu, MenuContent, MenuItem, MenuTrigger, PageHeader,
+  Banner, Button, cn, EmptyState, ErrorState, IconButton, InfoTip, LinkButton, Menu, MenuContent, MenuItem, MenuTrigger, PageHeader,
   POST_STATUS_LABEL, Segmented, Select, SkeletonRows, useToast,
 } from '@/components/ui';
 import { AgendaItem, DestinationDots } from '@/components/planner/agenda-item';
@@ -187,10 +187,10 @@ export default function PlannerPage() {
         <MenuItem icon={<SquareArrowOutUpRight aria-hidden />} onSelect={() => router.push(`/posts/${i.post_id}`)}>Open post</MenuItem>
         {mayReschedule ? (
           <MenuItem icon={<CalendarClock aria-hidden />} disabled={!canMove(i)} onSelect={() => setTarget({ item: i, local: null })}>
-            Reschedule…{!canMove(i) ? ' (not possible now)' : ''}
+            Reschedule…
           </MenuItem>
         ) : null}
-        {can('drafts.edit') ? <MenuItem icon={<Copy aria-hidden />} onSelect={() => void duplicate(i)}>Duplicate as draft</MenuItem> : null}
+        {can('drafts.edit') ? <MenuItem icon={<Copy aria-hidden />} onSelect={() => void duplicate(i)}>Duplicate</MenuItem> : null}
       </MenuContent>
     </Menu>
   );
@@ -199,26 +199,27 @@ export default function PlannerPage() {
     <>
       <PageHeader
         title="Planner"
-        description={<>Calendar days in <span className="text-fg">{viewTz.replace(/_/g, ' ')} ({zoneAbbr(new Date(), viewTz)})</span>. Each post shows its time in the zone it was scheduled in.</>}
+        meta={<span className="truncate">{viewTz.replace(/_/g, ' ')} · {zoneAbbr(new Date(), viewTz)}</span>}
         actions={can('drafts.edit') && session.brands.length ? <LinkButton href={withBrand('/compose')} variant="primary" icon={<Plus aria-hidden className="size-4" />}>New post</LinkButton> : null}
       />
 
-      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-2">
-          <IconButton variant="secondary" label={`Previous ${view === 'agenda' ? 'two weeks' : view}`} icon={<ChevronLeft aria-hidden className="size-4" />} onClick={() => nav(-1)} />
-          <IconButton variant="secondary" label={`Next ${view === 'agenda' ? 'two weeks' : view}`} icon={<ChevronRight aria-hidden className="size-4" />} onClick={() => nav(1)} />
+          <IconButton label={`Previous ${view === 'agenda' ? 'two weeks' : view}`} icon={<ChevronLeft aria-hidden className="size-4" />} onClick={() => nav(-1)} />
+          <IconButton label={`Next ${view === 'agenda' ? 'two weeks' : view}`} icon={<ChevronRight aria-hidden className="size-4" />} onClick={() => nav(1)} />
           <Button variant="ghost" size="sm" onClick={() => setParams({ date: null })} disabled={anchor === today}>Today</Button>
-          <h2 className="ml-1 text-[15px] font-semibold tabular" aria-live="polite">{title}</h2>
+          <h2 className="ml-2 min-w-0 truncate text-[15px] font-semibold tabular" aria-live="polite">{title}</h2>
+          {view !== 'agenda' && desktop && mayReschedule ? <InfoTip label="How to reschedule">Drag a post to another day, or use its ⋯ menu.</InfoTip> : null}
           {refreshing ? <span className="text-xs text-subtle">Updating…</span> : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="w-[180px]">
             <label className="sr-only" htmlFor="pl-account">Account</label>
-            <Select id="pl-account" value={connectionFilter} onChange={(e) => setParams({ account: e.target.value })} disabled={!brand} title={!brand ? 'Choose a brand in the sidebar to filter by account' : undefined} aria-describedby={!brand ? 'pl-account-hint' : undefined}>
+            <Select id="pl-account" value={connectionFilter} onChange={(e) => setParams({ account: e.target.value })} disabled={!brand} title={!brand ? 'Pick a brand first' : undefined} aria-describedby={!brand ? 'pl-account-hint' : undefined}>
               <option value="">All accounts</option>
               {conns.data?.items.map((c) => <option key={c.id} value={c.id}>{c.display_name}{c.is_mock ? ' (Simulated)' : ''}</option>)}
             </Select>
-            {!brand ? <span id="pl-account-hint" className="sr-only">Choose a brand to filter by account.</span> : null}
+            {!brand ? <span id="pl-account-hint" className="sr-only">Pick a brand first.</span> : null}
           </div>
           <div className="w-[170px]">
             <label className="sr-only" htmlFor="pl-status">Status</label>
@@ -274,9 +275,6 @@ export default function PlannerPage() {
           onMore={(d) => setParams({ view: 'agenda', date: d })}
         />
       )}
-      {view !== 'agenda' && desktop && mayReschedule ? (
-        <p className="mt-3 text-xs text-muted">Drag a scheduled post to another day to move it — you’ll confirm the new time first. Keyboard: use the post’s “…” menu → Reschedule.</p>
-      ) : null}
 
       <RescheduleDialog
         open={!!target}
@@ -301,9 +299,7 @@ function Agenda({
 }) {
   if (empty) {
     return (
-      <EmptyState icon={<CalendarDays aria-hidden />} title="Nothing scheduled in this period" action={canCreate ? <LinkButton href={withBrand('/compose')} variant="primary">Create a post</LinkButton> : null}>
-        Use the arrows to look at other dates, or clear filters.
-      </EmptyState>
+      <EmptyState icon={<CalendarDays aria-hidden />} title="Nothing scheduled" action={canCreate ? <LinkButton href={withBrand('/compose')} variant="secondary">New post</LinkButton> : null} />
     );
   }
   const list = Array.from({ length: days }, (_, i) => addDays(start, i)).filter((d) => byDay.has(d));
@@ -313,9 +309,9 @@ function Agenda({
         <section key={d} aria-labelledby={`ag-${d}`}>
           <h3 id={`ag-${d}`} className="mb-2 flex items-baseline gap-2 text-[13px] font-semibold">
             {labelDate(d, { weekday: 'long', day: 'numeric', month: 'long' })}
-            {d === today ? <span className="rounded-full bg-accent-soft px-2 text-[11px] font-medium text-accent-text">Today</span> : null}
+            {d === today ? <span className="rounded-full bg-raised px-2 text-[11px] font-medium text-muted">Today</span> : null}
           </h3>
-          <ul className="flex flex-col gap-2">
+          <ul className="flex flex-col">
             {byDay.get(d)!.map((i) => (
               <li key={i.schedule_id}><AgendaItem item={i} brandName={brandName?.(i.brand_id)} actions={menu(i)} /></li>
             ))}
@@ -353,16 +349,16 @@ function CalendarGrid({
               onDragLeave={() => setOver((o) => (o === d ? null : o))}
               onDrop={(e) => { setOver(null); onDropDay(d, e); }}
               className={cn(
-                'flex flex-col gap-1.5 border-border p-2',
+                'flex flex-col gap-1 border-border p-2',
                 idx % 7 !== 6 && 'border-r',
                 idx < days - 7 && 'border-b',
                 view === 'week' ? 'min-h-[420px]' : 'min-h-[120px]',
                 outside && 'bg-sunken/60',
-                over === d && 'bg-accent-soft outline-2 outline-dashed outline-[var(--focus)] -outline-offset-2',
+                over === d && 'bg-raised outline-2 outline-dashed outline-[var(--focus)] -outline-offset-2',
               )}
             >
               <div className={cn('flex items-center justify-between text-xs tabular', outside ? 'text-subtle' : 'text-muted')}>
-                <span className={cn(d === today && 'inline-flex size-6 items-center justify-center rounded-full bg-accent font-semibold text-on-accent')}>
+                <span className={cn(d === today && 'inline-flex size-6 items-center justify-center rounded-full bg-[var(--text)] font-semibold text-bg')}>
                   {Number(d.slice(8))}
                 </span>
                 {d === today ? <span className="sr-only">Today</span> : null}
@@ -391,7 +387,7 @@ function CalendarItem({ item, draggable, menu, compact }: { item: PlannerItem; d
         e.dataTransfer.effectAllowed = 'move';
       }}
       className={cn(
-        'group relative rounded-lg border border-border bg-raised px-2 py-1.5 text-xs hover:border-border-strong',
+        'group relative rounded-md bg-raised px-2 py-1 text-xs hover:bg-sunken',
         draggable && 'cursor-grab active:cursor-grabbing',
         item.status === 'needs_attention' || item.status === 'failed' || item.status === 'partial' ? 'border-l-2 border-l-[var(--warn)]' : '',
       )}
@@ -406,7 +402,7 @@ function CalendarItem({ item, draggable, menu, compact }: { item: PlannerItem; d
         </Link>
         <span className="-mr-1 -mt-0.5 opacity-70 group-hover:opacity-100 group-focus-within:opacity-100">{menu}</span>
       </div>
-      {!compact ? <div className="mt-1.5"><DestinationDots destinations={item.destinations} /></div> : null}
+      {!compact ? <div className="mt-1"><DestinationDots destinations={item.destinations} /></div> : null}
     </div>
   );
 }

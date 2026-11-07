@@ -31,7 +31,7 @@ export function WorkspaceSwitcher() {
         <button
           type="button"
           disabled={busy}
-          className="flex h-11 w-full items-center gap-2.5 rounded-lg border border-border bg-raised px-2.5 text-left hover:border-border-strong"
+          className="flex h-11 w-full items-center gap-2 rounded-lg px-2 text-left hover:bg-raised"
           aria-label={`Workspace: ${ws.name}. Switch workspace`}
         >
           <span aria-hidden className="flex size-7 shrink-0 items-center justify-center rounded-md bg-sunken text-xs font-semibold uppercase text-muted">
@@ -50,7 +50,7 @@ export function WorkspaceSwitcher() {
           <MenuItem key={w.id} onSelect={() => void switchTo(w.id)} icon={w.id === ws.id ? <Check aria-hidden /> : <span className="size-4" />}>
             <span className="flex min-w-0 flex-1 items-center gap-2">
               <span className="truncate">{w.name}</span>
-              {w.is_demo ? <FlaskConical aria-label="Demo" className="size-3.5 text-accent-text" /> : null}
+              {w.is_demo ? <FlaskConical aria-label="Demo" className="size-3.5 text-muted" /> : null}
             </span>
             <span className="text-[11px] text-muted">{ROLE_LABEL[w.role]}</span>
           </MenuItem>
@@ -58,7 +58,7 @@ export function WorkspaceSwitcher() {
         {session.can_create_workspace ? (
           <>
             <MenuSeparator />
-            <MenuItem onSelect={() => window.location.assign('/onboarding?new=1')}>Create a workspace…</MenuItem>
+            <MenuItem onSelect={() => window.location.assign('/onboarding?new=1')}>New workspace…</MenuItem>
           </>
         ) : null}
       </MenuContent>

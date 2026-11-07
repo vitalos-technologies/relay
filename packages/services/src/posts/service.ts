@@ -9,6 +9,7 @@ import { audit } from '../audit.js';
 import { assertBrand, assertUuid, brandAllowed, brandFilter, requireAction, type BrandRow } from '../tenancy.js';
 import { beginIdempotent, completeIdempotent } from '../idempotency.js';
 import { brandConnections, capabilitiesFor, contentHash, excerpt, mediaFacts, type ConnectionRow } from './shared.js';
+import { assetsByIds } from '../media/assets.js';
 import { approvalJson, connectionJson, deliveryJson, DELIVERY_SELECT, scheduleJson, type ApprovalRow, type DeliveryRow, type ScheduleRow } from './serialize.js';
 
 export interface PostRow {
@@ -215,9 +216,7 @@ export async function getPostDetail(ctx: Ctx, postId: string) {
   const conns = await brandConnections(db, ctx.access.workspaceId, post.brand_id, true);
   const draftConnIds = new Set(post.draft.variants.map((v) => v.connectionId));
   const assetIds = [...new Set([...post.draft.baseAssetIds, ...post.draft.variants.flatMap((v) => v.assetIds ?? [])])];
-  const assets = assetIds.length ? await many<Record<string, unknown>>(db,
-    `SELECT id, brand_id, status, rejection_reason, original_filename, mime, bytes, width, height, alt_text, tags, created_at
-       FROM assets WHERE workspace_id=$1 AND id = ANY($2::uuid[])`, [ctx.access.workspaceId, assetIds]) : [];
+  const assets = await assetsByIds(ctx, assetIds, db); // includes short-lived signed preview/thumb URLs
   const sched = await maybeOne<ScheduleRow>(db,
     `SELECT s.*, r.revision_number, u.email AS created_by_email FROM schedules s JOIN post_revisions r ON r.id=s.revision_id
        LEFT JOIN users u ON u.id=s.created_by WHERE s.post_id=$1 ORDER BY s.generation DESC LIMIT 1`, [post.id]);
@@ -237,7 +236,7 @@ export async function getPostDetail(ctx: Ctx, postId: string) {
     draft: post.draft, created_by: post.created_by, updated_by_email: updatedBy?.email ?? null, source: post.source,
     brand: await brandJson(db, brand),
     connections: conns.filter((c) => !c.disconnected_at || draftConnIds.has(c.id)).map(connectionJson),
-    assets: assets.map((a) => ({ ...a, bytes: a.bytes === null ? null : Number(a.bytes) })),
+    assets,
     current_schedule: sched ? scheduleJson(sched) : null,
     approval: approval ? approvalJson(approval) : null,
     deliveries: deliveries.map((d) => deliveryJson(d)),

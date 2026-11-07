@@ -10,7 +10,7 @@ export default function RootError({ error, reset }: { error: Error & { digest?: 
     <main className="flex min-h-[70dvh] items-center justify-center px-4 py-16">
       <div role="alert" className="max-w-md text-center">
         <h1 className="text-[22px] font-semibold">Something went wrong</h1>
-        <p className="mt-2 text-[13px] text-muted">This screen hit an unexpected problem. Your saved work is safe.</p>
+        <p className="mt-2 text-[13px] text-muted">Your saved work is safe.</p>
         {error.digest ? <p className="mt-3 font-mono text-[11px] text-subtle">Reference {error.digest}</p> : null}
         <div className="mt-6 flex justify-center gap-2">
           <button type="button" onClick={reset} className="touch-target inline-flex h-10 items-center rounded-lg bg-accent px-4 text-sm font-medium text-on-accent hover:bg-accent-hover">Try again</button>
