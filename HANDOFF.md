@@ -69,13 +69,40 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
 6b. (Support inbox proposal → superseded by V4.) Platform host restriction (ops.<domain>, office/VPN IPs) is an activation item.
 7. **V3.5** (`docs/queue/03f_V3_5_PROMPT.md`) — foundation (102498a) + streams B–E (33f3e12) **done and committed** (migrations 028–032; docs `docs/v3-5/*`; unit 559, integration 479). **Running:** stream F — admin + MCP + cross-stream wiring + full verification + final docs/activation checklist (progress `docs/v3-5-progress/final.md`; fix list `docs/v3-5-progress/lead-notes.md`). Open for user: Inbox in phone bottom bar; main nav grouping (copy-cleanup pass). → 7b. **V4** commercial + customer support (`docs/queue/03g_V4_PROMPT.md`: Relay support tickets, Platform → Support, plans/trials/subscriptions/billing via Stripe test mode behind a billing service, entitlements, tenant lifecycle; no Stripe keys in this environment → build against a provider interface with a test double + locally signed webhook fixtures; never request keys in chat) → 8. Copy cleanup (03e) → 9. Docs + Help Centre (04) → 10. One consolidated activation checklist + user reminder.
 
-## Current state (keep updated)
-- **V3.1 Admin: done and committed.** `/admin` app (Workspace ↔ Platform scope), platform operators (migration 026, applied to dev, frozen; next migration is **027**), support access (owner-approved, time-boxed, step-up), suspension gate in the engine, change-feed sync (10 s poll, ≤ 60 s backoff). Bootstrap an operator: `pnpm platform:operator` (dev seed makes owner@demo one).
-  - Verified: tsc clean; unit 495/495; integration 400/401 (`v31-analytics-summary` timing flake under load, passes alone); **full E2E 51/51 on a production build** (covers lead fixes 89286a7); mobile 30 routes × 8 widths no overflow; perf within budget; secret scan clean.
-  - Docs: `docs/admin/*` (12). Open decisions: G-A1 (Instance setup still owner-gated), G-A5 (optional pg-boss read grant for the web role). Left: large-dataset admin benchmark, screen-reader pass, real-device/RUM.
-- **Dev environment:** all migrations 001–017, 019–022, 025, 026 applied. Web runs as a production build on :3000 (`next build --webpack` + `next start`); a stale `next dev` on :3000 makes `next start` fail — check the process. Worker rebuilt with the worker DB role. E2E uses its own seeded workspaces (`pnpm db:seed:e2e`).
-- **Background agents** (a new session will NOT have them): V3.5 stream F (since ~04:45 UTC Nov 8). Relaunch with the F row of `docs/V3_5_WORKSTREAMS.md` + `docs/v3-5-progress/lead-notes.md`, resuming from `docs/v3-5-progress/final.md`.
-- **Known gaps carried forward:** `docs/V2_IMPLEMENTATION_GAPS.md`, `docs/V3_IMPLEMENTATION_GAPS.md`, `docs/V3_1_IMPLEMENTATION_GAPS.md`, `docs/admin/IMPLEMENTATION_GAPS.md` (planner payload, Zod in browser bundles, flags gate UI only, storage orphans, no follower data, TikTok handoff download, lint).
+## Current state (keep updated) — 2026-11-08 05:20 UTC
+- **main** = 33f3e12 + handoff commits: everything through V3.5 streams B–E is committed. Last verified on main: tsc clean,
+  unit 559/559, integration 479/479 (58 files), secret scan clean. Last full E2E on a production build: 59 passed / 2 skipped
+  (V3.5 foundation); stream F re-runs the full suite on the combined code.
+- **Running now:** V3.5 stream F (admin + MCP + cross-stream wiring + polish + full verification + final docs). Progress
+  `docs/v3-5-progress/final.md`; fix list `docs/v3-5-progress/lead-notes.md`. Code done: wiring (listening.alert_fired →
+  automation + Slack; content.approved bridge; echo detection scoped to Relay-written fields; Telegram release on remove;
+  GBP Pub/Sub → pollChannel), sync-job revocation re-check, admin pages `/admin/{care,integrations,listening,ai}` +
+  `/admin/platform/care`, 14 MCP tools / 6 scopes (`mcp/tools-v35.ts`), UI polish. Remaining: full E2E, mobile/perf,
+  docs incl. `docs/v3-5/FINAL_ACTIVATION_CHECKLIST.md`. Its uncommitted files are snapshotted on `wip/streams`.
+- **If this session is gone:** `git checkout origin/wip/streams -- .` on top of main, then relaunch stream F with: read
+  `docs/v3-5-progress/STREAM_BRIEFING.md`, the F row of `docs/V3_5_WORKSTREAMS.md`, `docs/v3-5-progress/lead-notes.md`,
+  resume from `docs/v3-5-progress/final.md`. When F reports: verify (tsc, unit, integration, E2E stats in
+  `evidence/e2e/results.json`, secret scan), commit, then start **V4** (`docs/queue/03g_V4_PROMPT.md`).
+- **Dev environment:** Docker + infra via `docker compose -f infra/compose.yaml up -d` (after a container restart: `rm -f
+  /var/run/docker.pid; nohup dockerd &` first). Migrations 001–017, 019–032 applied and frozen; **next migration 033**
+  (reserved for F) then **034+** for V4. Web = production build on :3000, worker = `apps/worker/dist/main.mjs`; rebuild/
+  restart only under `flock -o .data/devserver-v2.lock …` and start servers with `3>&- 9>&-` (the old devserver.lock is
+  retired). E2E uses seeded workspaces (`pnpm db:seed:e2e`); demo seeds `scripts/seed-*-demo.ts`.
+- **Usage limits / restarts:** agents stop on usage limits and container restarts; resume them with SendMessage (same
+  session) or relaunch from their progress notes (new session). Nothing is lost: files stay on disk + wip/streams.
+- **Open user decisions:** Inbox in the phone bottom bar for inbox users (lead recommends replacing Planner for them);
+  main nav grouping (it is long now) — decide in the copy-cleanup pass; V3.1 Admin G-A1 / G-A5.
+- **Activation items collected so far** (final consolidated list comes after Docs + Help Centre): Meta App Review (inbox +
+  Instagram permissions, Human Agent; webhook fields), WhatsApp Business (verification, payment, templates), Google
+  Business Profile API approval (+ optional Pub/Sub), Cloud Translation billing project, app registrations for Asana /
+  monday.com / HubSpot / Slack / Mailchimp, YouTube force-ssl, Bluesky app password, HTTPS APP_BASE_URL (Telegram), Threads
+  review, X/LinkedIn/TikTok access, AI provider key + budgets, SMTP_URL + EMAIL_FROM, Platform on a separate restricted
+  host, worker restart after deploy.
+- **Known gaps carried forward:** `docs/V2_IMPLEMENTATION_GAPS.md`, `docs/V3_IMPLEMENTATION_GAPS.md`,
+  `docs/V3_1_IMPLEMENTATION_GAPS.md`, `docs/admin/IMPLEMENTATION_GAPS.md`, `docs/collaboration/IMPLEMENTATION_GAPS.md`,
+  `docs/v3-5/*` (planner payload, Zod in browser bundles, flags gate UI only, storage orphans, no follower data, TikTok
+  handoff download, lint, security.spec back-channel logout isolation).
+- Earlier milestones (Admin, Collaboration, V3.5 foundation) are summarised in the Queue section above.
 
 ## Uncommitted work (who owns what)
 Backup: branch `wip/streams` on GitHub is a snapshot of all uncommitted stream work (refreshed by the lead at each stop). In a new session, `git checkout origin/wip/streams -- .` restores it on top of `main`. Then re-launch the streams from their progress notes.
