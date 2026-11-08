@@ -1,0 +1,191 @@
+{
+ "at": "2026-11-08T13:51:22.705Z",
+ "base": "http://localhost:3000",
+ "note": "Production build on the shared dev host; Demo Workspace data; Chromium headless 1440 px.",
+ "rows": [
+  {
+   "screen": "marketing",
+   "run": "cold",
+   "dom_content_loaded_ms": 117,
+   "first_api_ms": null,
+   "settled_ms": 870,
+   "api_calls": 0,
+   "slowest_api": null
+  },
+  {
+   "screen": "marketing",
+   "run": "warm",
+   "dom_content_loaded_ms": 116,
+   "first_api_ms": null,
+   "settled_ms": 866,
+   "api_calls": 0,
+   "slowest_api": null
+  },
+  {
+   "screen": "marketing-signed-in",
+   "run": "cold",
+   "dom_content_loaded_ms": 131,
+   "first_api_ms": null,
+   "settled_ms": 962,
+   "api_calls": 0,
+   "slowest_api": null
+  },
+  {
+   "screen": "marketing-signed-in",
+   "run": "warm",
+   "dom_content_loaded_ms": 199,
+   "first_api_ms": null,
+   "settled_ms": 941,
+   "api_calls": 0,
+   "slowest_api": null
+  },
+  {
+   "screen": "signup-handoff",
+   "run": "cold",
+   "dom_content_loaded_ms": 70,
+   "first_api_ms": null,
+   "settled_ms": 746,
+   "api_calls": 0,
+   "slowest_api": null
+  },
+  {
+   "screen": "signup-handoff",
+   "run": "warm",
+   "dom_content_loaded_ms": 73,
+   "first_api_ms": null,
+   "settled_ms": 739,
+   "api_calls": 0,
+   "slowest_api": null
+  },
+  {
+   "screen": "assistant",
+   "run": "cold",
+   "dom_content_loaded_ms": 68,
+   "first_api_ms": 378,
+   "settled_ms": 1135,
+   "api_calls": 7,
+   "slowest_api": {
+    "u": "/api/assistant/workspace",
+    "at": 458,
+    "s": 200
+   }
+  },
+  {
+   "screen": "assistant",
+   "run": "warm",
+   "dom_content_loaded_ms": 91,
+   "first_api_ms": 381,
+   "settled_ms": 1144,
+   "api_calls": 7,
+   "slowest_api": {
+    "u": "/api/assistant/workspace",
+    "at": 445,
+    "s": 200
+   }
+  },
+  {
+   "screen": "admin-ai",
+   "run": "cold",
+   "dom_content_loaded_ms": 82,
+   "first_api_ms": 367,
+   "settled_ms": 1040,
+   "api_calls": 5,
+   "slowest_api": {
+    "u": "/api/automation/admin",
+    "at": 384,
+    "s": 200
+   }
+  },
+  {
+   "screen": "admin-ai",
+   "run": "warm",
+   "dom_content_loaded_ms": 96,
+   "first_api_ms": 316,
+   "settled_ms": 1025,
+   "api_calls": 5,
+   "slowest_api": {
+    "u": "/api/assistant/admin",
+    "at": 338,
+    "s": 200
+   }
+  },
+  {
+   "screen": "platform-marketing",
+   "run": "cold",
+   "dom_content_loaded_ms": 63,
+   "first_api_ms": 355,
+   "settled_ms": 1049,
+   "api_calls": 3,
+   "slowest_api": {
+    "u": "/api/feature-flags",
+    "at": 422,
+    "s": 200
+   }
+  },
+  {
+   "screen": "platform-marketing",
+   "run": "warm",
+   "dom_content_loaded_ms": 69,
+   "first_api_ms": 310,
+   "settled_ms": 916,
+   "api_calls": 3,
+   "slowest_api": {
+    "u": "/api/feature-flags",
+    "at": 311,
+    "s": 200
+   }
+  },
+  {
+   "screen": "platform-ai",
+   "run": "cold",
+   "dom_content_loaded_ms": 83,
+   "first_api_ms": 358,
+   "settled_ms": 968,
+   "api_calls": 3,
+   "slowest_api": {
+    "u": "/api/feature-flags",
+    "at": 359,
+    "s": 200
+   }
+  },
+  {
+   "screen": "platform-ai",
+   "run": "warm",
+   "dom_content_loaded_ms": 61,
+   "first_api_ms": 324,
+   "settled_ms": 944,
+   "api_calls": 3,
+   "slowest_api": {
+    "u": "/api/feature-flags",
+    "at": 339,
+    "s": 200
+   }
+  },
+  {
+   "screen": "platform-support-widget",
+   "run": "cold",
+   "dom_content_loaded_ms": 63,
+   "first_api_ms": 322,
+   "settled_ms": 987,
+   "api_calls": 5,
+   "slowest_api": {
+    "u": "/api/review/me",
+    "at": 337,
+    "s": 200
+   }
+  },
+  {
+   "screen": "platform-support-widget",
+   "run": "warm",
+   "dom_content_loaded_ms": 54,
+   "first_api_ms": 301,
+   "settled_ms": 966,
+   "api_calls": 5,
+   "slowest_api": {
+    "u": "/api/feature-flags",
+    "at": 311,
+    "s": 200
+   }
+  }
+ ]
+}

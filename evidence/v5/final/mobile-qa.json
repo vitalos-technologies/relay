@@ -1,0 +1,305 @@
+{
+ "at": "2026-11-08T13:49:58.270Z",
+ "widths": [
+  320,
+  360,
+  390,
+  430,
+  768,
+  1024,
+  1440
+ ],
+ "screens": [
+  "marketing",
+  "marketing-signed-in",
+  "signup-handoff",
+  "assistant",
+  "admin-ai",
+  "platform-marketing",
+  "platform-ai",
+  "platform-support-widget"
+ ],
+ "horizontal_scroll_issues": 0,
+ "rows": [
+  {
+   "screen": "marketing",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "marketing-signed-in",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "signup-handoff",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "assistant",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-ai",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-marketing",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-ai",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-support-widget",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "marketing",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "marketing-signed-in",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "signup-handoff",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "assistant",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-ai",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-marketing",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-ai",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-support-widget",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "marketing",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "marketing-signed-in",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "signup-handoff",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "assistant",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-ai",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-marketing",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-ai",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-support-widget",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "marketing",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "marketing-signed-in",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "signup-handoff",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "assistant",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-ai",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-marketing",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-ai",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-support-widget",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "marketing",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "marketing-signed-in",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "signup-handoff",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "assistant",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-ai",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-marketing",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-ai",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-support-widget",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "marketing",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "marketing-signed-in",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "signup-handoff",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "assistant",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-ai",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-marketing",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-ai",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-support-widget",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "marketing",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "marketing-signed-in",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "signup-handoff",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "assistant",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-ai",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-marketing",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-ai",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-support-widget",
+   "width": 1440,
+   "horizontal_scroll": false
+  }
+ ]
+}
