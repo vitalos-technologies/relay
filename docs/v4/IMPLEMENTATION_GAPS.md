@@ -26,4 +26,5 @@ What V4 does **not** do yet, and why. Lead (F4), 2026-11-08. External activation
 | `ai_workflows` feature | Defined in the catalogue; nothing to gate until V5's AI workspace. | V5 gates its multi-step runs with it. |
 | Staff AI usage | Not charged to the customer's AI budget; rate-limited per staff member and recorded in the platform audit. | Decision recorded; revisit if staff AI becomes costly. |
 | Workspace closure/deletion flow | Not in the V4 brief's scope; suspension ≠ cancellation is implemented and documented. | Tenant offboarding runbook + export-then-delete flow later. |
+| Phone E2E for approving/revoking support access | Covered by integration tests and the desktop E2E only. | Add an `@mobile` case to `v4-support.spec.ts`. |
 | Flaky integration test | `v31-analytics-summary` (pre-V4) occasionally fails under full-suite load and passes alone. | Investigate the time-window assumption in that test. |

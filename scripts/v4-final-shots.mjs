@@ -30,7 +30,7 @@ const one = async (sql, p = []) => (await db.query(sql, p)).rows[0] ?? null;
 const ws = (await one(`SELECT id FROM workspaces WHERE name='Demo Workspace' LIMIT 1`)).id;
 const billingWs = (await one(`SELECT id FROM workspaces WHERE name='E2E Billing' LIMIT 1`))?.id ?? ws;
 const ticket = await one(`SELECT reference FROM support_tickets ORDER BY created_at DESC LIMIT 1`);
-const myTicket = await one(`SELECT t.reference FROM support_tickets t JOIN users u ON u.id=t.requester_user_id WHERE u.email='owner@demo.social-lite.test' ORDER BY t.created_at DESC LIMIT 1`);
+const myTicket = await one(`SELECT t.reference FROM support_tickets t JOIN users u ON u.id=t.requester_user_id WHERE u.email='owner@demo.social-lite.test' AND t.workspace_id=$1 ORDER BY t.created_at DESC LIMIT 1`, [ws]);
 const tokens = [];
 async function session(email, workspaceId = ws) {
   const u = await one(`SELECT id FROM users WHERE email=$1`, [email]);

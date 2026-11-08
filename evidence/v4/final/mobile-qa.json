@@ -1,0 +1,521 @@
+{
+ "at": "2026-11-08T10:20:02.595Z",
+ "widths": [
+  320,
+  360,
+  390,
+  430,
+  768,
+  1024,
+  1440
+ ],
+ "screens": [
+  "help",
+  "help-contact",
+  "help-requests",
+  "settings-billing",
+  "admin-usage",
+  "admin-usage-legacy",
+  "signup",
+  "platform-support",
+  "platform-ticket",
+  "platform-saved-replies",
+  "platform-support-access",
+  "platform-billing",
+  "platform-plans",
+  "platform-workspace"
+ ],
+ "horizontal_scroll_issues": 0,
+ "rows": [
+  {
+   "screen": "help",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "help-contact",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "help-requests",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "settings-billing",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-usage",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-usage-legacy",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "signup",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-support",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-ticket",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-saved-replies",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-support-access",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-billing",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-plans",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-workspace",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "help",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "help-contact",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "help-requests",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "settings-billing",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-usage",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-usage-legacy",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "signup",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-support",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-ticket",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-saved-replies",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-support-access",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-billing",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-plans",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-workspace",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "help",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "help-contact",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "help-requests",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "settings-billing",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-usage",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-usage-legacy",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "signup",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-support",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-ticket",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-saved-replies",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-support-access",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-billing",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-plans",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-workspace",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "help",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "help-contact",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "help-requests",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "settings-billing",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-usage",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-usage-legacy",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "signup",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-support",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-ticket",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-saved-replies",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-support-access",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-billing",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-plans",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-workspace",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "help",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "help-contact",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "help-requests",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "settings-billing",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-usage",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-usage-legacy",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "signup",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-support",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-ticket",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-saved-replies",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-support-access",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-billing",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-plans",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-workspace",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "help",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "help-contact",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "help-requests",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "settings-billing",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-usage",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-usage-legacy",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "signup",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-support",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-ticket",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-saved-replies",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-support-access",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-billing",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-plans",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-workspace",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "help",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "help-contact",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "help-requests",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "settings-billing",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-usage",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-usage-legacy",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "signup",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-support",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-ticket",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-saved-replies",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-support-access",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-billing",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-plans",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-workspace",
+   "width": 1440,
+   "horizontal_scroll": false
+  }
+ ]
+}

@@ -1,0 +1,389 @@
+{
+ "at": "2026-11-08T10:17:32.320Z",
+ "base": "http://localhost:3000",
+ "note": "Production build on the shared dev host; Demo Workspace data; Chromium headless 1440 px.",
+ "rows": [
+  {
+   "screen": "help",
+   "run": "cold",
+   "dom_content_loaded_ms": 135,
+   "first_api_ms": 443,
+   "settled_ms": 1214,
+   "api_calls": 6,
+   "slowest_api": {
+    "u": "/api/support/requests?status=open&scope=mine",
+    "at": 558,
+    "s": 200
+   }
+  },
+  {
+   "screen": "help",
+   "run": "warm",
+   "dom_content_loaded_ms": 69,
+   "first_api_ms": 388,
+   "settled_ms": 1132,
+   "api_calls": 6,
+   "slowest_api": {
+    "u": "/api/support/requests?status=open&scope=mine",
+    "at": 499,
+    "s": 200
+   }
+  },
+  {
+   "screen": "help-contact",
+   "run": "cold",
+   "dom_content_loaded_ms": 69,
+   "first_api_ms": 327,
+   "settled_ms": 1018,
+   "api_calls": 6,
+   "slowest_api": {
+    "u": "/api/entitlements",
+    "at": 357,
+    "s": 200
+   }
+  },
+  {
+   "screen": "help-contact",
+   "run": "warm",
+   "dom_content_loaded_ms": 53,
+   "first_api_ms": 284,
+   "settled_ms": 985,
+   "api_calls": 6,
+   "slowest_api": {
+    "u": "/api/approvals?status=pending",
+    "at": 308,
+    "s": 200
+   }
+  },
+  {
+   "screen": "help-requests",
+   "run": "cold",
+   "dom_content_loaded_ms": 82,
+   "first_api_ms": 363,
+   "settled_ms": 1052,
+   "api_calls": 6,
+   "slowest_api": {
+    "u": "/api/entitlements",
+    "at": 374,
+    "s": 200
+   }
+  },
+  {
+   "screen": "help-requests",
+   "run": "warm",
+   "dom_content_loaded_ms": 83,
+   "first_api_ms": 296,
+   "settled_ms": 1022,
+   "api_calls": 6,
+   "slowest_api": {
+    "u": "/api/entitlements",
+    "at": 317,
+    "s": 200
+   }
+  },
+  {
+   "screen": "help-request",
+   "run": "cold",
+   "dom_content_loaded_ms": 67,
+   "first_api_ms": 356,
+   "settled_ms": 1128,
+   "api_calls": 6,
+   "slowest_api": {
+    "u": "/api/entitlements",
+    "at": 368,
+    "s": 200
+   }
+  },
+  {
+   "screen": "help-request",
+   "run": "warm",
+   "dom_content_loaded_ms": 50,
+   "first_api_ms": 298,
+   "settled_ms": 995,
+   "api_calls": 6,
+   "slowest_api": {
+    "u": "/api/entitlements",
+    "at": 336,
+    "s": 200
+   }
+  },
+  {
+   "screen": "settings-billing",
+   "run": "cold",
+   "dom_content_loaded_ms": 70,
+   "first_api_ms": 365,
+   "settled_ms": 1193,
+   "api_calls": 9,
+   "slowest_api": {
+    "u": "/api/billing",
+    "at": 610,
+    "s": 200
+   }
+  },
+  {
+   "screen": "settings-billing",
+   "run": "warm",
+   "dom_content_loaded_ms": 72,
+   "first_api_ms": 330,
+   "settled_ms": 1133,
+   "api_calls": 7,
+   "slowest_api": {
+    "u": "/api/entitlements",
+    "at": 451,
+    "s": 200
+   }
+  },
+  {
+   "screen": "admin-usage",
+   "run": "cold",
+   "dom_content_loaded_ms": 60,
+   "first_api_ms": 326,
+   "settled_ms": 988,
+   "api_calls": 6,
+   "slowest_api": {
+    "u": "/api/entitlements/selections",
+    "at": 450,
+    "s": 200
+   }
+  },
+  {
+   "screen": "admin-usage",
+   "run": "warm",
+   "dom_content_loaded_ms": 59,
+   "first_api_ms": 250,
+   "settled_ms": 910,
+   "api_calls": 6,
+   "slowest_api": {
+    "u": "/api/entitlements/selections",
+    "at": 377,
+    "s": 200
+   }
+  },
+  {
+   "screen": "admin-usage-legacy",
+   "run": "cold",
+   "dom_content_loaded_ms": 69,
+   "first_api_ms": 354,
+   "settled_ms": 1004,
+   "api_calls": 6,
+   "slowest_api": {
+    "u": "/api/entitlements/selections",
+    "at": 469,
+    "s": 200
+   }
+  },
+  {
+   "screen": "admin-usage-legacy",
+   "run": "warm",
+   "dom_content_loaded_ms": 81,
+   "first_api_ms": 313,
+   "settled_ms": 994,
+   "api_calls": 6,
+   "slowest_api": {
+    "u": "/api/entitlements/selections",
+    "at": 458,
+    "s": 200
+   }
+  },
+  {
+   "screen": "signup",
+   "run": "cold",
+   "dom_content_loaded_ms": 77,
+   "first_api_ms": null,
+   "settled_ms": 713,
+   "api_calls": 0,
+   "slowest_api": null
+  },
+  {
+   "screen": "signup",
+   "run": "warm",
+   "dom_content_loaded_ms": 73,
+   "first_api_ms": null,
+   "settled_ms": 718,
+   "api_calls": 0,
+   "slowest_api": null
+  },
+  {
+   "screen": "platform-support",
+   "run": "cold",
+   "dom_content_loaded_ms": 76,
+   "first_api_ms": 345,
+   "settled_ms": 987,
+   "api_calls": 5,
+   "slowest_api": {
+    "u": "/api/platform/support/notifications",
+    "at": 346,
+    "s": 200
+   }
+  },
+  {
+   "screen": "platform-support",
+   "run": "warm",
+   "dom_content_loaded_ms": 83,
+   "first_api_ms": 291,
+   "settled_ms": 963,
+   "api_calls": 5,
+   "slowest_api": {
+    "u": "/api/platform/support/events?after=0",
+    "at": 293,
+    "s": 200
+   }
+  },
+  {
+   "screen": "platform-ticket",
+   "run": "cold",
+   "dom_content_loaded_ms": 60,
+   "first_api_ms": 322,
+   "settled_ms": 959,
+   "api_calls": 7,
+   "slowest_api": {
+    "u": "/api/platform/support/tickets/RLY-479183/ai",
+    "at": 412,
+    "s": 200
+   }
+  },
+  {
+   "screen": "platform-ticket",
+   "run": "warm",
+   "dom_content_loaded_ms": 79,
+   "first_api_ms": 310,
+   "settled_ms": 942,
+   "api_calls": 7,
+   "slowest_api": {
+    "u": "/api/platform/support/tickets/RLY-479183/ai",
+    "at": 407,
+    "s": 200
+   }
+  },
+  {
+   "screen": "platform-saved-replies",
+   "run": "cold",
+   "dom_content_loaded_ms": 62,
+   "first_api_ms": 319,
+   "settled_ms": 879,
+   "api_calls": 3,
+   "slowest_api": {
+    "u": "/api/feature-flags",
+    "at": 331,
+    "s": 200
+   }
+  },
+  {
+   "screen": "platform-saved-replies",
+   "run": "warm",
+   "dom_content_loaded_ms": 82,
+   "first_api_ms": 304,
+   "settled_ms": 872,
+   "api_calls": 3,
+   "slowest_api": {
+    "u": "/api/platform/support/saved-replies",
+    "at": 304,
+    "s": 200
+   }
+  },
+  {
+   "screen": "platform-support-access",
+   "run": "cold",
+   "dom_content_loaded_ms": 57,
+   "first_api_ms": 292,
+   "settled_ms": 884,
+   "api_calls": 3,
+   "slowest_api": {
+    "u": "/api/review/me",
+    "at": 292,
+    "s": 200
+   }
+  },
+  {
+   "screen": "platform-support-access",
+   "run": "warm",
+   "dom_content_loaded_ms": 81,
+   "first_api_ms": 274,
+   "settled_ms": 885,
+   "api_calls": 3,
+   "slowest_api": {
+    "u": "/api/feature-flags",
+    "at": 279,
+    "s": 200
+   }
+  },
+  {
+   "screen": "platform-billing",
+   "run": "cold",
+   "dom_content_loaded_ms": 64,
+   "first_api_ms": 314,
+   "settled_ms": 940,
+   "api_calls": 3,
+   "slowest_api": {
+    "u": "/api/feature-flags",
+    "at": 321,
+    "s": 200
+   }
+  },
+  {
+   "screen": "platform-billing",
+   "run": "warm",
+   "dom_content_loaded_ms": 65,
+   "first_api_ms": 284,
+   "settled_ms": 899,
+   "api_calls": 3,
+   "slowest_api": {
+    "u": "/api/feature-flags",
+    "at": 296,
+    "s": 200
+   }
+  },
+  {
+   "screen": "platform-plans",
+   "run": "cold",
+   "dom_content_loaded_ms": 85,
+   "first_api_ms": 335,
+   "settled_ms": 910,
+   "api_calls": 3,
+   "slowest_api": {
+    "u": "/api/feature-flags",
+    "at": 336,
+    "s": 200
+   }
+  },
+  {
+   "screen": "platform-plans",
+   "run": "warm",
+   "dom_content_loaded_ms": 80,
+   "first_api_ms": 301,
+   "settled_ms": 878,
+   "api_calls": 3,
+   "slowest_api": {
+    "u": "/api/review/me",
+    "at": 306,
+    "s": 200
+   }
+  },
+  {
+   "screen": "platform-workspace",
+   "run": "cold",
+   "dom_content_loaded_ms": 68,
+   "first_api_ms": 341,
+   "settled_ms": 977,
+   "api_calls": 5,
+   "slowest_api": {
+    "u": "/api/platform/entitlements/aebfecac-6258-4932-88a9-0a521b2fc58d",
+    "at": 450,
+    "s": 200
+   }
+  },
+  {
+   "screen": "platform-workspace",
+   "run": "warm",
+   "dom_content_loaded_ms": 72,
+   "first_api_ms": 318,
+   "settled_ms": 1000,
+   "api_calls": 5,
+   "slowest_api": {
+    "u": "/api/platform/entitlements/aebfecac-6258-4932-88a9-0a521b2fc58d",
+    "at": 426,
+    "s": 200
+   }
+  }
+ ]
+}
