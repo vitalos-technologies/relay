@@ -17,6 +17,7 @@ import {
 import { AgendaItem, DestinationDots, OwnerMeta } from '@/components/planner/agenda-item';
 import { RescheduleDialog, type RescheduleResult } from '@/components/planner/reschedule-dialog';
 import { PostDrawer } from '@/components/planner/post-drawer';
+import { AssistantButton } from '@/components/assistant/assistant-panel'; // V3.5 stream E
 import { BulkBar, useSelection, type Selection } from '@/components/bulk/bulk';
 import { useFlag } from '@/lib/client/flags';
 
@@ -243,6 +244,7 @@ export default function PlannerPage() {
         title="Planner"
         meta={<span className="truncate">{viewTz.replace(/_/g, ' ')} · {zoneAbbr(new Date(), viewTz)}</span>}
         actions={<>
+          <AssistantButton surface="planner" size="md" brandId={brand || null} />
           {queueOn ? <LinkButton href={withBrand('/queue')} variant="ghost" icon={<ListOrdered aria-hidden className="size-4" />}>Queue</LinkButton> : null}
           {can('history.read') ? <LinkButton href={withBrand('/history')} variant="ghost" icon={<FileClock aria-hidden className="size-4" />}>History</LinkButton> : null}
           {can('drafts.edit') && session.brands.length ? <LinkButton href={withBrand('/compose')} variant="primary" icon={<Plus aria-hidden className="size-4" />}>Create post</LinkButton> : null}

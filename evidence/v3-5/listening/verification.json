@@ -1,0 +1,14 @@
+{
+  "date": "2026-11-08",
+  "unit": { "file": "tests/unit/v35-listening.test.ts", "passed": 7, "suite_total": "559/559 (pnpm test)" },
+  "integration": { "file": "tests/integration/v35-listening.test.ts", "passed": 10, "with_v35_inbox": "18/18" },
+  "e2e": { "file": "tests/e2e/listening.spec.ts", "desktop": "2 passed", "mobile": "1 passed (Pixel 7)", "skipped": "1 (desktop project skips @mobile)" },
+  "mobile_qa": { "widths": [320, 360, 390, 430, 768, 1024, 1440], "screens": 10, "horizontal_scroll_issues": 0 },
+  "load_20k_mentions_ms": { "timeline_30d": "73-294 (first call)", "sentiment_30d": 42, "topics_30d": 71, "mentions_page": 51, "mentions_text_search": 55 },
+  "acceptance": {
+    "AT10": "integration 'AT10 …' + E2E 'AT10 …': alert evidence = the exact simulated comments (real stored inbox messages), coverage snapshot (sources, monitoring start, query version, simulated)",
+    "AT12": "integration 'AT12 + isolation': revoked grants ⇒ reads rejected immediately; alert notification not delivered; brand/tenant/permission scoping",
+    "AT13": "integration 'honest metrics': failing channel ⇒ state 'incomplete' with the reason, never 'no matches'; not collected ≠ zero",
+    "AT15": "E2E @mobile 'phone: inspect a listening alert and create a task' + mobile QA 0 overflow"
+  }
+}

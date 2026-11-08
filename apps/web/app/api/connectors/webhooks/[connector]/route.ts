@@ -2,6 +2,8 @@
 // (Slack/HubSpot signed timestamps, Asana hook secret, monday JWT, Mailchimp URL key, WhatsApp X-Hub-Signature-256),
 // persisted + deduplicated, then acknowledged. Unverified requests are never stored; missing secrets answer 412.
 import { ingestIntegrationWebhook } from '@social-lite/services/connectors/index';
+// Stream C: registers the GBP Pub/Sub (OIDC) and Mailchimp (signature / URL key) verifiers in this process.
+import '@social-lite/services/integrations-v35/index';
 import { publicRoute } from '@/lib/api';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';

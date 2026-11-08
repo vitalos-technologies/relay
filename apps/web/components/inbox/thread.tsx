@@ -4,7 +4,7 @@
 // Send-once: one idempotency key per send action; the server re-checks the thread version and answers 409 with what
 // changed — the agent reviews, then explicitly sends anyway. Drafts are kept per conversation (browser + server).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlarmClock, ArrowLeft, CheckCircle2, ChevronDown, Info, MoreHorizontal, RotateCcw, ShieldAlert, UserRound, Users } from 'lucide-react';
+import { AlarmClock, ArrowLeft, CheckCircle2, ChevronDown, Eye, EyeOff, Info, MoreHorizontal, Paperclip, RotateCcw, ShieldAlert, Trash2, UserRound, Users } from 'lucide-react';
 import type { ConversationDetail, PersonRef, ReplyAttemptDto, ReplyMode, ThreadChangedDetails } from '@social-lite/core/contracts/v35-inbox';
 import { api, isApiError } from '@/lib/client/api';
 import { useApi } from '@/lib/client/use-api';
@@ -12,7 +12,13 @@ import { useSession } from '@/lib/client/session';
 import { Badge, Banner, Button, IconButton, Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger, SimulatedBadge, useToast } from '@/components/ui';
 import { ConversationComposer, type ComposerMode } from '@/components/conversation/composer';
 import { ConversationTimeline, type TimelineEntryView } from '@/components/conversation/timeline';
-import { ATTEMPT_LABEL, CHANNEL_LABEL, KIND_LABEL, MODE_LABEL, STATUS_LABEL, newKey } from './labels';
+import { AssistantButton } from '@/components/assistant/assistant-panel'; // V3.5 stream E
+import { ATTEMPT_LABEL, CHANNEL_LABEL, KIND_LABEL, MODE_LABEL, STATUS_LABEL, newKey, windowLabel } from './labels';
+import { WhatsAppTemplateButton } from './whatsapp-template-dialog';   // stream B
+import { INBOX_CHANGED } from './realtime-stream';
+
+const moderate = (messageId: string, action: 'hide' | 'unhide' | 'delete_own') => api.post<{ state: 'done' | 'failed'; message: string | null }>(`/api/inbox/messages/${messageId}/moderate`, { action })
+  .then((r) => { if (r.state === 'failed') throw new Error(r.message ?? 'The network refused this action.'); return r; });
 
 type Mode = ReplyMode | 'note';
 const DRAFT_KEY = (id: string) => `relay.inbox.draft.${id}`;
@@ -31,12 +37,13 @@ export function InboxThread({ id, onBack, onDetails, onChanged }: { id: string; 
   const { session } = useSession();
   const me = session.user?.id;
   const { data: c, error, refetch } = useApi<ConversationDetail>(`/api/inbox/conversations/${id}`, { poll: 8_000 });
-  const assignees = useApi<{ items: PersonRef[] }>(c?.reply.can_assign ? `/api/inbox/conversations/${id}/assignees` : null);
+  const assignees = useApi<{ items: PersonRef[] }>(c ? `/api/inbox/conversations/${id}/assignees` : null);
   const [mode, setMode] = useState<Mode>('private_message');
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
   const [conflict, setConflict] = useState<(ThreadChangedDetails & { message: string; reason: string }) | null>(null);
   const sendKey = useRef<string | null>(null);
+  const [noteMentions, setNoteMentions] = useState<string[]>([]);   // stream B: @mentions in internal notes
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
   // The thread version the agent was looking at when they STARTED writing (not the latest poll): a reply that lands while
   // they type must stop their send and be reviewed, even though polling already shows it.
@@ -69,6 +76,13 @@ export function InboxThread({ id, onBack, onDetails, onChanged }: { id: string; 
     return () => clearInterval(t);
   }, [id, !!body.trim()]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Stream B: realtime — refetch when the inbox stream reports a change on this conversation.
+  useEffect(() => {
+    const on = (e: Event) => { if ((e as CustomEvent<string | null>).detail === id) void refetch(); };
+    window.addEventListener(INBOX_CHANGED, on);
+    return () => window.removeEventListener(INBOX_CHANGED, on);
+  }, [id, refetch]);
+
   const act = useCallback(async (fn: () => Promise<unknown>, ok?: string) => {
     try { await fn(); if (ok) toast.success(ok); await refetch(); onChanged(); } catch (e) { toast.error(e); }
   }, [refetch, onChanged, toast]);
@@ -78,7 +92,8 @@ export function InboxThread({ id, onBack, onDetails, onChanged }: { id: string; 
     setBusy(true);
     try {
       if (mode === 'note') {
-        await api.post(`/api/inbox/conversations/${id}/notes`, { body });
+        await api.post(`/api/inbox/conversations/${id}/notes`, { body, mentions: noteMentions });
+        setNoteMentions([]);
         toast.success('Note added');
       } else {
         sendKey.current ??= newKey();
@@ -102,7 +117,7 @@ export function InboxThread({ id, onBack, onDetails, onChanged }: { id: string; 
         toast.error(e, 'Not sent');
       }
     } finally { setBusy(false); }
-  }, [c, body, mode, id, refetch, onChanged, toast, composeBase]);
+  }, [c, body, mode, id, refetch, onChanged, toast, composeBase, noteMentions]);
 
   const entries = useMemo<TimelineEntryView[]>(() => {
     if (!c) return [];
@@ -110,8 +125,34 @@ export function InboxThread({ id, onBack, onDetails, onChanged }: { id: string; 
       if (t.type === 'message') {
         const m = t.message;
         const sim = c.channel.is_simulated ? ' (simulated)' : '';
-        const meta = m.direction === 'outbound' ? <span>· {m.delivery === 'read' ? 'Read' : m.delivery === 'delivered' ? 'Delivered' : 'Sent'}{sim}</span> : undefined;
-        return { key: `m${m.id}`, kind: 'message', side: m.direction === 'inbound' ? 'them' : 'us', author: m.author.name ?? (m.direction === 'inbound' ? c.contact.name ?? 'Customer' : 'Outside Relay'), body: m.body, at: m.at, meta, edited: !!m.edited_at, deleted: !!m.deleted_at, attachments: m.attachments.map((a) => a.name ?? a.type) };
+        const meta = m.direction === 'outbound' ? <span>· {m.failed ? <span className="text-danger">Not delivered: {m.failed}</span> : m.delivery === 'read' ? 'Read' : m.delivery === 'delivered' ? 'Delivered' : 'Sent'}{sim}{m.pricing ? ` · ${m.pricing.billable ? `charged (${m.pricing.category ?? 'template'})` : 'free'}` : ''}</span> : undefined;
+        // Stream B: rating, moderation state, safe attachment downloads, permitted moderation actions.
+        const header = m.rating || m.hidden || m.removed ? (
+          <span className="flex flex-wrap items-center gap-1.5 text-xs">
+            {m.rating ? <span aria-label={`${m.rating} out of 5 stars`} className="tracking-wider text-[var(--warn)]">{'★'.repeat(m.rating)}<span className="text-subtle">{'★'.repeat(5 - m.rating)}</span></span> : null}
+            {m.hidden ? <Badge tone="neutral" className="h-5 px-1.5 text-[11px]">Hidden</Badge> : null}
+            {m.removed ? <Badge tone="neutral" className="h-5 px-1.5 text-[11px]">Deleted by you</Badge> : null}
+          </span>
+        ) : undefined;
+        const attachments = m.attachments.map((a, i) => {
+          const label = a.name ?? a.type;
+          const st = m.attachment_state?.[i];
+          return st === 'available' || st === 'stored'
+            ? <a key={i} href={`/api/inbox/messages/${m.id}/attachments/${i}`} download className="inline-flex items-center gap-1 underline underline-offset-2 hover:text-fg"><Paperclip aria-hidden className="size-3" />{label}</a>
+            : <span key={i} className="inline-flex items-center gap-1" title={st === 'blocked' ? 'Not downloadable (type or host not allowed)' : 'The network does not provide this file'}><Paperclip aria-hidden className="size-3" />{label}</span>;
+        });
+        const mod = m.moderation ?? [];
+        const actions = mod.length ? (
+          <Menu>
+            <MenuTrigger asChild><button type="button" className="rounded px-1 text-muted hover:bg-raised hover:text-fg" aria-label="Moderate this message"><MoreHorizontal aria-hidden className="size-3.5" /></button></MenuTrigger>
+            <MenuContent>
+              {mod.includes('hide') ? <MenuItem icon={<EyeOff aria-hidden className="size-4" />} onSelect={() => act(() => moderate(m.id, 'hide'), 'Hidden')}>Hide on {CHANNEL_LABEL[c.channel.kind]}</MenuItem> : null}
+              {mod.includes('unhide') ? <MenuItem icon={<Eye aria-hidden className="size-4" />} onSelect={() => act(() => moderate(m.id, 'unhide'), 'Visible again')}>Unhide</MenuItem> : null}
+              {mod.includes('delete_own') ? <MenuItem icon={<Trash2 aria-hidden className="size-4" />} onSelect={() => { if (window.confirm(c.kind === 'review' ? 'Delete your owner reply? The customer’s review stays.' : 'Delete your reply on the network?')) void act(() => moderate(m.id, 'delete_own'), 'Deleted'); }}>{c.kind === 'review' ? 'Delete owner reply' : 'Delete my reply'}</MenuItem> : null}
+            </MenuContent>
+          </Menu>
+        ) : undefined;
+        return { key: `m${m.id}`, kind: 'message', side: m.direction === 'inbound' ? 'them' : 'us', author: m.author.name ?? (m.direction === 'inbound' ? c.contact.name ?? 'Customer' : 'Outside Relay'), body: m.body, at: m.at, meta, edited: !!m.edited_at, deleted: !!m.deleted_at, attachments, header, actions, muted: !!m.removed };
       }
       if (t.type === 'note') return { key: `n${t.note.id}`, kind: 'note', author: personName(t.note.author), body: t.note.body, at: t.at };
       if (t.type === 'attempt') {
@@ -147,7 +188,9 @@ export function InboxThread({ id, onBack, onDetails, onChanged }: { id: string; 
   if (!c) return <div className="p-6 text-[13px] text-muted">Loading…</div>;
 
   const modes: Array<ComposerMode<Mode>> = [
-    ...c.reply.modes.filter((m) => m.allowed || (c.kind === 'dm' ? m.mode === 'private_message' : true))
+    // Show a disabled mode only where it can exist (DMs; private replies to Facebook/Instagram comments). Stream B: reviews,
+    // YouTube/Threads/Bluesky/Telegram group replies are public only, so the private mode is not offered at all.
+    ...c.reply.modes.filter((m) => m.allowed || (c.kind === 'dm' ? m.mode === 'private_message' : c.kind === 'comment' && (c.channel.kind === 'facebook_page' || c.channel.kind === 'instagram')))
       .map((m) => ({ value: m.mode as Mode, label: MODE_LABEL[m.mode], audience: m.mode === 'public_reply' ? 'public' as const : 'private' as const, disabled: !m.allowed || !c.reply.can_reply, reason: !c.reply.can_reply ? 'You can read but not reply here.' : m.reason })),
     { value: 'note', label: 'Internal note', audience: 'internal' },
   ];
@@ -213,6 +256,12 @@ export function InboxThread({ id, onBack, onDetails, onChanged }: { id: string; 
       <div className="sticky bottom-[calc(64px+env(safe-area-inset-bottom))] border-t border-border bg-surface px-3 py-3 sm:px-4 md:static">
         <ConversationComposer modes={modes} mode={mode} onModeChange={setMode} body={body} onBodyChange={(v) => { if (!body.trim() && v.trim()) setComposeBase(c.version); if (!v.trim()) setComposeBase(null); setBody(v); }}
           busy={busy} onSubmit={() => void send()}
+          toolbar={<span className="flex items-center gap-1">
+            {c.channel.kind === 'whatsapp' && mode !== 'note' ? <WhatsAppTemplateButton channelId={c.channel.id} conversationId={id} baseVersion={composeBase ?? c.version} windowOpen={!!c.reply.modes.find((m) => m.mode === 'private_message')?.allowed} disabled={!c.reply.can_reply} onSent={() => { void refetch(); onChanged(); }} /> : null}
+            <AssistantButton surface="inbox" context={{ type: 'conversation', id }} onUseText={(t) => { if (!body.trim()) setComposeBase(c.version); setBody(t); }} />
+          </span>}
+          mentions={{ options: (assignees.data?.items ?? []).filter((p) => p.id !== me).map((p) => ({ id: p.id, label: personName(p) })), onChange: setNoteMentions }}
+          footnote={mode !== 'note' ? windowLabel(c.reply.modes.find((m) => m.mode === mode)?.window_ends_at ?? null, c.channel.kind) : null}
           banner={conflict ? (
             <Banner tone="warn" title={conflict.reason === 'reply_collision' ? 'Someone else replied' : 'New messages arrived'}>
               <ul className="mt-1 text-[13px]">

@@ -4,6 +4,7 @@
 // private reply to the same comment answers code 10 / subcode 2018108.
 import type { HttpResponse } from '@social-lite/core';
 import { json, lostResponse, type FakeEnv, type MockObject } from '../transport/mock.js';
+import { instagramInboxFake } from './inbox-instagram-fake.js';
 
 const DAY = 86_400_000;
 
@@ -37,6 +38,7 @@ async function put(env: FakeEnv, objectId: string, kind: string, data: Record<st
 
 /** Messenger/comment routes; returns null when the request is not an inbox route. */
 export async function metaInboxFake(method: string, segments: string[], params: URLSearchParams, env: FakeEnv): Promise<HttpResponse | null> {
+  if (env.provider === 'instagram') return instagramInboxFake(method, segments, params, env);   // stream B
   if (env.provider !== 'facebook') return null;
   const pageId = env.accountId;
   const [first, edge] = segments;
@@ -76,6 +78,20 @@ export async function metaInboxFake(method: string, segments: string[], params: 
       return json(200, { recipient_id: psid, message_id: mid });
     }
     return gerr(400, 100, '(#100) recipient is required');
+  }
+
+  // Stream B moderation: POST /{comment-id}?is_hidden=true|false · DELETE /{comment-id} (the Page's own reply)
+  if (first && first.startsWith('mock_c_') && !edge && (method === 'POST' || method === 'DELETE')) {
+    const c = await env.store.get('facebook', first);
+    if (!c || c.kind !== 'inbox_comment' || c.accountId !== pageId) return gerr(400, 100, '(#100) Unsupported request. Object does not exist', 33);
+    if (env.scenario === 'missing_permission') return gerr(403, 200, '(#200) Requires pages_manage_engagement');
+    if (method === 'DELETE') {
+      if (c.data.from_id !== pageId) return gerr(403, 200, '(#200) Users can only delete their own comments');
+      await put(env, first, 'inbox_comment', { ...c.data, deleted: true });
+      return json(200, { success: true });
+    }
+    await put(env, first, 'inbox_comment', { ...c.data, hidden: params.get('is_hidden') === 'true' });
+    return json(200, { success: true });
   }
 
   // /{comment-id}/comments — reply to / list replies of a simulated comment

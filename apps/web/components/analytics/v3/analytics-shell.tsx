@@ -7,13 +7,16 @@ import { api } from '@/lib/client/api';
 import { useSession } from '@/lib/client/session';
 import { Button, EmptyState, Menu, MenuContent, MenuItem, MenuTrigger, PageHeader, useToast } from '@/components/ui';
 import { AnalyticsTabs, useAnalyticsQuery } from './shared';
+import { AssistantButton } from '@/components/assistant/assistant-panel'; // V3.5 stream E
+import { useBrandFilter } from '@/lib/client/hooks';
 
 export function AnalyticsShell({ children }: { children: ReactNode }) {
   const { canV2 } = useSession();
+  const [brand] = useBrandFilter();
   if (!canV2('analytics.read')) return <><PageHeader title="Analytics" /><EmptyState icon={<ChartColumn aria-hidden />} title="No access" /></>;
   return (
     <>
-      <PageHeader title="Analytics" actions={canV2('exports.create') ? <ExportMenu /> : null} />
+      <PageHeader title="Analytics" actions={<><AssistantButton surface="analytics" size="md" brandId={brand || null} />{canV2('exports.create') ? <ExportMenu /> : null}</>} />
       <AnalyticsTabs />
       {children}
     </>

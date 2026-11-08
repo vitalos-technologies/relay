@@ -11,6 +11,7 @@ import { getInboxAdapter } from '@social-lite/providers';
 import { getPool, many, maybeOne, one, withTx, type Queryable } from '@social-lite/db';
 import { writeOutbox } from '../outbox.js';
 import { onBusinessReply, onCustomerMessage } from './cases.js';
+import { recordCsatResponse } from './csat.js';
 import { clipPreview, inboxEvent, type ChannelRow, type ConversationRow } from './shared.js';
 
 export interface IngestResult { messages: number; duplicates: number; edits: number; deletes: number; receipts: number; unrouted: number }
@@ -23,7 +24,8 @@ export async function ingestProviderPayload(kind: ChannelKind, body: unknown, op
   return ingestItems(kind, adapter.parseWebhook(body), opts);
 }
 
-export async function ingestItems(kind: ChannelKind, items: InboundItem[], opts: { simulated: boolean }): Promise<IngestResult> {
+/** opts.channelId (stream B, polling): deliver only to the channel that was polled (never to other workspaces). */
+export async function ingestItems(kind: ChannelKind, items: InboundItem[], opts: { simulated: boolean; channelId?: string }): Promise<IngestResult> {
   const res: IngestResult = { messages: 0, duplicates: 0, edits: 0, deletes: 0, receipts: 0, unrouted: 0 };
   const channelCache = new Map<string, ChannelRow[]>();
   for (const item of items) {
@@ -32,6 +34,7 @@ export async function ingestItems(kind: ChannelKind, items: InboundItem[], opts:
       chans = await many<ChannelRow>(getPool(), `SELECT * FROM inbox_channels WHERE kind=$1 AND external_account_id=$2 AND disconnected_at IS NULL AND is_simulated=$3`, [kind, item.accountId, opts.simulated]);
       channelCache.set(item.accountId, chans);
     }
+    if (opts.channelId) chans = chans.filter((c) => c.id === opts.channelId);
     if (!chans.length) { res.unrouted++; continue; }
     for (const ch of chans) {
       if (item.type === 'message') {
@@ -71,9 +74,9 @@ async function ingestMessage(tx: Queryable, ch: ChannelRow, m: Extract<InboundIt
     [ch.workspace_id, ch.brand_id, ch.id, m.conversationKind satisfies ConversationKind, visibility, m.threadKey.slice(0, 300), contactId, m.relatedPostExternalId, m.subject, at, ch.is_simulated]);
   await tx.query(`SELECT 1 FROM inbox_conversations WHERE id=$1 FOR UPDATE`, [conv.id]);
   const ins = await maybeOne<{ id: string }>(tx,
-    `INSERT INTO inbox_messages(workspace_id, conversation_id, channel_id, direction, external_id, parent_external_id, author_contact_id, body, attachments, provider_created_at, delivery_state, is_simulated)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT (channel_id, external_id) WHERE external_id IS NOT NULL DO NOTHING RETURNING id`,
-    [ch.workspace_id, conv.id, ch.id, m.direction, m.externalId.slice(0, 300), m.parentExternalId, contactId, m.text, JSON.stringify(m.attachments), at, inbound ? null : 'sent', ch.is_simulated]);
+    `INSERT INTO inbox_messages(workspace_id, conversation_id, channel_id, direction, external_id, parent_external_id, author_contact_id, body, attachments, provider_created_at, delivery_state, is_simulated, meta)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT (channel_id, external_id) WHERE external_id IS NOT NULL DO NOTHING RETURNING id`,
+    [ch.workspace_id, conv.id, ch.id, m.direction, m.externalId.slice(0, 300), m.parentExternalId, contactId, m.text, JSON.stringify(m.attachments), at, inbound ? null : 'sent', ch.is_simulated, JSON.stringify(m.meta ?? {})]);
   if (!ins) return 'duplicate';
   const newest = at >= conv.last_message_at;
   if (inbound) {
@@ -86,6 +89,7 @@ async function ingestMessage(tx: Queryable, ch: ChannelRow, m: Extract<InboundIt
       [conv.id, at, newest, clipPreview(m.text), reopen]);
     await tx.query(`UPDATE inbox_messages SET conv_version=(SELECT version FROM inbox_conversations WHERE id=$2) WHERE id=$1`, [ins.id, conv.id]);
     if (conv.case_id) await onCustomerMessage(tx, conv.case_id, at);
+    await recordCsatResponse(tx, conv.id, ins.id, m.text, at);   // stream B: only an explicit 1–5 answer to an open request
     await inboxEvent(tx, { workspaceId: ch.workspace_id, conversationId: conv.id, brandId: ch.brand_id, kind: 'message.received', data: { message_id: ins.id, reopened: reopen } });
     await writeOutbox(tx, { workspaceId: ch.workspace_id, aggregateType: 'inbox_conversation', aggregateId: conv.id, eventType: 'inbox.message_received', payload: { messageId: ins.id, channelId: ch.id, kind: m.conversationKind } });
     await tx.query(`UPDATE inbox_channels SET last_inbound_at=greatest(coalesce(last_inbound_at, $2), $2) WHERE id=$1`, [ch.id, at]);

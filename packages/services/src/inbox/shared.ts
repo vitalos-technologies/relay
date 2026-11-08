@@ -12,6 +12,8 @@ export interface ChannelRow {
   external_account_id: string; display_name: string; is_simulated: boolean; status: 'active' | 'needs_permission' | 'paused' | 'disconnected' | 'error';
   status_detail: string | null; missing_permissions: string[]; enabled_types: ConversationKind[]; last_inbound_at: Date | null; last_sync_at: Date | null;
   created_by: string | null; created_at: Date; updated_at: Date; disconnected_at: Date | null;
+  /** Stream B (029): non-secret channel settings; secret_enc holds the encrypted per-channel secret (never returned). */
+  settings: Record<string, unknown>; secret_enc?: unknown;
 }
 
 export interface ConversationRow {

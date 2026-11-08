@@ -51,6 +51,16 @@ export interface InboxChannelJson {
   capability: ChannelCapability;
   last_inbound_at: string | null;
   last_sync_at: string | null;
+  /** Stream B: safe, non-secret settings summary (Telegram update ownership, CSAT, WhatsApp templates/rates, polling). */
+  options?: ChannelOptions;
+}
+
+export interface ChannelOptions {
+  telegram?: { owner: 'relay' | 'external' | 'none' | 'unknown'; external_host: string | null; checked_at: string | null; pending: number | null };
+  csat_enabled?: boolean;
+  templates?: { count: number; refreshed_at: string | null };
+  rates?: Record<string, { amount: number; currency: string }> | null;
+  poll?: { last_run_at: string | null; last_success_at: string | null; last_error: string | null } | null;
 }
 
 // ------------------------------------------------------------------ provider adapter
@@ -70,6 +80,8 @@ export type InboundItem =
       occurredAt: string;
       relatedPostExternalId: string | null;
       subject: string | null;
+      /** Stream B: provider references needed later (e.g. Bluesky uri/cid, review rating, Telegram chat type). Never secrets. */
+      meta?: Record<string, unknown>;
     }
   | { type: 'edit'; accountId: string; externalId: string; text: string; occurredAt: string }
   | { type: 'delete'; accountId: string; externalId: string; occurredAt: string }
@@ -81,6 +93,40 @@ export interface ReplyTarget {
   /** Message/comment being answered (comment id for public replies and private replies). */
   replyToExternalId: string | null;
   contactExternalId: string | null;
+  /** Stream B: provider refs of the message being answered (inbox_messages.meta), e.g. Bluesky {uri, cid, root}. */
+  replyToMeta?: Record<string, unknown> | null;
+}
+
+// ------------------------------------------------------------------ stream B additions (optional adapter capabilities)
+export type ModerationAction = 'hide' | 'unhide' | 'delete_own';
+
+/** WhatsApp template (approved at Meta) chosen by the agent; body params fill {{1}}, {{2}}, … in order. */
+export interface TemplateSend { name: string; language: string; category: 'marketing' | 'utility' | 'authentication' | 'service' | null; params: string[] }
+
+export interface TemplateInfo { name: string; language: string; category: 'marketing' | 'utility' | 'authentication' | null; status: string; body: string; param_count: number }
+
+/** Poll page: items + the next cursor. `cursor` is opaque to Relay (stored in integration_cursors). */
+export type PollResult =
+  | { ok: true; items: InboundItem[]; cursor: string | null; more: boolean }
+  | { ok: false; code: string; message: string; retryAfterMs?: number; reconnect?: boolean };
+
+export type ModerationResult = { ok: true } | { ok: false; code: string; message: string; retryable: boolean; reconnect?: boolean };
+
+/** Where the bytes of an inbound attachment can be fetched (safe fetch: allow-listed hosts, size + type limits). */
+export type AttachmentSource =
+  | { kind: 'url'; url: string; headers?: Record<string, string>; allowHosts: string[]; mime: string | null; name: string | null }
+  | { kind: 'bytes'; base64: string; mime: string; name: string | null }   // simulated transport only
+  | { kind: 'error'; code: string; message: string };
+
+export interface InboxAdapterExtras {
+  /** Polling (reconciliation or primary inbound). Cursor-based; bounded page; quota-aware interval. */
+  poll?(ctx: AdapterContext, creds: ProviderCredentials, conn: PublishConnection, input: { cursor: string | null; types: ConversationKind[] }): Promise<PollResult>;
+  pollIntervalMs?: number;
+  /** Moderation actions the provider permits on a message (inbound comment vs the business's own reply). */
+  moderationActions?(kind: ConversationKind, direction: 'inbound' | 'outbound'): ModerationAction[];
+  moderate?(ctx: AdapterContext, creds: ProviderCredentials, conn: PublishConnection, input: { action: ModerationAction; kind: ConversationKind; externalId: string; threadKey: string; meta: Record<string, unknown> }): Promise<ModerationResult>;
+  resolveAttachment?(ctx: AdapterContext, creds: ProviderCredentials, conn: PublishConnection, input: { providerRef: string; type: string }): Promise<AttachmentSource>;
+  listTemplates?(ctx: AdapterContext, creds: ProviderCredentials, conn: PublishConnection): Promise<{ ok: true; items: TemplateInfo[] } | { ok: false; code: string; message: string }>;
 }
 
 export interface ReplyRulesInput {
@@ -105,7 +151,7 @@ export type SendReplyResult =
   | { kind: 'retry'; code: string; message: string; retryAfterMs?: number }    // refused before acting (throttle, connect)
   | { kind: 'unknown'; code: string; message: string };                       // may have been sent: reconcile
 
-export interface InboxAdapter {
+export interface InboxAdapter extends InboxAdapterExtras {
   kind: ChannelKind;
   capability(): ChannelCapability;
   /** Permissions this channel needs that the connection lacks (from granted scopes). */
@@ -113,7 +159,7 @@ export interface InboxAdapter {
   /** Parse a VERIFIED webhook body into items (signature checked by the ingress before this). */
   parseWebhook(body: unknown): InboundItem[];
   replyRules(input: ReplyRulesInput): ReplyRulesResult;
-  sendReply(ctx: AdapterContext, creds: ProviderCredentials, conn: PublishConnection, input: { mode: ReplyMode; target: ReplyTarget; text: string; tag?: string; attemptId: string }): Promise<SendReplyResult>;
+  sendReply(ctx: AdapterContext, creds: ProviderCredentials, conn: PublishConnection, input: { mode: ReplyMode; target: ReplyTarget; text: string; tag?: string; attemptId: string; template?: TemplateSend | null }): Promise<SendReplyResult>;
   /** After an 'unknown' outcome: find the business's own message matching the text sent after `since`. Never guesses. */
   findSent(ctx: AdapterContext, creds: ProviderCredentials, conn: PublishConnection, input: { mode: ReplyMode; target: ReplyTarget; text: string; since: Date }): Promise<{ found: true; externalId: string } | { found: false } | { found: 'ambiguous' }>;
 }
@@ -176,6 +222,16 @@ export interface MessageDto {
   attachments: Array<{ type: string; name: string | null; size: number | null }>;
   at: string;
   automated: boolean;
+  /** Stream B: safe display metadata (e.g. rating for reviews), moderation state and permitted actions. */
+  rating?: number | null;
+  hidden?: boolean;
+  removed?: boolean;
+  moderation?: ModerationAction[];
+  attachment_state?: Array<'available' | 'stored' | 'failed' | 'blocked' | 'unavailable'>;
+  /** Provider reported a failure after accepting the message (WhatsApp status 'failed'). */
+  failed?: string | null;
+  /** Actual pricing reported by the provider for this message (WhatsApp status webhook). */
+  pricing?: { billable: boolean; category: string | null } | null;
   /** Outbound only: provider evidence. delivered/read are shown only when the provider reported them. */
   delivery: 'sent' | 'delivered' | 'read' | null;
   reply_attempt_id: string | null;
@@ -206,6 +262,9 @@ export interface ReplyAttemptDto {
   provider_result: { external_id?: string; status?: number; code?: string; message?: string; reconciled?: boolean } | null;
   error: { code: string; message: string } | null;
   is_simulated: boolean;
+  /** Stream B (WhatsApp): the template sent and the charge notice shown before sending. */
+  template?: TemplateSend | null;
+  charge?: { billable: boolean; category: string; estimate: { amount: number; currency: string } | null; note: string } | null;
 }
 
 export type TimelineEntry =
@@ -239,6 +298,10 @@ export interface ReplyRequest {
   idempotency_key: string;
   /** Set to the CURRENT version after the agent reviewed a 409 reply_collision / thread_changed. */
   acknowledge_version?: number | null;
+  /** Stream B (WhatsApp): send an approved template (outside the 24 h window); the server renders the exact text. */
+  template?: { name: string; language: string; params: string[] } | null;
+  /** Stream B: the agent saw the charge notice (required when the send may be charged). */
+  acknowledge_charge?: boolean;
 }
 
 /** 409 details for reply_collision / thread_changed. */

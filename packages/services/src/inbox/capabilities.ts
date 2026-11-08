@@ -3,7 +3,7 @@
 // implemented it is a separate column (`implemented`). Checked against official docs on 2026-11-07 unless noted.
 import type { ChannelCapability, ChannelKind } from '@social-lite/core/contracts/v35-inbox';
 import { FACEBOOK_PAGE_CAPABILITY } from '@social-lite/providers/meta/inbox';
-import { implementedChannelKinds } from '@social-lite/providers';
+import { getInboxAdapter, implementedChannelKinds } from '@social-lite/providers';
 
 const V = '2026-11-07';
 
@@ -115,7 +115,17 @@ export const CHANNEL_CAPABILITIES: Record<ChannelKind, ChannelCapability> = {
   },
 };
 
-export function capabilityMatrix(): Array<ChannelCapability & { implemented: boolean }> {
+// Stream B: implemented networks use their adapter's own capability record (verified when the adapter was built).
+for (const k of implementedChannelKinds()) {
+  const c = getInboxAdapter(k)?.capability();
+  if (c) CHANNEL_CAPABILITIES[k] = c;
+}
+
+export function capabilityMatrix(): Array<ChannelCapability & { implemented: boolean; live_requires_approval: boolean }> {
   const impl = new Set(implementedChannelKinds());
-  return Object.values(CHANNEL_CAPABILITIES).map((c) => ({ ...c, implemented: impl.has(c.kind) }));
+  return Object.values(CHANNEL_CAPABILITIES).map((c) => ({
+    ...c, implemented: impl.has(c.kind),
+    // Built in Relay, but the provider must approve access before real (non-simulated) use.
+    live_requires_approval: impl.has(c.kind) && Object.values(c.conversationTypes).some((t) => t && (t.read === 'needs_approval' || t.reply === 'needs_approval')),
+  }));
 }

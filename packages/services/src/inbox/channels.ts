@@ -12,6 +12,14 @@ import { loadConnection, toPublishConnection, type ConnectionStoreRow } from '..
 import { assertUuid, authorizeCtx, brandAllowed, requireAction } from '../tenancy.js';
 import { CHANNEL_CAPABILITIES } from './capabilities.js';
 import { iso, type ChannelRow } from './shared.js';
+import { channelOptions, telegramGate } from './channels-telegram.js';
+
+/** Stream B: status of an integration-backed channel (WhatsApp, Google Business Profile) on resume. */
+async function integrationStatus(db: Parameters<typeof maybeOne>[0], r: ChannelRow): Promise<{ status: ChannelRow['status']; detail: string | null; missing: string[] }> {
+  const { evaluateIntegration } = await import('./channels-integration.js');
+  const i = await maybeOne<Parameters<typeof evaluateIntegration>[0]>(db, `SELECT * FROM integration_connections WHERE id=$1`, [r.integration_id]);
+  return i ? evaluateIntegration(i, r.kind) : { status: 'error', detail: 'The integration is no longer connected.', missing: [] };
+}
 
 export function toChannelJson(r: ChannelRow): InboxChannelJson {
   return {
@@ -19,6 +27,7 @@ export function toChannelJson(r: ChannelRow): InboxChannelJson {
     display_name: r.display_name, is_simulated: r.is_simulated, status: r.disconnected_at ? 'disconnected' : r.status, status_detail: r.status_detail,
     missing_permissions: r.missing_permissions, enabled_types: r.enabled_types, capability: CHANNEL_CAPABILITIES[r.kind],
     last_inbound_at: iso(r.last_inbound_at), last_sync_at: iso(r.last_sync_at),
+    options: channelOptions(r),   // stream B: safe, non-secret settings summary
   };
 }
 
@@ -29,7 +38,12 @@ async function grantedScopes(conn: ConnectionStoreRow): Promise<string[] | null>
 }
 
 /** Channel status from the connection + adapter permissions (pure inputs; used on enable and by the health sweep). */
-export async function evaluateChannel(conn: ConnectionStoreRow): Promise<{ status: ChannelRow['status']; detail: string | null; missing: string[] }> {
+export async function evaluateChannel(conn: ConnectionStoreRow, settings: Record<string, unknown> = {}): Promise<{ status: ChannelRow['status']; detail: string | null; missing: string[] }> {
+  const ev = await evaluateConnection(conn);
+  return PROVIDER_CHANNEL[conn.provider] === 'telegram_bot' ? telegramGate(settings, ev) : ev;   // stream B: Telegram needs update ownership
+}
+
+async function evaluateConnection(conn: ConnectionStoreRow): Promise<{ status: ChannelRow['status']; detail: string | null; missing: string[] }> {
   const kind = PROVIDER_CHANNEL[conn.provider];
   const adapter = kind ? getInboxAdapter(kind) : null;
   if (!adapter) return { status: 'error', detail: 'This network has no inbox support in Relay yet.', missing: [] };
@@ -50,21 +64,24 @@ export async function enableChannel(ctx: Ctx, input: z.infer<typeof enableChanne
   requireAction(ctx, 'inbox.manage', { brandId: conn.brand_id });
   const kind = PROVIDER_CHANNEL[conn.provider];
   if (!kind || !getInboxAdapter(kind)) throw new AppError('invalid_state', 'This network has no inbox support in Relay yet.');
-  const ev = await evaluateChannel(conn);
+  // Telegram: the inbox channel is the BOT (one per bot, whichever publishing chat it was connected for).
+  const externalId = kind === 'telegram_bot' && typeof conn.metadata?.bot_id === 'string' ? conn.metadata.bot_id : conn.provider_account_id;
+  const prior = await maybeOne<{ settings: Record<string, unknown> }>(getPool(), `SELECT settings FROM inbox_channels WHERE workspace_id=$1 AND kind=$2 AND external_account_id=$3 AND disconnected_at IS NULL`, [ctx.access.workspaceId, kind, externalId]);
+  const ev = await evaluateChannel(conn, prior?.settings ?? {});
   if (ev.status === 'disconnected') throw new AppError('invalid_state', 'Reconnect the account first.');
   const supported = Object.entries(CHANNEL_CAPABILITIES[kind].conversationTypes).filter(([, v]) => v && v.read !== 'not_available' && v.read !== 'not_implemented').map(([k]) => k as ConversationKind);
   const types = (input.enabled_types ?? supported).filter((t) => supported.includes(t));
   if (!types.length) throw new AppError('validation_failed', 'Choose at least one supported conversation type.');
   return withTx(async (tx) => {
     const existing = await maybeOne<ChannelRow>(tx, `SELECT * FROM inbox_channels WHERE workspace_id=$1 AND kind=$2 AND external_account_id=$3 AND disconnected_at IS NULL FOR UPDATE`,
-      [ctx.access.workspaceId, kind, conn.provider_account_id]);
+      [ctx.access.workspaceId, kind, externalId]);
     const row = existing
       ? await one<ChannelRow>(tx, `UPDATE inbox_channels SET connection_id=$2, brand_id=$3, display_name=$4, status=$5, status_detail=$6, missing_permissions=$7, enabled_types=$8, updated_at=now() WHERE id=$1 RETURNING *`,
         [existing.id, conn.id, conn.brand_id, conn.display_name, ev.status, ev.detail, ev.missing, types])
       : await one<ChannelRow>(tx,
         `INSERT INTO inbox_channels(workspace_id, brand_id, kind, connection_id, external_account_id, display_name, is_simulated, status, status_detail, missing_permissions, enabled_types, created_by)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-        [ctx.access.workspaceId, conn.brand_id, kind, conn.id, conn.provider_account_id, conn.display_name, conn.is_mock, ev.status, ev.detail, ev.missing, types, ctx.actor.userId]);
+        [ctx.access.workspaceId, conn.brand_id, kind, conn.id, externalId, conn.display_name, conn.is_mock, ev.status, ev.detail, ev.missing, types, ctx.actor.userId]);
     await audit(tx, { workspaceId: ctx.access.workspaceId, brandId: conn.brand_id, actorUserId: ctx.actor.userId, action: 'inbox.channel_enabled', resourceType: 'inbox_channel', resourceId: row.id, diff: { kind, status: row.status, types }, correlationId: ctx.correlationId });
     return toChannelJson(row);
   });
@@ -94,7 +111,7 @@ export async function setChannelPaused(ctx: Ctx, id: string, paused: boolean): P
     let missing = r.missing_permissions;
     if (!paused) {
       const conn = r.connection_id ? await maybeOne<ConnectionStoreRow>(tx, `SELECT * FROM connections WHERE id=$1`, [r.connection_id]) : null;
-      const ev = conn ? await evaluateChannel(conn) : { status: 'error' as const, detail: 'The account is no longer connected.', missing: [] };
+      const ev = conn ? await evaluateChannel(conn, r.settings) : r.integration_id ? await integrationStatus(tx, r) : { status: 'error' as const, detail: 'The account is no longer connected.', missing: [] };
       status = ev.status; detail = ev.detail; missing = ev.missing;
     }
     const row = await one<ChannelRow>(tx, `UPDATE inbox_channels SET status=$2, status_detail=$3, missing_permissions=$4, updated_at=now() WHERE id=$1 RETURNING *`, [id, status, detail, missing]);
@@ -121,7 +138,7 @@ export async function refreshChannelHealth(limit = 100): Promise<number> {
   let n = 0;
   for (const r of rows) {
     const conn = r.conn ? { ...r.conn, disconnected_at: r.conn.disconnected_at ? new Date(r.conn.disconnected_at as unknown as string) : null } as ConnectionStoreRow : null;
-    const ev = conn ? await evaluateChannel(conn) : { status: 'error' as const, detail: 'The account is no longer connected.', missing: [] };
+    const ev = conn ? await evaluateChannel(conn, r.settings) : { status: 'error' as const, detail: 'The account is no longer connected.', missing: [] };
     await getPool().query(`UPDATE inbox_channels SET status=$2, status_detail=$3, missing_permissions=$4, updated_at=now() WHERE id=$1`, [r.id, ev.status, ev.detail, ev.missing]);
     n++;
   }

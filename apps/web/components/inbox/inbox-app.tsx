@@ -14,6 +14,8 @@ import { Badge, Button, DetailDrawer, EmptyState, ErrorState, Input, LinkButton,
 import { InboxThread } from './thread';
 import { InboxContextPanel } from './context-panel';
 import { CHANNEL_LABEL, CHANNEL_PROVIDER, KIND_LABEL, PRIORITY_LABEL, QUEUES, QUEUE_LABEL, shortAgo } from './labels';
+import { SavedViewsPanel, SavedViewsSelect, VIEW_KEYS } from './saved-views-panel';   // stream B
+import { useInboxStream } from './realtime-stream';                                     // stream B
 
 type Counts = Record<InboxQueue, number>;
 interface ListResp { items: ConversationListItem[]; next_cursor: string | null }
@@ -27,14 +29,21 @@ export function InboxApp() {
   const panel = params.get('panel');
   const kind = params.get('kind') ?? '';
   const priority = params.get('priority') ?? '';
+  const channelId = params.get('channel_id') ?? '';
   const [search, setSearch] = useState(params.get('q') ?? '');
   const q = useDebouncedValue(search, 300);
   const wide = useMediaQuery('(min-width: 1536px)');
   const [more, setMore] = useState<{ key: string; items: ConversationListItem[]; next: string | null } | null>(null);
 
-  const qs = useMemo(() => new URLSearchParams({ queue, ...(brand ? { brand_id: brand } : {}), ...(kind ? { kind } : {}), ...(priority ? { priority } : {}), ...(q.trim() ? { q: q.trim() } : {}) }).toString(), [queue, brand, kind, priority, q]);
-  const list = useApi<ListResp>(`/api/inbox/conversations?${qs}`, { keepPrevious: true, poll: 15_000 });
-  const counts = useApi<Counts>('/api/inbox/counts', { poll: 30_000 });
+  const qs = useMemo(() => new URLSearchParams({ queue, ...(brand ? { brand_id: brand } : {}), ...(kind ? { kind } : {}), ...(priority ? { priority } : {}), ...(channelId ? { channel_id: channelId } : {}), ...(q.trim() ? { q: q.trim() } : {}) }).toString(), [queue, brand, kind, priority, channelId, q]);
+  // Stream B: realtime over SSE; polling stays as the slower fallback.
+  const list = useApi<ListResp>(`/api/inbox/conversations?${qs}`, { keepPrevious: true, poll: 30_000 });
+  const counts = useApi<Counts>('/api/inbox/counts', { poll: 60_000 });
+  const latest = useRef({ list, counts });
+  useEffect(() => { latest.current = { list, counts }; });
+  const live = useInboxStream(() => { void latest.current.list.refetch(); void latest.current.counts.refetch(); });
+  const currentView: Record<string, string> = { queue, ...(kind ? { kind } : {}), ...(priority ? { priority } : {}), ...(channelId ? { channel_id: channelId } : {}), ...(q.trim() ? { q: q.trim() } : {}) };
+  const applyView = (f: Record<string, string>) => { setSearch(f.q ?? ''); setParams(Object.fromEntries(VIEW_KEYS.map((k) => [k, k === 'queue' && f.queue === 'unassigned' ? null : f[k] ?? null]).concat([['c', null]]))); };
   const channels = useApi<{ items: InboxChannelJson[] }>('/api/inbox/channels');
   useEffect(() => { setParams({ q: q.trim() || null }); }, [q]); // eslint-disable-line react-hooks/exhaustive-deps
   const extra = more?.key === qs ? more : null;
@@ -70,8 +79,14 @@ export function InboxApp() {
     <div className="flex flex-col gap-2">
       <Select aria-label="Type" value={kind} onChange={(e) => setParams({ kind: e.target.value || null })}>
         <option value="">All types</option>
-        {(['dm', 'comment', 'mention', 'review'] as const).map((k) => <option key={k} value={k}>{KIND_LABEL[k]}s</option>)}
+ {(['dm', 'comment', 'mention', 'review'] as const).map((k) => <option key={k} value={k}>{KIND_LABEL[k]}s</option>)}
       </Select>
+      {channels.data && channels.data.items.length > 1 ? (
+        <Select aria-label="Channel" value={channelId} onChange={(e) => setParams({ channel_id: e.target.value || null })}>
+          <option value="">All channels</option>
+          {channels.data.items.map((ch) => <option key={ch.id} value={ch.id}>{CHANNEL_LABEL[ch.kind]} · {ch.display_name}</option>)}
+        </Select>
+      ) : null}
       <Select aria-label="Priority" value={priority} onChange={(e) => setParams({ priority: e.target.value || null })}>
         <option value="">Any priority</option>
         {(['urgent', 'high', 'normal', 'low'] as const).map((p) => <option key={p} value={p}>{PRIORITY_LABEL[p]}</option>)}
@@ -80,16 +95,17 @@ export function InboxApp() {
   );
 
   const listPane = (
-    <section aria-label="Conversations" className={cn('flex min-h-0 flex-col border-border md:border-r', selected ? 'max-md:hidden' : '')}>
+    <section aria-label="Conversations" className={cn('flex min-h-0 min-w-0 flex-col border-border md:border-r', selected ? 'max-md:hidden' : '')}>
       <div className="flex flex-col gap-2 border-b border-border p-3">
-        <div className="flex items-center gap-2 xl:hidden">
-          <Select aria-label="Queue" className="flex-1" value={queue} onChange={(e) => setParams({ queue: e.target.value === 'unassigned' ? null : e.target.value, c: null })}>
+        <div className="flex flex-wrap items-center gap-2 xl:hidden">
+          <Select aria-label="Queue" className="min-w-0 flex-1 basis-32" value={queue} onChange={(e) => setParams({ queue: e.target.value === 'unassigned' ? null : e.target.value, c: null })}>
             {QUEUES.map((qq) => <option key={qq} value={qq}>{QUEUE_LABEL[qq]}{counts.data && qq !== 'all' && counts.data[qq] ? ` (${counts.data[qq]})` : ''}</option>)}
           </Select>
           <Select aria-label="Type" className="w-28" value={kind} onChange={(e) => setParams({ kind: e.target.value || null })}>
             <option value="">All types</option>
-            {(['dm', 'comment'] as const).map((k) => <option key={k} value={k}>{KIND_LABEL[k]}s</option>)}
+            {(['dm', 'comment', 'mention', 'review'] as const).map((k) => <option key={k} value={k}>{KIND_LABEL[k]}s</option>)}
           </Select>
+          <SavedViewsSelect current={currentView} onApply={applyView} />
         </div>
         <label className="relative block">
           <span className="sr-only">Search conversations</span>
@@ -121,6 +137,8 @@ export function InboxApp() {
           </div>
           {queueNav}
           <div className="border-t border-border pt-3">{filters}</div>
+          <div className="border-t border-border pt-3"><SavedViewsPanel current={currentView} onApply={applyView} /></div>
+          {live === 'live' ? <p className="flex items-center gap-1.5 px-1 text-xs text-subtle"><span aria-hidden className="size-1.5 rounded-full bg-[var(--success)]" />Live</p> : null}
           {channels.data?.items.length ? (
             <div className="border-t border-border pt-3 text-xs text-muted">
               <p className="mb-1 font-medium text-subtle">Channels</p>
@@ -140,7 +158,7 @@ export function InboxApp() {
           {selected ? (
             <div className={cn('grid h-full min-h-0', wide ? 'grid-cols-[minmax(0,1fr)_280px]' : 'grid-cols-1')}>
               <InboxThread key={selected} id={selected} onBack={() => setParams({ c: null, panel: null })} onDetails={wide ? undefined : () => setParams({ panel: 'details' })} onChanged={refresh} />
-              {wide ? <aside aria-label="Customer and case" className="min-h-0 overflow-y-auto border-l border-border p-4"><InboxContextPanel id={selected} onChanged={refresh} /></aside> : null}
+              {wide ? <aside aria-label="Customer and case" className="min-h-0 overflow-y-auto border-l border-border p-4"><InboxContextPanel id={selected} onChanged={refresh} onOpenConversation={open} /></aside> : null}
             </div>
           ) : (
             <div className="hidden h-full items-center justify-center md:flex"><EmptyState icon={<InboxIcon aria-hidden />} title="Select a conversation" /></div>
@@ -149,7 +167,7 @@ export function InboxApp() {
       </div>
       {selected && !wide ? (
         <DetailDrawer open={panel === 'details'} onOpenChange={(o) => setParams({ panel: o ? 'details' : null })} title="Customer and case">
-          <InboxContextPanel id={selected} onChanged={refresh} />
+          <InboxContextPanel id={selected} onChanged={refresh} onOpenConversation={open} />
         </DetailDrawer>
       ) : null}
     </div>
@@ -169,7 +187,7 @@ function Row({ it, active, onOpen }: { it: ConversationListItem; active: boolean
       </span>
       <span className="line-clamp-2 text-[13px] text-muted">{it.preview || '—'}</span>
       <span className="flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[11px] text-subtle">
-        <span className="shrink-0">{CHANNEL_LABEL[it.channel.kind]} · {KIND_LABEL[it.kind]}</span>
+        <span className="min-w-0 truncate">{CHANNEL_LABEL[it.channel.kind]} · {KIND_LABEL[it.kind]}</span>
         {it.priority === 'urgent' || it.priority === 'high' ? <Badge tone="warn" className="h-5 shrink-0 px-1.5 text-[11px]">{PRIORITY_LABEL[it.priority]}</Badge> : null}
         {it.case ? <Badge tone="info" className="h-5 shrink-0 px-1.5 text-[11px]">Case #{it.case.number}</Badge> : null}
         {it.assignee ? <span className="min-w-0 truncate">· {it.assignee.name ?? it.assignee.email}</span> : null}

@@ -6,10 +6,16 @@ import { BriefcaseBusiness, CircleAlert, Clock } from 'lucide-react';
 import type { CaseDto, ConversationDetail, Priority } from '@social-lite/core/contracts/v35-inbox';
 import { api } from '@/lib/client/api';
 import { useApi } from '@/lib/client/use-api';
-import { Badge, Button, Dialog, Facts, Field, Input, Select, Textarea, useToast } from '@/components/ui';
-import { CASE_STATE_LABEL, CHANNEL_LABEL, PRIORITY_LABEL, dueLabel } from './labels';
+import { Badge, Button, Dialog, Field, Input, Select, Textarea, useToast } from '@/components/ui';
+import { ClassificationChip } from '@/components/assistant/classification-chip'; // V3.5 stream E
+import { CASE_STATE_LABEL, PRIORITY_LABEL, dueLabel } from './labels';
+import { IdentityPanel } from './identity-panel';   // stream B
+import { CsatPanel } from './csat-panel';           // stream B
+// V3.5 stream C: external tasks / HubSpot ticket and translation (each renders nothing when not installed / not enabled).
+import { ExternalWork } from '@/components/integrations-hub/external-work';
+import { TranslatePanel } from '@/components/integrations-hub/translate-panel';
 
-export function InboxContextPanel({ id, onChanged }: { id: string; onChanged: () => void }) {
+export function InboxContextPanel({ id, onChanged, onOpenConversation }: { id: string; onChanged: () => void; onOpenConversation?: (id: string) => void }) {
   const toast = useToast();
   const { data: c, refetch } = useApi<ConversationDetail>(`/api/inbox/conversations/${id}`, { poll: 15_000 });
   const kase = useApi<CaseDto>(c?.case ? `/api/inbox/cases/${c.case.id}` : null, { poll: 30_000 });
@@ -30,12 +36,14 @@ export function InboxContextPanel({ id, onChanged }: { id: string; onChanged: ()
     <div className="flex flex-col gap-5 text-[13px]">
       <section aria-labelledby="ctx-customer">
         <h3 id="ctx-customer" className="mb-2 text-xs font-medium uppercase tracking-[0.06em] text-subtle">Customer</h3>
-        <Facts items={[
-          ['Name', c.contact.name ?? '—'],
-          ['Channel', `${CHANNEL_LABEL[c.channel.kind]} · ${c.channel.display_name}`],
-          ['Waiting since', c.unanswered_since ? new Date(c.unanswered_since).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'Answered'],
-        ]} />
-        <p className="mt-2 text-xs text-subtle">Provider identity only. Linking to a CRM contact is explicit and never by name.</p>
+        {/* Stream B: explicit identity linking + history */}
+        <IdentityPanel conversationId={id} brandId={c.brand_id} onOpen={onOpenConversation} />
+        <p className="mt-2 text-xs text-muted">Waiting since: {c.unanswered_since ? new Date(c.unanswered_since).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'answered'}</p>
+      </section>
+
+      <section aria-labelledby="ctx-csat">
+        <h3 id="ctx-csat" className="sr-only">Satisfaction</h3>
+        <CsatPanel conversationId={id} onChanged={onChanged} />
       </section>
 
       <section aria-labelledby="ctx-prio">
@@ -44,6 +52,7 @@ export function InboxContextPanel({ id, onChanged }: { id: string; onChanged: ()
           onChange={(e) => run(() => api.patch(`/api/inbox/conversations/${id}`, { priority: e.target.value as Priority }), 'Priority updated')}>
           {(Object.keys(PRIORITY_LABEL) as Priority[]).map((p) => <option key={p} value={p}>{PRIORITY_LABEL[p]}</option>)}
         </Select>
+        <ClassificationChip conversationId={id} />
       </section>
 
       <section aria-labelledby="ctx-case">
@@ -77,6 +86,10 @@ export function InboxContextPanel({ id, onChanged }: { id: string; onChanged: ()
           </div>
         )}
       </section>
+
+      <ExternalWork relayType={c.case ? 'case' : 'conversation'} relayId={c.case?.id ?? id} brandId={c.brand_id} />
+      <TranslatePanel conversationId={id} customerLanguage={c.language}
+        latestInboundId={[...c.timeline].reverse().find((e): e is Extract<typeof e, { type: 'message' }> => e.type === 'message' && e.message.direction === 'inbound')?.message.id ?? null} />
 
       <Dialog open={creating} onOpenChange={setCreating} title="Create case" footer={<>
         <Button variant="ghost" onClick={() => setCreating(false)}>Cancel</Button>

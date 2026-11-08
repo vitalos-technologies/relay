@@ -34,7 +34,9 @@ describe('setup', () => {
     process.env.NOTION_INTERNAL_TOKEN = 'ntn_envinternaltokenvalue0123456789';
     resetConfigCache();
     const { groups } = await getSetup(t.ownerCtx);
-    expect(groups.map((g) => g.id)).toEqual(['core', 'identity', 'storage', 'email', 'meta', 'telegram', 'x', 'tiktok', 'youtube', 'linkedin', 'threads', 'pinterest', 'google_content', 'notion', 'ai', 'tipsignal']);
+    expect(groups.map((g) => g.id)).toEqual(['core', 'identity', 'storage', 'email', 'meta', 'telegram', 'x', 'tiktok', 'youtube', 'linkedin', 'threads', 'pinterest', 'google_content', 'notion', 'ai', 'tipsignal',
+      // V3.5 business integrations (stream C)
+      'asana', 'monday', 'hubspot', 'gbp', 'translate', 'slack', 'mailchimp']);
     const all = groups.flatMap((g) => g.items);
     const item = (k: string) => all.find((i) => i.key === k)!;
     expect(item('APP_BASE_URL')).toMatchObject({ source: 'env', is_set: true, value: 'http://localhost:3000', editable: false });

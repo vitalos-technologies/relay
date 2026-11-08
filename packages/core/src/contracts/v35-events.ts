@@ -19,6 +19,11 @@ export const V35_OUTBOX_EVENTS = [
   'case.changed',             // aggregate: care_cases.id           payload: { change: 'created'|'state'|'owner'|'breach'|'escalated' }
   'integration.event_received', // aggregate: integration_events.id
   'integration.sync_requested',  // aggregate: integration_sync_jobs.id
+  'ai.run_requested',            // aggregate: ai_runs.id (stream E; 'ai-assist' queue, ai_assist class)
+  'listening.ingest_requested',  // aggregate: inbox_messages.id (stream D; public items only; 'listening-ingest', bulk pool)
+  'listening.rematch_requested', // aggregate: listening_searches.id  payload: { version } (stream D)
+  'listening.alert_fired',       // aggregate: listening_alerts.id    payload: { ruleId, searchId, brandId } (stream D; onInboxEvent subscribers)
+  'inbox.inbound_received',      // aggregate: inbox_channels.id  payload: { eventId } (stream B; Relay-owned channel webhook, e.g. Telegram)
 ] as const;
 export type V35OutboxEvent = (typeof V35_OUTBOX_EVENTS)[number];
 
@@ -40,6 +45,11 @@ export const V35_EVENT_QUEUES: Record<V35OutboxEvent, string> = {
   'case.changed': V35_QUEUES.inboxEvents,
   'integration.event_received': V35_QUEUES.integrationSync,
   'integration.sync_requested': V35_QUEUES.integrationSync,
+  'ai.run_requested': V35_QUEUES.aiAssist,
+  'listening.ingest_requested': V35_QUEUES.listeningIngest,
+  'listening.rematch_requested': V35_QUEUES.listeningIngest,
+  'listening.alert_fired': V35_QUEUES.inboxEvents,
+  'inbox.inbound_received': V35_QUEUES.inboxEvents,
 };
 
 /** New workload classes (added to WORKLOAD_CLASSES in v31-perf.ts; DB check widened in 028). */

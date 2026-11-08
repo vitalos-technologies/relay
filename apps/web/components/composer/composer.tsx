@@ -37,7 +37,10 @@ import { LinkBuilderButton, LinkBuilderDialog } from '@/components/links/links';
 import { useFlag } from '@/lib/client/flags';
 import type { ReuseResult } from '@social-lite/core/contracts/v31-gov';
 import { DeliveriesPanel } from './deliveries-panel';
+// V3.5 stream C: Google Business Profile / Mailchimp / task integrations for this post (renders nothing when none installed).
+const PostIntegrations = dynamic(() => import('@/components/integrations-hub/post-integrations').then((m) => m.PostIntegrations));
 import { AiAssist } from '@/components/ai/assist';
+import { AssistantButton } from '@/components/assistant/assistant-panel'; // V3.5 stream E
 import { VariantCrops } from '@/components/crops/variant-crops';
 import { QueueButton, useQueueAction } from '@/components/slots/queue-button';
 import { COLLAB_TABS, CollabPanel, type CollabTab } from '@/components/collab/collab-panel';
@@ -714,6 +717,7 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
           </Card>
 
           <DeliveriesPanel post={post} onChanged={() => void refetch()} />
+          <PostIntegrations postId={post.id} brandId={post.brand_id} />
         </div>
 
         {/* Region 3: readiness + live preview + collaboration */}
@@ -789,6 +793,7 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
           <SaveStatus state={saveState} savedAt={savedAt} tz={tz} error={saveError} localSaved={localSaved} onRetry={() => { retries.current = 0; void save(); }} onConflict={() => setConflictOpen(true)} onHistory={() => setHistoryOpen(true)} readOnly={readOnly} />
           <span className="flex-1" />
           <AiAssist postId={post.id} draft={draft} connections={selectedConns} tab={tab} readOnly={readOnly} flush={flush} onAccept={acceptSuggestion} />
+          <AssistantButton surface="composer" size="md" context={{ type: 'post', id: post.id }} brandId={post.brand_id} onUseText={readOnly ? undefined : (t) => acceptSuggestion(tab, t)} />
           {!readOnly ? (
             <div className="hidden sm:block">
               <Button variant="ghost" size="md" icon={<Save aria-hidden className="size-4" />} onClick={() => void flush()} disabled={saveState === 'saved' || saveState === 'saving' || saveState === 'conflict'}>

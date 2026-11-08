@@ -11,7 +11,7 @@
 // No idempotency key exists on these endpoints: an ambiguous send is reconciled through findSent(), never retried blindly.
 import { TransportError, type AdapterContext, type ProviderCredentials, type PublishConnection } from '@social-lite/core';
 import type {
-  ChannelCapability, InboundItem, InboxAdapter, ReplyRulesInput, ReplyRulesResult, SendReplyResult,
+  ChannelCapability, InboundItem, InboxAdapter, ModerationAction, ModerationResult, ReplyRulesInput, ReplyRulesResult, SendReplyResult,
 } from '@social-lite/core/contracts/v35-inbox';
 import { normalizeGraphError } from './errors.js';
 import { graph, pageToken, str, type GraphResult } from './graph.js';
@@ -30,7 +30,7 @@ export const FACEBOOK_PAGE_CAPABILITY: ChannelCapability = {
   history: 'Messenger conversations and Page post comments via the Graph API (recent threads); webhooks only for new events.',
   replyWindow: 'Messages: 24 h after the customer’s last message (Human Agent tag: 7 days, needs approval). Private reply to a comment: once, within 7 days.',
   attachments: 'Inbound attachment metadata only; outbound text only in this release.',
-  moderation: ['Hide/unhide comment (not implemented yet)', 'Delete the Page’s own reply (not implemented yet)'],
+  moderation: ['Hide/unhide comments', 'Delete the Page’s own reply'],
   receipts: { delivered: true, read: true },
   requires: ['Meta App Review: pages_messaging, pages_manage_engagement, pages_read_user_content (Advanced Access for Pages you do not own)', 'Page role with the MESSAGING task', 'Webhook subscription: messages, message_echoes, message_edits, message_deliveries, message_reads, feed'],
   verifiedOn: '2026-11-07',
@@ -126,7 +126,7 @@ export function facebookReplyRules(i: ReplyRulesInput): ReplyRulesResult {
   return { allowed: false, code: 'not_supported', message: 'Replies to this conversation type are not supported.' };
 }
 
-function classify<T>(r: Extract<GraphResult<T>, { ok: false }>): SendReplyResult {
+export function classifyMetaReply<T>(r: Extract<GraphResult<T>, { ok: false }>): SendReplyResult {
   const sub = r.error.subcode;
   if (r.error.code === 10 && (sub === 2018278 || sub === 2534022)) return { kind: 'rejected', code: 'reply_window_closed', message: 'Meta refused the message: the reply window has closed.' };
   if (r.error.code === 551) return { kind: 'rejected', code: 'recipient_unavailable', message: 'Meta says this person is not available to receive messages.' };
@@ -141,7 +141,7 @@ function classify<T>(r: Extract<GraphResult<T>, { ok: false }>): SendReplyResult
   }
 }
 
-function transportOutcome(err: unknown): SendReplyResult {
+export function transportOutcome(err: unknown): SendReplyResult {
   if (err instanceof TransportError) {
     if (!err.requestMayHaveBeenSent) return { kind: 'retry', code: 'connect_failed', message: 'Meta could not be reached. The reply will be retried.' };
     return { kind: 'unknown', code: 'response_lost', message: 'The connection to Meta dropped after sending. Checking whether the reply arrived.' };
@@ -150,6 +150,24 @@ function transportOutcome(err: unknown): SendReplyResult {
 }
 
 const idOf = (threadKey: string, prefix: string) => (threadKey.startsWith(prefix) ? threadKey.slice(prefix.length) : null);
+
+/** Stream B: Graph moderation shared by Facebook comments (is_hidden) and Instagram comments (hide). Idempotent. */
+export async function metaModerate(ctx: AdapterContext, token: string, input: { action: ModerationAction; externalId: string }, hideParam: 'is_hidden' | 'hide'): Promise<ModerationResult> {
+  try {
+    const r = input.action === 'delete_own'
+      ? await graph(ctx, { method: 'DELETE', path: input.externalId, token, op: 'meta.inbox.delete_comment' })
+      : await graph(ctx, { method: 'POST', path: input.externalId, token, params: { [hideParam]: input.action === 'hide' }, op: 'meta.inbox.hide_comment' });
+    if (r.ok) return { ok: true };
+    const n = normalizeGraphError(r.error, r.headers);
+    if (n.cls === 'reconnect') return { ok: false, code: n.code, message: 'Meta no longer accepts this connection. Reconnect the account.', retryable: false, reconnect: true };
+    if (n.cls === 'permission') return { ok: false, code: 'permission_denied', message: 'Meta refused: a moderation permission is missing.', retryable: false };
+    if (n.cls === 'rate_limit' || n.cls === 'transient' || n.cls === 'server_error') return { ok: false, code: n.code, message: 'Meta is busy. Try again shortly.', retryable: true };
+    return { ok: false, code: n.code, message: 'Meta refused this action.', retryable: false };
+  } catch (err) {
+    if (err instanceof TransportError) return { ok: false, code: 'network', message: 'Meta could not be reached. Try again.', retryable: true };
+    throw err;
+  }
+}
 
 export const facebookInboxAdapter: InboxAdapter = {
   kind: 'facebook_page',
@@ -164,6 +182,13 @@ export const facebookInboxAdapter: InboxAdapter = {
   parseWebhook: parseFacebookWebhook,
   replyRules: facebookReplyRules,
 
+  moderationActions: (kind, direction) => (kind !== 'comment' ? [] : direction === 'inbound' ? ['hide', 'unhide'] : ['delete_own']),
+  async moderate(ctx, creds, _conn, input) {
+    const token = pageToken(creds);
+    if (!token) return { ok: false, code: 'no_credentials', message: 'No Page access token is stored. Reconnect the Page.', retryable: false, reconnect: true };
+    return metaModerate(ctx, token, input, 'is_hidden');
+  },
+
   async sendReply(ctx: AdapterContext, creds: ProviderCredentials, conn: PublishConnection, input): Promise<SendReplyResult> {
     const token = pageToken(creds);
     if (!token) return { kind: 'rejected', code: 'no_credentials', message: 'No Page access token is stored. Reconnect the Page.', reconnect: true };
@@ -173,7 +198,7 @@ export const facebookInboxAdapter: InboxAdapter = {
         const commentId = idOf(input.target.threadKey, 'comment:');
         if (input.target.conversationKind !== 'comment' || !commentId) return { kind: 'rejected', code: 'mode_not_supported', message: 'Public replies are only possible on comments.' };
         const r = await graph<{ id?: string }>(ctx, { method: 'POST', path: `${commentId}/comments`, token, params: { message: text }, op: 'facebook.inbox.comment_reply', publishes: true });
-        if (!r.ok) return classify(r);
+        if (!r.ok) return classifyMetaReply(r);
         const id = str(r.data.id);
         return id ? { kind: 'sent', externalId: id, detail: { status: r.status } } : { kind: 'unknown', code: 'no_id', message: 'Meta accepted the reply without returning an id. Checking.' };
       }
@@ -194,7 +219,7 @@ export const facebookInboxAdapter: InboxAdapter = {
           messaging_type: input.tag ? 'MESSAGE_TAG' : 'RESPONSE', ...(input.tag ? { tag: input.tag } : {}),
         },
       });
-      if (!r.ok) return classify(r);
+      if (!r.ok) return classifyMetaReply(r);
       const id = str(r.data.message_id);
       return id ? { kind: 'sent', externalId: id, detail: { status: r.status, recipient_id: str(r.data.recipient_id) } } : { kind: 'unknown', code: 'no_id', message: 'Meta accepted the message without returning an id. Checking.' };
     } catch (err) {

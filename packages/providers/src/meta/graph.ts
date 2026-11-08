@@ -65,7 +65,7 @@ export type GraphResult<T = Record<string, unknown>> =
   | { ok: false; status: number; error: GraphErrorInfo; headers: Record<string, string> };
 
 export interface GraphCall {
-  method: 'GET' | 'POST';
+  method: 'GET' | 'POST' | 'DELETE';   // DELETE: V3.5 inbox moderation (delete the business's own comment)
   /** Path below the version, without leading slash, e.g. "123/feed". */
   path: string;
   /** Access token; omitted for OAuth endpoints that authenticate with client_secret. */
@@ -102,7 +102,7 @@ export function buildGraphRequest(config: ProviderAppConfig, call: GraphCall): H
   }
   const body = new URLSearchParams([...params, ...auth]).toString();
   return {
-    method: 'POST', url: url.toString(), body, op: call.op, publishes: call.publishes, timeoutMs: call.timeoutMs,
+    method: call.method === 'DELETE' ? 'DELETE' : 'POST', url: url.toString(), body, op: call.op, publishes: call.publishes, timeoutMs: call.timeoutMs,
     headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },
   };
 }

@@ -5,7 +5,7 @@
 import type { ReactNode } from 'react';
 import {
   BadgeCheck, Bell, BookText, Building2, Cable, CalendarClock, Clock, FileDown, Fingerprint, FolderInput, Gauge, HardDrive, HeartPulse, KeyRound, Link2, Mail, MessageSquareQuote,
-  Palette, Plug, ScrollText, Inbox, Timer, MessageSquareText, ShieldCheck, ShieldHalf, Stamp, Tag, UserRound, ToggleRight, Users, UsersRound, Webhook, type LucideIcon,
+  Palette, Plug, Radar, ScrollText, Inbox, Timer, MessageSquareText, ShieldCheck, ShieldHalf, Stamp, Tag, UserRound, ToggleRight, Users, UsersRound, Webhook, type LucideIcon,
 } from 'lucide-react';
 import type { Action, Permission } from '@social-lite/core';
 import dynamic from 'next/dynamic';
@@ -27,6 +27,7 @@ const UtmDefaultsSettings = dynamic(() => import('@/components/links/links').the
 const InboxChannelsSettings = dynamic(() => import('@/components/inbox/settings').then((m) => m.InboxChannelsSettings), { loading });
 const ServiceLevelsSettings = dynamic(() => import('@/components/inbox/settings').then((m) => m.ServiceLevelsSettings), { loading });
 const SavedRepliesSettings = dynamic(() => import('@/components/inbox/settings').then((m) => m.SavedRepliesSettings), { loading });
+const ListeningSourcesSettings = dynamic(() => import('@/components/listening/sources-settings').then((m) => m.ListeningSourcesSettings), { loading });
 const FeatureFlagsSettings = dynamic(() => import('@/components/support/support').then((m) => m.FeatureFlagsSettings), { loading });
 import {
   AppearanceSection, ApprovalPoliciesSection, BrandingSection, BrandVoiceSection, DataExportSection, ProfileSection, PublishingDefaultsSection,
@@ -88,11 +89,15 @@ export const SETTINGS: SettingsGroup[] = [
     { slug: 'google', label: 'Google Drive and Docs', icon: FolderInput, keywords: 'drive docs import sources export', render: () => <SourceConnectionsSettings source="google" />, visible: (p) => p.canV2('connections.read') },
     { slug: 'notion', label: 'Notion', icon: BookText, keywords: 'notion pages databases import sources writeback', render: () => <SourceConnectionsSettings source="notion" />, visible: (p) => p.canV2('connections.read') },
     { slug: 'health', label: 'Connection health', icon: HeartPulse, keywords: 'reconnect permissions expiring', href: '/accounts/health' },
+    { slug: 'business', label: 'Business integrations', icon: Cable, keywords: 'asana monday hubspot google business profile translation slack mailchimp crm tasks', href: '/integrations', visible: (p) => p.canV2('integrations.read') },
   ]),
   G('inbox', 'Inbox', [
     { slug: 'channels', label: 'Channels', icon: Inbox, keywords: 'inbox messages comments messenger facebook page reply permissions capabilities', render: () => <InboxChannelsSettings />, visible: (p) => p.canV2('inbox.read') },
     { slug: 'service-levels', label: 'Service levels', icon: Timer, keywords: 'sla first response resolution business hours holidays cases', render: () => <ServiceLevelsSettings />, visible: (p) => p.canV2('inbox.read') },
     { slug: 'saved-replies', label: 'Saved replies', icon: MessageSquareText, keywords: 'canned templates responses', render: () => <SavedRepliesSettings />, visible: (p) => p.canV2('inbox.read') },
+  ]),
+  G('listening', 'Listening', [
+    { slug: 'sources', label: 'Sources', icon: Radar, keywords: 'listening coverage monitoring mentions sources licensed providers awaiting activation', render: () => <ListeningSourcesSettings />, visible: (p) => p.canV2('listening.read') },
   ]),
   G('automation', 'AI and automation', [
     { slug: 'voice', label: 'Brand voice', icon: MessageSquareQuote, keywords: 'tone terms hashtags footer cta', render: () => <BrandVoiceSection /> },

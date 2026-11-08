@@ -22,6 +22,8 @@ export const PROVIDER_HOSTS = new Set([
   'graph.threads.com', 'graph.threads.net',
   'api.pinterest.com', 'pinterest-media-upload.s3-accelerate.amazonaws.com',
   'bsky.social', 'public.api.bsky.app',
+  // V3.5 stream B: Google Business Profile reviews (WhatsApp uses graph.facebook.com, already listed).
+  'mybusiness.googleapis.com',
 ]);
 
 /** Operator-supplied hostnames: lower-case DNS names only (no IPs, ports, wildcards or schemes). */

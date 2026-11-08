@@ -73,6 +73,14 @@ const PROVIDER_GROUPS: Array<{ id: string; title: string; group: string }> = [
   { id: 'notion', title: 'Notion', group: 'notion' },
   { id: 'ai', title: 'AI assistance', group: 'ai' },
   { id: 'tipsignal', title: 'TipSignal', group: 'tipsignal' },
+  // V3.5 business integrations (stream C).
+  { id: 'asana', title: 'Asana', group: 'asana' },
+  { id: 'monday', title: 'monday.com', group: 'monday' },
+  { id: 'hubspot', title: 'HubSpot', group: 'hubspot' },
+  { id: 'gbp', title: 'Google Business Profile', group: 'gbp' },
+  { id: 'translate', title: 'Google Cloud Translation', group: 'translate' },
+  { id: 'slack', title: 'Slack', group: 'slack' },
+  { id: 'mailchimp', title: 'Mailchimp', group: 'mailchimp' },
 ];
 
 const envValue = (key: string): string | undefined => {

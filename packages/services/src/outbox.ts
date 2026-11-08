@@ -1,6 +1,7 @@
 // Transactional outbox writer. Call inside the same transaction as the state change.
 import type { Queryable } from '@social-lite/db';
 import type { V35OutboxEvent } from '@social-lite/core/contracts/v35-events';
+import { currentOrigin } from './automation/origin.js';
 
 export type OutboxEventType =
   | 'delivery.due'              // wake the worker for a specific delivery (fast path)
@@ -27,6 +28,12 @@ export async function writeOutbox(
   await db.query(
     `INSERT INTO outbox(workspace_id, aggregate_type, aggregate_id, event_type, payload, available_at)
      VALUES ($1,$2,$3,$4,$5,$6)`,
-    [e.workspaceId, e.aggregateType, e.aggregateId, e.eventType, JSON.stringify(e.payload ?? {}), e.availableAt ?? new Date()],
+    [e.workspaceId, e.aggregateType, e.aggregateId, e.eventType, JSON.stringify(withChangeOrigin(e.payload ?? {})), e.availableAt ?? new Date()],
   );
+}
+
+/** V3.5 loop prevention: events written while automation acts carry payload.origin (automation/origin.ts). */
+function withChangeOrigin(payload: Record<string, unknown>): Record<string, unknown> {
+  const o = currentOrigin();
+  return o && payload.origin === undefined ? { ...payload, origin: o } : payload;
 }

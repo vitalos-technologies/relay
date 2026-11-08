@@ -8,7 +8,9 @@ import { cn } from '@/components/ui';
 
 export type TimelineSide = 'them' | 'us';
 export type TimelineEntryView =
-  | { key: string; kind: 'message'; side: TimelineSide; author: string; body: string | null; at: string; meta?: ReactNode; edited?: boolean; deleted?: boolean; attachments?: string[] }
+  | { key: string; kind: 'message'; side: TimelineSide; author: string; body: string | null; at: string; meta?: ReactNode; edited?: boolean; deleted?: boolean; attachments?: ReactNode[];
+      /** Above the text (e.g. a rating or a "hidden" state) and an actions slot after the meta line. */
+      header?: ReactNode; actions?: ReactNode; muted?: boolean }
   | { key: string; kind: 'note'; author: string; body: string; at: string }
   | { key: string; kind: 'pending'; author: string; body: string; at: string; status: ReactNode; actions?: ReactNode }
   | { key: string; kind: 'system'; text: string; at: string };
@@ -44,12 +46,13 @@ export function ConversationTimeline({ entries, empty, className }: { entries: T
         const us = e.side === 'us';
         return (
           <li key={e.key} className={cn('flex max-w-[85%] flex-col gap-1', us ? 'ml-auto items-end' : 'items-start')}>
-            <div className={cn('rounded-2xl px-3 py-2 text-[13px] leading-relaxed', us ? 'rounded-br-md bg-[var(--accent-soft)]' : 'rounded-bl-md bg-raised')}>
+            <div className={cn('rounded-2xl px-3 py-2 text-[13px] leading-relaxed', us ? 'rounded-br-md bg-[var(--accent-soft)]' : 'rounded-bl-md bg-raised', e.muted && 'opacity-60')}>
+              {e.header ? <div className="mb-1">{e.header}</div> : null}
               {e.deleted ? <p className="italic text-muted">Deleted by the sender</p> : <p className="whitespace-pre-wrap break-words">{e.body}</p>}
-              {e.attachments?.length ? <p className="mt-1 text-xs text-muted">{e.attachments.join(' · ')}</p> : null}
+              {e.attachments?.length ? <p className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted">{e.attachments.map((a, i) => <span key={i}>{a}</span>)}</p> : null}
             </div>
             <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted">
-              <span>{e.author}</span>·<time dateTime={e.at}>{time(e.at)}</time>{e.edited ? <span>· edited</span> : null}{e.meta}
+              <span>{e.author}</span>·<time dateTime={e.at}>{time(e.at)}</time>{e.edited ? <span>· edited</span> : null}{e.meta}{e.actions}
             </p>
           </li>
         );

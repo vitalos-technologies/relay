@@ -2,130 +2,17 @@
 // Settings → Inbox: Channels (use a connected account in the inbox; status + missing permissions; honest capability
 // record per network), Service levels (business hours, holidays, targets) and Saved replies.
 import { useMemo, useState } from 'react';
-import { CircleAlert, CircleCheck, FlaskConical, MessageSquarePlus, Plus } from 'lucide-react';
-import type { ChannelCapability, InboxChannelJson, SlaPolicyDto, Support } from '@social-lite/core/contracts/v35-inbox';
+import { MessageSquarePlus } from 'lucide-react';
+import type { SlaPolicyDto } from '@social-lite/core/contracts/v35-inbox';
 import { api } from '@/lib/client/api';
 import { useApi } from '@/lib/client/use-api';
 import { useSession } from '@/lib/client/session';
-import type { Connection } from '@/lib/client/types';
 import {
-  Badge, Button, Card, CardHeader, Checkbox, Dialog, EmptyState, ErrorState, Field, Input, Select, SimulatedBadge, SkeletonRows, Switch, Table, THead, Th, Tr, Td, Textarea, useToast,
+  Button, Card, CardHeader, Checkbox, Dialog, EmptyState, ErrorState, Field, Input, SkeletonRows, Switch, Textarea, useToast,
 } from '@/components/ui';
-import { CHANNEL_LABEL } from './labels';
 
-const SUPPORT: Record<Support, { label: string; tone: 'success' | 'warn' | 'neutral' | 'info' }> = {
-  supported: { label: 'Supported', tone: 'success' }, needs_approval: { label: 'Needs approval', tone: 'warn' },
-  not_available: { label: 'Not available', tone: 'neutral' }, not_implemented: { label: 'Not built yet', tone: 'info' },
-};
-
-export function InboxChannelsSettings() {
-  const toast = useToast();
-  const { session, canV2 } = useSession();
-  const channels = useApi<{ items: InboxChannelJson[] }>('/api/inbox/channels');
-  const caps = useApi<{ items: Array<ChannelCapability & { implemented: boolean }> }>('/api/inbox/capabilities');
-  const [brand, setBrand] = useState(session.brands[0]?.id ?? '');
-  const conns = useApi<{ items: Connection[] }>(brand ? `/api/brands/${brand}/connections` : null);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [sim, setSim] = useState<InboxChannelJson | null>(null);
-  const manage = canV2('inbox.manage');
-  const enabled = new Set((channels.data?.items ?? []).map((c) => c.connection_id));
-  const candidates = (conns.data?.items ?? []).filter((c) => c.provider === 'facebook' && !c.disconnected_at && !enabled.has(c.id));
-
-  const run = async (key: string, fn: () => Promise<unknown>, ok: string) => {
-    setBusy(key);
-    try { await fn(); toast.success(ok); await channels.refetch(); } catch (e) { toast.error(e); } finally { setBusy(null); }
-  };
-
-  return (
-    <div className="flex max-w-4xl flex-col gap-6">
-      <Card aria-labelledby="h-ch">
-        <CardHeader id="h-ch" title="In the inbox" />
-        {channels.error ? <ErrorState error={channels.error} onRetry={channels.refetch} /> : !channels.data ? <SkeletonRows rows={2} className="p-4" /> : !channels.data.items.length ? (
-          <EmptyState compact title="No channels in the inbox yet" />
-        ) : (
-          <ul className="divide-y divide-border">
-            {channels.data.items.map((c) => (
-              <li key={c.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
-                <div className="min-w-0 flex-1">
-                  <p className="flex flex-wrap items-center gap-2 text-[14px] font-medium">{c.display_name}{c.is_simulated ? <SimulatedBadge /> : null}</p>
-                  <p className="text-xs text-muted">{CHANNEL_LABEL[c.kind]} · {c.enabled_types.map((t) => (t === 'dm' ? 'messages' : `${t}s`)).join(', ')}</p>
-                  {c.missing_permissions.length ? <p className="mt-1 text-xs text-warn">Missing: {c.missing_permissions.join(', ')}</p> : null}
-                </div>
-                <Badge tone={c.status === 'active' ? 'success' : c.status === 'paused' ? 'neutral' : 'warn'} icon={c.status === 'active' ? <CircleCheck aria-hidden className="size-3.5" /> : <CircleAlert aria-hidden className="size-3.5" />}>
-                  {c.status === 'active' ? 'Receiving' : c.status === 'paused' ? 'Paused' : c.status === 'needs_permission' ? 'Permission missing' : 'Needs attention'}
-                </Badge>
-                {manage ? (
-                  <div className="flex gap-2">
-                    {c.is_simulated ? <Button size="sm" variant="ghost" icon={<FlaskConical aria-hidden className="size-4" />} onClick={() => setSim(c)}>Simulate</Button> : null}
-                    <Button size="sm" variant="ghost" loading={busy === c.id} onClick={() => run(c.id, () => api.patch(`/api/inbox/channels/${c.id}`, { paused: c.status !== 'paused' }), c.status === 'paused' ? 'Resumed' : 'Paused')}>{c.status === 'paused' ? 'Resume' : 'Pause'}</Button>
-                  </div>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
-        {manage ? (
-          <div className="flex flex-wrap items-end gap-3 border-t border-border px-4 py-3">
-            {session.brands.length > 1 ? (
-              <Field label="Brand" className="w-full sm:w-64"><Select value={brand} onChange={(e) => setBrand(e.target.value)}>{session.brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</Select></Field>
-            ) : null}
-            {candidates.length ? candidates.map((c) => (
-              <Button key={c.id} variant="secondary" icon={<Plus aria-hidden className="size-4" />} loading={busy === c.id}
-                onClick={() => run(c.id, () => api.post('/api/inbox/channels', { connection_id: c.id }), 'Channel added')}>Add {c.display_name}</Button>
-            )) : <p className="text-[13px] text-muted">{conns.data ? 'Connect a Facebook Page in Connections to add it here.' : ''}</p>}
-          </div>
-        ) : null}
-      </Card>
-
-      <Card aria-labelledby="h-cap">
-        <CardHeader id="h-cap" title="What each network allows" />
-        {!caps.data ? <SkeletonRows rows={4} className="p-4" /> : (
-          <div className="overflow-x-auto px-1 pb-2">
-            <Table caption="Inbox capabilities by network">
-              <THead><Tr><Th>Network</Th><Th>Messages</Th><Th>Comments</Th><Th>Reviews / mentions</Th><Th>In Relay</Th></Tr></THead>
-              <tbody>
-                {caps.data.items.map((c) => {
-                  const cell = (k: 'dm' | 'comment' | 'review' | 'mention') => { const v = c.conversationTypes[k]; return v ? <Badge tone={SUPPORT[v.reply].tone}>{SUPPORT[v.reply].label}</Badge> : <span className="text-subtle">—</span>; };
-                  return (
-                    <Tr key={c.kind}>
-                      <Td className="font-medium">{CHANNEL_LABEL[c.kind]}</Td>
-                      <Td>{cell('dm')}</Td><Td>{cell('comment')}</Td><Td>{c.conversationTypes.review ? cell('review') : cell('mention')}</Td>
-                      <Td>{c.implemented ? <Badge tone="success">Available</Badge> : <span className="text-xs text-muted">Not yet</span>}</Td>
-                    </Tr>
-                  );
-                })}
-              </tbody>
-            </Table>
-          </div>
-        )}
-      </Card>
-      {sim ? <SimulateDialog channel={sim} onClose={() => setSim(null)} /> : null}
-    </div>
-  );
-}
-
-function SimulateDialog({ channel, onClose }: { channel: InboxChannelJson; onClose: () => void }) {
-  const toast = useToast();
-  const [kind, setKind] = useState<'dm' | 'comment'>('dm');
-  const [text, setText] = useState('');
-  const [name, setName] = useState('');
-  const [busy, setBusy] = useState(false);
-  return (
-    <Dialog open onOpenChange={(o) => !o && onClose()} title="Simulate a customer message" description="Simulated channel only. Nothing is received from Facebook." footer={<>
-      <Button variant="ghost" onClick={onClose}>Cancel</Button>
-      <Button variant="primary" loading={busy} disabledReason={!text.trim() ? 'Write a message' : null} onClick={async () => {
-        setBusy(true);
-        try { await api.post(`/api/inbox/channels/${channel.id}/simulate`, { kind, text: text.trim(), ...(name.trim() ? { name: name.trim() } : {}) }); toast.success('Simulated message received'); onClose(); } catch (e) { toast.error(e); } finally { setBusy(false); }
-      }}>Receive</Button>
-    </>}>
-      <div className="flex flex-col gap-3">
-        <Field label="Type"><Select value={kind} onChange={(e) => setKind(e.target.value as 'dm' | 'comment')}><option value="dm">Private message</option><option value="comment">Comment on a post</option></Select></Field>
-        <Field label="Customer name"><Input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} placeholder="Simulated customer" /></Field>
-        <Field label="Message"><Textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} maxLength={2000} /></Field>
-      </div>
-    </Dialog>
-  );
-}
+// Channels moved to channels-settings.tsx (stream B: all networks, Add channel per network, ownership/templates dialogs).
+export { InboxChannelsSettings } from './channels-settings';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 

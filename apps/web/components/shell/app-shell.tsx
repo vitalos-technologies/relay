@@ -7,7 +7,7 @@ import { usePathname } from 'next/navigation';
 import { Suspense, useEffect, useState, type ReactNode } from 'react';
 import {
   Activity, CalendarDays, PanelsTopLeft, ChartColumn, CheckCheck, Ellipsis, Flag, FolderOpen, LayoutDashboard, Plug, Settings, ShieldCheck, SquarePen, Users, Wrench,
-  type LucideIcon, ListTodo, Inbox } from 'lucide-react';
+  type LucideIcon, ListTodo, Inbox, Radar, Sparkles, Blocks } from 'lucide-react';
 import type { Action, Permission } from '@social-lite/core';
 import { useSession } from '@/lib/client/session';
 import { useApi } from '@/lib/client/use-api';
@@ -40,9 +40,15 @@ export const NAV: NavItem[] = [
   { href: '/approvals', label: 'Approvals', icon: CheckCheck, badge: 'approvals', mobile: true },
   // V3.5: customer conversations (shown only with inbox access on some brand).
   { href: '/inbox', label: 'Inbox', icon: Inbox, v2: ['inbox.read'] },
+  // V3.5 stream D: listening (connected-source monitoring), shown with listening.read on some brand.
+  { href: '/listening', label: 'Listening', icon: Radar, v2: ['listening.read'] },
+  // V3.5 stream E: AI assistant (+ automation under it), shown with ai.use or automation.manage.
+  { href: '/assistant', label: 'Assistant', icon: Sparkles, v2: ['ai.use', 'automation.manage'], also: ['/automation'] },
   { href: '/tasks', label: 'Tasks', icon: ListTodo },
   { href: '/analytics', label: 'Analytics', icon: ChartColumn, perm: 'history.read' },
   { href: '/accounts', label: 'Connections', icon: Plug },
+  // V3.5 stream C: business integrations hub (Asana, monday.com, HubSpot, Google Business Profile, Translation, Slack, Mailchimp).
+  { href: '/integrations', label: 'Integrations', icon: Blocks, v2: ['integrations.read'] },
   { href: '/team', label: 'Team', icon: Users, v2: ['members.read', 'teams.read'] },
   { href: '/settings', label: 'Settings', icon: Settings, also: ['/security', '/mcp/settings'] },
 ];

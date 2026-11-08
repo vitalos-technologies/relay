@@ -10,3 +10,14 @@ export * from './saved.js';
 export * from './simulate.js';
 export * from './hooks.js';
 export * from './admin.js';
+// Stream B (remaining inbox capabilities)
+export * from './channels-runtime.js';
+export * from './channels-integration.js';
+export * from './channels-whatsapp.js';
+export * from './channels-telegram.js';
+export * from './channels-poll.js';
+export * from './moderation.js';
+export * from './attachments.js';
+export * from './identity.js';
+export * from './csat.js';
+export * from './worker-more.js';

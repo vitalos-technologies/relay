@@ -60,7 +60,7 @@ function parse(req: HttpRequest): Parsed | HttpResponse {
   const m = /^\/(v\d+\.\d+)\/(.+)$/.exec(u.pathname);
   if (!m) return invalidParam('Unknown path components: an API version is required');
   const params = new URLSearchParams(u.search);
-  if (req.method === 'POST' && typeof req.body === 'string') {
+  if ((req.method === 'POST' || req.method === 'DELETE') && typeof req.body === 'string') {
     for (const [k, v] of new URLSearchParams(req.body)) params.append(k, v);
   }
   const auth = req.headers?.authorization ?? req.headers?.Authorization;

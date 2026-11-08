@@ -12,6 +12,7 @@ import {
   PageHeader, Pagination, Select, Skeleton, Tabs, TabsContent, TabsList, TabsTrigger, Textarea, cn, useToast,
 } from '@/components/ui';
 import { UploadDropzone } from '@/components/library/upload-dropzone';
+import { AssistantButton } from '@/components/assistant/assistant-panel'; // V3.5 stream E
 import dynamic from 'next/dynamic';
 // Sources tab (Google/Notion, incl. the Drive picker) loads only when opened.
 const ContentHubPanel = dynamic(() => import('@/components/content-hub/content-hub-panel').then((m) => m.ContentHubPanel), { loading: () => <Skeleton className="h-48 w-full rounded-xl" /> });
@@ -40,7 +41,9 @@ export default function LibraryPage() {
     <>
       <PageHeader
         title="Content library"
-        actions={!brandFilter ? (
+        actions={<>
+          <AssistantButton surface="content_hub" size="md" brandId={brandFilter || localBrand || null} />
+          {!brandFilter ? (
           <div className="w-auto min-w-[180px] max-w-[360px]">
             <label htmlFor="lib-brand" className="sr-only">Brand</label>
             <Select id="lib-brand" value={localBrand} onChange={(e) => setLocalBrand(e.target.value)} className="[field-sizing:content] max-w-[360px]"
@@ -49,6 +52,7 @@ export default function LibraryPage() {
             </Select>
           </div>
         ) : null}
+        </>}
       />
       <Tabs value={tab} onValueChange={(v) => setParams({ tab: v === 'assets' ? null : v })}>
         <TabsList label="Library sections">

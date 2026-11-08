@@ -12,21 +12,29 @@ import { getPool } from '@social-lite/db';
 import { DbMockStore } from '../mock-store.js';
 import { loadChannelFor } from './channels.js';
 import { ingestProviderPayload } from './ingest.js';
+import { simulateMore } from './channels-simulate.js';
 
 export const simulateSchema = z.object({
-  kind: z.enum(['dm', 'comment']),
+  kind: z.enum(['dm', 'comment', 'mention', 'review']),
   text: z.string().trim().min(1).max(2000),
   name: z.string().trim().min(1).max(80).optional(),
   /** Continue an existing simulated thread (PSID or top-level comment id). */
-  thread: z.string().regex(/^mock_[A-Za-z0-9_]{3,80}$/).optional(),
+  thread: z.string().regex(/^(mock_[A-Za-z0-9_]{3,80}|-?\d{5,20})$/).optional(),
   /** Backdate (tests: reply-window expiry). Minutes in the past. */
   minutes_ago: z.number().int().min(0).max(60 * 24 * 30).optional(),
+  // Stream B: review star rating (Google Business Profile), one attachment, group chat (Telegram).
+  rating: z.number().int().min(1).max(5).optional(),
+  attachment: z.boolean().optional(),
+  group: z.boolean().optional(),
 }).strict();
 
 export async function simulateInbound(ctx: Ctx, channelId: string, input: z.infer<typeof simulateSchema>): Promise<{ thread: string; external_id: string }> {
   if (config().APP_ENV === 'production' || !mockProvidersEnabled()) throw new AppError('forbidden', 'Simulated messages are disabled in this environment.');
   const ch = await loadChannelFor(ctx, channelId, 'inbox.manage');
-  if (!ch.is_simulated || ch.kind !== 'facebook_page' || !ch.external_account_id.startsWith('mock_')) throw new AppError('invalid_state', 'Only simulated channels accept simulated messages.');
+  if (!ch.is_simulated) throw new AppError('invalid_state', 'Only simulated channels accept simulated messages.');
+  if (ch.kind !== 'facebook_page') return simulateMore(ctx, ch, input);   // stream B networks (channels-simulate.ts)
+  if (!ch.external_account_id.startsWith('mock_')) throw new AppError('invalid_state', 'Only simulated channels accept simulated messages.');
+  if (input.kind !== 'dm' && input.kind !== 'comment') throw new AppError('validation_failed', 'Facebook supports messages and comments.');
   const at = new Date(Date.now() - (input.minutes_ago ?? 0) * 60_000);
   const pageId = ch.external_account_id;
   const store = new DbMockStore();

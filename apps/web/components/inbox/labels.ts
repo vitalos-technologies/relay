@@ -45,3 +45,12 @@ export function dueLabel(iso: string | null, now = Date.now()): string {
 }
 
 export const newKey = () => (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}${Math.random()}`).replace(/[^A-Za-z0-9]/g, '').slice(0, 40);
+
+/** Stream B: reply-window hint under the composer ("Reply window closes in 5h"); WhatsApp adds that replies inside it are free. */
+export function windowLabel(endsAt: string | null, kind: ChannelKind, now = Date.now()): string | null {
+  if (!endsAt) return null;
+  const m = Math.round((Date.parse(endsAt) - now) / 60_000);
+  if (m <= 0) return null;
+  const left = m < 60 ? `${m}m` : m < 60 * 24 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${Math.round(m / 1440)}d`;
+  return `Reply window closes in ${left}${kind === 'whatsapp' ? ' · replies inside it are free' : ''}`;
+}

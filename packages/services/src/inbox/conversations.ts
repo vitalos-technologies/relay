@@ -17,6 +17,7 @@ import { staffAllowed } from '../collab/access.js';
 import { authorizeCtx, brandAllowed, requireAction } from '../tenancy.js';
 import { getSetting } from '../settings.js';
 import { iso, inboxEvent, loadChannelRow, loadConversation, people, type ConversationRow } from './shared.js';
+import { moderationFor } from './moderation.js';
 
 type ListRow = ConversationRow & { ch_kind: ConversationListItem['channel']['kind']; ch_name: string; ch_sim: boolean; c_name: string | null; c_handle: string | null; case_number: string | null; case_state: string | null };
 
@@ -107,13 +108,14 @@ export async function inboxCounts(ctx: Ctx): Promise<Record<InboxQueue, number>>
 }
 
 // ------------------------------------------------------------------ detail
-type AttemptRow = { id: string; conversation_id: string; mode: 'public_reply' | 'private_message'; body: string; state: ReplyAttemptDto['state']; created_by: string | null; created_at: Date; sent_at: Date | null; attempts: number; provider_message_id: string | null; provider_result: ReplyAttemptDto['provider_result']; error_code: string | null; error_message: string | null; is_simulated: boolean };
+type AttemptRow = { id: string; conversation_id: string; mode: 'public_reply' | 'private_message'; body: string; state: ReplyAttemptDto['state']; created_by: string | null; created_at: Date; sent_at: Date | null; attempts: number; provider_message_id: string | null; provider_result: ReplyAttemptDto['provider_result']; error_code: string | null; error_message: string | null; is_simulated: boolean; template?: ReplyAttemptDto['template']; charge?: ReplyAttemptDto['charge'] };
 
 export function attemptDto(a: AttemptRow, ppl: Map<string, PersonRef>): ReplyAttemptDto {
   return {
     id: a.id, conversation_id: a.conversation_id, mode: a.mode, body: a.body, state: a.state, created_by: (a.created_by && ppl.get(a.created_by)) || { id: a.created_by ?? '', name: null, email: null },
     created_at: a.created_at.toISOString(), sent_at: iso(a.sent_at), attempts: a.attempts, provider_result: a.provider_result,
     error: a.error_code ? { code: a.error_code, message: a.error_message ?? '' } : null, is_simulated: a.is_simulated,
+    template: a.template ?? null, charge: a.charge ?? null,   // stream B (WhatsApp)
   };
 }
 
@@ -136,7 +138,7 @@ export async function getConversation(ctx: Ctx, id: string, q: { before?: string
   const before = q.before && !Number.isNaN(Date.parse(q.before)) ? new Date(q.before) : null;
   const [listRow, msgs, notes, attempts, events, draft, presence] = await Promise.all([
     one<ListRow>(db, `${LIST_SELECT} WHERE c.id=$1`, [id]),
-    many<{ id: string; direction: 'inbound' | 'outbound'; external_id: string | null; author_contact_id: string | null; author_user_id: string | null; body: string | null; revision: number; edited_at: Date | null; deleted_at: Date | null; attachments: Array<{ type: string; name: string | null; size: number | null }>; provider_created_at: Date; automated: boolean; delivery_state: 'sent' | 'delivered' | 'read' | null; reply_attempt_id: string | null; c_name: string | null }>(db,
+    many<{ id: string; direction: 'inbound' | 'outbound'; external_id: string | null; author_contact_id: string | null; author_user_id: string | null; body: string | null; revision: number; edited_at: Date | null; deleted_at: Date | null; attachments: Array<{ type: string; name: string | null; size: number | null }>; provider_created_at: Date; automated: boolean; delivery_state: 'sent' | 'delivered' | 'read' | null; reply_attempt_id: string | null; c_name: string | null; meta: Record<string, unknown>; hidden_at: Date | null; removed_at: Date | null }>(db,
       `SELECT m.*, ct.display_name AS c_name FROM inbox_messages m LEFT JOIN inbox_contacts ct ON ct.id=m.author_contact_id
         WHERE m.conversation_id=$1 AND ($2::timestamptz IS NULL OR m.provider_created_at < $2) ORDER BY m.provider_created_at DESC, m.id DESC LIMIT 51`, [id, before]),
     many<{ id: string; author_id: string | null; body: string; mentions: string[]; created_at: Date; edited_at: Date | null }>(db,
@@ -151,6 +153,10 @@ export async function getConversation(ctx: Ctx, id: string, q: { before?: string
   ]);
   const ppl = await people(db, [...msgs.map((m) => m.author_user_id), ...notes.map((n) => n.author_id), ...attempts.map((a) => a.created_by), ...events.map((e) => e.actor_id), ...presence.map((p) => p.user_id)]);
   const sentBy = new Map((await many<{ id: string; created_by: string | null }>(db, `SELECT id, created_by FROM inbox_reply_attempts WHERE id = ANY($1::uuid[])`, [msgs.map((m) => m.reply_attempt_id).filter(Boolean)])).map((x) => [x.id, x.created_by]));
+  // Stream B: fetched-attachment states + permitted moderation per message.
+  const attStates = new Map((await many<{ message_id: string; idx: number; state: 'stored' | 'failed' | 'blocked' }>(db, `SELECT message_id, idx, state FROM inbox_attachments WHERE message_id = ANY($1::uuid[])`, [msgs.map((m) => m.id)])).map((x) => [`${x.message_id}:${x.idx}`, x.state]));
+  const chKind = listRow.ch_kind;
+  const canModerate = authorizeCtx(ctx, 'inbox.reply', { brandId: conv.brand_id }).allowed;
   const timeline: TimelineEntry[] = [
     ...msgs.slice(0, 50).map((m): TimelineEntry => {
       const by = m.reply_attempt_id ? sentBy.get(m.reply_attempt_id) : m.author_user_id;
@@ -160,6 +166,11 @@ export async function getConversation(ctx: Ctx, id: string, q: { before?: string
           author: m.direction === 'inbound' ? { kind: 'contact', name: m.c_name } : by ? { kind: 'user', name: ppl.get(by)?.name ?? ppl.get(by)?.email ?? null } : { kind: 'business', name: null },
           body: m.body, revision: m.revision, edited_at: iso(m.edited_at), deleted_at: iso(m.deleted_at), attachments: m.attachments.map((a) => ({ type: a.type, name: a.name, size: a.size })),
           at: m.provider_created_at.toISOString(), automated: m.automated, delivery: m.direction === 'outbound' ? m.delivery_state : null, reply_attempt_id: m.reply_attempt_id,
+          rating: typeof m.meta?.rating === 'number' ? m.meta.rating : null, hidden: !!m.hidden_at, removed: !!m.removed_at,
+          failed: (m.meta?.failed as { title?: string } | undefined)?.title ?? null,
+          pricing: (m.meta?.pricing as { billable: boolean; category: string | null } | undefined) ?? null,
+          moderation: canModerate ? moderationFor(conv.kind, chKind, m) : [],
+          attachment_state: m.attachments.map((a, i) => attStates.get(`${m.id}:${i}`) ?? ((a as { providerRef?: string | null }).providerRef ? 'available' : 'unavailable')),
         },
       };
     }),

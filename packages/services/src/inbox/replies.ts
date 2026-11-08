@@ -10,7 +10,7 @@
 //  - internal notes are a separate table; nothing here reads them.
 import { createHash } from 'node:crypto';
 import { AppError, notFound } from '@social-lite/core';
-import type { ReplyAttemptDto, ReplyRequest, ThreadChangedDetails } from '@social-lite/core/contracts/v35-inbox';
+import type { ReplyAttemptDto, ReplyRequest, TemplateSend, ThreadChangedDetails } from '@social-lite/core/contracts/v35-inbox';
 import { getInboxAdapter } from '@social-lite/providers';
 import { getPool, many, maybeOne, one, withTx, type Queryable } from '@social-lite/db';
 import { z } from 'zod';
@@ -20,9 +20,11 @@ import { writeOutbox } from '../outbox.js';
 import { log } from '../log.js';
 import { loadUserAuthz } from '../authz.js';
 import { staffAllowed } from '../collab/access.js';
-import { buildAdapterContext, getUsableCredentials, CredentialUnavailableError } from '../connections/index.js';
+import { ChannelUnavailableError, channelRuntime } from './channels-runtime.js';
+import { prepareTemplateSend } from './channels-whatsapp.js';
 import { recordActivity } from '../connectors/store.js';
 import { getSetting } from '../settings.js';
+import { isAutomated } from '../automation/origin.js';
 import { onBusinessReply } from './cases.js';
 import { attemptDto } from './conversations.js';
 import { inboxEvent, loadChannelRow, loadConversation, people, type ConversationRow } from './shared.js';
@@ -37,9 +39,13 @@ export const replySchema = z.object({
   base_version: z.number().int().positive(),
   idempotency_key: z.string().regex(/^[A-Za-z0-9_-]{8,80}$/),
   acknowledge_version: z.number().int().positive().nullable().optional(),
+  // Stream B (WhatsApp): approved template + the charge acknowledgement shown before sending.
+  template: z.object({ name: z.string().regex(/^[a-z0-9_]{1,512}$/), language: z.string().regex(/^[A-Za-z_]{2,15}$/), params: z.array(z.string().trim().min(1).max(1000)).max(20).default([]) }).strict().nullable().optional(),
+  acknowledge_charge: z.boolean().optional(),
 }).strict();
 
-type AttemptRow = Parameters<typeof attemptDto>[0] & { workspace_id: string; brand_id: string; channel_id: string; base_version: number; idempotency_key: string; body_sha256: string; reply_to_external_id: string | null; next_attempt_at: Date; lease_owner: string | null; reconcile_after: Date | null; automated: boolean };
+type AttemptRow = Parameters<typeof attemptDto>[0] & { workspace_id: string; brand_id: string; channel_id: string; base_version: number; idempotency_key: string; body_sha256: string; reply_to_external_id: string | null; next_attempt_at: Date; lease_owner: string | null; reconcile_after: Date | null; automated: boolean;
+  template: TemplateSend | null; charge: Record<string, unknown> | null; target_meta: Record<string, unknown> | null; purpose: 'reply' | 'csat' };
 
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 
@@ -79,7 +85,10 @@ export async function requestReply(ctx: Ctx, conversationId: string, input: Repl
     if (ch.status !== 'active') throw new AppError('invalid_state', ch.status === 'paused' ? 'This channel is paused.' : (ch.status_detail ?? 'This channel needs attention.'), undefined, { reason: 'channel_unavailable' });
     if (conv.status === 'spam') throw new AppError('invalid_state', 'Marked as spam. Move it out of spam to reply.', undefined, { reason: 'conversation_closed' });
     const rules = adapter.replyRules({ kind: conv.kind, mode: input.mode, now: new Date(), lastInboundAt: conv.last_inbound_at, firstInboundAt: conv.first_inbound_at, privateReplyUsed: conv.private_reply_used, features: await features() });
-    if (!rules.allowed) throw new AppError('invalid_state', rules.message, undefined, { reason: rules.code });
+    // Stream B: a WhatsApp template is the documented way to write outside the 24 h window; the charge must be acknowledged.
+    const tpl = input.template ? prepareTemplateSend(ch, input.template, rules.allowed) : null;
+    if (!rules.allowed && !tpl) throw new AppError('invalid_state', rules.message, undefined, { reason: rules.code });
+    if (tpl?.charge.billable && !input.acknowledge_charge) throw new AppError('invalid_state', `${tpl.charge.note} Confirm the charge to send.`, undefined, { reason: 'charge_ack_required', charge: tpl.charge });
     // Collision / thread-changed check on the locked row.
     if (input.base_version !== conv.version && input.acknowledge_version !== conv.version) {
       const details: ThreadChangedDetails = { current_version: conv.version, changes: await changesSince(tx, conv, input.base_version, ctx.actor.userId) };
@@ -90,13 +99,14 @@ export async function requestReply(ctx: Ctx, conversationId: string, input: Repl
     if (inflight) {
       throw new AppError('conflict', 'Another reply is being sent on this conversation. Wait for its result.', undefined, { reason: 'reply_collision', current_version: conv.version, changes: await changesSince(tx, conv, input.base_version, ctx.actor.userId) });
     }
-    const replyTo = input.mode === 'private_message' && conv.kind === 'comment'
-      ? (await maybeOne<{ external_id: string }>(tx, `SELECT external_id FROM inbox_messages WHERE conversation_id=$1 AND direction='inbound' AND deleted_at IS NULL ORDER BY provider_created_at DESC LIMIT 1`, [conversationId]))?.external_id ?? null
-      : null;
+    // Stream B: the message being answered (latest customer message) + its provider refs, snapshotted with the attempt.
+    const last = await maybeOne<{ external_id: string; meta: Record<string, unknown> }>(tx, `SELECT external_id, meta FROM inbox_messages WHERE conversation_id=$1 AND direction='inbound' AND deleted_at IS NULL AND external_id IS NOT NULL ORDER BY provider_created_at DESC LIMIT 1`, [conversationId]);
+    const replyTo = last?.external_id ?? null;
     const a = await one<AttemptRow>(tx,
-      `INSERT INTO inbox_reply_attempts(workspace_id, brand_id, conversation_id, channel_id, mode, body, body_sha256, base_version, idempotency_key, reply_to_external_id, is_simulated, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-      [ctx.access.workspaceId, conv.brand_id, conversationId, ch.id, input.mode, input.body, sha(input.body), conv.version, input.idempotency_key, replyTo, ch.is_simulated, ctx.actor.userId]);
+      `INSERT INTO inbox_reply_attempts(workspace_id, brand_id, conversation_id, channel_id, mode, body, body_sha256, base_version, idempotency_key, reply_to_external_id, is_simulated, created_by, automated, template, charge, target_meta)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
+      [ctx.access.workspaceId, conv.brand_id, conversationId, ch.id, input.mode, tpl ? tpl.rendered : input.body, sha(input.body), conv.version, input.idempotency_key, replyTo, ch.is_simulated, ctx.actor.userId, isAutomated(),
+        tpl ? JSON.stringify(tpl.template) : null, tpl ? JSON.stringify(tpl.charge) : null, last ? JSON.stringify(last.meta ?? {}) : null]);
     await tx.query(`UPDATE inbox_conversations SET version=version+1, updated_at=now(), private_reply_used = private_reply_used OR ($2 = 'private_message' AND kind='comment') WHERE id=$1`, [conversationId, input.mode]);
     await tx.query(`DELETE FROM inbox_drafts WHERE conversation_id=$1 AND user_id=$2`, [conversationId, ctx.actor.userId]);
     await inboxEvent(tx, { workspaceId: conv.workspace_id, conversationId, brandId: conv.brand_id, kind: 'reply.queued', actorId: ctx.actor.userId, data: { attempt_id: a.id, mode: input.mode } });
@@ -162,6 +172,11 @@ async function markSent(a: AttemptRow, externalId: string, detail: Record<string
   });
 }
 
+export type AutomatedReplyGuard = (a: { workspaceId: string; idempotencyKey: string; brandId: string; conversationId: string }) => Promise<{ allowed: true } | { allowed: false; code: string; message: string }>;
+let automatedGuard: AutomatedReplyGuard | null = null;
+/** Stream E registers the dispatch-time policy check for automated replies (automation/guard.ts). */
+export function registerAutomatedReplyGuard(g: AutomatedReplyGuard | null): void { automatedGuard = g; }
+
 /** Process one reply attempt (fast path from the 'inbox-reply' queue and the recovery sweep). */
 export async function dispatchReply(attemptId: string, workerId: string): Promise<ReplyAttemptDto['state'] | 'skipped'> {
   const db = getPool();
@@ -172,7 +187,13 @@ export async function dispatchReply(attemptId: string, workerId: string): Promis
   const conv = await maybeOne<ConversationRow>(db, `SELECT * FROM inbox_conversations WHERE id=$1`, [a.conversation_id]);
   const ch = conv ? await loadChannelRow(db, conv.channel_id) : null;
   const adapter = ch ? getInboxAdapter(ch.kind) : null;
-  if (!conv || !ch || !adapter || ch.disconnected_at || !ch.connection_id) { await settle(db, a, 'cancelled', 'channel_unavailable', 'The channel was removed before sending. Nothing was sent.'); return 'cancelled'; }
+  if (!conv || !ch || !adapter || ch.disconnected_at || (!ch.connection_id && !ch.integration_id)) { await settle(db, a, 'cancelled', 'channel_unavailable', 'The channel was removed before sending. Nothing was sent.'); return 'cancelled'; }
+  // V3.5 automation (stream E): automated attempts are re-checked against their automation policy (active, unexpired,
+  // not stopped, workspace emergency stop off, policy owner still allowed). No guard registered ⇒ refused.
+  if (a.automated) {
+    const g = automatedGuard ? await automatedGuard({ workspaceId: a.workspace_id, idempotencyKey: a.idempotency_key, brandId: a.brand_id, conversationId: a.conversation_id }) : { allowed: false as const, code: 'automation_unavailable', message: 'Automation is not available. Nothing was sent.' };
+    if (!g.allowed) { await settle(db, a, 'cancelled', g.code, g.message); return 'cancelled'; }
+  }
   // Re-check at send time: the sender still has inbox.reply on the brand (membership revocation blocks the send).
   if (a.created_by && !a.automated) {
     const s = await loadUserAuthz(a.created_by, a.workspace_id, null, db);
@@ -181,24 +202,23 @@ export async function dispatchReply(attemptId: string, workerId: string): Promis
   if (ch.status !== 'active') { await settle(db, a, 'failed', 'channel_unavailable', ch.status === 'paused' ? 'The channel is paused. Nothing was sent.' : 'The channel needs attention. Nothing was sent.'); return 'failed'; }
   if (conv.status === 'spam') { await settle(db, a, 'cancelled', 'conversation_closed', 'The conversation was marked as spam. Nothing was sent.'); return 'cancelled'; }
   const rules = adapter.replyRules({ kind: conv.kind, mode: a.mode, now: new Date(), lastInboundAt: conv.last_inbound_at, firstInboundAt: conv.first_inbound_at, privateReplyUsed: false, features: await features() });
-  if (!rules.allowed) { await settle(db, a, 'failed', rules.code, `${rules.message} Nothing was sent.`); return 'failed'; }
+  if (!rules.allowed && !a.template) { await settle(db, a, 'failed', rules.code, `${rules.message} Nothing was sent.`); return 'failed'; }
   const outside = await maybeOne(db, `SELECT 1 FROM inbox_messages WHERE conversation_id=$1 AND direction='outbound' AND reply_attempt_id IS NULL AND received_at > $2`, [conv.id, a.created_at]);
   if (outside) { await settle(db, a, 'cancelled', 'reply_collision', 'A reply was sent from outside Relay after this one was queued. Nothing was sent; review the thread.'); return 'cancelled'; }
 
-  let creds;
+  let rt;
   try {
-    creds = await getUsableCredentials(ch.connection_id);
+    rt = await channelRuntime(ch, db); // live channels always get the live transport; simulated ones the simulated API
   } catch (err) {
-    if (err instanceof CredentialUnavailableError && err.retryable && a.attempts < MAX_RETRIES) {
+    if (err instanceof ChannelUnavailableError && err.retryable && a.attempts < MAX_RETRIES) {
       await db.query(`UPDATE inbox_reply_attempts SET state='queued', next_attempt_at=now() + interval '60 seconds', lease_owner=NULL, lease_expires_at=NULL, error_code='credentials_unavailable', error_message=$2, updated_at=now() WHERE id=$1`, [a.id, err.message]);
       return 'queued';
     }
-    await settle(db, a, 'failed', 'reconnect_required', err instanceof CredentialUnavailableError ? `${err.message} Nothing was sent.` : 'The account could not be used. Nothing was sent.');
+    await settle(db, a, 'failed', 'reconnect_required', err instanceof ChannelUnavailableError ? `${err.message} Nothing was sent.` : 'The account could not be used. Nothing was sent.');
     return 'failed';
   }
-  const ctxA = await buildAdapterContext(creds.connection.provider, creds.connection); // live connections always get the live transport
-  const target = { conversationKind: conv.kind, threadKey: conv.external_thread_id, replyToExternalId: a.reply_to_external_id, contactExternalId: null };
-  const r = await adapter.sendReply(ctxA, creds.credentials, creds.connection, { mode: a.mode, target, text: a.body, tag: rules.tag, attemptId: a.id });
+  const target = { conversationKind: conv.kind, threadKey: conv.external_thread_id, replyToExternalId: a.reply_to_external_id, contactExternalId: null, replyToMeta: a.target_meta };
+  const r = await adapter.sendReply(rt.ctx, rt.creds, rt.conn, { mode: a.mode, target, text: a.body, tag: rules.allowed ? rules.tag : undefined, attemptId: a.id, template: a.template });
   await recordActivity(db, { workspaceId: a.workspace_id, channelId: ch.id, kind: 'sync', outcome: r.kind === 'sent' ? 'ok' : r.kind === 'retry' ? 'retry' : 'error', code: r.kind === 'sent' ? 'reply_sent' : r.code, message: r.kind === 'sent' ? null : r.message });
   switch (r.kind) {
     case 'sent':
@@ -215,9 +235,11 @@ export async function dispatchReply(attemptId: string, workerId: string): Promis
       return 'failed';
     case 'rejected':
       await settle(db, a, 'failed', r.code, r.message, { code: r.code, message: r.message });
-      if (r.reconnect) {
+      if (r.reconnect && ch.connection_id) {
         const { markReconnectRequired } = await import('../connections/index.js');
         await markReconnectRequired(ch.connection_id, r.message, 'inbox').catch(() => undefined);
+      } else if (r.reconnect && ch.integration_id) {
+        await db.query(`UPDATE integration_connections SET status='reconnect_required', health_message=$2, updated_at=now() WHERE id=$1`, [ch.integration_id, r.message.slice(0, 300)]).catch(() => undefined);
       }
       return 'failed';
     case 'unknown':
@@ -238,11 +260,10 @@ export async function reconcileUnknownReplies(limit = 20): Promise<{ resolved: n
     const ch = conv ? await loadChannelRow(db, conv.channel_id) : null;
     const adapter = ch ? getInboxAdapter(ch.kind) : null;
     let found: Awaited<ReturnType<NonNullable<typeof adapter>['findSent']>> = { found: false };
-    if (conv && ch?.connection_id && adapter) {
+    if (conv && ch && (ch.connection_id || ch.integration_id) && adapter) {
       try {
-        const creds = await getUsableCredentials(ch.connection_id);
-        const ctxA = await buildAdapterContext(creds.connection.provider, creds.connection);
-        found = await adapter.findSent(ctxA, creds.credentials, creds.connection, { mode: a.mode, target: { conversationKind: conv.kind, threadKey: conv.external_thread_id, replyToExternalId: a.reply_to_external_id, contactExternalId: null }, text: a.body, since: a.created_at });
+        const rt = await channelRuntime(ch, db);
+        found = await adapter.findSent(rt.ctx, rt.creds, rt.conn, { mode: a.mode, target: { conversationKind: conv.kind, threadKey: conv.external_thread_id, replyToExternalId: a.reply_to_external_id, contactExternalId: null, replyToMeta: a.target_meta }, text: a.body, since: a.created_at });
       } catch (err) { log.warn('inbox_reconcile_failed', { attemptId: a.id, err: { name: (err as Error).name } }); }
     }
     if (found.found === true) { await markSent(a, found.externalId, {}, true); resolved++; continue; }
@@ -283,4 +304,16 @@ export async function resolveUnknownReply(ctx: Ctx, attemptId: string, outcome: 
     await audit(getPool(), { workspaceId: a.workspace_id, brandId: a.brand_id, actorUserId: ctx.actor.userId, action: 'inbox.reply_marked_not_sent', resourceType: 'inbox_conversation', resourceId: a.conversation_id, diff: { attempt_id: a.id }, correlationId: ctx.correlationId });
   }
   return getAttempt(ctx, attemptId);
+}
+
+/**
+ * Stream B: provider evidence for an Unknown send that arrived by webhook (WhatsApp status carrying Relay's callback
+ * marker `relay:<attempt id>`). Only an attempt still Unknown on the same channel is confirmed; never a resend.
+ */
+export async function confirmAttemptFromProvider(attemptId: string, channelId: string, externalId: string): Promise<boolean> {
+  if (!/^[0-9a-f-]{36}$/i.test(attemptId)) return false;
+  const a = await maybeOne<AttemptRow>(getPool(), `SELECT * FROM inbox_reply_attempts WHERE id=$1 AND channel_id=$2 AND state='unknown'`, [attemptId, channelId]);
+  if (!a) return false;
+  await markSent(a, externalId, { confirmed_by: 'provider_status' }, true);
+  return true;
 }

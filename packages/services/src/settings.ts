@@ -21,6 +21,14 @@ export const SETTING_KEYS = [
   // V3 Content Hub (docs/V3_CONTENT_INTEGRATIONS.md): Google Drive/Docs content connection (separate from YouTube) + Notion.
   'GOOGLE_CONTENT_CLIENT_ID', 'GOOGLE_CONTENT_CLIENT_SECRET', 'GOOGLE_PICKER_API_KEY', 'GOOGLE_PICKER_APP_ID',
   'NOTION_CLIENT_ID', 'NOTION_CLIENT_SECRET', 'NOTION_INTERNAL_TOKEN', 'NOTION_WEBHOOK_VERIFICATION_TOKEN',
+  // V3.5 business integrations (stream C; docs/v3-5/INTEGRATIONS.md). Redirect URI: <APP_BASE_URL>/api/connectors/oauth/<connector>/callback.
+  'ASANA_CLIENT_ID', 'ASANA_CLIENT_SECRET',
+  'MONDAY_CLIENT_ID', 'MONDAY_CLIENT_SECRET', 'MONDAY_SIGNING_SECRET', 'MONDAY_API_VERSION',
+  'HUBSPOT_CLIENT_ID', 'HUBSPOT_CLIENT_SECRET',
+  'GBP_CLIENT_ID', 'GBP_CLIENT_SECRET', 'GBP_PUBSUB_AUDIENCE', 'GBP_PUBSUB_SERVICE_ACCOUNT',
+  'GOOGLE_TRANSLATE_PROJECT_ID', 'GOOGLE_TRANSLATE_SERVICE_ACCOUNT_JSON', 'GOOGLE_TRANSLATE_LOCATION', 'TRANSLATE_PRICE_PER_MILLION_USD',
+  'SLACK_CLIENT_ID', 'SLACK_CLIENT_SECRET', 'SLACK_SIGNING_SECRET', 'SLACK_SIGNING_SECRET_PREVIOUS',
+  'MAILCHIMP_CLIENT_ID', 'MAILCHIMP_CLIENT_SECRET', 'MAILCHIMP_WEBHOOK_SECRET',
 ] as const;
 export type SettingKey = (typeof SETTING_KEYS)[number];
 
@@ -30,7 +38,8 @@ export interface SettingDef {
   optional?: boolean;
   label: string;
   secret: boolean;
-  group: 'meta' | 'x' | 'telegram' | 'ai' | 'tipsignal' | 'tiktok' | 'youtube' | 'linkedin' | 'threads' | 'pinterest' | 'google_content' | 'notion';
+  group: 'meta' | 'x' | 'telegram' | 'ai' | 'tipsignal' | 'tiktok' | 'youtube' | 'linkedin' | 'threads' | 'pinterest' | 'google_content' | 'notion'
+    | 'asana' | 'monday' | 'hubspot' | 'gbp' | 'translate' | 'slack' | 'mailchimp';
   hint: string;
   /** Validates a value entered on the setup page. Returns an error message or null. */
   validate?: (v: string) => string | null;
@@ -40,6 +49,7 @@ export interface SettingDef {
 const noWhitespace = (v: string) => (/\s/.test(v) ? 'Must not contain spaces' : null);
 const bool = (v: string) => (/^(true|false)$/.test(v) ? null : 'Use true or false');
 const cb = (p: string) => `Redirect URI: <APP_BASE_URL>/api/oauth/${p}/callback.`;
+const cbc = (p: string) => `Redirect URI: <APP_BASE_URL>/api/connectors/oauth/${p}/callback.`;
 
 export const SETTING_DEFS: Record<SettingKey, SettingDef> = {
   META_APP_ID: { key: 'META_APP_ID', label: 'Meta app ID', secret: false, group: 'meta', hint: 'Numeric App ID from developers.facebook.com → your app → Settings → Basic.',
@@ -88,6 +98,30 @@ export const SETTING_DEFS: Record<SettingKey, SettingDef> = {
   NOTION_INTERNAL_TOKEN: { key: 'NOTION_INTERNAL_TOKEN', label: 'Notion internal token (test installs)', secret: true, group: 'notion', hint: 'Internal connection token for a single internal test workspace only. Not available in production; use public OAuth for customers.', validate: (v) => (/^(secret_|ntn_)[A-Za-z0-9]{20,}$/.test(v) ? null : 'Notion internal tokens start with ntn_ or secret_') },
   NOTION_WEBHOOK_VERIFICATION_TOKEN: { key: 'NOTION_WEBHOOK_VERIFICATION_TOKEN', label: 'Notion webhook verification token', secret: true, group: 'notion', hint: 'Optional. The verification_token Notion sent to <APP_BASE_URL>/api/webhooks/notion; used to verify X-Notion-Signature.', validate: (v) => (v.length >= 16 ? null : 'Use the full token') },
   PINTEREST_ACCESS_TIER: { key: 'PINTEREST_ACCESS_TIER', optional: true, label: 'Pinterest access tier', secret: false, group: 'pinterest', hint: 'trial (default: Pins visible only to you) or standard (after Pinterest approved the upgrade).', validate: (v) => (/^(trial|standard)$/.test(v) ? null : 'Use trial or standard') },
+  // ---- V3.5 business integrations (stream C)
+  ASANA_CLIENT_ID: { key: 'ASANA_CLIENT_ID', label: 'Asana client ID', secret: false, group: 'asana', hint: `Asana developer console → your app → OAuth (scopes: tasks:read, tasks:write, projects:read, users:read, workspaces:read, webhooks:write). ${cbc('asana')}`, validate: noWhitespace, docsUrl: 'https://app.asana.com/0/my-apps' },
+  ASANA_CLIENT_SECRET: { key: 'ASANA_CLIENT_SECRET', label: 'Asana client secret', secret: true, group: 'asana', hint: 'Stored encrypted; never shown again.', validate: noWhitespace },
+  MONDAY_CLIENT_ID: { key: 'MONDAY_CLIENT_ID', label: 'monday.com client ID', secret: false, group: 'monday', hint: `monday.com Developer Center → your app → OAuth (scopes: boards:read, boards:write, users:read, webhooks:write). ${cbc('monday')}`, validate: noWhitespace, docsUrl: 'https://developer.monday.com/apps/docs/oauth' },
+  MONDAY_CLIENT_SECRET: { key: 'MONDAY_CLIENT_SECRET', label: 'monday.com client secret', secret: true, group: 'monday', hint: 'Stored encrypted; never shown again.', validate: noWhitespace },
+  MONDAY_SIGNING_SECRET: { key: 'MONDAY_SIGNING_SECRET', label: 'monday.com signing secret', secret: true, group: 'monday', hint: 'App signing secret; verifies the JWT on board webhooks.', validate: noWhitespace },
+  MONDAY_API_VERSION: { key: 'MONDAY_API_VERSION', optional: true, label: 'monday.com API version', secret: false, group: 'monday', hint: 'API-Version header (YYYY-MM). Default 2026-04.', validate: (v) => (/^\d{4}-\d{2}$/.test(v) ? null : 'Use the form 2026-04') },
+  HUBSPOT_CLIENT_ID: { key: 'HUBSPOT_CLIENT_ID', label: 'HubSpot client ID', secret: false, group: 'hubspot', hint: `HubSpot developer account → your app → Auth (scopes: crm.objects.contacts.read, crm.objects.companies.read, tickets, crm.objects.owners.read). ${cbc('hubspot')}`, validate: noWhitespace, docsUrl: 'https://developers.hubspot.com/docs/api/oauth-quickstart-guide' },
+  HUBSPOT_CLIENT_SECRET: { key: 'HUBSPOT_CLIENT_SECRET', label: 'HubSpot client secret', secret: true, group: 'hubspot', hint: 'Also verifies webhook signatures (v3). Stored encrypted; never shown again.', validate: noWhitespace },
+  GBP_CLIENT_ID: { key: 'GBP_CLIENT_ID', label: 'Google OAuth client ID (Business Profile)', secret: false, group: 'gbp', hint: `Web OAuth client in the Google Cloud project approved for the Business Profile APIs (scope business.manage). ${cbc('google_business_profile')}`, validate: (v) => (/^[\w-]+\.apps\.googleusercontent\.com$/.test(v) ? null : 'Google client IDs end with .apps.googleusercontent.com'), docsUrl: 'https://developers.google.com/my-business/content/prereqs' },
+  GBP_CLIENT_SECRET: { key: 'GBP_CLIENT_SECRET', label: 'Google OAuth client secret (Business Profile)', secret: true, group: 'gbp', hint: 'Stored encrypted; never shown again.', validate: noWhitespace },
+  GBP_PUBSUB_AUDIENCE: { key: 'GBP_PUBSUB_AUDIENCE', optional: true, label: 'Pub/Sub push audience', secret: false, group: 'gbp', hint: 'Audience set on the authenticated Pub/Sub push subscription for review notifications (usually <APP_BASE_URL>/api/connectors/webhooks/google_business_profile).', validate: (v) => (v.length >= 8 ? null : 'Use the full audience') },
+  GBP_PUBSUB_SERVICE_ACCOUNT: { key: 'GBP_PUBSUB_SERVICE_ACCOUNT', optional: true, label: 'Pub/Sub push service account', secret: false, group: 'gbp', hint: 'Service account email the push subscription signs its OIDC token with.', validate: (v) => (/^[^@\s]+@[\w.-]+\.iam\.gserviceaccount\.com$/.test(v) ? null : 'Use the service account email') },
+  GOOGLE_TRANSLATE_PROJECT_ID: { key: 'GOOGLE_TRANSLATE_PROJECT_ID', label: 'Cloud Translation project ID', secret: false, group: 'translate', hint: 'Google Cloud project with the Cloud Translation API enabled and billing attached (paid per character).', validate: (v) => (/^[a-z][a-z0-9-]{4,29}$/.test(v) ? null : 'Use the project ID'), docsUrl: 'https://console.cloud.google.com/apis/library/translate.googleapis.com' },
+  GOOGLE_TRANSLATE_SERVICE_ACCOUNT_JSON: { key: 'GOOGLE_TRANSLATE_SERVICE_ACCOUNT_JSON', label: 'Cloud Translation service account key (JSON)', secret: true, group: 'translate', hint: 'Key for a service account with roles/cloudtranslate.user only. Stored encrypted; never shown again.', validate: (v) => { try { const j = JSON.parse(v); return j?.type === 'service_account' && j.client_email && j.private_key ? null : 'Paste the service account JSON key'; } catch { return 'Paste the service account JSON key'; } } },
+  GOOGLE_TRANSLATE_LOCATION: { key: 'GOOGLE_TRANSLATE_LOCATION', optional: true, label: 'Cloud Translation location', secret: false, group: 'translate', hint: 'global (default). Glossaries need a regional location such as us-central1.', validate: (v) => (/^[a-z0-9-]{2,30}$/.test(v) ? null : 'Use e.g. global or us-central1') },
+  TRANSLATE_PRICE_PER_MILLION_USD: { key: 'TRANSLATE_PRICE_PER_MILLION_USD', optional: true, label: 'Translation list price (USD per million characters)', secret: false, group: 'translate', hint: 'Used for cost estimates. Default 20 (NMT list price checked 2026-11-08).', validate: (v) => (/^\d{1,4}(\.\d{1,4})?$/.test(v) ? null : 'Use a number, e.g. 20') },
+  SLACK_CLIENT_ID: { key: 'SLACK_CLIENT_ID', label: 'Slack client ID', secret: false, group: 'slack', hint: `api.slack.com/apps → your app → Basic information (bot scopes: chat:write, channels:read, groups:read; interactivity URL <APP_BASE_URL>/api/connectors/webhooks/slack). ${cbc('slack')}`, validate: noWhitespace, docsUrl: 'https://api.slack.com/apps' },
+  SLACK_CLIENT_SECRET: { key: 'SLACK_CLIENT_SECRET', label: 'Slack client secret', secret: true, group: 'slack', hint: 'Stored encrypted; never shown again.', validate: noWhitespace },
+  SLACK_SIGNING_SECRET: { key: 'SLACK_SIGNING_SECRET', label: 'Slack signing secret', secret: true, group: 'slack', hint: 'Verifies interactive requests (X-Slack-Signature). Stored encrypted; never shown again.', validate: noWhitespace },
+  SLACK_SIGNING_SECRET_PREVIOUS: { key: 'SLACK_SIGNING_SECRET_PREVIOUS', optional: true, label: 'Previous Slack signing secret', secret: true, group: 'slack', hint: 'Only while rotating the signing secret; clear it afterwards.', validate: noWhitespace },
+  MAILCHIMP_CLIENT_ID: { key: 'MAILCHIMP_CLIENT_ID', label: 'Mailchimp client ID', secret: false, group: 'mailchimp', hint: `Mailchimp → Account → Extras → Registered apps. Access is account-wide (Mailchimp has no granular scopes). ${cbc('mailchimp')}`, validate: noWhitespace, docsUrl: 'https://mailchimp.com/developer/marketing/guides/access-user-data-oauth-2/' },
+  MAILCHIMP_CLIENT_SECRET: { key: 'MAILCHIMP_CLIENT_SECRET', label: 'Mailchimp client secret', secret: true, group: 'mailchimp', hint: 'Stored encrypted; never shown again.', validate: noWhitespace },
+  MAILCHIMP_WEBHOOK_SECRET: { key: 'MAILCHIMP_WEBHOOK_SECRET', optional: true, label: 'Mailchimp webhook signing secret', secret: true, group: 'mailchimp', hint: 'Optional. Shown once when a signed webhook is created; verifies X-Mailchimp-Signature.', validate: noWhitespace },
 };
 
 export function isSettingKey(k: string): k is SettingKey {

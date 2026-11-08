@@ -126,6 +126,12 @@ export async function processWebhookReceipt(receiptId: string): Promise<{ confir
     const r = await ingestProviderPayload('facebook_page', body, { simulated: false });
     inboxItems = r.messages + r.edits + r.deletes + r.receipts;
   }
+  // V3.5 stream B: Instagram messaging + comments (object=instagram; same Meta app signature).
+  if (rec.provider === 'meta' && body.object === 'instagram') {
+    const { ingestProviderPayload } = await import('./inbox/ingest.js');
+    const r = await ingestProviderPayload('instagram', body, { simulated: false });
+    inboxItems = r.messages + r.edits + r.deletes + r.receipts;
+  }
   const state = confirmed || inboxItems ? 'processed' : 'ignored';
   await db.query(`UPDATE webhook_receipts SET processing_state=$2, processed_at=now() WHERE id=$1`, [receiptId, state]);
   return { confirmed, state };

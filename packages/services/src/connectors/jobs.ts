@@ -64,7 +64,17 @@ export async function ingestIntegrationWebhook(connector: string, req: Omit<Inbo
     }
     return { status: v.response.status, body: v.response.body, headers: v.response.headers };
   }
-  const body = (() => { try { return JSON.parse(req.rawBody); } catch { return { raw_form: true }; } })();
+  // Form-encoded bodies (Slack interactivity `payload=<json>`, Mailchimp `type=…&data[…]=…`) are kept as parsed data (stream C).
+  const body = (() => {
+    try { return JSON.parse(req.rawBody); } catch { /* not JSON */ }
+    if ((full.headers['content-type'] ?? '').includes('application/x-www-form-urlencoded')) {
+      const f = new URLSearchParams(req.rawBody);
+      const p = f.get('payload');
+      if (p) { try { return JSON.parse(p); } catch { /* fall through */ } }
+      return { form: Object.fromEntries([...f.entries()].slice(0, 100)) };
+    }
+    return { raw_form: true };
+  })();
   const echo = req.rawBody.includes(ORIGIN_MARKER_PREFIX) && /relay:[0-9a-f-]{36}/i.test(req.rawBody);
   const ins = await maybeOne<{ id: string }>(getPool(),
     `INSERT INTO integration_events(connector, dedupe_key, workspace_id, integration_id, external_account_id, event_type, origin, occurred_at, summary, body, state)

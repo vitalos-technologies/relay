@@ -12,7 +12,7 @@ const V = '2026-11-07';
 
 export const CONNECTORS: Record<ConnectorKey, ConnectorDefinition> = {
   asana: {
-    key: 'asana', name: 'Asana', auth: 'oauth2_pkce', scopes: ['tasks:read', 'tasks:write', 'projects:read', 'users:read', 'webhooks:write'], inbound: 'webhook_hmac',
+    key: 'asana', name: 'Asana', auth: 'oauth2_pkce', scopes: ['tasks:read', 'tasks:write', 'projects:read', 'users:read', 'workspaces:read', 'webhooks:write'], inbound: 'webhook_hmac',
     resourceTypes: ['workspace', 'project'], prerequisites: ['Asana developer app (OAuth) registered by the operator', 'Webhooks are at-most-once: polling fallback required for completeness'],
     hosts: ['app.asana.com'], docsUrl: 'https://developers.asana.com/docs/webhooks-guide', verifiedOn: V,
   },
@@ -38,14 +38,14 @@ export const CONNECTORS: Record<ConnectorKey, ConnectorDefinition> = {
     hosts: ['translation.googleapis.com'], docsUrl: 'https://cloud.google.com/translate/docs', verifiedOn: V,
   },
   slack: {
-    key: 'slack', name: 'Slack', auth: 'oauth2', scopes: ['chat:write', 'channels:read', 'groups:read', 'users:read', 'users:read.email'], inbound: 'webhook_signed_ts',
+    key: 'slack', name: 'Slack', auth: 'oauth2', scopes: ['chat:write', 'channels:read', 'groups:read'] /* stream C: no users:read(.email) — identities are linked explicitly, never by email */, inbound: 'webhook_signed_ts',
     resourceTypes: ['channel'], prerequisites: ['Slack app (OAuth v2) + signing secret; interactivity URL for approval buttons'],
     hosts: ['slack.com'], docsUrl: 'https://docs.slack.dev/authentication/verifying-requests-from-slack', verifiedOn: V,
   },
   mailchimp: {
     key: 'mailchimp', name: 'Mailchimp', auth: 'oauth2', scopes: [], inbound: 'webhook_hmac',
     resourceTypes: ['audience', 'campaign'], prerequisites: ['Mailchimp OAuth app (Marketing API); scopes are account-wide (no granular scopes)', 'Webhook signature optional; URL secret otherwise'],
-    hosts: ['login.mailchimp.com'], docsUrl: 'https://mailchimp.com/developer/marketing/guides/sync-audience-data-webhooks/', verifiedOn: V,
+    hosts: ['login.mailchimp.com', '<dc>.api.mailchimp.com'], docsUrl: 'https://mailchimp.com/developer/marketing/guides/sync-audience-data-webhooks/', verifiedOn: V,
   },
   whatsapp: {
     key: 'whatsapp', name: 'WhatsApp Business Platform', auth: 'system_user_token', scopes: ['whatsapp_business_messaging', 'whatsapp_business_management'], inbound: 'webhook_hmac',
