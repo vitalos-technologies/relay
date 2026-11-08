@@ -102,7 +102,7 @@ function AdminInner({ children }: { children: ReactNode }) {
           <main id="admin-main" tabIndex={-1} className="mx-auto w-full max-w-[1280px] flex-1 px-4 pb-[calc(64px+env(safe-area-inset-bottom))] pt-6 focus:outline-none sm:px-6 md:px-8 md:pt-8">
             {allowed ? children : (
               <EmptyState title={platformScope ? 'Platform operators only' : 'Workspace admins only'}
-                action={<LinkButton href="/" icon={<ArrowLeft aria-hidden className="size-4" />}>Back to Relay</LinkButton>} />
+                action={<LinkButton href="/overview" icon={<ArrowLeft aria-hidden className="size-4" />}>Back to Relay</LinkButton>} />
             )}
           </main>
         </div>
@@ -198,7 +198,7 @@ function Sidebar({ groups, pathname, platformScope, platform, workspaceAdmin }: 
         </ul>
       </nav>
       <div className="border-t border-border p-3">
-        <Link href="/" className="flex h-10 items-center gap-2 rounded-lg px-2.5 text-[13px] text-muted hover:bg-raised hover:text-fg">
+        <Link href="/overview" className="flex h-10 items-center gap-2 rounded-lg px-2.5 text-[13px] text-muted hover:bg-raised hover:text-fg">
           <ArrowLeft aria-hidden className="size-4" />Back to Relay
         </Link>
       </div>

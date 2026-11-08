@@ -86,7 +86,7 @@ describe('OIDC login against Keycloak', () => {
     // Second login: same user (identified by issuer+subject).
     const again = await loginAs('owner@demo.social-lite.test');
     expect(again.result.userId).toBe(result.userId);
-    expect(again.result.redirectTo).toBe('/');
+    expect(again.result.redirectTo).toBe('/overview'); // V5 (D23): default post-login destination
   });
 
   it('refuses expired login states', async () => {
@@ -233,7 +233,10 @@ describe('returnTo validation', () => {
   it('accepts only same-site relative paths', () => {
     expect(safeReturnTo('/posts/1?tab=a#x')).toBe('/posts/1?tab=a#x');
     for (const bad of ['//evil.example/x', 'https://evil.example/', '/\\evil.example', 'javascript:alert(1)', '/api/auth/login', '', null, 'posts', `/${'a'.repeat(600)}`, '/\nx']) {
-      expect(safeReturnTo(bad as string | null), String(bad)).toBe('/');
+      expect(safeReturnTo(bad as string | null), String(bad)).toBe('/overview');
     }
+    // V5: the public marketing page is never a post-login destination; the app home is.
+    expect(safeReturnTo('/')).toBe('/overview');
+    expect(safeReturnTo('/overview')).toBe('/overview');
   });
 });

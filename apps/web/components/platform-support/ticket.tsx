@@ -84,7 +84,7 @@ export function StaffTicketView({ reference }: { reference: string }) {
           <Badge tone={st.tone}>{st.label}</Badge>
           {data.priority !== 'normal' ? <Badge tone={PRIORITY_TONE[data.priority]}>{data.priority}</Badge> : null}
           {data.restricted ? <Badge icon={<Lock aria-hidden className="size-3" />}>Restricted</Badge> : null}
-          <span className="text-xs text-muted">{data.reference} · {data.source === 'problem_report' ? 'from problem report' : data.source}</span>
+          <span className="text-xs text-muted">{data.reference} · {data.source === 'problem_report' ? 'from problem report' : data.source === 'widget' ? 'marketing widget' : data.source}</span>
         </>}
         actions={
           <Menu>
@@ -97,6 +97,11 @@ export function StaffTicketView({ reference }: { reference: string }) {
               <MenuSeparator />
               <MenuItem icon={<Copy aria-hidden />} onSelect={() => setDialog('duplicate')}>Mark as duplicate…</MenuItem>
               {data.workspace ? <MenuItem icon={<KeyRound aria-hidden />} onSelect={() => setDialog('access')}>Request support access…</MenuItem> : null}
+              {data.visitor ? (
+                <MenuItem onSelect={() => { const blocked = !!data.visitor?.blocked; void run('block', async () => { await api.post(`${path}/visitor`, { blocked: !blocked }); return api.get<StaffTicketDetail>(path); }, blocked ? 'Visitor unblocked' : 'Visitor blocked'); }}>
+                  {data.visitor.blocked ? 'Unblock visitor' : 'Block visitor…'}
+                </MenuItem>
+              ) : null}
             </MenuContent>
           </Menu>
         }
@@ -152,8 +157,13 @@ export function StaffTicketView({ reference }: { reference: string }) {
             <CardHeader title="Customer" />
             <div className="px-4 pb-4">
               <Facts items={[
-                ['Requester', data.requester.name ? `${data.requester.name}` : '—'],
-                ['Email', data.requester.email ?? '—'],
+                ['Requester', data.requester.name ? `${data.requester.name}${data.requester_kind === 'visitor' ? ' (visitor)' : ''}` : '—'],
+                ['Email', data.requester.email ? `${data.requester.email}${data.visitor ? (data.visitor.email_verified ? ' · verified' : ' · not verified') : ''}` : '—'],
+                ...(data.visitor ? [
+                  ['Account', 'Not linked — visitors are never matched to accounts by email'] as [string, string],
+                  ['Chat sessions', `${data.visitor.sessions} active${data.visitor.other_conversations ? ` · ${data.visitor.other_conversations} other conversation${data.visitor.other_conversations === 1 ? '' : 's'}` : ''}`] as [string, string],
+                  ...(data.visitor.blocked ? [['Status', 'Blocked'] as [string, string]] : []),
+                ] : []),
                 ['Workspace', data.workspace ? <Link key="w" className="hover:underline" href={`/admin/platform/workspaces/${data.workspace.id}`}>{data.workspace.name}</Link> : '—'],
                 ...(ctx.workspace ? [
                   ['State', ctx.workspace.state + (ctx.workspace.is_demo ? ' · demo' : '')] as [string, string],

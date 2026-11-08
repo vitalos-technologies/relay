@@ -68,6 +68,7 @@ const TASK_ACTIONS: Record<AssistantTask | 'auto_reply', readonly ProposedAction
 
 const ACTION_PERMISSION: Record<ProposedActionKind, string> = {
   use_reply_draft: 'inbox.reply', apply_labels: 'inbox.reply', set_priority: 'inbox.reply', assign: 'inbox.assign', add_note: 'inbox.read', use_copy: 'content.edit', create_task: 'content.read',
+  schedule_post: 'content.schedule', submit_for_approval: 'content.edit', send_reply: 'inbox.reply',
 };
 
 // ------------------------------------------------------------------ automation bridge (no import cycle)
@@ -165,7 +166,7 @@ export async function queueAutomationRun(tx: Queryable, a: { workspaceId: string
 
 export async function getRun(ctx: Ctx, id: string): Promise<AssistantRunDto> {
   assertUuid(id, 'Run');
-  const r = await maybeOne<RunRow>(getPool(), `SELECT * FROM ai_runs WHERE id=$1 AND workspace_id=$2`, [id, ctx.access.workspaceId]);
+  const r = await maybeOne<RunRow>(getPool(), `SELECT * FROM ai_runs WHERE id=$1 AND workspace_id=$2 AND kind='task'`, [id, ctx.access.workspaceId]);
   if (!r || !(await canSeeRun(ctx, r))) throw notFound('Run');
   return runDto(getPool(), r);
 }
@@ -182,7 +183,7 @@ export async function listRuns(ctx: Ctx, q: { limit?: number | null; context_id?
   const params: unknown[] = [ctx.access.workspaceId, ctx.actor.userId, limit];
   let extra = '';
   if (q.context_id) { assertUuid(q.context_id, 'Context'); params.push(q.context_id); extra = ` AND (context->>'id' = $4 OR context->>'brand_id' = $4)`; }
-  const rows = await many<RunRow>(getPool(), `SELECT * FROM ai_runs WHERE workspace_id=$1 AND requested_by=$2${extra} ORDER BY created_at DESC LIMIT $3`, params);
+  const rows = await many<RunRow>(getPool(), `SELECT * FROM ai_runs WHERE workspace_id=$1 AND requested_by=$2 AND kind='task'${extra} ORDER BY created_at DESC LIMIT $3`, params);
   const out: AssistantRunDto[] = [];
   for (const r of rows) if (await canSeeRun(ctx, r)) out.push(await runDto(getPool(), r));
   return { items: out };
@@ -213,8 +214,11 @@ function sanitizeLabels(v: string): string[] {
 }
 
 /** Process one queued run. Returns the final status, or 'skipped' when another worker holds it. */
-export async function executeRun(runId: string, workerId: string): Promise<AssistantRunDto['status'] | 'skipped'> {
+export async function executeRun(runId: string, workerId: string): Promise<AssistantRunDto['status'] | 'skipped' | string> {
   const db = getPool();
+  // V5: workflow runs share this queue and table; they are executed by the workflow engine (ai-workflows/engine.ts).
+  const kind = await maybeOne<{ kind: string }>(db, `SELECT kind FROM ai_runs WHERE id=$1`, [runId]);
+  if (kind?.kind === 'workflow') return (await import('../ai-workflows/index.js')).executeWorkflowRun(runId, workerId);
   const r = await maybeOne<RunRow>(db,
     `UPDATE ai_runs SET status='running', attempts=attempts+1, started_at=coalesce(started_at, now()), lease_owner=$2, lease_expires_at=now() + make_interval(secs => $3)
       WHERE id=$1 AND (status='queued' OR (status='running' AND lease_expires_at < now())) RETURNING *`, [runId, workerId, LEASE_MS / 1000]);
@@ -398,12 +402,15 @@ export function postProcess(r: Pick<RunRow, 'task' | 'context' | 'brand_id'>, so
 /** Worker: queued runs whose wake-up was lost, expired leases. */
 export async function sweepRuns(): Promise<string[]> {
   const rows = await many<{ id: string }>(getPool(),
-    `SELECT id FROM ai_runs WHERE (status='queued' AND created_at < now() - interval '30 seconds') OR (status='running' AND lease_expires_at < now()) ORDER BY created_at LIMIT 20`);
-  return rows.map((r) => r.id);
+    `SELECT id FROM ai_runs WHERE kind='task' AND ((status='queued' AND created_at < now() - interval '30 seconds') OR (status='running' AND lease_expires_at < now())) ORDER BY created_at LIMIT 20`);
+  // V5: workflow runs (lost wake-ups, expired leases; timed-out ones are finalized by the sweep itself).
+  const wf = await (await import('../ai-workflows/index.js')).sweepWorkflowRuns();
+  return [...rows.map((r) => r.id), ...wf];
 }
 
 /** Retention: run output (drafts/summaries) and the person's request text are purged after 30 days. */
 export async function purgeRunOutputs(): Promise<number> {
+  await (await import('../ai-workflows/index.js')).purgeWorkflowContent(OUTPUT_RETENTION_DAYS);
   const r = await getPool().query(`UPDATE ai_runs SET output=NULL, params = params - 'request', output_purged_at=now() WHERE output IS NOT NULL AND finished_at < now() - make_interval(days => $1)`, [OUTPUT_RETENTION_DAYS]);
   await getPool().query(`UPDATE ai_proposed_actions SET status='expired' WHERE status='proposed' AND expires_at < now()`);
   return r.rowCount ?? 0;

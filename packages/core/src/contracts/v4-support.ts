@@ -1,13 +1,15 @@
 // V4 Relay support contracts (stream SUP; brief docs/queue/03g_V4_PROMPT.md §3–8, §16). Types + const enums only.
 // Customer DTOs never carry internal notes, staff-only activity or assignee identity; staff DTOs do.
 
-export const SUPPORT_TICKET_CATEGORIES = ['account_access', 'billing', 'publishing', 'connections', 'analytics', 'technical', 'feature_request', 'security'] as const;
+export const SUPPORT_TICKET_CATEGORIES = ['account_access', 'billing', 'publishing', 'connections', 'analytics', 'technical', 'feature_request', 'security', 'general'] as const;
 export type SupportTicketCategory = (typeof SUPPORT_TICKET_CATEGORIES)[number];
 /** Restricted: visible to the requester and explicit participants only (never to workspace owners by policy). */
 export const RESTRICTED_SUPPORT_CATEGORIES: readonly SupportTicketCategory[] = ['security'];
 export const SUPPORT_CATEGORY_LABEL: Record<SupportTicketCategory, string> = {
   account_access: 'Account access', billing: 'Billing', publishing: 'Publishing', connections: 'Connections', analytics: 'Analytics',
   technical: 'Technical problem', feature_request: 'Feature request', security: 'Security or private account matter',
+  // V5 WID: pre-sales / general questions from the marketing support widget (migration 037).
+  general: 'General question',
 };
 
 export const SUPPORT_TICKET_STATUSES = ['new', 'waiting_on_relay', 'waiting_on_customer', 'resolved', 'archived'] as const;
@@ -126,6 +128,8 @@ export interface StaffTicketDetail extends StaffTicketSummary {
   problem_reports: Array<{ id: string; category: string; summary: string; created_at: string; shared_at: string | null }>;
   duplicates: Array<{ id: string; reference: string; subject: string; status: SupportTicketStatus }>;
   context: WorkspaceSupportContext;
+  /** V5 WID: widget visitor tickets only (requester_kind 'visitor'). */
+  visitor?: { email_verified: boolean; blocked: boolean; sessions: number; last_seen_at: string | null; other_conversations: number } | null;
   cursor: number;
 }
 

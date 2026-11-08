@@ -61,6 +61,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             <ShieldCheck aria-hidden className="size-3.5 shrink-0 text-success" />
             We never see your password.
           </p>
+          {/* V5: visitors from the marketing page who have no account yet. */}
+          <p className="mt-4 border-t border-border pt-4 text-[13px] text-muted">New to Relay? <a href="/signup" className="font-medium text-accent-text hover:underline">Start a free trial</a></p>
         </div>
 
         <div className="mt-8 flex items-center gap-2" role="group" aria-label="Supported networks: Instagram, Facebook, Telegram and X">

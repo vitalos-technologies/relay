@@ -98,7 +98,7 @@ function Ask({ status }: { status: AssistantStatusDto | undefined }) {
   );
 }
 
-function RunHistory() {
+export function RunHistory() {
   const runs = useApi<{ items: AssistantRunDto[] }>('/api/assistant/runs?limit=30');
   const [open, setOpen] = useState<AssistantRunDto | null>(null);
   if (runs.error && !runs.data) return <ErrorState error={runs.error} onRetry={() => void runs.refetch()} />;
@@ -125,7 +125,7 @@ function RunHistory() {
   );
 }
 
-function Knowledge() {
+export function Knowledge() {
   const { session, canOn } = useSession();
   const toast = useToast();
   const [filter] = useBrandFilter();

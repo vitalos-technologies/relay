@@ -234,7 +234,7 @@ export function registerTools(server: McpServer, hooks: ToolHooks = {}): void {
         p.kind === 'service_account' ? [p.apiKeyId] : [p.clientId, p.userId]);
       const pending = p.kind === 'user' ? await maybeOne<{ id: string }>(db, `SELECT id FROM mcp_clients WHERE kind='oauth' AND client_id=$1 AND owner_user_id=$2 AND status='pending'`, [p.clientId, p.userId]) : null;
       return {
-        workspaces: rows.map((r) => ({ id: r.workspace_id, name: r.name, scopes: p.tokenScopes.filter((x) => r.granted_scopes.includes(x)), brand_ids: r.brand_ids, app_url: appUrl('/') })),
+        workspaces: rows.map((r) => ({ id: r.workspace_id, name: r.name, scopes: p.tokenScopes.filter((x) => r.granted_scopes.includes(x)), brand_ids: r.brand_ids, app_url: appUrl('/overview') })),
         consent_url: pending ? appUrl(`/mcp/connect/${pending.id}`) : null,
         ...(pending && !rows.length ? { next_step: 'Ask the user to open consent_url in Relay and approve this client for a workspace.' } : {}),
       };

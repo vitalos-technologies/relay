@@ -105,7 +105,8 @@ export function SupportInbox() {
     if (v) next.set(k, v); else next.delete(k);
     router.replace(`/admin/platform/support?${next.toString()}`, { scroll: false });
   };
-  const path = `/api/platform/support/tickets?${new URLSearchParams({ queue, ...(category ? { category } : {}), ...(priority ? { priority } : {}), ...(workspace ? { workspace_id: workspace } : {}), ...(query ? { q: query } : {}) }).toString()}`;
+  const source = params.get('source') ?? '';
+  const path = `/api/platform/support/tickets?${new URLSearchParams({ queue, ...(category ? { category } : {}), ...(priority ? { priority } : {}), ...(source ? { source } : {}), ...(workspace ? { workspace_id: workspace } : {}), ...(query ? { q: query } : {}) }).toString()}`;
   const { data, error, loading, refetch } = useApi<StaffTicketsResponse>(path, { keepPrevious: true, poll: 60_000 });
   useStaffFeed(() => void refetch());
   return (
@@ -133,6 +134,13 @@ export function SupportInbox() {
           <option value="">Any priority</option>
           {SUPPORT_PRIORITIES.map((p) => <option key={p} value={p}>{p[0]!.toUpperCase() + p.slice(1)}</option>)}
         </FilterSelect>
+        {/* V5 WID: conversations from the marketing support widget. */}
+        <FilterSelect id="sup-src" label="Source" value={source} onChange={(v) => set('source', v || null)}>
+          <option value="">Any source</option>
+          <option value="widget">Marketing widget</option>
+          <option value="app">In-app request</option>
+          <option value="problem_report">Problem report</option>
+        </FilterSelect>
       </div>
       {error && !data ? <ErrorState error={error} onRetry={refetch} /> : loading && !data ? <SkeletonRows rows={6} /> : !data?.items.length ? (
         <EmptyState icon={<Inbox aria-hidden />} title={query ? 'No matches' : 'Nothing here'} />
@@ -153,6 +161,7 @@ export function SupportInbox() {
                   </span>
                   <span className="flex shrink-0 flex-col items-end gap-1">
                     <span className="flex flex-wrap justify-end gap-1">
+                      {t.source === 'widget' ? <Badge tone="info">Widget</Badge> : null}
                       {t.priority === 'urgent' || t.priority === 'high' ? <Badge tone={PRIORITY_TONE[t.priority]}>{t.priority}</Badge> : null}
                       <Badge tone={STAFF_STATUS[t.status].tone}>{STAFF_STATUS[t.status].label}</Badge>
                     </span>

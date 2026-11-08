@@ -260,3 +260,50 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 @media (pointer: coarse) {
   .touch-target { min-height: 44px; min-width: 44px; }
 }
+
+/* ------------------------------------------------------------------ V5 shared UI tokens (components/ui-v5; D24–D25)
+   Namespaced (--v5-*) so the shadcn/Base UI copy-ins never collide with the app's token names. App scope: mapped to the
+   app palette (orange, both themes). `.mkt` (the marketing page, app/(marketing)/marketing.css) re-maps them to the purple
+   marketing palette. WID/AIW surfaces inside the app get the app look automatically. */
+:root {
+  --v5-bg: var(--bg);
+  --v5-surface: var(--surface);
+  --v5-raised: var(--raised);
+  --v5-fg: var(--text);
+  --v5-muted: var(--muted);
+  --v5-border: var(--border);
+  --v5-border-strong: var(--border-strong);
+  --v5-primary: var(--accent);
+  --v5-primary-hover: var(--accent-hover);
+  --v5-on-primary: var(--on-accent);
+  --v5-primary-text: var(--accent-text);
+  --v5-primary-soft: var(--accent-soft);
+  --v5-ring: var(--focus);
+  --v5-overlay: var(--overlay);
+  --v5-success: var(--success);
+  --v5-success-soft: var(--success-soft);
+  --v5-warn: var(--warn);
+  --v5-warn-soft: var(--warn-soft);
+}
+@theme inline {
+  --color-v5-bg: var(--v5-bg);
+  --color-v5-surface: var(--v5-surface);
+  --color-v5-raised: var(--v5-raised);
+  --color-v5-fg: var(--v5-fg);
+  --color-v5-muted: var(--v5-muted);
+  --color-v5-border: var(--v5-border);
+  --color-v5-border-strong: var(--v5-border-strong);
+  --color-v5-primary: var(--v5-primary);
+  --color-v5-primary-hover: var(--v5-primary-hover);
+  --color-v5-on-primary: var(--v5-on-primary);
+  --color-v5-primary-text: var(--v5-primary-text);
+  --color-v5-primary-soft: var(--v5-primary-soft);
+  --color-v5-ring: var(--v5-ring);
+  --color-v5-overlay: var(--v5-overlay);
+  --color-v5-success: var(--v5-success);
+  --color-v5-success-soft: var(--v5-success-soft);
+  --color-v5-warn: var(--v5-warn);
+  --color-v5-warn-soft: var(--v5-warn-soft);
+}
+/* ui-v5 Reveal never hides content on paper. */
+@media print { [data-reveal] { opacity: 1 !important; transform: none !important; } }

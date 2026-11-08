@@ -298,7 +298,7 @@ export async function openNotification(ctx: Ctx, id: string, db: Queryable = get
     [id, ctx.access.workspaceId, ctx.actor.userId]);
   if (!row || !(await filterReadable(ctx, [row], db)).length) throw new AppError('not_found', 'This item is no longer available to you');
   await db.query(`UPDATE notifications SET read_at=coalesce(read_at, now()) WHERE id=$1`, [id]);
-  return { href: linkFor(row).slice(config().APP_BASE_URL.length) || '/' };
+  return { href: linkFor(row).slice(config().APP_BASE_URL.length) || '/overview' };
 }
 
 // ------------------------------------------------------------------ preferences API

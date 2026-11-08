@@ -6,6 +6,7 @@ import { ArrowRight, Check } from 'lucide-react';
 import { publicCatalogue, TRIAL_DAYS, type PublicPlanId } from '@social-lite/core/contracts/v4-plans';
 import { RelayWordmark } from '@/components/brand/relay-mark';
 import { money } from '@/components/billing/format';
+import { SeatTotal } from '@/components/marketing/seat-total';
 
 export const metadata: Metadata = { title: 'Start your free trial' };
 export const dynamic = 'force-dynamic';
@@ -15,6 +16,10 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
   const raw = Array.isArray(sp.plan) ? sp.plan[0] : sp.plan;
   const plans = publicCatalogue();
   const selected = (plans.find((p) => p.id === raw)?.id ?? 'standard') as PublicPlanId;
+  // V5: team size carried from the marketing pricing estimate (display only; clamped).
+  const rawSeats = Number(Array.isArray(sp.seats) ? sp.seats[0] : sp.seats);
+  const seats = Number.isInteger(rawSeats) && rawSeats >= 1 ? Math.min(rawSeats, 500) : 1;
+  const selectedPlan = plans.find((p) => p.id === selected)!;
   return (
     <main className="flex min-h-dvh items-start justify-center px-4 py-10 sm:items-center">
       <div className="w-full max-w-[720px]">
@@ -25,7 +30,7 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
           {plans.map((p) => {
             const on = p.id === selected;
             return (
-              <Link key={p.id} role="listitem" href={`/signup?plan=${p.id}`} aria-current={on ? 'true' : undefined} data-testid={`signup-plan-${p.id}`}
+              <Link key={p.id} role="listitem" href={`/signup?plan=${p.id}${seats > 1 ? `&seats=${seats}` : ''}`} aria-current={on ? 'true' : undefined} data-testid={`signup-plan-${p.id}`}
                 className={`flex flex-col gap-2 rounded-2xl border p-5 ${on ? 'border-accent bg-accent-soft' : 'border-border bg-surface hover:bg-raised'}`}>
                 <span className="flex items-center justify-between">
                   <span className="text-[17px] font-semibold">{p.name}</span>
@@ -38,11 +43,13 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
             );
           })}
         </div>
+        <SeatTotal key={selected} plan={selected} planName={selectedPlan.name} initialSeats={seats} trialDays={TRIAL_DAYS} />
         <Link href={`/signup/workspace?plan=${selected}`} data-testid="signup-continue"
           className="touch-target mt-6 flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-accent text-[15px] font-medium text-on-accent hover:bg-accent-hover sm:w-auto sm:px-6">
-          Start free trial on {plans.find((p) => p.id === selected)!.name}<ArrowRight aria-hidden className="size-4" />
+          Start free trial on {selectedPlan.name}<ArrowRight aria-hidden className="size-4" />
         </Link>
-        <p className="mt-3 text-xs text-muted">You’ll sign in or create an account, then name your workspace. Prices in GBP; any tax is shown at checkout.</p>
+        <p className="mt-3 text-xs text-muted">You’ll sign in or create an account, then name your workspace. You’re billed for the active members in your workspace when you subscribe; Billing shows the seats and total before you buy. Prices in GBP; any tax is shown at checkout.</p>
+        <p className="mt-4 text-xs"><Link href="/#pricing" className="font-medium text-accent-text hover:underline">Compare plans</Link></p>
       </div>
     </main>
   );

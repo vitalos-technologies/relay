@@ -1,5 +1,5 @@
 import { siBluesky, siFacebook, siInstagram, siPinterest, siTelegram, siThreads, siTiktok, siX, siYoutube } from 'simple-icons';
-import { PROVIDER_LABEL, type Provider } from '@social-lite/core';
+import { PROVIDER_LABEL, type Provider } from '@social-lite/core/types'; // subpath: keeps the core barrel (zod, twitter-text) out of client bundles
 import { cn } from './cn';
 
 const ICONS: Record<Provider, { path: string; bg: string }> = {

@@ -12,7 +12,7 @@ const OUT = 'evidence/v2';
 /** helpers.signIn with the app port taken from baseURL (the stream-D instance may run on :3100). */
 async function signInHere(page: Page, email: string) {
   const port = new URL(test.info().project.use.baseURL ?? 'http://localhost:3000').port || '80';
-  await page.goto('/');
+  await page.goto('/overview');
   await page.waitForURL(/\/login/);
   await page.locator('a[href^="/api/auth/login"]').first().click();
   await page.waitForURL(/localhost:5556/);

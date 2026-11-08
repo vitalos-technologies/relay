@@ -127,7 +127,9 @@ export const PROPOSED_ACTION_KINDS = [
   'use_copy',             // put copy into the composer (drafts.edit; the person saves)
   'create_task',          // Relay task from an insight/brief (content.create)
 ] as const;
-export type ProposedActionKind = (typeof PROPOSED_ACTION_KINDS)[number];
+/** V5 (AIW): external actions a workflow run PREPARES; executed only after the person confirms the exact preview. Never model-proposable. */
+export const EXTERNAL_ACTION_KINDS = ['schedule_post', 'submit_for_approval', 'send_reply'] as const;
+export type ProposedActionKind = (typeof PROPOSED_ACTION_KINDS)[number] | (typeof EXTERNAL_ACTION_KINDS)[number];
 
 export type ProposedActionStatus = 'proposed' | 'applied' | 'dismissed' | 'expired' | 'failed';
 

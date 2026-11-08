@@ -129,7 +129,7 @@ test.describe('security', () => {
 });
 
 test.describe('screens', () => {
-  for (const path of ['/', '/planner', '/compose', '/approvals', '/library', '/history', '/accounts', '/settings', '/operations']) {
+  for (const path of ['/overview', '/planner', '/compose', '/approvals', '/library', '/history', '/accounts', '/settings', '/operations']) {
     test(`${path} renders without errors @mobile`, async ({ page }, info) => {
       const errors: string[] = [];
       page.on('pageerror', (e) => errors.push(e.message));
@@ -139,7 +139,7 @@ test.describe('screens', () => {
       expect(errors).toEqual([]);
       const overflow = await page.evaluate<number>('document.documentElement.scrollWidth - document.documentElement.clientWidth');
       expect(overflow).toBeLessThanOrEqual(1);
-      await page.screenshot({ path: `evidence/e2e/screens/${info.project.name}${path === '/' ? '-home' : path.replace(/\//g, '-')}.png`, fullPage: false });
+      await page.screenshot({ path: `evidence/e2e/screens/${info.project.name}${path === '/overview' ? '-home' : path.replace(/\//g, '-')}.png`, fullPage: false });
     });
   }
 

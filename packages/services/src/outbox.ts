@@ -22,6 +22,7 @@ export type OutboxEventType =
   | 'bulk.requested'             // V3.1 bulk jobs (data/bulk.ts → queue bulk-ops)
   // V4 Relay support (support/notify.ts → durable customer + staff notifications)
   | 'support.ticket_created' | 'support.message_created' | 'support.ticket_assigned' | 'support.access_requested' | 'support.access_decided'
+  | 'support.widget_verification' // V5 WID: one-time code/link email for a widget visitor (support/widget-verify.ts)
   | V35OutboxEvent              // V3.5 inbox / care / integrations (contracts/v35-events.ts)
   | BillingEvent;               // V4 billing (BIL; contracts/v4-billing.ts BILLING_EVENTS → events queue)
 

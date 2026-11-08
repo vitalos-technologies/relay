@@ -23,6 +23,7 @@ import { attachmentsFor, bindAttachments } from './attachments.js';
 import { deliverySummary } from './notify.js';
 import { activityText, appendSearch, iso, writeActivity } from './shared.js';
 import { commercialSummary } from './commercial.js';
+import { visitorStaffInfo } from './widget.js';
 
 export const STAFF_REPLY_RATE = { capacity: 120, refillPerSecond: 120 / 600 };
 
@@ -88,7 +89,7 @@ export async function listStaffTickets(p: PlatformCtx, raw: unknown = {}, db: Qu
     // Search covers the subject, reference and PUBLIC messages (search_doc) plus requester / workspace names. Internal
     // notes are not indexed and cannot be found by search.
     add((n) => /^RLY-\d+$/i.test(q.q!) ? `upper(t.reference) = upper($${n})`
-      : `(t.search_doc @@ websearch_to_tsquery('simple', $${n}) OR t.subject ILIKE '%' || $${n} || '%' OR ru.email::text ILIKE '%' || $${n} || '%' OR w.name ILIKE '%' || $${n} || '%')`, q.q);
+      : `(t.search_doc @@ websearch_to_tsquery('simple', $${n}) OR t.subject ILIKE '%' || $${n} || '%' OR ru.email::text ILIKE '%' || $${n} || '%' OR w.name ILIKE '%' || $${n} || '%' OR t.visitor_email::text ILIKE '%' || $${n} || '%')`, q.q);
   }
   const countParams = [...params];
   if (q.cursor) {
@@ -139,7 +140,7 @@ export async function getStaffTicket(p: PlatformCtx, idOrRef: string, db: Querya
   const delivery = await deliverySummary(db, msgs.filter((m) => m.author_kind === 'staff').map((m) => m.id));
   const display = (name: string | null, email: string | null) => name || email?.split('@')[0] || 'Unknown';
   const timeline: Array<StaffTimelineItem & { at: string }> = [
-    ...msgs.map((m) => ({ type: 'message' as const, id: m.id, author: { kind: m.author_kind, name: display(m.name, m.email), id: m.author_user_id }, body: m.body,
+    ...msgs.map((m) => ({ type: 'message' as const, id: m.id, author: { kind: m.author_kind, name: m.author_kind === 'visitor' ? (t.visitor_name || 'Visitor') : display(m.name, m.email), id: m.author_user_id }, body: m.body,
       created_at: m.created_at.toISOString(), at: m.created_at.toISOString(), attachments: mFiles.get(m.id) ?? [],
       ...(delivery.get(m.id) ? { delivery: delivery.get(m.id) } : {}) })),
     ...notes.map((n) => ({ type: 'note' as const, id: n.id, author: { name: display(n.name, n.email), id: n.author_user_id }, body: n.body, created_at: n.created_at.toISOString(),
@@ -163,6 +164,8 @@ export async function getStaffTicket(p: PlatformCtx, idOrRef: string, db: Querya
     problem_reports: reports.map((r) => ({ id: r.id, category: r.category, summary: r.summary, created_at: r.created_at.toISOString(), shared_at: iso(r.shared_at) })),
     duplicates: dups.filter((d) => d.id !== t.id),
     context: await workspaceContext(db, t.workspace_id, t.id),
+    // V5 WID: widget visitor metadata (verification / block state; no IPs or device details).
+    visitor: t.requester_kind === 'visitor' ? await visitorStaffInfo(db, t.id) : null,
     cursor: Number(cursor.id ?? 0),
   };
 }

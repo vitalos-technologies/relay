@@ -246,7 +246,7 @@ export async function queueSlackSummaries(): Promise<number> {
       [r.workspace_id, b]).catch(() => null);
     if (!counts) continue;
     const text = `Daily summary: ${counts.approvals} awaiting approval · ${counts.failed} failed posts (24 h) · ${counts.unassigned} unassigned conversations · ${counts.breaches} service-level breaches (24 h)`;
-    const ins = await getPool().query(`INSERT INTO slack_deliveries(workspace_id, integration_id, route_id, event_key, category, text, link_path) VALUES ($1,$2,$3,$4,'summaries',$5,'/') ON CONFLICT (route_id, event_key) DO NOTHING`,
+    const ins = await getPool().query(`INSERT INTO slack_deliveries(workspace_id, integration_id, route_id, event_key, category, text, link_path) VALUES ($1,$2,$3,$4,'summaries',$5,'/overview') ON CONFLICT (route_id, event_key) DO NOTHING`,
       [r.workspace_id, r.integration_id, r.id, `summary:${lp.date}`, text]);
     n += ins.rowCount ?? 0;
   }

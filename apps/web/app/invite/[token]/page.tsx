@@ -41,7 +41,7 @@ function Invite() {
     { redirectOn401: false },
   );
   const usable = data && data.status !== 'expired' && data.status !== 'revoked' && data.status !== 'accepted';
-  const signIn = `/api/auth/login?invite=${encodeURIComponent(token ?? '')}&returnTo=${encodeURIComponent('/')}`;
+  const signIn = `/api/auth/login?invite=${encodeURIComponent(token ?? '')}&returnTo=${encodeURIComponent('/overview')}`;
 
   return (
     <section className="rounded-2xl border border-border bg-surface p-6 sm:p-8">

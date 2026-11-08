@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import { BRAND } from '@social-lite/core';
+import { BRAND } from '@social-lite/core/brand'; // subpath: no core barrel in client bundles
 
 /** Relay "R" mark — vector redraw of the brand kit (orange→red ribbon). Decorative unless `title` is given. */
 export function RelayMark({ size = 28, title, className }: { size?: number; title?: string; className?: string }) {

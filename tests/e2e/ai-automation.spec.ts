@@ -35,7 +35,9 @@ test.describe('AI assistant + automation', () => {
     await expect(page.getByRole('heading', { name: 'Assistant', level: 1 })).toBeVisible();
     if (!status.configured) {
       await expect(page.getByText('AI is not set up').first()).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Ask' })).toHaveAttribute('aria-disabled', 'true');
+      // V5 workspace: a free-text question needs a provider — the Ask task type is not offered and Start stays disabled.
+      await expect(page.getByTestId('ai-composer').getByLabel('Task type').locator('option[value="ask"]')).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Start task' })).toHaveAttribute('aria-disabled', 'true');
       const ch = await channel(a);
       const name = `Cara ${randomUUID().slice(0, 6)}`;
       await a.send('POST', `/api/inbox/channels/${ch.id}/simulate`, { kind: 'dm', name, text: 'Where is my order?' });
@@ -50,8 +52,8 @@ test.describe('AI assistant + automation', () => {
     }
     await page.keyboard.press('Escape');
     await page.goto('/assistant');
-    await page.getByRole('tab', { name: 'Knowledge' }).click();
-    await expect(page.getByText(/approved knowledge|Only approved sources/).first()).toBeVisible();
+    await page.getByRole('button', { name: 'Knowledge sources' }).click(); // V5: from the workspace history sidebar
+    await expect(page.getByRole('dialog').getByText(/approved knowledge|Only approved sources/).first()).toBeVisible();
   });
 
   test('policy + rule: test preview, live routing by the worker, history, emergency stop', async ({ page }) => {

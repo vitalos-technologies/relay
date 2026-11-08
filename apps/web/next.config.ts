@@ -19,6 +19,8 @@ const nextConfig: NextConfig = {
   transpilePackages: ['@social-lite/core', '@social-lite/db', '@social-lite/providers', '@social-lite/services'],
   serverExternalPackages: ['sharp', 'pg', 'pg-boss', 'nodemailer', 'openid-client'],
   poweredByHeader: false,
+  // V5 (MKT): the marketing hero screenshot is served by next/image — AVIF first, WebP fallback (Accept header decides).
+  images: { formats: ['image/avif', 'image/webp'], qualities: [75] },
   typedRoutes: false,
   // Workspace packages use ESM ".js" import suffixes that point at ".ts" sources.
   webpack(config) {

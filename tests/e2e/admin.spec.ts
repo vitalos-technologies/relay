@@ -70,7 +70,7 @@ test.describe('V3.1 Admin', () => {
     await expect(page.getByRole('status').filter({ hasText: 'Live' })).toBeVisible();
     // Another tab (same user) schedules a post through the main app's API.
     const other = await context.newPage();
-    await other.goto('/');
+    await other.goto('/overview');
     const b = await api(other);
     const s = await scheduleOne(b, title);
     const t0 = Date.now();

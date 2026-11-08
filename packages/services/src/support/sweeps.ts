@@ -47,6 +47,8 @@ export async function runSupportSweeps(pool: Pool = getPool()): Promise<void> {
     ['archive', () => autoArchiveResolved(pool)],
     ['purge', () => purgeExpiredTickets(pool)],
     ['ai', () => pool.query(`DELETE FROM support_ai_drafts WHERE created_at < now() - interval '30 days'`)],
+    // V5 WID: visitor email retries, verification/session/visitor housekeeping (widget-sweeps.ts).
+    ['widget', async () => { const { sweepWidget } = await import('./widget-sweeps.js'); await sweepWidget(pool); }],
   ] as const) {
     try { await fn(); } catch (err) { log.warn('support_sweep_failed', { sweep: name, err: err as Error }); }
   }

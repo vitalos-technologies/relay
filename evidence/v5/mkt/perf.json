@@ -1,0 +1,87 @@
+{
+  "base": "http://localhost:3000",
+  "at": "2026-11-08T12:36:43.007Z",
+  "conditions": "headless Chromium, cold cache per run; mobile = 390x844, DPR 2, CPU 4x, 150ms RTT, 1.6/0.75 Mbps",
+  "results": [
+    {
+      "path": "/",
+      "profile": "desktop",
+      "runs": 5,
+      "lcp_ms_median": 232,
+      "fcp_ms_median": 232,
+      "cls_max": 0,
+      "ttfb_ms_median": 28,
+      "html_kb": 47.6,
+      "js_files": 15,
+      "js_transfer_kb": 208.2,
+      "js_decoded_kb": 666,
+      "css_kb": 18.9,
+      "fonts": [
+        "2bcd4b1f8f3a3e9f.p.woff2",
+        "3835a68e46c991a5-s.p.woff2",
+        "6c596dfcddeca1e9-s.p.woff2"
+      ],
+      "images": 1
+    },
+    {
+      "path": "/",
+      "profile": "mobile",
+      "runs": 5,
+      "lcp_ms_median": 1712,
+      "fcp_ms_median": 1184,
+      "cls_max": 0,
+      "ttfb_ms_median": 32,
+      "html_kb": 47.6,
+      "js_files": 15,
+      "js_transfer_kb": 208.2,
+      "js_decoded_kb": 666,
+      "css_kb": 18.9,
+      "fonts": [
+        "2bcd4b1f8f3a3e9f.p.woff2",
+        "3835a68e46c991a5-s.p.woff2",
+        "6c596dfcddeca1e9-s.p.woff2"
+      ],
+      "images": 1
+    },
+    {
+      "path": "/login",
+      "profile": "desktop",
+      "runs": 5,
+      "lcp_ms_median": 96,
+      "fcp_ms_median": 96,
+      "cls_max": 0,
+      "ttfb_ms_median": 12,
+      "html_kb": 9,
+      "js_files": 9,
+      "js_transfer_kb": 136.7,
+      "js_decoded_kb": 453.3,
+      "css_kb": 17.7,
+      "fonts": [
+        "2bcd4b1f8f3a3e9f.p.woff2",
+        "3835a68e46c991a5-s.p.woff2",
+        "6c596dfcddeca1e9-s.p.woff2"
+      ],
+      "images": 0
+    },
+    {
+      "path": "/login",
+      "profile": "mobile",
+      "runs": 5,
+      "lcp_ms_median": 960,
+      "fcp_ms_median": 960,
+      "cls_max": 0,
+      "ttfb_ms_median": 11,
+      "html_kb": 9,
+      "js_files": 9,
+      "js_transfer_kb": 136.7,
+      "js_decoded_kb": 453.3,
+      "css_kb": 17.7,
+      "fonts": [
+        "2bcd4b1f8f3a3e9f.p.woff2",
+        "6c596dfcddeca1e9-s.p.woff2",
+        "3835a68e46c991a5-s.p.woff2"
+      ],
+      "images": 0
+    }
+  ]
+}

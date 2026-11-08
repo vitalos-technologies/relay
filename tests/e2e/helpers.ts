@@ -69,7 +69,7 @@ export async function completeKeycloak(page: Page, email: string, opts: { totpKe
 
 /** Real OIDC sign-in through the local Keycloak realm (password, then TOTP for privileged demo users). */
 export async function signIn(page: Page, email: string, opts: { totpKey?: Buffer } = {}): Promise<void> {
-  await page.goto('/');
+  await page.goto('/overview'); // V5: `/` is the public marketing page; the app home is /overview
   await page.waitForURL(/\/login/);
   await page.locator('a[href^="/api/auth/login"]').first().click();
   await page.waitForURL(/localhost:5556/);
@@ -95,7 +95,7 @@ export async function useE2EWorkspace(page: Page): Promise<void> {
     data: JSON.stringify({ workspace_id: target.id }),
   });
   expect(r.status(), 'switch to the E2E workspace').toBeLessThan(300);
-  await page.goto('/');
+  await page.goto('/overview');
 }
 
 export interface Api {

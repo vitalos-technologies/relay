@@ -5,7 +5,7 @@
 import {
   Activity, BadgeCheck, BookOpen, Building2, Cable, ChartColumn, CheckCheck, Cog, FileStack, Flag, Gauge, HandHelping, HeartPulse, KeyRound,
   LayoutDashboard, LifeBuoy, ListChecks, MessageSquareWarning, Plug, ScrollText, Send, ServerCog, ShieldCheck, Stethoscope, Tag, ToggleRight, UserCog, Users, UsersRound,
-  Webhook, Wrench, Workflow, MessagesSquare, UserRoundCog, BellRing, SlidersHorizontal, Radar, Sparkles, CreditCard, Layers, Inbox, MessageSquareText, type LucideIcon,
+  Webhook, Wrench, Workflow, MessagesSquare, UserRoundCog, BellRing, SlidersHorizontal, Radar, Sparkles, CreditCard, Layers, Inbox, MessageSquareText, Megaphone, type LucideIcon,
 } from 'lucide-react';
 import type { Action, Permission } from '@social-lite/core';
 import { SETTINGS, itemAllowed, type Perms } from '@/components/settings-shell/registry';
@@ -60,7 +60,7 @@ export const WORKSPACE_NAV: AdminNavGroup[] = [
     { href: '/admin/inbox', label: 'Inbox health', icon: HeartPulse, visible: v1('diagnostics.read'), keywords: 'backlog replies failed unknown sla breaches channels webhooks' },
     { href: '/admin/integrations', label: 'Integrations and sync', icon: Cable, visible: v1('diagnostics.read'), keywords: 'connector health sync lag jobs webhooks slack translation asana monday hubspot mailchimp' },
     { href: '/admin/listening', label: 'Listening coverage', icon: Radar, visible: v2('workspace.read'), keywords: 'sources coverage ingestion failures alerts mentions' },
-    { href: '/admin/ai', label: 'AI and automation', icon: Sparkles, visible: v1('diagnostics.read'), keywords: 'ai usage budget tokens runs automation policies rules emergency stop' },
+    { href: '/admin/ai', label: 'AI and automation', icon: Sparkles, visible: v1('diagnostics.read'), keywords: 'ai usage budget tokens runs workflows failures automation policies rules emergency stop' },
     settings('inbox', 'channels', 'Inbox channels'),
     settings('inbox', 'service-levels'),
     settings('listening', 'sources', 'Listening sources'),
@@ -135,9 +135,13 @@ export const PLATFORM_NAV: AdminNavGroup[] = [
   ] },
   { id: 'p-ops', label: 'Operations', icon: Activity, items: [
     { href: '/admin/platform/rollouts', label: 'Rollouts', icon: Flag, visible: anyStaff, keywords: 'feature flags kill switch percent' },
+    // V5 (MKT): marketing page configuration — support widget switches, legal links (no secrets).
+    { href: '/admin/platform/marketing', label: 'Marketing', icon: Megaphone, visible: anyStaff, keywords: 'website landing widget chat staffed legal privacy terms' },
     { href: '/admin/platform/integrations', label: 'Integrations', icon: ListChecks, visible: anyStaff, keywords: 'providers apps configured matrix' },
     { href: '/admin/platform/collaboration', label: 'Collaboration pipeline', icon: MessagesSquare, visible: anyStaff, keywords: 'notifications email reminders outbox' },
     { href: '/admin/platform/care', label: 'Inbox and AI pipeline', icon: HeartPulse, visible: anyStaff, keywords: 'inbox replies sync listening ai automation counts' },
+    // V5 (AIW): AI workflow operations across workspaces — counts, outcome codes, failed steps, tokens (no customer content).
+    { href: '/admin/platform/ai', label: 'AI operations', icon: Sparkles, visible: anyStaff, keywords: 'ai workflows runs failures budget tokens usage assistant' },
   ] },
   { id: 'p-security', label: 'Security', icon: ShieldCheck, items: [
     { href: '/admin/platform/support/access', label: 'Support access', icon: KeyRound, visible: supportStaff, keywords: 'request time-boxed' },

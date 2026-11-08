@@ -32,7 +32,7 @@ interface NavItem {
 }
 
 export const NAV: NavItem[] = [
-  { href: '/', label: 'Overview', icon: LayoutDashboard, mobile: true },
+  { href: '/overview', label: 'Overview', icon: LayoutDashboard, mobile: true }, // V5 (D23): app home moved from `/`
   { href: '/planner', label: 'Planner', icon: CalendarDays, mobile: true, also: ['/history'] },
   { href: '/compose', label: 'Create', icon: SquarePen, perm: 'drafts.edit', mobile: true, also: ['/posts/'] },
   { href: '/library', label: 'Content library', icon: FolderOpen },
@@ -62,7 +62,6 @@ const ADMIN_NAV: NavItem[] = [
 ];
 
 function isActive(pathname: string, item: NavItem) {
-  if (item.href === '/') return pathname === '/';
   if (pathname === item.href || pathname.startsWith(`${item.href}/`)) return true;
   return (item.also ?? []).some((p) => (p.endsWith('/') ? pathname.startsWith(p) : pathname === p || pathname.startsWith(`${p}/`)));
 }

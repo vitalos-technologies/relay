@@ -14,6 +14,7 @@
 import { isIP } from 'node:net';
 import * as oidc from 'openid-client';
 import { AppError } from '@social-lite/core';
+import { APP_HOME } from '@social-lite/core/contracts/v5-marketing';
 import { getPool, maybeOne, withTx, type Queryable } from '@social-lite/db';
 import { audit } from '../audit.js';
 import { config } from '../config.js';
@@ -81,19 +82,23 @@ export function callbackUrl(): string {
   return `${config().APP_BASE_URL.replace(/\/$/, '')}/api/auth/callback`;
 }
 
-/** Only same-site relative paths are accepted as post-login destinations. */
+/**
+ * Only same-site relative paths are accepted as post-login destinations. Anything else — and the public marketing page `/`
+ * itself (V5, D23) — falls back to the app home (`APP_HOME`, /overview).
+ */
 export function safeReturnTo(raw: string | null | undefined): string {
-  if (!raw || raw.length > 512) return '/';
+  if (!raw || raw.length > 512) return APP_HOME;
   // eslint-disable-next-line no-control-regex
-  if (!raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/\\') || /[\u0000-\u001f\u007f\\]/.test(raw)) return '/';
+  if (!raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/\\') || /[\u0000-\u001f\u007f\\]/.test(raw)) return APP_HOME;
   try {
     const base = new URL(config().APP_BASE_URL);
     const u = new URL(raw, base);
-    if (u.origin !== base.origin) return '/';
-    if (u.pathname.startsWith('/api/')) return '/';
+    if (u.origin !== base.origin) return APP_HOME;
+    if (u.pathname.startsWith('/api/')) return APP_HOME;
+    if (u.pathname === '/' && !u.search) return APP_HOME;
     return `${u.pathname}${u.search}${u.hash}`;
   } catch {
-    return '/';
+    return APP_HOME;
   }
 }
 
@@ -292,7 +297,7 @@ export async function completeLogin(
     userAgent: p.userAgent, ip: normalizeIp(p.ip), workspaceId, ...assurance, idpSessionId: assurance.sid, idpSubject: sub,
     idTokenEnc: encryptSecret(idToken, idTokenAad),
   });
-  let redirectTo = row.redirect_after ?? '/';
+  let redirectTo = row.redirect_after ?? APP_HOME;
   if (invitation && !invitation.accepted && secret.invite) {
     redirectTo = `/invite/${encodeURIComponent(secret.invite)}?error=${encodeURIComponent(invitation.error ?? 'invitation_invalid')}`;
   }

@@ -50,7 +50,7 @@ function PickWorkspace({ session, onCreate }: { session: SessionInfo; onCreate: 
     setError(null);
     try {
       await api.post('/api/session/workspace', { workspace_id: id });
-      window.location.assign('/');
+      window.location.assign('/overview');
     } catch (e) {
       setError(e);
       setBusy(null);

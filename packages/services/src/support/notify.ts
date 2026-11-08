@@ -20,7 +20,8 @@ import type { PlatformCtx } from '../admin/platform.js';
 import { log } from '../log.js';
 import { activeSupportStaff, customerCanSee } from './access.js';
 
-export const SUPPORT_EVENTS = ['support.ticket_created', 'support.message_created', 'support.ticket_assigned', 'support.access_requested', 'support.access_decided'] as const;
+export const SUPPORT_EVENTS = ['support.ticket_created', 'support.message_created', 'support.ticket_assigned', 'support.access_requested', 'support.access_decided',
+  'support.widget_verification'] as const;
 export type SupportEventType = (typeof SUPPORT_EVENTS)[number];
 
 interface Ticket { id: string; reference: string; workspace_id: string | null; requester_user_id: string | null; assignee_user_id: string | null; status: string }
@@ -118,7 +119,12 @@ export async function handleSupportEvent(evt: { event_type: string; workspace_id
       const m = await maybeOne<{ id: string; author_kind: string; author_user_id: string | null }>(db, `SELECT id, author_kind, author_user_id FROM support_messages WHERE id=$1 AND ticket_id=$2`, [p.messageId, t.id]);
       if (!m) return;
       if (m.author_kind === 'staff') {
-        if (!t.workspace_id) return; // visitor tickets: widget delivery arrives with V5
+        if (!t.workspace_id) {
+          // V5 WID: visitor tickets — the reply shows in the widget (polling); the contact address gets a content-free email.
+          const { queueVisitorReplyEmail } = await import('./widget-verify.js');
+          await queueVisitorReplyEmail(db, t, m.id);
+          return;
+        }
         const participants = (await many<{ user_id: string }>(db, `SELECT user_id FROM support_ticket_participants WHERE ticket_id=$1 AND removed_at IS NULL`, [t.id])).map((r) => r.user_id);
         const recipients = [...new Set([t.requester_user_id, ...participants].filter((x): x is string => !!x))];
         for (const uid of recipients) {
@@ -164,6 +170,12 @@ export async function handleSupportEvent(evt: { event_type: string; workspace_id
         linkPath: staffLink(g.reference), ticketId: g.support_ticket_id, dedupeKey: `support:access-decided:${g.id}`, email: false });
       return;
     }
+    case 'support.widget_verification': {
+      // V5 WID: one-time code/link for a widget visitor (secrets generated at send time; widget-verify.ts).
+      const { handleWidgetVerification } = await import('./widget-verify.js');
+      await handleWidgetVerification(db, evt.aggregate_id);
+      return;
+    }
     default:
       log.debug('support_event_ignored', { type: evt.event_type });
   }
@@ -205,6 +217,14 @@ export async function deliverySummary(db: Queryable, messageIds: string[]): Prom
     const cur = out.get(id) ?? { recipients: 0, email: {} };
     cur.recipients += r.n;
     cur.email[r.email_state] = (cur.email[r.email_state] ?? 0) + r.n;
+    out.set(id, cur);
+  }
+  // V5 WID: staff replies on visitor tickets are emailed to the contact address (widget_emails), not via notifications.
+  const { visitorEmailSummary } = await import('./widget-verify.js');
+  for (const [id, state] of await visitorEmailSummary(db, messageIds)) {
+    const cur = out.get(id) ?? { recipients: 0, email: {} };
+    cur.recipients += 1;
+    cur.email[state] = (cur.email[state] ?? 0) + 1;
     out.set(id, cur);
   }
   return out;

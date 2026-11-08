@@ -28,6 +28,8 @@ async function decide(ctx: Ctx, a: Row, status: 'applied' | 'dismissed' | 'faile
   if (!r) throw new AppError('invalid_state', 'This suggestion was already handled.');
   await audit(getPool(), { workspaceId: a.workspace_id, brandId: a.brand_id, actorUserId: ctx.actor.userId, action: `ai.action_${status}`, resourceType: 'ai_proposed_action', resourceId: a.id,
     diff: { kind: a.kind, target_type: a.target_type, target_id: a.target_id, run_id: a.run_id }, correlationId: ctx.correlationId });
+  // V5: a workflow run waiting for review completes once nothing required is left to review.
+  await (await import('../ai-workflows/engine.js')).settleReviewIfDone(a.run_id);
   return actionDto(r);
 }
 
@@ -37,8 +39,13 @@ export async function dismissAction(ctx: Ctx, id: string): Promise<ProposedActio
 }
 
 /** Apply through the normal service. Returns the action plus, for copy/reply, the text the client puts in its editor. */
-export async function applyAction(ctx: Ctx, id: string): Promise<{ action: ProposedActionDto; text: string | null }> {
+export async function applyAction(ctx: Ctx, id: string, body: { reviewed_hash?: string | null } = {}): Promise<{ action: ProposedActionDto; text: string | null; result?: Record<string, unknown> }> {
   const a = await load(ctx, id);
+  // V5 external actions (schedule / submit for approval / send reply): only with the hash of the reviewed preview.
+  if (a.kind === 'schedule_post' || a.kind === 'submit_for_approval' || a.kind === 'send_reply') {
+    const r = await (await import('../ai-workflows/actions.js')).confirmAction(ctx, id, body.reviewed_hash);
+    return { action: r.action, text: null, result: r.result };
+  }
   if (a.status !== 'proposed') throw new AppError('invalid_state', 'This suggestion was already handled.');
   if (a.expires_at.getTime() < Date.now()) throw new AppError('invalid_state', 'This suggestion expired. Ask again.');
   const p = a.preview.params;
@@ -72,6 +79,8 @@ export async function applyAction(ctx: Ctx, id: string): Promise<{ action: Propo
       break;
     case 'assign':
       throw new AppError('invalid_state', 'Assignment is chosen by a person.');
+    default:
+      throw new AppError('invalid_state', 'This action is not available.');
   }
   return { action: await decide(ctx, a, 'applied'), text };
 }

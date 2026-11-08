@@ -4,11 +4,8 @@
       "/opt/node22/bin/node",
       "/home/user/relay/node_modules/@playwright/test/cli.js",
       "test",
-      "tests/e2e/v4-support.spec.ts",
-      "--trace",
-      "off",
-      "-g",
-      "phone"
+      "tests/e2e/v5-ai.spec.ts",
+      "tests/e2e/ai-automation.spec.ts"
     ],
     "configFile": "/home/user/relay/playwright.config.ts",
     "rootDir": "/home/user/relay/tests/e2e",
@@ -86,27 +83,25 @@
   },
   "suites": [
     {
-      "title": "v4-support.spec.ts",
-      "file": "v4-support.spec.ts",
+      "title": "ai-automation.spec.ts",
+      "file": "ai-automation.spec.ts",
       "column": 0,
       "line": 0,
       "specs": [],
       "suites": [
         {
-          "title": "V4 Relay support",
-          "file": "v4-support.spec.ts",
-          "line": 51,
+          "title": "AI assistant + automation",
+          "file": "ai-automation.spec.ts",
+          "line": 27,
           "column": 6,
           "specs": [
             {
-              "title": "phone: create with a screenshot, read and reply; staff triage and reply; no horizontal scroll @mobile",
+              "title": "assistant reports its provider state honestly and never shows invented output",
               "ok": true,
-              "tags": [
-                "mobile"
-              ],
+              "tags": [],
               "tests": [
                 {
-                  "timeout": 300000,
+                  "timeout": 240000,
                   "annotations": [],
                   "expectedStatus": "passed",
                   "projectId": "desktop",
@@ -116,12 +111,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 92713,
+                      "duration": 29810,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-08T09:00:27.069Z",
+                      "startTime": "2026-11-08T12:09:34.338Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -129,20 +124,110 @@
                   "status": "expected"
                 }
               ],
-              "id": "45fde2ec11b5ac07d8ff-e5f786f04b9092d9d7a1",
-              "file": "v4-support.spec.ts",
-              "line": 161,
+              "id": "d4d84c67d772666817fe-3db1f1b405b490141bb2",
+              "file": "ai-automation.spec.ts",
+              "line": 30,
               "column": 7
             },
             {
-              "title": "phone: create with a screenshot, read and reply; staff triage and reply; no horizontal scroll @mobile",
+              "title": "policy + rule: test preview, live routing by the worker, history, emergency stop",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 240000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 37453,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-08T12:10:04.267Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d4d84c67d772666817fe-2c65cb30a0370d050e82",
+              "file": "ai-automation.spec.ts",
+              "line": 59,
+              "column": 7
+            },
+            {
+              "title": "phone: assistant and automation screens fit every width @mobile",
               "ok": true,
               "tags": [
                 "mobile"
               ],
               "tests": [
                 {
-                  "timeout": 300000,
+                  "timeout": 240000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "phone layout only",
+                      "location": {
+                        "file": "/home/user/relay/tests/e2e/ai-automation.spec.ts",
+                        "line": 117,
+                        "column": 10
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "skipped",
+                      "duration": 80,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-08T12:10:41.744Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "description": "phone layout only",
+                          "location": {
+                            "file": "/home/user/relay/tests/e2e/ai-automation.spec.ts",
+                            "line": 117,
+                            "column": 10
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "d4d84c67d772666817fe-ba2e6b3b77690c660c28",
+              "file": "ai-automation.spec.ts",
+              "line": 116,
+              "column": 7
+            },
+            {
+              "title": "phone: assistant and automation screens fit every width @mobile",
+              "ok": true,
+              "tags": [
+                "mobile"
+              ],
+              "tests": [
+                {
+                  "timeout": 240000,
                   "annotations": [],
                   "expectedStatus": "passed",
                   "projectId": "mobile",
@@ -152,12 +237,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 58853,
+                      "duration": 30192,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-08T09:02:00.396Z",
+                      "startTime": "2026-11-08T12:14:34.457Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -165,9 +250,356 @@
                   "status": "expected"
                 }
               ],
-              "id": "45fde2ec11b5ac07d8ff-88ee8e318ede5130de26",
-              "file": "v4-support.spec.ts",
-              "line": 161,
+              "id": "d4d84c67d772666817fe-52789b83971dd8a0dde4",
+              "file": "ai-automation.spec.ts",
+              "line": 116,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "v5-ai.spec.ts",
+      "file": "v5-ai.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "V5 AI workspace",
+          "file": "v5-ai.spec.ts",
+          "line": 44,
+          "column": 6,
+          "specs": [
+            {
+              "title": "home: welcome, composer with context, 4–6 actionable suggestions from real data (AT13)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 240000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 50994,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-08T12:10:41.847Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7ff9db20bc7545eb6c5c-ecd61d3ee9540d2c365f",
+              "file": "v5-ai.spec.ts",
+              "line": 47,
+              "column": 7
+            },
+            {
+              "title": "weekly planning through the UI: progress, refresh-safe, real plan + review schedule preview (AT14/15/16)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 240000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 32087,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-08T12:11:32.851Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7ff9db20bc7545eb6c5c-1167606b687af981b195",
+              "file": "v5-ai.spec.ts",
+              "line": 83,
+              "column": 7
+            },
+            {
+              "title": "campaign from an attached brief: real campaign record with a working link; honest about AI (AT14)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 240000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 30077,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-08T12:12:04.955Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7ff9db20bc7545eb6c5c-c72b1f051d18bd0384b7",
+              "file": "v5-ai.spec.ts",
+              "line": 127,
+              "column": 7
+            },
+            {
+              "title": "stop: a run stopped before it starts never runs, and says so (AT15)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 240000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 27813,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-08T12:12:35.046Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7ff9db20bc7545eb6c5c-10de0d67c17cbf7ad543",
+              "file": "v5-ai.spec.ts",
+              "line": 157,
+              "column": 7
+            },
+            {
+              "title": "keyboard, names and reduced motion: suggestions and composer work without a mouse (AT18)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 240000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 28515,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-08T12:13:02.874Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7ff9db20bc7545eb6c5c-c9df6c7cf53293d67247",
+              "file": "v5-ai.spec.ts",
+              "line": 177,
+              "column": 7
+            },
+            {
+              "title": "widths 320–1440: no horizontal scroll on the workspace and a run",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 240000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 35389,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-08T12:13:31.403Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7ff9db20bc7545eb6c5c-d3746c44e74260084146",
+              "file": "v5-ai.spec.ts",
+              "line": 201,
+              "column": 7
+            },
+            {
+              "title": "admin: workspace AI workflows and Platform → AI operations (metadata only)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 240000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 27122,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-08T12:14:06.801Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7ff9db20bc7545eb6c5c-2e61c6a66e09f2f4c9d3",
+              "file": "v5-ai.spec.ts",
+              "line": 217,
+              "column": 7
+            },
+            {
+              "title": "phone: history sheet, composer with the on-screen keyboard, results readable @mobile",
+              "ok": true,
+              "tags": [
+                "mobile"
+              ],
+              "tests": [
+                {
+                  "timeout": 240000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "phone layout only",
+                      "location": {
+                        "file": "/home/user/relay/tests/e2e/v5-ai.spec.ts",
+                        "line": 231,
+                        "column": 10
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "skipped",
+                      "duration": 1,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-08T12:14:33.936Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "description": "phone layout only",
+                          "location": {
+                            "file": "/home/user/relay/tests/e2e/v5-ai.spec.ts",
+                            "line": 231,
+                            "column": 10
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "7ff9db20bc7545eb6c5c-691d39491f4f24b92822",
+              "file": "v5-ai.spec.ts",
+              "line": 230,
+              "column": 7
+            },
+            {
+              "title": "phone: history sheet, composer with the on-screen keyboard, results readable @mobile",
+              "ok": true,
+              "tags": [
+                "mobile"
+              ],
+              "tests": [
+                {
+                  "timeout": 240000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "mobile",
+                  "projectName": "mobile",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 57319,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-08T12:15:04.788Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7ff9db20bc7545eb6c5c-ba59803a22405f50731e",
+              "file": "v5-ai.spec.ts",
+              "line": 230,
               "column": 7
             }
           ]
@@ -177,10 +609,10 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-11-08T09:00:24.948Z",
-    "duration": 154520.94100000002,
-    "expected": 2,
-    "skipped": 0,
+    "startTime": "2026-11-08T12:09:32.346Z",
+    "duration": 389833.998,
+    "expected": 11,
+    "skipped": 2,
     "unexpected": 0,
     "flaky": 0
   }

@@ -209,7 +209,7 @@ export async function apiFetch<T>(path: string, opts: RequestOptions = {}): Prom
   if (err.code === 'conflict' && err.details?.reason === 'workspace_changed' && typeof window !== 'undefined') {
     pendingKeys.clear();
     expectedWorkspace = null;
-    window.location.replace('/');
+    window.location.replace('/overview');
   }
   // Definitive outcomes clear the key; transient ones keep it so a retry is deduplicated server-side.
   if (keyId && !err.isTransient) pendingKeys.delete(keyId);
@@ -234,7 +234,7 @@ export const api = {
 };
 
 /** Safe same-origin relative path for returnTo parameters. */
-export function safeReturnTo(v: string | null | undefined, fallback = '/'): string {
+export function safeReturnTo(v: string | null | undefined, fallback = '/overview'): string {
   if (!v || !v.startsWith('/') || v.startsWith('//') || v.startsWith('/\\')) return fallback;
   return v;
 }

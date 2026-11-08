@@ -42,7 +42,7 @@ export function onWorkspaceChangedElsewhere(currentWorkspaceId: string | null, c
 }
 
 /** Hard reload into the new workspace after clearing caches (no client state is carried over). */
-export function enterWorkspace(workspaceId: string, path = '/'): void {
+export function enterWorkspace(workspaceId: string, path = '/overview'): void {
   clearClientCaches();
   broadcastWorkspaceChange(workspaceId);
   window.location.replace(path);

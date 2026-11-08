@@ -10,6 +10,7 @@ import type { EntitlementsDto } from '@social-lite/core/contracts/v4-entitlement
 import type { BillingChangePreviewDto, BillingOverviewDto } from '@social-lite/core/contracts/v4-billing-dto';
 import { api } from '@/lib/client/api';
 import { useApi } from '@/lib/client/use-api';
+import { useSession } from '@/lib/client/session';
 import { Badge, Banner, Button, Card, CardHeader, ConfirmDialog, Dialog, EmptyState, ErrorNotice, ErrorState, Facts, MetaChip, Skeleton, Spinner, cn, useToast } from '@/components/ui';
 import { STATUS_LABEL, STATUS_TONE, day, money, seatsLabel, usersLabel } from './format';
 
@@ -165,7 +166,7 @@ function PlanCard({ d, onChanged }: { d: BillingOverviewDto; onChanged: () => un
             {d.scheduled_change && d.actions.change_subscription ? <Button variant="ghost" className="w-full sm:w-auto" onClick={async () => { try { await api.del('/api/billing/change'); toast.success('Scheduled change removed'); await onChanged(); } catch (e) { toast.error((e as Error).message); } }}>Keep current plan</Button> : null}
             {d.actions.cancel ? <Button variant="ghost" className="w-full sm:w-auto sm:ml-auto" onClick={() => setCancel(true)}>Cancel renewal</Button> : null}
           </div>
-        ) : <p className="text-xs text-muted">Only people who manage billing can make changes.</p>}
+        ) : <ManageHint />}
       </div>
       {change ? <ChangeDialog d={d} onClose={() => setChange(false)} onDone={onChanged} /> : null}
       <ConfirmDialog open={cancel} onOpenChange={setCancel} title="Cancel renewal?" confirmLabel="Cancel renewal" confirmVariant="danger"
@@ -390,4 +391,15 @@ function UsageCard() {
       </ul>
     </Card>
   );
+}
+
+/** V5 (MKT): a new self-serve owner usually lacks a verified second factor, which billing changes require by the workspace
+ *  security policy — say so instead of implying they lack the role. */
+function ManageHint() {
+  const { session } = useSession();
+  const ownerish = session.workspace?.role === 'owner' || session.workspace?.role === 'admin';
+  if (ownerish && session.v2 && !session.v2.mfa_verified) {
+    return <p className="text-xs text-muted" data-testid="billing-mfa-hint">Billing changes need two-step verification. <Link href="/security" className="font-medium text-accent-text hover:underline">Set it up in Security</Link>, then come back to choose a plan.</p>;
+  }
+  return <p className="text-xs text-muted">Only people who manage billing can make changes.</p>;
 }

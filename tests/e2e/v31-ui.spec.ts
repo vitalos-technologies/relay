@@ -141,7 +141,7 @@ test.describe('V3.1 UI', () => {
     const { a, brand, tg } = await setup(page);
     const word = `zephyr${randomUUID().slice(0, 6)}`;
     const p = await draft(a, brand.id, tg.id, `Search ${word}`, `Findable ${word} text`);
-    await page.goto('/');
+    await page.goto('/overview');
     await expect(page.getByRole('button', { name: 'Search' })).toBeVisible();
     await page.keyboard.press('Control+k');
     const box = page.getByRole('combobox', { name: /Search posts/ });
@@ -188,7 +188,7 @@ test.describe('V3.1 UI', () => {
     expect(target, 'seeded by pnpm db:seed:e2e').toBeTruthy();
     await page.goto('/api/session');
     expect((await a.send('POST', '/api/session/workspace', { workspace_id: target.id })).status).toBeLessThan(300);
-    await page.goto('/');
+    await page.goto('/overview');
     a = await api(page);
     expect((await a.send('PUT', '/api/feature-flags/v31.onboarding_checklist', { enabled: true })).status).toBe(200);
     await a.send('PATCH', '/api/onboarding', { dismissed: false });

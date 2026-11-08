@@ -34,23 +34,31 @@ const safeFilename = (n: string) => n.normalize('NFKC').replace(/[^\w.\- ]+/g, '
 
 interface Row { id: string; filename: string; mime: string | null; size: string | null; state: SupportAttachmentDto['state']; error: string | null; declared_type: string }
 
-export function attachmentDto(r: Row, urlBase: '/api/support/attachments' | '/api/platform/support/attachments'): SupportAttachmentDto {
+/** Download routes: customer, staff, and (V5 WID) the marketing support widget. */
+export type AttachmentUrlBase = '/api/support/attachments' | '/api/platform/support/attachments' | '/api/widget/attachments';
+
+export function attachmentDto(r: Row, urlBase: AttachmentUrlBase): SupportAttachmentDto {
   return { id: r.id, filename: r.filename, mime: r.mime ?? r.declared_type, size: r.size === null ? null : Number(r.size), state: r.state, error: r.error,
     url: r.state === 'ready' ? `${urlBase}/${r.id}` : null };
 }
 
-type Owner = { kind: 'member'; userId: string; workspaceId: string } | { kind: 'staff'; userId: string };
+// V5 WID: anonymous widget visitors own uploads through their visitor identity (support_attachments.visitor_id).
+export type AttachmentOwner = { kind: 'member'; userId: string; workspaceId: string } | { kind: 'staff'; userId: string } | { kind: 'visitor'; visitorId: string };
+type Owner = AttachmentOwner;
+const ownerUser = (o: Owner): string | null => (o.kind === 'visitor' ? null : o.userId);
+const ownerVisitor = (o: Owner): string | null => (o.kind === 'visitor' ? o.visitorId : null);
+const ownerWorkspace = (o: Owner): string | null => (o.kind === 'member' ? o.workspaceId : null);
 
-async function createIntent(owner: Owner, raw: unknown, urlBase: Parameters<typeof attachmentDto>[1]): Promise<SupportUploadIntent> {
+async function createIntent(owner: Owner, raw: unknown, urlBase: AttachmentUrlBase): Promise<SupportUploadIntent> {
   const input = intentSchema.parse(raw);
-  await enforceRateLimit('supportAttach', owner.userId, ATTACH_RATE);
+  await enforceRateLimit('supportAttach', owner.kind === 'visitor' ? `visitor:${owner.visitorId}` : owner.userId, ATTACH_RATE);
   await ensureBucket();
   const id = randomUUID();
   const key = `support/${id}`;
   const r = await one<Row>(getPool(),
-    `INSERT INTO support_attachments(id, owner_kind, owner_user_id, workspace_id, filename, declared_type, declared_size, storage_key)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, filename, mime, size::text, state, error, declared_type`,
-    [id, owner.kind, owner.userId, owner.kind === 'member' ? owner.workspaceId : null, safeFilename(input.filename), input.content_type, input.size, key]);
+    `INSERT INTO support_attachments(id, owner_kind, owner_user_id, workspace_id, filename, declared_type, declared_size, storage_key, visitor_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id, filename, mime, size::text, state, error, declared_type`,
+    [id, owner.kind, ownerUser(owner), ownerWorkspace(owner), safeFilename(input.filename), input.content_type, input.size, key, ownerVisitor(owner)]);
   const post = await presignUpload({ key, contentType: input.content_type, maxBytes: Math.min(input.size, SUPPORT_ATTACHMENT_MAX_BYTES), minBytes: 1, expiresSeconds: 600 });
   return { attachment: attachmentDto(r, urlBase), upload: { url: post.url, method: 'POST', fields: post.fields } };
 }
@@ -58,6 +66,8 @@ async function createIntent(owner: Owner, raw: unknown, urlBase: Parameters<type
 export const customerUploadIntent = (ctx: Ctx, raw: unknown) =>
   createIntent({ kind: 'member', userId: ctx.actor.userId, workspaceId: ctx.access.workspaceId }, raw, '/api/support/attachments');
 export const staffUploadIntent = (p: PlatformCtx, raw: unknown) => { requireSupportStaff(p); return createIntent({ kind: 'staff', userId: p.actor.userId }, raw, '/api/platform/support/attachments'); };
+/** V5 WID: upload intent for a widget visitor (identity from the widget session only). */
+export const visitorUploadIntent = (visitorId: string, raw: unknown) => createIntent({ kind: 'visitor', visitorId }, raw, '/api/widget/attachments');
 
 /** Magic-byte / encoding check for the allow-listed types. */
 export function sniffMatches(mime: string, b: Buffer): boolean {
@@ -76,12 +86,12 @@ export function sniffMatches(mime: string, b: Buffer): boolean {
 }
 
 /** Validate an uploaded object (owner only). Idempotent: a validated row is returned as is. */
-async function complete(owner: Owner, id: string, urlBase: Parameters<typeof attachmentDto>[1], db: Queryable = getPool()): Promise<SupportAttachmentDto> {
+async function complete(owner: Owner, id: string, urlBase: AttachmentUrlBase, db: Queryable = getPool()): Promise<SupportAttachmentDto> {
   assertUuid(id, 'Attachment');
-  const a = await maybeOne<Row & { storage_key: string; declared_size: string; owner_user_id: string; workspace_id: string | null }>(db,
+  const a = await maybeOne<Row & { storage_key: string; declared_size: string; owner_user_id: string | null; workspace_id: string | null }>(db,
     `SELECT id, filename, mime, size::text, state, error, declared_type, storage_key, declared_size::text, owner_user_id, workspace_id FROM support_attachments
-      WHERE id=$1 AND owner_user_id=$2 AND owner_kind=$3 AND ($4::uuid IS NULL OR workspace_id=$4)`,
-    [id, owner.userId, owner.kind, owner.kind === 'member' ? owner.workspaceId : null]);
+      WHERE id=$1 AND owner_user_id IS NOT DISTINCT FROM $2::uuid AND owner_kind=$3 AND ($4::uuid IS NULL OR workspace_id=$4) AND visitor_id IS NOT DISTINCT FROM $5::uuid`,
+    [id, ownerUser(owner), owner.kind, ownerWorkspace(owner), ownerVisitor(owner)]);
   if (!a) throw notFound('Attachment');
   if (a.state !== 'pending') return attachmentDto(a, urlBase);
   const reject = async (error: string) => {
@@ -109,6 +119,7 @@ async function complete(owner: Owner, id: string, urlBase: Parameters<typeof att
 
 export const completeCustomerUpload = (ctx: Ctx, id: string) => complete({ kind: 'member', userId: ctx.actor.userId, workspaceId: ctx.access.workspaceId }, id, '/api/support/attachments');
 export const completeStaffUpload = (p: PlatformCtx, id: string) => { requireSupportStaff(p); return complete({ kind: 'staff', userId: p.actor.userId }, id, '/api/platform/support/attachments'); };
+export const completeVisitorUpload = (visitorId: string, id: string) => complete({ kind: 'visitor', visitorId }, id, '/api/widget/attachments');
 
 /**
  * Bind ready, unattached files owned by the author to a new message or note (same transaction as the message).
@@ -121,12 +132,13 @@ export async function bindAttachments(db: Queryable, p: { ids: string[]; owner: 
   for (const id of ids) assertUuid(id, 'Attachment');
   const r = await db.query(
     `UPDATE support_attachments SET ticket_id=$1, message_id=$2, note_id=$3, attached_at=now()
-      WHERE id = ANY($4::uuid[]) AND owner_user_id=$5 AND owner_kind=$6 AND state='ready' AND ticket_id IS NULL AND ($7::uuid IS NULL OR workspace_id=$7)`,
-    [p.ticketId, p.messageId ?? null, p.noteId ?? null, ids, p.owner.userId, p.owner.kind, p.owner.kind === 'member' ? p.owner.workspaceId : null]);
+      WHERE id = ANY($4::uuid[]) AND owner_user_id IS NOT DISTINCT FROM $5::uuid AND owner_kind=$6 AND state='ready' AND ticket_id IS NULL AND ($7::uuid IS NULL OR workspace_id=$7)
+        AND visitor_id IS NOT DISTINCT FROM $8::uuid`,
+    [p.ticketId, p.messageId ?? null, p.noteId ?? null, ids, ownerUser(p.owner), p.owner.kind, ownerWorkspace(p.owner), ownerVisitor(p.owner)]);
   if (r.rowCount !== ids.length) throw new AppError('validation_failed', 'One of the files is not ready or not yours. Upload it again.', { attachment_ids: 'Not available' });
 }
 
-export async function attachmentsFor(db: Queryable, col: 'message_id' | 'note_id', ids: string[], urlBase: Parameters<typeof attachmentDto>[1]): Promise<Map<string, SupportAttachmentDto[]>> {
+export async function attachmentsFor(db: Queryable, col: 'message_id' | 'note_id', ids: string[], urlBase: AttachmentUrlBase): Promise<Map<string, SupportAttachmentDto[]>> {
   const out = new Map<string, SupportAttachmentDto[]>();
   if (!ids.length) return out;
   const rows = await many<Row & { parent: string }>(db,
@@ -137,7 +149,7 @@ export async function attachmentsFor(db: Queryable, col: 'message_id' | 'note_id
 
 export interface OpenedFile { bytes: Buffer; mime: string; filename: string; inline: boolean }
 
-async function readReady(a: { storage_key: string; mime: string | null; filename: string }): Promise<OpenedFile> {
+export async function readReady(a: { storage_key: string; mime: string | null; filename: string }): Promise<OpenedFile> {
   const mime = a.mime ?? 'application/octet-stream';
   return { bytes: await getObjectBytes(a.storage_key, SUPPORT_ATTACHMENT_MAX_BYTES), mime, filename: a.filename, inline: mime.startsWith('image/') };
 }

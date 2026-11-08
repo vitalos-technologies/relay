@@ -61,7 +61,7 @@ export function SessionProvider({
   const ready = state.kind === 'ready' ? state.session : null;
   // Another tab switched workspace: this tab's data belongs to the old one — reload.
   const activeId = ready?.workspace?.id ?? null;
-  useEffect(() => (activeId ? onWorkspaceChangedElsewhere(activeId, () => window.location.replace('/')) : undefined), [activeId]);
+  useEffect(() => (activeId ? onWorkspaceChangedElsewhere(activeId, () => window.location.replace('/overview')) : undefined), [activeId]);
   useEffect(() => {
     if (ready && requireWorkspace && !ready.workspace && !window.location.pathname.startsWith('/onboarding')) {
       window.location.replace('/onboarding');

@@ -6,8 +6,11 @@ import Link from 'next/link';
 import { useApi } from '@/lib/client/use-api';
 import { Badge, Card, CardHeader, ErrorState, InfoTip, PageHeader, SkeletonRows } from '@/components/ui';
 import type { AiAutomationAdminOverview } from '@social-lite/services/automation/admin';
+import { AiWorkflowsAdmin } from '@/components/ai-workspace/admin-workflows';
 
-const RUN_LABEL: Record<string, string> = { queued: 'Queued', running: 'Running', succeeded: 'Done', failed: 'Failed', blocked: 'Blocked', cancelled: 'Cancelled' };
+const RUN_LABEL: Record<string, string> = { queued: 'Queued', running: 'Running', succeeded: 'Done', failed: 'Failed', blocked: 'Blocked', cancelled: 'Cancelled',
+  // V5 workflow runs (AIW)
+  preparing: 'Preparing', working: 'Working', needs_input: 'Needs input', needs_review: 'Ready for review', completed: 'Completed', partially_completed: 'Partly done', not_configured: 'AI not set up', budget_exhausted: 'Budget used up', refused: 'Declined' };
 const OUTCOME_LABEL: Record<string, string> = { succeeded: 'Done', partial: 'Partly done', failed: 'Failed', blocked: 'Blocked', skipped: 'Skipped', escalated: 'Escalated to a person', pending: 'In progress' };
 
 function Counts({ data, labels }: { data: Record<string, number>; labels: Record<string, string> }) {
@@ -26,6 +29,7 @@ export default function AdminAiPage() {
   return (
     <>
       <PageHeader title="AI and automation" meta={<InfoTip label="About this page">AI usage shares the workspace’s monthly token budget. Automation runs only under an active policy.</InfoTip>} />
+      <section aria-label="AI workflows" className="mb-6"><AiWorkflowsAdmin /></section>
       {error && !data ? <ErrorState error={error} onRetry={refetch} /> : loading || !data ? <SkeletonRows rows={6} /> : (
         <div className="flex flex-col gap-6" data-testid="admin-ai">
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
