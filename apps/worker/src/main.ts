@@ -121,7 +121,12 @@ async function main(): Promise<void> {
     for (const job of jobs) await track(workload.run('interactive_import', { queue: 'bulk-ops' }, () => bulk.handleBulkJob(job.data)));
   });
 
+  // V3.5 inbox + integrations: 'inbox-reply' (customer_reply), 'inbox-events', 'integration-sync' + recovery loops.
+  const v35 = await import('@social-lite/services/inbox/worker');
+  const v35Timers = await v35.registerV35Workers(boss, { workerId: WORKER_ID, track, stopping: () => stopping, job: (q, j, fn) => workload.job(q, j, fn), run: (cls, meta, fn) => workload.run(cls, meta, fn) });
+
   const timers = [
+    ...v35Timers,
     every('heartbeat', 10_000, () => pool.query(`UPDATE worker_heartbeats SET last_seen_at=now(), info = info || $2::jsonb WHERE worker_id=$1`, [WORKER_ID, JSON.stringify({ inFlight: inFlight.size, lastRun, workload: workload.runner.snapshot() })])),
     every('outbox', 1_000, async () => { while ((await dispatchOutbox(boss)) > 0 && !stopping) { /* drain */ } }),
     ...Array.from({ length: CONCURRENCY }, (_, slot) => every(`claim#${slot}`, 1_000, () => claimLoop(slot))),

@@ -79,7 +79,9 @@ function makeConnector(provider: 'facebook' | 'instagram'): OAuthConnector {
       u.searchParams.set('state', p.state);
       u.searchParams.set('response_type', 'code');
       const insights = config.features?.meta_insights === true ? [...(provider === 'facebook' ? FACEBOOK_INSIGHTS_SCOPES : INSTAGRAM_INSIGHTS_SCOPES)] : [];
-      u.searchParams.set('scope', [...requiredScopes, ...insights].join(','));
+      // V3.5 inbox: messaging/engagement permissions only once Meta has approved them (META_REQUEST_INBOX).
+      const inbox = provider === 'facebook' && config.features?.meta_inbox === true ? ['pages_messaging', 'pages_manage_engagement', 'pages_read_user_content'] : [];
+      u.searchParams.set('scope', [...requiredScopes, ...insights, ...inbox].join(','));
       return u.toString();
     },
 

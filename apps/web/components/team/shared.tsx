@@ -9,15 +9,15 @@ import { Badge, Tooltip, cn } from '@/components/ui';
 
 export const V2_ROLE_LABEL: Record<string, string> = {
   owner: 'Owner', admin: 'Admin', team_manager: 'Team manager', brand_manager: 'Brand manager', editor: 'Editor', approver: 'Approver',
-  publisher: 'Publisher', analyst: 'Analyst', viewer: 'Viewer', exporter: 'Exporter', guest: 'Guest', integration: 'Integration',
+  publisher: 'Publisher', analyst: 'Analyst', viewer: 'Viewer', exporter: 'Exporter', guest: 'Guest', integration: 'Integration', care_agent: 'Care agent',
 };
 export const ROLE_HINT: Record<string, string> = {
   admin: 'Users, teams, brands, accounts', brand_manager: 'Everything on a brand', editor: 'Draft, upload, submit', approver: 'Approve; no publishing',
-  publisher: 'Schedule and publish', analyst: 'Read + analytics', viewer: 'Read only', exporter: 'Exports only', guest: 'Shared reviews only (expires)',
+  publisher: 'Schedule and publish', analyst: 'Read + analytics', viewer: 'Read only', exporter: 'Exports only', guest: 'Shared reviews only (expires)', care_agent: 'Inbox replies and cases',
 };
 /** Roles offered in grant pickers (owner moves only by transfer; team manager via a team). */
-export const GRANT_ROLES = ['brand_manager', 'publisher', 'editor', 'approver', 'analyst', 'viewer', 'exporter', 'admin', 'guest'] as const;
-export const TEAM_ROLES = ['brand_manager', 'publisher', 'editor', 'approver', 'analyst', 'viewer', 'exporter'] as const;
+export const GRANT_ROLES = ['brand_manager', 'publisher', 'editor', 'approver', 'care_agent', 'analyst', 'viewer', 'exporter', 'admin', 'guest'] as const;
+export const TEAM_ROLES = ['brand_manager', 'publisher', 'editor', 'approver', 'care_agent', 'analyst', 'viewer', 'exporter'] as const;
 
 export interface GrantView {
   id: string; role: string; scope_type: 'workspace' | 'brand' | 'connection'; brand_id: string | null; brand_name: string | null;

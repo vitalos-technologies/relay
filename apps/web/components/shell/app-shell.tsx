@@ -7,7 +7,7 @@ import { usePathname } from 'next/navigation';
 import { Suspense, useEffect, useState, type ReactNode } from 'react';
 import {
   Activity, CalendarDays, PanelsTopLeft, ChartColumn, CheckCheck, Ellipsis, Flag, FolderOpen, LayoutDashboard, Plug, Settings, ShieldCheck, SquarePen, Users, Wrench,
-  type LucideIcon, ListTodo } from 'lucide-react';
+  type LucideIcon, ListTodo, Inbox } from 'lucide-react';
 import type { Action, Permission } from '@social-lite/core';
 import { useSession } from '@/lib/client/session';
 import { useApi } from '@/lib/client/use-api';
@@ -38,6 +38,8 @@ export const NAV: NavItem[] = [
   { href: '/library', label: 'Content library', icon: FolderOpen },
   { href: '/campaigns', label: 'Campaigns', icon: Flag },
   { href: '/approvals', label: 'Approvals', icon: CheckCheck, badge: 'approvals', mobile: true },
+  // V3.5: customer conversations (shown only with inbox access on some brand).
+  { href: '/inbox', label: 'Inbox', icon: Inbox, v2: ['inbox.read'] },
   { href: '/tasks', label: 'Tasks', icon: ListTodo },
   { href: '/analytics', label: 'Analytics', icon: ChartColumn, perm: 'history.read' },
   { href: '/accounts', label: 'Connections', icon: Plug },

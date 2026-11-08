@@ -54,6 +54,11 @@ export const WORKSPACE_NAV: AdminNavGroup[] = [
     { href: '/admin/collaboration/notifications', label: 'Notification delivery', icon: BellRing, visible: v2('workspace.manage'), keywords: 'email failed smtp digest diagnose' },
     { href: '/admin/collaboration/settings', label: 'Collaboration settings', icon: SlidersHorizontal, visible: v2('workspace.manage'), keywords: 'client comments reminders presence defaults reviewers permissions' },
   ] },
+  { id: 'inbox', label: 'Inbox and integrations', icon: MessagesSquare, items: [
+    { href: '/admin/inbox', label: 'Inbox health', icon: HeartPulse, visible: v1('diagnostics.read'), keywords: 'backlog replies failed unknown sla breaches channels webhooks integrations sync' },
+    settings('inbox', 'channels', 'Inbox channels'),
+    settings('inbox', 'service-levels'),
+  ] },
   { id: 'content', label: 'Content and media', icon: FileStack, items: [
     { href: '/admin/content', label: 'Jobs and storage', icon: FileStack, visible: v2('content.read'), keywords: 'imports exports writeback media trash storage' },
   ] },

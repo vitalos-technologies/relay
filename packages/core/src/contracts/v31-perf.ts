@@ -16,6 +16,9 @@ export const WORKLOAD_CLASSES = [
   'video',               // video validation / transcoding
   'report_export',       // report + Content Hub + MCP exports
   'notifications',       // outbox events, emails, digests
+  // V3.5 (contracts/v35-events.ts): customer replies + inbox ingestion keep reserved main-pool capacity; integration
+  // sync, listening and AI run on the bulk pool so a listening import can never starve replies or publishing.
+  'customer_reply', 'inbox_ingest', 'integration_sync', 'listening_ingest', 'ai_assist',
 ] as const;
 export type WorkloadClass = (typeof WORKLOAD_CLASSES)[number];
 

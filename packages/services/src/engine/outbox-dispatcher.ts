@@ -6,6 +6,7 @@
 import { PgBoss } from 'pg-boss';
 import { v5 as uuidv5 } from 'uuid';
 import { getPool, many, withTx, type Pool } from '@social-lite/db';
+import { V35_EVENT_QUEUES } from '@social-lite/core/contracts/v35-events';
 import { log } from '../log.js';
 
 const NAMESPACE = '6b1d2b4e-58f7-4d0a-9d47-4a2f1d1f5c11';
@@ -29,6 +30,8 @@ export const WORKLOAD_QUEUES: Record<string, string> = {
   'comment.created': QUEUE_COLLAB, 'comment.edited': QUEUE_COLLAB, 'task.changed': QUEUE_COLLAB, 'assignment.changed': QUEUE_COLLAB,
   'approval.requested': QUEUE_COLLAB, 'approval.decided': QUEUE_COLLAB, 'approval.invalidated': QUEUE_COLLAB,
   'review.reviewers_requested': QUEUE_COLLAB, 'review.shared': QUEUE_COLLAB,
+  // V3.5: customer replies, inbox events and integration sync on their own queues (contracts/v35-events.ts).
+  ...V35_EVENT_QUEUES,
 };
 
 export function jobIdFor(outboxId: string): string {

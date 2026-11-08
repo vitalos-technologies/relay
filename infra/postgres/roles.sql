@@ -102,6 +102,10 @@ BEGIN
   IF to_regclass('public.collab_task_events') IS NOT NULL THEN
     EXECUTE 'REVOKE UPDATE, DELETE, TRUNCATE ON collab_task_events FROM socialite_app, socialite_worker';
   END IF;
+  -- V3.5 (028): case history (SLA evidence) is append-only for the same roles.
+  IF to_regclass('public.care_case_events') IS NOT NULL THEN
+    EXECUTE 'REVOKE UPDATE, DELETE, TRUNCATE ON care_case_events FROM socialite_app, socialite_worker';
+  END IF;
 END $$;
 -- Migration bookkeeping is read-only outside the migrator.
 DO $$

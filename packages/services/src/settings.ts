@@ -8,6 +8,8 @@ import { encryptSecret, decryptSecret, settingAad, type EncryptedBlob } from './
 
 export const SETTING_KEYS = [
   'META_APP_ID', 'META_APP_SECRET', 'META_GRAPH_VERSION', 'META_REQUEST_INSIGHTS',
+  // V3.5 inbox (Messenger + Page comments): request messaging permissions only after Meta approves them; Human Agent tag.
+  'META_REQUEST_INBOX', 'META_HUMAN_AGENT_APPROVED',
   'X_CLIENT_ID', 'X_CLIENT_SECRET',
   'TELEGRAM_WEBHOOK_SECRET', 'TIPSIGNAL_SIGNING_SECRET', 'ANTHROPIC_API_KEY',
   // V3 social providers (docs/providers/<provider>.md). Bluesky needs none (app password per connection).
@@ -47,6 +49,8 @@ export const SETTING_DEFS: Record<SettingKey, SettingDef> = {
   META_GRAPH_VERSION: { key: 'META_GRAPH_VERSION', label: 'Graph API version', secret: false, group: 'meta', hint: 'Pinned Graph API version, e.g. v26.0.',
     validate: (v) => (/^v\d{1,3}\.\d$/.test(v) ? null : 'Use the form v26.0') },
   META_REQUEST_INSIGHTS: { key: 'META_REQUEST_INSIGHTS', optional: true, label: 'Request Meta insights permissions', secret: false, group: 'meta', hint: 'Set to true only after Meta approves read_insights / instagram_manage_insights for the app. Unapproved permissions break login for non-test users.', validate: bool },
+  META_REQUEST_INBOX: { key: 'META_REQUEST_INBOX', optional: true, label: 'Request Meta inbox permissions', secret: false, group: 'meta', hint: 'Set to true only after Meta approves pages_messaging, pages_manage_engagement and pages_read_user_content. Unapproved permissions break login for non-test users.', validate: bool },
+  META_HUMAN_AGENT_APPROVED: { key: 'META_HUMAN_AGENT_APPROVED', optional: true, label: 'Meta Human Agent tag approved', secret: false, group: 'meta', hint: 'Set to true only after Meta approves the Human Agent feature (replies up to 7 days after the customer’s last message).', validate: bool },
   X_CLIENT_ID: { key: 'X_CLIENT_ID', label: 'X OAuth 2.0 client ID', secret: false, group: 'x', hint: 'From the X developer portal → your app → Keys and tokens → OAuth 2.0 Client ID.',
     validate: noWhitespace, docsUrl: 'https://developer.x.com/en/portal/dashboard' },
   X_CLIENT_SECRET: { key: 'X_CLIENT_SECRET', label: 'X OAuth 2.0 client secret', secret: true, group: 'x', hint: 'Confidential client secret. Stored encrypted; never shown again.', validate: noWhitespace },

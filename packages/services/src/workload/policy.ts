@@ -16,6 +16,12 @@ const DEFAULTS: Record<WorkloadClass, Omit<WorkloadClassPolicy, 'class'>> = {
   video: { max_concurrent: 1, per_workspace: 1, defers_under_publishing_pressure: true, pool: 'bulk' },
   report_export: { max_concurrent: 2, per_workspace: 1, defers_under_publishing_pressure: true, pool: 'bulk' },
   notifications: { max_concurrent: 2, per_workspace: 2, defers_under_publishing_pressure: false, pool: 'main' },
+  // V3.5 (contracts/v35-events.ts)
+  customer_reply: { max_concurrent: 4, per_workspace: 2, defers_under_publishing_pressure: false, pool: 'main' },
+  inbox_ingest: { max_concurrent: 2, per_workspace: 2, defers_under_publishing_pressure: false, pool: 'main' },
+  integration_sync: { max_concurrent: 2, per_workspace: 1, defers_under_publishing_pressure: true, pool: 'bulk' },
+  listening_ingest: { max_concurrent: 1, per_workspace: 1, defers_under_publishing_pressure: true, pool: 'bulk' },
+  ai_assist: { max_concurrent: 2, per_workspace: 1, defers_under_publishing_pressure: false, pool: 'bulk' },
 };
 
 /** pg-boss queue / worker loop → workload class. Publishing's queue of record is the deliveries table. */
@@ -30,6 +36,13 @@ export const QUEUE_CLASS: Record<string, WorkloadClass> = {
   'analytics-sync': 'analytics_refresh',
   'media-transcode': 'video',
   'collab-notify': 'notifications',
+  // V3.5
+  'inbox-reply': 'customer_reply',
+  'inbox-reply-sweep': 'customer_reply',
+  'inbox-events': 'inbox_ingest',
+  'integration-sync': 'integration_sync',
+  'listening-ingest': 'listening_ingest',
+  'ai-assist': 'ai_assist',
 };
 
 function envInt(name: string, env: NodeJS.ProcessEnv): number | null {

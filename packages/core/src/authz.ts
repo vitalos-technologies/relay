@@ -19,10 +19,14 @@ export const PERMISSIONS = [
   'audit.read', 'security.manage', 'service_accounts.manage',
   // narrow, guest/integration-oriented permissions
   'comments.shared', 'comments.internal', 'content.create_draft',
+  // V3.5 (reserved by the foundation stream for every V3.5 stream; docs/V3_5_WORKSTREAMS.md). Private customer
+  // conversations need inbox.read; platform operators never get it implicitly.
+  'inbox.read', 'inbox.reply', 'inbox.assign', 'inbox.manage', 'cases.manage',
+  'integrations.read', 'integrations.manage', 'listening.read', 'listening.manage', 'ai.use', 'automation.manage',
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
-export const ROLE_PRESETS = ['owner', 'admin', 'team_manager', 'brand_manager', 'editor', 'approver', 'publisher', 'analyst', 'viewer', 'exporter', 'guest', 'integration'] as const;
+export const ROLE_PRESETS = ['owner', 'admin', 'team_manager', 'brand_manager', 'editor', 'approver', 'publisher', 'analyst', 'viewer', 'exporter', 'guest', 'integration', 'care_agent'] as const;
 export type RolePreset = (typeof ROLE_PRESETS)[number];
 
 const ALL = PERMISSIONS as readonly Permission[];
@@ -34,17 +38,20 @@ export const PRESET_PERMISSIONS: Record<RolePreset, readonly Permission[]> = {
   admin: ALL.filter((p) => p !== 'workspace.transfer_owner' && p !== 'security.manage'),
   team_manager: ['workspace.read', 'members.read', 'teams.read'],
   brand_manager: [...READ, 'brands.manage', 'content.create', 'content.edit', 'content.archive', 'content.submit', 'content.schedule', 'content.publish',
-    'publishing.pause', 'publishing.resume', 'publishing.retry', 'assets.upload', 'assets.manage', 'analytics.read', 'comments.shared'],
-  editor: [...READ, 'content.create', 'content.edit', 'content.archive', 'content.submit', 'assets.upload', 'comments.shared'],
+    'publishing.pause', 'publishing.resume', 'publishing.retry', 'assets.upload', 'assets.manage', 'analytics.read', 'comments.shared',
+    'inbox.read', 'inbox.reply', 'inbox.assign', 'cases.manage', 'integrations.read', 'listening.read', 'ai.use'],
+  editor: [...READ, 'content.create', 'content.edit', 'content.archive', 'content.submit', 'assets.upload', 'comments.shared', 'listening.read', 'ai.use'],
   approver: [...READ, 'content.approve', 'publishing.pause', 'comments.shared'],
   publisher: [...READ, 'content.schedule', 'content.publish', 'publishing.pause', 'publishing.resume', 'publishing.retry'],
-  analyst: [...READ, 'analytics.read'],
+  analyst: [...READ, 'analytics.read', 'listening.read'],
   viewer: READ,
   exporter: ['exports.create'],
   // Guests: only what is explicitly shared with them (review requests); never internal notes or the library.
   guest: ['content.read', 'content.approve', 'comments.shared'],
   // Service accounts (e.g. TipSignal): create drafts on one brand, nothing else.
   integration: ['content.create_draft'],
+  // V3.5: customer care on a brand — read/answer/assign conversations and run cases; no publishing, no settings.
+  care_agent: [...READ, 'inbox.read', 'inbox.reply', 'inbox.assign', 'cases.manage', 'integrations.read', 'ai.use'],
 };
 
 /** Workspace-level permissions are meaningful only at workspace scope. */
@@ -56,7 +63,7 @@ export const WORKSPACE_ONLY: ReadonlySet<Permission> = new Set([
 /** Actions that always require verified MFA in the current session (when the policy requires MFA for the role). */
 export const SENSITIVE_PERMISSIONS: ReadonlySet<Permission> = new Set([
   'workspace.manage', 'workspace.transfer_owner', 'members.invite', 'members.manage', 'teams.manage', 'connections.manage',
-  'security.manage', 'service_accounts.manage', 'content.publish', 'content.schedule', 'exports.create',
+  'security.manage', 'service_accounts.manage', 'content.publish', 'content.schedule', 'exports.create', 'integrations.manage', 'automation.manage',
 ]);
 
 export interface Grant {

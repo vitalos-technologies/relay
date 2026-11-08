@@ -12,6 +12,7 @@
 // video status (processing for PROCESSING_POLLS polls under the `processing` scenario).
 import type { HttpRequest, HttpResponse } from '@social-lite/core';
 import { json, lostResponse, type FakeEnv, type FakeHandler, type MockObject } from '../transport/mock.js';
+import { metaInboxFake } from './inbox-fake.js';
 
 const CONTAINER_TTL_MS = 24 * 60 * 60_000;
 const PROCESSING_POLLS = 2;
@@ -163,6 +164,10 @@ export const metaFake: FakeHandler = async (req, env) => {
 
   if (!p.token) return gerr(400, 104, 'An access token is required to request this resource.');
   if (env.scenario === 'revoked') return revoked();
+
+  // V3.5 inbox: Messenger Send API, private replies and comment replies for simulated Pages (inbox-fake.ts).
+  const inbox = await metaInboxFake(p.method, segments, params, env);
+  if (inbox) return inbox;
 
   // ---------------------------------------------------------------- user-level
   if (first === 'me' && edge === 'permissions' && p.method === 'GET') {

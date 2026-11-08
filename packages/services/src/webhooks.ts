@@ -119,7 +119,14 @@ export async function processWebhookReceipt(receiptId: string): Promise<{ confir
       if (matches.length === 1 && await withTx((tx) => confirm(tx, matches[0]!.id, String(post.message_id!), 'Confirmed by the Telegram channel update.'), db)) confirmed++;
     }
   }
-  const state = confirmed ? 'processed' : 'ignored';
+  // V3.5 inbox: verified Page messaging/feed events become inbox messages (non-simulated channels only; idempotent).
+  let inboxItems = 0;
+  if (rec.provider === 'meta' && body.object === 'page') {
+    const { ingestProviderPayload } = await import('./inbox/ingest.js');
+    const r = await ingestProviderPayload('facebook_page', body, { simulated: false });
+    inboxItems = r.messages + r.edits + r.deletes + r.receipts;
+  }
+  const state = confirmed || inboxItems ? 'processed' : 'ignored';
   await db.query(`UPDATE webhook_receipts SET processing_state=$2, processed_at=now() WHERE id=$1`, [receiptId, state]);
   return { confirmed, state };
 }

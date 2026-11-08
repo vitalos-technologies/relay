@@ -26,7 +26,7 @@ export async function providerAppConfig(provider: Provider): Promise<ProviderApp
       apiVersion: (await getSetting('META_GRAPH_VERSION')) ?? config().META_GRAPH_VERSION,
       redirectUri: oauthRedirectUri(provider),
       // Analytics permissions are requested only once Meta has approved them for the app (otherwise login fails).
-      features: { meta_insights: (await getSetting('META_REQUEST_INSIGHTS')) === 'true' },
+      features: { meta_insights: (await getSetting('META_REQUEST_INSIGHTS')) === 'true', meta_inbox: (await getSetting('META_REQUEST_INBOX')) === 'true' },
     };
   }
   if (provider === 'x') {

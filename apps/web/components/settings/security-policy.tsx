@@ -13,7 +13,7 @@ interface View { policy: Policy; policy_version: number; roles: string[] }
 
 const ROLE_LABEL: Record<string, string> = {
   owner: 'Owner', admin: 'Admin', team_manager: 'Team manager', brand_manager: 'Brand manager', editor: 'Editor', approver: 'Approver',
-  publisher: 'Publisher', analyst: 'Analyst', viewer: 'Viewer', exporter: 'Exporter', guest: 'Guest',
+  publisher: 'Publisher', analyst: 'Analyst', viewer: 'Viewer', exporter: 'Exporter', guest: 'Guest', care_agent: 'Care agent',
 };
 
 export function SecurityPolicySettings() {
