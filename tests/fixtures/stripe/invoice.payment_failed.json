@@ -1,0 +1,29 @@
+{
+  "id": "evt_1QfixtureInvoiceFailed0001",
+  "object": "event",
+  "api_version": "2026-10-28.endive",
+  "created": 1796592100,
+  "livemode": false,
+  "type": "invoice.payment_failed",
+  "data": {
+    "object": {
+      "id": "in_1QfixtureInvoice02",
+      "object": "invoice",
+      "customer": "cus_Tfixture0001",
+      "number": "RELAY-0002",
+      "status": "open",
+      "currency": "gbp",
+      "amount_due": 3000,
+      "amount_paid": 0,
+      "total": 3000,
+      "hosted_invoice_url": "https://invoice.stripe.com/i/acct_test/fixture",
+      "invoice_pdf": "https://pay.stripe.com/invoice/acct_test/fixture/pdf",
+      "period_start": 1796592000,
+      "period_end": 1799270400,
+      "created": 1796592050,
+      "billing_reason": "subscription_cycle",
+      "livemode": false,
+      "parent": { "type": "subscription_details", "subscription_details": { "subscription": "sub_1QfixtureSub0001", "metadata": { "relay_workspace_id": "4b0f6c55-58a3-4c50-9d77-8e8c3c7e0a11" } } }
+    }
+  }
+}

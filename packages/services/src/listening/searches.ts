@@ -12,6 +12,7 @@ import { audit } from '../audit.js';
 import { writeOutbox } from '../outbox.js';
 import { searchAccepts } from './ingest.js';
 import { allSources, defaultDataset } from './sources.js';
+import { assertCanActivateSearch } from '../entitlements/actions.js';
 import { canListen, datasetOf, listeningBrands, loadSearch, requireBrand, LISTENING_MANAGE, type ObservationRow, type SearchRow } from './shared.js';
 
 const entry = z.string().trim().min(1).max(80);
@@ -107,6 +108,7 @@ export async function createSearch(ctx: Ctx, input: z.infer<typeof createSearchS
     if (!b) throw notFound('Brand');
     const n = await one<{ n: number }>(tx, `SELECT count(*)::int AS n FROM listening_searches WHERE workspace_id=$1 AND archived_at IS NULL`, [ctx.access.workspaceId]);
     if (n.n >= 100) throw new AppError('invalid_state', 'This workspace has 100 saved searches. Archive one first.');
+    await assertCanActivateSearch(tx, ctx.access.workspaceId); // V4: listening in the plan + active-search allowance (race-free)
     const row = await one<SearchRow>(tx,
       `INSERT INTO listening_searches(workspace_id, brand_id, name, role, terms, keywords, exclusions, boolean_query, languages, sources, kinds, created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,

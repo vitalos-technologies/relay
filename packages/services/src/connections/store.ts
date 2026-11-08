@@ -11,6 +11,7 @@ import { assertUuid, brandAllowed } from '../tenancy.js';
 import { credentialAad, encryptSecret } from '../crypto.js';
 import { audit } from '../audit.js';
 import { writeOutbox } from '../outbox.js';
+import { assertCanConnectAccount } from '../entitlements/actions.js';
 import { blockDeliveriesForConnection, onConnectionRestored } from '../engine/hooks.js';
 
 export interface ConnectionRow {
@@ -200,6 +201,8 @@ export async function upsertConnectionFromDestination(tx: Queryable, a: UpsertAr
     return { row, created: false };
   }
 
+  // V4 entitlements: a NEW account counts against the plan's connected-account allowance (race-free in this tx).
+  await assertCanConnectAccount(tx, a.workspaceId);
   const credentialId = await insertCredential(tx, a.workspaceId, dest.credentials, credMeta);
   const row = await one<ConnectionRow>(tx,
     `INSERT INTO connections(workspace_id, brand_id, provider, provider_account_id, display_name, username, status, is_mock, credential_id,

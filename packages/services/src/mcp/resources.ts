@@ -12,6 +12,7 @@ import { brandConnections, capabilitiesFor } from '../posts/shared.js';
 import type { McpPrincipal } from './auth.js';
 import { safeIds, touchClient, writeMcpAudit } from './audit.js';
 import { appUrl, callScope, requireScope, toToolError, type CallScope } from './principal.js';
+import { requireEntitlement } from '../entitlements/resolve.js';
 import { getJobStatus } from './jobs.js';
 
 const NOT_FOUND = -32002; // MCP "resource not found"
@@ -35,7 +36,11 @@ async function guarded(name: string, extra: Extra, ids: Record<string, unknown>,
   let code: string | null = null;
   try {
     principal = principalOf(extra);
-    return await fn(principal, async (ws) => (s = await callScope(principal!, ws, correlationId)));
+    return await fn(principal, async (ws) => {
+      s = await callScope(principal!, ws, correlationId);
+      await requireEntitlement(getPool(), s.ctx.access.workspaceId, 'mcp', { paid: false }); // V4: MCP must be in the plan
+      return s;
+    });
   } catch (err) {
     if (err instanceof McpError) { result = 'error'; code = String(err.code); throw err; }
     const e = toToolError(err);
@@ -81,6 +86,7 @@ export function registerResources(server: McpServer): void {
         try {
           const s = await callScope(p, ws);
           if (!s.scopes.includes('social.read')) continue;
+          await requireEntitlement(getPool(), ws, 'mcp', { paid: false });
           const f = s.ctx.access.brandIds;
           const brands = await many<{ id: string; name: string }>(getPool(),
             `SELECT id, name FROM brands WHERE workspace_id=$1 AND archived_at IS NULL AND ($2::uuid[] IS NULL OR id = ANY($2::uuid[])) ORDER BY name LIMIT 50`, [ws, f]);

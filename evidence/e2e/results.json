@@ -2,19 +2,20 @@
   "config": {
     "argv": [
       "/opt/node22/bin/node",
-      "/home/user/social-lite/node_modules/@playwright/test/cli.js",
+      "/home/user/relay/node_modules/@playwright/test/cli.js",
       "test",
-      "tests/e2e/inbox-more.spec.ts",
-      "tests/e2e/inbox.spec.ts",
+      "tests/e2e/v4-support.spec.ts",
       "--trace",
-      "off"
+      "off",
+      "-g",
+      "phone"
     ],
-    "configFile": "/home/user/social-lite/playwright.config.ts",
-    "rootDir": "/home/user/social-lite/tests/e2e",
+    "configFile": "/home/user/relay/playwright.config.ts",
+    "rootDir": "/home/user/relay/tests/e2e",
     "failOnFlakyTests": false,
     "forbidOnly": false,
     "fullyParallel": false,
-    "globalSetup": "/home/user/social-lite/tests/e2e/global-setup.ts",
+    "globalSetup": "/home/user/relay/tests/e2e/global-setup.ts",
     "globalTeardown": null,
     "globalTimeout": 0,
     "grep": {},
@@ -26,7 +27,7 @@
     "preserveOutput": "always",
     "projects": [
       {
-        "outputDir": "/home/user/social-lite/test-results",
+        "outputDir": "/home/user/relay/test-results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
@@ -34,7 +35,7 @@
         },
         "id": "desktop",
         "name": "desktop",
-        "testDir": "/home/user/social-lite/tests/e2e",
+        "testDir": "/home/user/relay/tests/e2e",
         "testIgnore": [],
         "testMatch": [
           "**/*.@(spec|test).?(c|m)[jt]s?(x)"
@@ -42,7 +43,7 @@
         "timeout": 90000
       },
       {
-        "outputDir": "/home/user/social-lite/test-results",
+        "outputDir": "/home/user/relay/test-results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
@@ -50,7 +51,7 @@
         },
         "id": "mobile",
         "name": "mobile",
-        "testDir": "/home/user/social-lite/tests/e2e",
+        "testDir": "/home/user/relay/tests/e2e",
         "testIgnore": [],
         "testMatch": [
           "**/*.@(spec|test).?(c|m)[jt]s?(x)"
@@ -85,221 +86,63 @@
   },
   "suites": [
     {
-      "title": "inbox-more.spec.ts",
-      "file": "inbox-more.spec.ts",
+      "title": "v4-support.spec.ts",
+      "file": "v4-support.spec.ts",
       "column": 0,
       "line": 0,
       "specs": [],
       "suites": [
         {
-          "title": "Inbox — remaining networks",
-          "file": "inbox-more.spec.ts",
-          "line": 45,
+          "title": "V4 Relay support",
+          "file": "v4-support.spec.ts",
+          "line": 51,
           "column": 6,
           "specs": [
             {
-              "title": "Add channel: networks with honest states; X needs approval; a simulated Instagram account is added",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 240000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "desktop",
-                  "projectName": "desktop",
-                  "results": [
-                    {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
-                      "status": "passed",
-                      "duration": 25420,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-11-08T03:25:06.569Z",
-                      "annotations": [],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "expected"
-                }
-              ],
-              "id": "9f60cde09c3f9cec6bb6-1c32a7721a7bbeffc28d",
-              "file": "inbox-more.spec.ts",
-              "line": 48,
-              "column": 7
-            },
-            {
-              "title": "Google review → inbox item with its rating; only a public owner reply is offered; identity link/unlink",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 240000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "desktop",
-                  "projectName": "desktop",
-                  "results": [
-                    {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
-                      "status": "passed",
-                      "duration": 33212,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-11-08T03:25:32.080Z",
-                      "annotations": [],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "expected"
-                }
-              ],
-              "id": "9f60cde09c3f9cec6bb6-076fef6369e12f939b79",
-              "file": "inbox-more.spec.ts",
-              "line": 66,
-              "column": 7
-            },
-            {
-              "title": "moderation hides a comment; @mention in a note; saved view",
-              "ok": true,
-              "tags": [
-                "mention"
-              ],
-              "tests": [
-                {
-                  "timeout": 240000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "desktop",
-                  "projectName": "desktop",
-                  "results": [
-                    {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
-                      "status": "passed",
-                      "duration": 33925,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-11-08T03:26:05.304Z",
-                      "annotations": [],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "expected"
-                }
-              ],
-              "id": "9f60cde09c3f9cec6bb6-bd8a8f06b72c8b463a39",
-              "file": "inbox-more.spec.ts",
-              "line": 100,
-              "column": 7
-            },
-            {
-              "title": "WhatsApp: outside the 24 h window only a template, with the charge shown before sending",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 240000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "desktop",
-                  "projectName": "desktop",
-                  "results": [
-                    {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
-                      "status": "passed",
-                      "duration": 22768,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-11-08T03:26:39.240Z",
-                      "annotations": [],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "expected"
-                }
-              ],
-              "id": "9f60cde09c3f9cec6bb6-42ad6b6830c6b2443117",
-              "file": "inbox-more.spec.ts",
-              "line": 135,
-              "column": 7
-            },
-            {
-              "title": "phone: Google review, internal note with mention and Add channel dialog fit 390 px @mobile",
+              "title": "phone: create with a screenshot, read and reply; staff triage and reply; no horizontal scroll @mobile",
               "ok": true,
               "tags": [
                 "mobile"
               ],
               "tests": [
                 {
-                  "timeout": 240000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "phone layout only",
-                      "location": {
-                        "file": "/home/user/social-lite/tests/e2e/inbox-more.spec.ts",
-                        "line": 155,
-                        "column": 10
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
+                  "timeout": 300000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
                   "projectId": "desktop",
                   "projectName": "desktop",
                   "results": [
                     {
                       "workerIndex": 0,
                       "parallelIndex": 0,
-                      "status": "skipped",
-                      "duration": 103,
+                      "status": "passed",
+                      "duration": 92713,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-08T03:27:02.030Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "phone layout only",
-                          "location": {
-                            "file": "/home/user/social-lite/tests/e2e/inbox-more.spec.ts",
-                            "line": 155,
-                            "column": 10
-                          }
-                        }
-                      ],
+                      "startTime": "2026-11-08T09:00:27.069Z",
+                      "annotations": [],
                       "attachments": []
                     }
                   ],
-                  "status": "skipped"
+                  "status": "expected"
                 }
               ],
-              "id": "9f60cde09c3f9cec6bb6-df3ea9736caddffca56a",
-              "file": "inbox-more.spec.ts",
-              "line": 154,
+              "id": "45fde2ec11b5ac07d8ff-e5f786f04b9092d9d7a1",
+              "file": "v4-support.spec.ts",
+              "line": 161,
               "column": 7
             },
             {
-              "title": "phone: Google review, internal note with mention and Add channel dialog fit 390 px @mobile",
+              "title": "phone: create with a screenshot, read and reply; staff triage and reply; no horizontal scroll @mobile",
               "ok": true,
               "tags": [
                 "mobile"
               ],
               "tests": [
                 {
-                  "timeout": 240000,
+                  "timeout": 300000,
                   "annotations": [],
                   "expectedStatus": "passed",
                   "projectId": "mobile",
@@ -309,12 +152,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 26093,
+                      "duration": 58853,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-08T03:28:06.229Z",
+                      "startTime": "2026-11-08T09:02:00.396Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -322,186 +165,9 @@
                   "status": "expected"
                 }
               ],
-              "id": "9f60cde09c3f9cec6bb6-c11afd1282c47dc21c5b",
-              "file": "inbox-more.spec.ts",
-              "line": 154,
-              "column": 7
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "title": "inbox.spec.ts",
-      "file": "inbox.spec.ts",
-      "column": 0,
-      "line": 0,
-      "specs": [],
-      "suites": [
-        {
-          "title": "Inbox",
-          "file": "inbox.spec.ts",
-          "line": 45,
-          "column": 6,
-          "specs": [
-            {
-              "title": "receive, assign, internal note, reply sent once with the provider result",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 240000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "desktop",
-                  "projectName": "desktop",
-                  "results": [
-                    {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
-                      "status": "passed",
-                      "duration": 44944,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-11-08T03:27:02.157Z",
-                      "annotations": [],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "expected"
-                }
-              ],
-              "id": "c9086cbe786fc8171a5a-baabc7c6b6e52bf4e665",
-              "file": "inbox.spec.ts",
-              "line": 48,
-              "column": 7
-            },
-            {
-              "title": "two agents reply at the same time: one is sent, the other is stopped and shown what changed",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 240000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "desktop",
-                  "projectName": "desktop",
-                  "results": [
-                    {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
-                      "status": "passed",
-                      "duration": 18571,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-11-08T03:27:47.115Z",
-                      "annotations": [],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "expected"
-                }
-              ],
-              "id": "c9086cbe786fc8171a5a-3a3f7e6ccd5b709163d1",
-              "file": "inbox.spec.ts",
-              "line": 88,
-              "column": 7
-            },
-            {
-              "title": "phone: reply, add a note and create + resolve a case @mobile",
-              "ok": true,
-              "tags": [
-                "mobile"
-              ],
-              "tests": [
-                {
-                  "timeout": 240000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "phone layout only",
-                      "location": {
-                        "file": "/home/user/social-lite/tests/e2e/inbox.spec.ts",
-                        "line": 113,
-                        "column": 10
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "desktop",
-                  "projectName": "desktop",
-                  "results": [
-                    {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
-                      "status": "skipped",
-                      "duration": 85,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-11-08T03:28:05.697Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "phone layout only",
-                          "location": {
-                            "file": "/home/user/social-lite/tests/e2e/inbox.spec.ts",
-                            "line": 113,
-                            "column": 10
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                }
-              ],
-              "id": "c9086cbe786fc8171a5a-a72c4d8288d5422c5864",
-              "file": "inbox.spec.ts",
-              "line": 112,
-              "column": 7
-            },
-            {
-              "title": "phone: reply, add a note and create + resolve a case @mobile",
-              "ok": true,
-              "tags": [
-                "mobile"
-              ],
-              "tests": [
-                {
-                  "timeout": 240000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "mobile",
-                  "projectName": "mobile",
-                  "results": [
-                    {
-                      "workerIndex": 1,
-                      "parallelIndex": 0,
-                      "status": "passed",
-                      "duration": 32722,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-11-08T03:28:32.436Z",
-                      "annotations": [],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "expected"
-                }
-              ],
-              "id": "c9086cbe786fc8171a5a-fa130d93cd5b45b84f7d",
-              "file": "inbox.spec.ts",
-              "line": 112,
+              "id": "45fde2ec11b5ac07d8ff-88ee8e318ede5130de26",
+              "file": "v4-support.spec.ts",
+              "line": 161,
               "column": 7
             }
           ]
@@ -511,10 +177,10 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-11-08T03:25:04.841Z",
-    "duration": 240398.101,
-    "expected": 8,
-    "skipped": 2,
+    "startTime": "2026-11-08T09:00:24.948Z",
+    "duration": 154520.94100000002,
+    "expected": 2,
+    "skipped": 0,
     "unexpected": 0,
     "flaky": 0
   }

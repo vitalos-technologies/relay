@@ -18,6 +18,7 @@ import { loadPost, validateDraft, deliveriesForSchedule, type PostRow } from './
 import { approvalJson, deliveryJson, scheduleJson, type ApprovalRow, type ScheduleRow } from './serialize.js';
 import { enforceBrandRules } from '../gov/brand-rules.js';
 import { approvalRequiredFor, createReviewRequest, recordApproval, recordRejection, type ReviewRequestRow } from './approval-policy.js';
+import { assertSchedulingEntitled } from '../entitlements/actions.js';
 
 const PAST_TOLERANCE_MS = 60_000;
 
@@ -136,6 +137,8 @@ async function createScheduleTx(ctx: Ctx, postId: string, rawReq: unknown, idemK
       if (mode === 'immediate' && ctx.access.authz) requireAction(ctx, 'content.publish', { brandId: post.brand_id, message: 'You cannot publish posts for this brand' });
     }
     const ids = [...new Set(req.connection_ids)];
+    // V4 entitlements: publishing must be in the plan; publish-now needs paid access; held (over-limit) accounts refused.
+    await assertSchedulingEntitled(tx, ctx.access.workspaceId, ids, { immediate: mode === 'immediate' });
     const conns = await brandConnections(tx, ctx.access.workspaceId, post.brand_id, true);
     const validation = await validateDraft(tx, ctx, post, ids);
     if (!validation.ok) {

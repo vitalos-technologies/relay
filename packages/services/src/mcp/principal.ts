@@ -115,12 +115,12 @@ export function toToolError(err: unknown): McpToolError {
       not_found: 'not_found', forbidden: 'forbidden', validation_failed: 'validation_failed', version_conflict: 'version_conflict',
       conflict: 'conflict', invalid_state: 'invalid_state', idempotency_conflict: 'idempotency_conflict', rate_limited: 'rate_limited',
       budget_exhausted: 'budget_exhausted', mfa_required: 'mfa_required', step_up_required: 'mfa_required', unauthenticated: 'forbidden',
-      provider_not_configured: 'not_configured',
+      provider_not_configured: 'not_configured', entitlement_required: 'entitlement_required',
     };
     const code = err.details?.reason === 'ambiguous_time' ? 'needs_choice' : err.details?.reason === 'approval_required' ? 'approval_required' : (map[err.code] ?? 'internal');
     // Details are already user-safe in services (no secrets); pass through a small allow-list only.
     const details: Record<string, unknown> = {};
-    for (const k of ['issues', 'per_destination', 'options', 'current', 'reason', 'retry_after_seconds', 'conflict_copy_id']) if (err.details?.[k] !== undefined) details[k] = err.details[k];
+    for (const k of ['issues', 'per_destination', 'options', 'current', 'reason', 'retry_after_seconds', 'conflict_copy_id', 'feature', 'allowance', 'upgrade_to', 'access']) if (err.details?.[k] !== undefined) details[k] = err.details[k];
     if (err.fieldErrors) details.field_errors = err.fieldErrors;
     if (code === 'forbidden' && err.details?.reason === 'restricted') return new McpToolError('insufficient_scope', 'This client is not allowed to do that (scope or brand not granted in Relay).');
     if (code === 'mfa_required') return new McpToolError('mfa_required', 'This action needs a recent second-factor sign-in. Re-authorize the client with your second factor, or confirm it in Relay.');

@@ -40,6 +40,7 @@ import { getImport, requestImport } from '../content-hub/imports.js';
 import { registerDataTools } from './tools-data.js';
 import { registerGovTools } from './tools-gov.js';
 import { registerV35Tools } from './tools-v35.js';
+import { chargeMcpCall } from '../entitlements/actions.js';
 
 // ------------------------------------------------------------------ shared schema pieces
 
@@ -155,7 +156,14 @@ export function register<I extends Shape, O extends Shape>(server: McpServer, ho
       async scope(ws: string) {
         call.ids.workspace_id = ws;
         const s = await callScope(principal!, ws, correlationId);
-        scopes.push(s);
+        // V4 entitlements: MCP must be in the workspace's plan; write tools are paid actions; one mcp.calls unit per call
+        // per workspace (a retry with the same idempotency_key is charged once). Checked AFTER authority is resolved.
+        const charged = scopes.some((x) => x.ctx.access.workspaceId === s.ctx.access.workspaceId);
+        scopes.push(s); // audited against this workspace even when the entitlement check refuses the call
+        if (!charged) {
+          const key = (args as Record<string, unknown>).idempotency_key;
+          await chargeMcpCall(s.ctx.access.workspaceId, { tool: def.name, readOnly: info.readOnly, userId: principal!.userId ?? s.client.owner_user_id, dedupeKey: typeof key === 'string' ? key : null });
+        }
         return s;
       },
     };
@@ -184,7 +192,7 @@ export function register<I extends Shape, O extends Shape>(server: McpServer, ho
       } else {
         const e = toToolError(err);
         code = e.code;
-        auditResult = ['forbidden', 'insufficient_scope', 'consent_required', 'client_revoked', 'mfa_required', 'not_found', 'confirmation_required', 'unsupported_principal'].includes(e.code) ? 'denied' : 'error';
+        auditResult = ['forbidden', 'insufficient_scope', 'consent_required', 'client_revoked', 'mfa_required', 'not_found', 'confirmation_required', 'unsupported_principal', 'entitlement_required'].includes(e.code) ? 'denied' : 'error';
         out = errorResult(e);
       }
     } finally {

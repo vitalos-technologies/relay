@@ -11,7 +11,7 @@ export type TimelineEntryView =
   | { key: string; kind: 'message'; side: TimelineSide; author: string; body: string | null; at: string; meta?: ReactNode; edited?: boolean; deleted?: boolean; attachments?: ReactNode[];
       /** Above the text (e.g. a rating or a "hidden" state) and an actions slot after the meta line. */
       header?: ReactNode; actions?: ReactNode; muted?: boolean }
-  | { key: string; kind: 'note'; author: string; body: string; at: string }
+  | { key: string; kind: 'note'; author: string; body: string; at: string; attachments?: ReactNode[] }
   | { key: string; kind: 'pending'; author: string; body: string; at: string; status: ReactNode; actions?: ReactNode }
   | { key: string; kind: 'system'; text: string; at: string };
 
@@ -32,6 +32,7 @@ export function ConversationTimeline({ entries, empty, className }: { entries: T
                 <Lock aria-hidden className="size-3.5" />Internal note · {e.author} · <time dateTime={e.at} className="font-normal">{time(e.at)}</time>
               </p>
               <p className="whitespace-pre-wrap break-words text-[13px] leading-relaxed">{e.body}</p>
+              {e.attachments?.length ? <p className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted">{e.attachments.map((a, i) => <span key={i}>{a}</span>)}</p> : null}
             </li>
           );
         }

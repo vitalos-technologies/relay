@@ -55,7 +55,18 @@ export async function handleEvent(evt: { event_type: string; workspace_id: strin
     await processWebhookReceipt(evt.aggregate_id);
     return;
   }
+  // V4 Relay support: customer + platform-staff notifications (staff have no workspace; visitor tickets have none).
+  if (evt.event_type.startsWith('support.')) {
+    const { handleSupportEvent } = await import('../support/notify.js');
+    await handleSupportEvent(evt, db);
+    return;
+  }
   if (!evt.workspace_id) return;
+  // V4 billing (BIL): notify billing managers. No return — entitlement handlers below also consume billing events.
+  if (evt.event_type.startsWith('billing.')) {
+    const { onBillingEventNotify } = await import('../billing/notify.js');
+    await onBillingEventNotify(evt, db).catch((e) => log.warn('billing_notify_failed', { type: evt.event_type, err: e as Error }));
+  }
   switch (evt.event_type) {
     case 'delivery.state_changed': {
       const d = await maybeOne<{ id: string; post_id: string; provider: Provider; state: string; is_mock: boolean; display_name: string; created_by: string | null; last_error_message: string | null; blocked_reason: string | null; title: string | null }>(db,
@@ -131,10 +142,25 @@ export async function handleEvent(evt: { event_type: string; workspace_id: strin
       return;
     case 'notification.created': {
       if (evt.payload.kind === 'budget_threshold') {
+        const isX = evt.payload.meter === 'x.write' || evt.payload.meter === 'x.read';
+        // V4: every metered allowance (AI, storage, exports, MCP, integrations) notifies at 50/80/100 % of the enforced limit.
+        const { BUDGET_METERS } = await import('../product/budgets.js');
+        const label = (BUDGET_METERS as Record<string, { label: string }>)[String(evt.payload.meter)]?.label.replace(/ \/ month$/, '') ?? String(evt.payload.meter);
         await notify(db, { workspaceId: evt.workspace_id, userIds: await recipients(db, evt.workspace_id), severity: Number(evt.payload.percent) >= 100 ? 'critical' : 'warning',
-          kind: 'budget', title: `X API ${evt.payload.meter === 'x.write' ? 'post' : 'read'} budget ${evt.payload.percent}% used (${evt.payload.period})`,
-          body: `Monthly cap: ${evt.payload.cap}. At 100% X jobs are blocked; other channels continue.`, dedupeKey: `budget:${evt.payload.meter}:${evt.payload.period}:${evt.payload.percent}`, email: Number(evt.payload.percent) >= 80 });
+          kind: 'budget', title: isX ? `X API ${evt.payload.meter === 'x.write' ? 'post' : 'read'} budget ${evt.payload.percent}% used (${evt.payload.period})` : `${label}: ${evt.payload.percent}% of the limit used`,
+          body: isX ? `Monthly cap: ${evt.payload.cap}. At 100% X jobs are blocked; other channels continue.` : `Limit: ${evt.payload.cap}. See Usage for details.`,
+          dedupeKey: `budget:${evt.payload.meter}:${evt.payload.period}:${evt.payload.percent}`, email: Number(evt.payload.percent) >= 80 });
       }
+      return;
+    }
+    // V4 entitlements (stream ENT): billing access changed (BIL outbox) ⇒ re-evaluate held work; release when access returns.
+    case 'billing.access_changed':
+    case 'billing.subscription_changed':
+    case 'billing.trial_expired':
+    case 'billing.subscription_ended':
+    case 'billing.payment_recovered': {
+      const { onBillingAccessChanged } = await import('../entitlements/holds.js');
+      await onBillingAccessChanged(evt);
       return;
     }
     default:

@@ -28,6 +28,7 @@ import { enqueueSyncJob, loadIntegration, registerInboundHandler, registerSyncEx
 import { appErrorFrom, openConn, outcomeFromError } from '../core/runtime.js';
 import { loadRelayObject } from '../core/relay-objects.js';
 import type { Conn, HubAdapter } from '../core/types.js';
+import { syncHold } from '../../entitlements/holds.js';
 
 export const gbpAdapter: HubAdapter = {
   connector: 'google_business_profile', hosts: GBP_HOSTS, sim: gbpSim, connect: 'oauth', pkce: true, webhook: 'global',
@@ -233,6 +234,9 @@ export async function dispatchDueGbpPosts(limit = 25): Promise<number> {
     const g = await gate(r);
     if (!g.ok) { if (g.state !== r.state || g.detail !== r.state_detail) await setState(r.id, g.state, g.detail); continue; }
     if (r.due_at.getTime() > Date.now()) { if (r.state !== 'scheduled') await setState(r.id, 'scheduled', null); continue; }
+    // V4 entitlements: business integrations held by the plan/billing state ⇒ stays scheduled with the reason (never failed).
+    const hold = await syncHold(getPool(), r.workspace_id);
+    if (hold.held) { if (r.state !== 'scheduled' || r.state_detail !== hold.message) await setState(r.id, 'scheduled', hold.message); continue; }
     try {
       const { job } = await enqueueSyncJob(g.ctx, { integrationId: r.integration_id, kind: 'gbp.local_post', relayType: 'post', relayId: r.post_id, idempotencyKey: `gbp.local_post:${r.id}`, payload: { request_id: r.id } });
       await setState(r.id, 'publishing', null, { job: job.id });

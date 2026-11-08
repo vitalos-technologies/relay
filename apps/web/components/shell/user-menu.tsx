@@ -1,6 +1,7 @@
 'use client';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { LifeBuoy, LogOut, Monitor, Moon, ShieldCheck, Sparkles, Sun, UserRound } from 'lucide-react';
+import { Bug, LifeBuoy, LogOut, MessageSquarePlus, Monitor, Moon, ShieldCheck, Sparkles, Sun, UserRound } from 'lucide-react';
 import { useFlag } from '@/lib/client/flags';
 import { ReportProblemDialog, WhatsNewDrawer, useReleaseNotes } from '@/components/support/support';
 import { api } from '@/lib/client/api';
@@ -11,6 +12,7 @@ import { Menu, MenuContent, MenuItem, MenuLabel, MenuRadioGroup, MenuRadioItem, 
 
 export function UserMenu({ compact }: { compact?: boolean }) {
   const { session } = useSession();
+  const router = useRouter();
   const toast = useToast();
   const [theme, setTheme] = useState<Theme>('system');
   const notesOn = useFlag('v31.release_notes');
@@ -77,7 +79,9 @@ export function UserMenu({ compact }: { compact?: boolean }) {
             <span className="flex-1">What’s new</span>{unseen ? <span className="rounded-full bg-accent px-1.5 text-[11px] font-semibold text-on-accent tabular">{unseen}</span> : null}
           </MenuItem>
         ) : null}
-        <MenuItem icon={<LifeBuoy aria-hidden />} onSelect={() => setReportOpen(true)}>Report a problem</MenuItem>
+        <MenuItem icon={<MessageSquarePlus aria-hidden />} onSelect={() => router.push('/help/contact')}>Contact support</MenuItem>
+        <MenuItem icon={<LifeBuoy aria-hidden />} onSelect={() => router.push('/help/requests')}>My requests</MenuItem>
+        <MenuItem icon={<Bug aria-hidden />} onSelect={() => setReportOpen(true)}>Report a problem</MenuItem>
         <MenuSeparator />
         <MenuItem icon={<LogOut aria-hidden />} onSelect={() => void signOut()}>Sign out</MenuItem>
       </MenuContent>

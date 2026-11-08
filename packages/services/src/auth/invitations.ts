@@ -151,6 +151,9 @@ async function insertInvitation(tx: Queryable, ctx: Ctx, p: Prepared, batchId: s
     if (open.expires_at.getTime() > Date.now()) throw new AppError('conflict', 'An invitation for this email is already pending. Resend or revoke it.', undefined, { reason: 'already_invited', invitation_id: open.id });
     await tx.query(`UPDATE invitations SET revoked_at=now(), revoked_by=$2 WHERE id=$1`, [open.id, ctx.actor.userId]); // replace expired invitation
   }
+  // V4 billing: with a paid subscription, pending member invitations reserve paid seats; never add paid seats silently.
+  const { assertSeatForInvite } = await import('../billing/seats.js');
+  await assertSeatForInvite(tx, ctx.access.workspaceId, p.kind);
   const policy = await workspacePolicy(tx, ctx.access.workspaceId);
   const token = randomToken(32);
   const stored: StoredGrant[] = p.grants.map((g) => ({ role: g.role, scope_type: g.scopeType, brand_id: g.brandId, connection_id: g.connectionId }));
@@ -354,6 +357,10 @@ export async function acceptInvitation(tx: Queryable, tokenHash: Buffer, user: {
   if (m?.status === 'suspended') throw new LoginError('membership_suspended', 'Your access to this workspace is suspended. Contact the workspace owner.');
   const alreadyMember = !!m && m.status === 'active' && m.removed_at === null;
   if (!alreadyMember) {
+    const { seatAvailableOnAccept } = await import('../billing/seats.js');
+    if (!(await seatAvailableOnAccept(tx, inv.workspace_id, inv.kind === 'guest' ? 'guest' : 'member'))) {
+      throw new LoginError('seats_unavailable', 'This workspace has no free paid seat. Ask its owner to add a seat, then open the invitation again.');
+    }
     if (m) {
       await tx.query(
         `UPDATE memberships SET status='active', removed_at=NULL, removed_by=NULL, suspended_at=NULL, suspended_by=NULL, status_reason=NULL, created_at=now()

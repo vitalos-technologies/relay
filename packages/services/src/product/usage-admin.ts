@@ -8,7 +8,8 @@ import { z } from 'zod';
 import type { Ctx } from '../context.js';
 import { audit } from '../audit.js';
 import { assertUuid, authorizeCtx, requireAction } from '../tenancy.js';
-import { BUDGET_METERS, BUDGET_METER_KEYS, periodFor, workspaceCap, type BudgetMeter } from './budgets.js';
+import { BUDGET_METERS, BUDGET_METER_KEYS, workspaceCap, type BudgetMeter } from './budgets.js';
+import { entitlementsCore, meterRules } from '../entitlements/resolve.js';
 
 export const LIMIT_METERS = {
   x_monthly_writes: { meter: 'x.write', label: 'X posts / month' },
@@ -16,6 +17,8 @@ export const LIMIT_METERS = {
   ai_monthly_tokens: { meter: 'ai.tokens', label: 'AI tokens / month' },
   storage_bytes: { meter: 'storage.bytes', label: 'Media storage (bytes)' },
   monthly_exports: { meter: 'exports.count', label: 'Exports / month' },
+  mcp_monthly_calls: { meter: 'mcp.calls', label: 'MCP tool calls / month' },
+  integration_monthly_jobs: { meter: 'integration.jobs', label: 'Integration sync jobs / month' },
 } as const satisfies Record<string, { meter: BudgetMeter; label: string }>;
 export type LimitKey = keyof typeof LIMIT_METERS;
 const LIMIT_KEYS = Object.keys(LIMIT_METERS) as LimitKey[];
@@ -26,8 +29,8 @@ export const teamBudgetPatchSchema = z.object(Object.fromEntries(BUDGET_METER_KE
 
 interface CounterRow { team_id: string | null; meter: string; period: string; used: string; reserved: string }
 
-async function counters(db: Queryable, workspaceId: string): Promise<CounterRow[]> {
-  const periods = [...new Set(BUDGET_METER_KEYS.map((m) => periodFor(m)))];
+async function counters(db: Queryable, workspaceId: string, periodOf: (m: BudgetMeter) => string): Promise<CounterRow[]> {
+  const periods = [...new Set(BUDGET_METER_KEYS.map((m) => periodOf(m)))];
   return many<CounterRow>(db, `SELECT team_id, meter, period, used, reserved FROM usage_counters WHERE workspace_id=$1 AND period = ANY($2::text[])`, [workspaceId, periods]);
 }
 
@@ -35,7 +38,11 @@ const pct = (used: number, cap: number | null) => (cap ? Math.min(999, Math.roun
 
 export async function limitsView(ctx: Ctx, db: Queryable = getPool()) {
   const ws = await one<{ limits: Record<string, unknown> }>(db, `SELECT limits FROM workspaces WHERE id=$1`, [ctx.access.workspaceId]);
-  const rows = await counters(db, ctx.access.workspaceId);
+  // V4: the period follows the billing period and the plan allowance is a ceiling the customer cap can only lower.
+  const core = await entitlementsCore(db, ctx.access.workspaceId);
+  const rules = (m: BudgetMeter) => meterRules(core, m, BUDGET_METERS[m].period);
+  const periodFor = (m: BudgetMeter) => rules(m).period;
+  const rows = await counters(db, ctx.access.workspaceId, periodFor);
   const find = (teamId: string | null, meter: BudgetMeter) => rows.find((r) => r.team_id === teamId && r.meter === meter && r.period === periodFor(meter));
   const teams = await many<{ id: string; name: string }>(db, `SELECT id, name FROM teams WHERE workspace_id=$1 AND archived_at IS NULL ORDER BY name`, [ctx.access.workspaceId]);
   const budgets = await many<{ team_id: string; meter: BudgetMeter; cap: string }>(db, `SELECT team_id, meter, cap FROM usage_budgets WHERE workspace_id=$1`, [ctx.access.workspaceId]);
@@ -46,10 +53,11 @@ export async function limitsView(ctx: Ctx, db: Queryable = getPool()) {
       const meter = LIMIT_METERS[key].meter;
       const explicit = ws.limits?.[key];
       const cap = typeof explicit === 'number' && Number.isFinite(explicit) ? explicit : null;
-      const effective = workspaceCap(ws.limits, meter);
+      const planLimit = rules(meter).ceiling;
+      const effective = workspaceCap(ws.limits, meter, planLimit);
       const c = find(null, meter);
       const used = Number(c?.used ?? 0);
-      return { key, meter, label: LIMIT_METERS[key].label, unit: BUDGET_METERS[meter].unit, period: periodFor(meter), cap, effective_cap: effective,
+      return { key, meter, label: LIMIT_METERS[key].label, unit: BUDGET_METERS[meter].unit, period: periodFor(meter), cap, effective_cap: effective, plan_limit: planLimit,
         used, reserved: Number(c?.reserved ?? 0), percent: pct(used, effective) };
     }),
     teams: teams.map((t) => ({

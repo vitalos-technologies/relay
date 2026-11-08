@@ -12,6 +12,7 @@ import { deliverNotification } from '../collab/notifications.js';
 import { loadUserAuthz } from '../authz.js';
 import { staffAllowed } from '../collab/access.js';
 import { assertUuid, authorizeCtx, brandAllowed, requireAction } from '../tenancy.js';
+import { assertFeatureConfigurable } from '../entitlements/actions.js';
 import { iso, loadConversation, people } from './shared.js';
 
 export interface CaseRow {
@@ -256,6 +257,7 @@ export async function listSlaPolicies(ctx: Ctx): Promise<{ items: SlaPolicyDto[]
 
 export async function upsertSlaPolicy(ctx: Ctx, input: z.infer<typeof slaPolicySchema>): Promise<SlaPolicyDto> {
   requireAction(ctx, 'inbox.manage', input.brand_id ? { brandId: input.brand_id } : undefined);
+  await assertFeatureConfigurable(getPool(), ctx.access.workspaceId, 'care_advanced'); // V4: service levels are Professional
   try { new Intl.DateTimeFormat('en', { timeZone: input.timezone }); } catch { throw new AppError('validation_failed', 'Unknown time zone.', { timezone: 'Use an IANA name, e.g. Europe/London.' }); }
   return withTx(async (tx) => {
     if (input.is_default) await tx.query(`UPDATE care_sla_policies SET is_default=false WHERE workspace_id=$1 AND brand_id IS NOT DISTINCT FROM $2 AND is_default AND ($3::uuid IS NULL OR id <> $3)`, [ctx.access.workspaceId, input.brand_id ?? null, input.id ?? null]);

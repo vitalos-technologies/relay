@@ -28,6 +28,7 @@ import { loadIntegration, recordActivity, registerInboundHandler } from '../../c
 import { onInboxEvent } from '../../inbox/hooks.js';
 import { appErrorFrom, baseUrl, markRevoked, openConn } from '../core/runtime.js';
 import type { Conn, HubAdapter } from '../core/types.js';
+import { syncHold } from '../../entitlements/holds.js';
 
 export const slackAdapter: HubAdapter = {
   connector: 'slack', hosts: SLACK_HOSTS, sim: slackSim, connect: 'oauth', webhook: 'global',
@@ -273,6 +274,9 @@ export async function sendSlackDeliveries(limit = 20): Promise<{ sent: number; d
     const set = (state: string, detail: string | null, extra = '') => getPool().query(`UPDATE slack_deliveries SET state=$2, state_detail=$3 ${extra} WHERE id=$1`, [d.id, state, detail]);
     if (!r?.enabled) { await set('suppressed', 'Route disabled'); continue; }
     if (!(await routeAllows(r, d.brand_id))) { await set('suppressed', 'The route owner no longer has access to this brand.'); continue; }
+    // V4 entitlements: business integrations held by the plan/billing state ⇒ deferred with the reason (re-checked later).
+    const hold = await syncHold(getPool(), d.workspace_id);
+    if (hold.held) { await getPool().query(`UPDATE slack_deliveries SET state='deferred', state_detail=$2, attempts=attempts-1, not_before=now() + interval '15 minutes' WHERE id=$1`, [d.id, hold.message.slice(0, 200)]); out.deferred++; continue; }
     const quiet = quietMinutesLeft(r);
     if (quiet > 0) { await getPool().query(`UPDATE slack_deliveries SET state='deferred', state_detail='Quiet hours', attempts=attempts-1, not_before=now() + make_interval(mins => $2) WHERE id=$1`, [d.id, quiet]); out.deferred++; continue; }
     const recent = await one<{ n: number; oldest: Date | null }>(getPool(), `SELECT count(*)::int n, min(sent_at) oldest FROM slack_deliveries WHERE route_id=$1 AND state='sent' AND sent_at > now() - interval '1 hour'`, [r.id]);

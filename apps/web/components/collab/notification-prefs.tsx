@@ -13,7 +13,7 @@ interface Prefs {
 
 const LABEL: Record<string, string> = {
   mention: 'Mentions', comment: 'Replies and client comments', review_requested: 'Review requests', review_decided: 'Review decisions',
-  assignment: 'Tasks and assignments', reminder: 'Deadline reminders', publishing_problem: 'Publishing problems', account_health: 'Account health', budget: 'Budgets',
+  assignment: 'Tasks and assignments', reminder: 'Deadline reminders', publishing_problem: 'Publishing problems', account_health: 'Account health', budget: 'Budgets', support: 'Relay support replies',
 };
 const toHm = (m: number | null) => (m === null ? '' : `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`);
 const fromHm = (v: string) => { const [h, m] = v.split(':').map(Number); return Number.isFinite(h) && Number.isFinite(m) ? h! * 60 + m! : null; };

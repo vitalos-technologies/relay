@@ -13,6 +13,8 @@ import { useSession } from '@/lib/client/session';
 import { Badge, Banner, Button, Card, CardHeader, ErrorState, Facts, Field, Input, PageHeader, Select, SkeletonRows, useToast } from '@/components/ui';
 import { Ago, ReasonDialog } from '@/components/admin/ui';
 import { SUPPORT_TONE, WsState } from '@/components/admin/badges';
+import { PlatformBillingPanel } from '@/components/billing/platform-billing-panel';
+import { PlatformEntitlements } from '@/components/entitlements/platform-entitlements';
 
 export default function PlatformWorkspacePage() {
   const { id } = useParams<{ id: string }>();
@@ -24,6 +26,7 @@ export default function PlatformWorkspacePage() {
   const [minutes, setMinutes] = useState('60');
   const [ticket, setTicket] = useState('');
   const operator = session.platform_role === 'operator';
+  const billingStaff = operator || session.platform_role === 'billing'; // V4: billing panel (BIL); support access is not for billing staff
   const mine = w?.support_access.find((s) => s.operator.id === session.user.id && (s.status === 'requested' || s.status === 'active'));
   if (error && !w) return <ErrorState error={error} onRetry={refetch} />;
   if (!w) return <SkeletonRows rows={8} />;
@@ -32,7 +35,7 @@ export default function PlatformWorkspacePage() {
       <PageHeader title={w.name} eyebrow={<Link href="/admin/platform/workspaces" className="inline-flex items-center gap-1 hover:text-fg"><ArrowLeft aria-hidden className="size-3.5" />Workspaces</Link>}
         meta={<WsState w={w} />}
         actions={<>
-          {!mine ? <Button size="sm" icon={<LifeBuoy aria-hidden className="size-4" />} onClick={() => setDialog('support')}>Request support access</Button> : null}
+          {!mine && session.platform_role !== 'billing' ? <Button size="sm" icon={<LifeBuoy aria-hidden className="size-4" />} onClick={() => setDialog('support')}>Request support access</Button> : null}
           {operator ? (w.state === 'suspended'
             ? <Button size="sm" variant="primary" onClick={() => setDialog('reactivate')}>Reactivate</Button>
             : <Button size="sm" variant="danger" onClick={() => setDialog('suspend')}>Suspend</Button>) : null}
@@ -67,6 +70,8 @@ export default function PlatformWorkspacePage() {
             </ul>
           </Card>
         </div>
+        {billingStaff ? <PlatformBillingPanel workspaceId={w.id} operator={operator} /> : null}
+        <PlatformEntitlements workspaceId={w.id} />
         <Card>
           <CardHeader title="Support access" />
           <ul className="divide-y divide-border px-4 pb-2 text-[13px]">

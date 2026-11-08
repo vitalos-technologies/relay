@@ -10,9 +10,20 @@
 //   consume  — reserve + settle inside the CALLER's transaction (provider writes at the send gate:
 //              once the request leaves, it cannot be un-sent, so there is nothing to release).
 // Stale reservations (crashed process) expire and are released by sweepExpiredReservations().
+//
+// V4 (entitlements, stream ENT) layers the PLAN under the customer's caps without forking this mechanism:
+//   - the workspace cap enforced is min(customer cap, plan ceiling) — customers can lower, never raise, a plan allowance
+//     (entitlements/resolve.ts: plan / trial allowance, then audited platform overrides);
+//   - the counter period follows the billing period (whole trial = one bucket; subscription period; else calendar month);
+//   - each meter is gated by its entitlement inside the same transaction (paid actions held while access is restricted;
+//     exports and X reconciliation reads never are);
+//   - every settled consumption is written once to the durable ledger usage_events (dedupe key per reservation or per
+//     caller key), so a retried call is charged once.
+import { randomUUID } from 'node:crypto';
 import { AppError } from '@social-lite/core';
 import { getPool, many, maybeOne, withTx, type Queryable } from '@social-lite/db';
 import { writeOutbox } from '../outbox.js';
+import { entitlementError, entitlementsCore, meterRules, type MeterRules } from '../entitlements/resolve.js';
 
 export const BUDGET_METERS = {
   'ai.tokens': { limitKey: 'ai_monthly_tokens', label: 'AI tokens / month', unit: 'tokens', period: 'month', defaultCap: 200_000 },
@@ -20,22 +31,42 @@ export const BUDGET_METERS = {
   'x.read': { limitKey: 'x_monthly_reads', label: 'X reads / month', unit: 'calls', period: 'month', defaultCap: null },
   'storage.bytes': { limitKey: 'storage_bytes', label: 'Media storage', unit: 'bytes', period: 'total', defaultCap: null },
   'exports.count': { limitKey: 'monthly_exports', label: 'Exports / month', unit: 'exports', period: 'month', defaultCap: null },
+  // V4: plan allowances metered through the same counters (customers may set a lower cap too).
+  'mcp.calls': { limitKey: 'mcp_monthly_calls', label: 'MCP tool calls / month', unit: 'calls', period: 'month', defaultCap: null },
+  'integration.jobs': { limitKey: 'integration_monthly_jobs', label: 'Integration sync jobs / month', unit: 'jobs', period: 'month', defaultCap: null },
 } as const;
 export type BudgetMeter = keyof typeof BUDGET_METERS;
 export const BUDGET_METER_KEYS = Object.keys(BUDGET_METERS) as BudgetMeter[];
 export const isBudgetMeter = (m: string): m is BudgetMeter => m in BUDGET_METERS;
 
-/** 'YYYY-MM' (UTC) for monthly meters; 'total' for gauges such as storage. */
+/**
+ * Calendar key ('YYYY-MM' UTC) for monthly meters; 'total' for gauges such as storage. This is the legacy/no-plan
+ * period; reservations use `rulesFor()` (billing-period aware). Kept for callers that only need the calendar month.
+ */
 export function periodFor(meter: BudgetMeter, now = new Date()): string {
   return BUDGET_METERS[meter].period === 'month' ? now.toISOString().slice(0, 7) : 'total';
 }
 
-/** Workspace cap for a meter from workspaces.limits (null = uncapped). */
-export function workspaceCap(limits: Record<string, unknown> | null | undefined, meter: BudgetMeter): number | null {
-  const def = BUDGET_METERS[meter];
-  const v = limits?.[def.limitKey];
-  if (typeof v === 'number' && Number.isFinite(v) && v >= 0) return Math.floor(v);
-  return def.defaultCap;
+/** The customer's explicit cap from workspaces.limits (null = none set). */
+export function customerCap(limits: Record<string, unknown> | null | undefined, meter: BudgetMeter): number | null {
+  const v = limits?.[BUDGET_METERS[meter].limitKey];
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : null;
+}
+
+/**
+ * Workspace cap enforced for a meter (null = uncapped). Without a plan ceiling (legacy, or not metered by plan): the
+ * customer cap or the meter's safety default — the pre-V4 behaviour. With a plan ceiling: min(customer cap, ceiling);
+ * the safety default does not apply because the plan allowance is the limit.
+ */
+export function workspaceCap(limits: Record<string, unknown> | null | undefined, meter: BudgetMeter, planCeiling: number | null = null): number | null {
+  const explicit = customerCap(limits, meter);
+  if (planCeiling !== null) return explicit === null ? planCeiling : Math.min(explicit, planCeiling);
+  return explicit ?? BUDGET_METERS[meter].defaultCap;
+}
+
+/** Period key, plan ceiling and entitlement gate for a meter (resolved in the caller's transaction). */
+export async function rulesFor(db: Queryable, workspaceId: string, meter: BudgetMeter): Promise<MeterRules> {
+  return meterRules(await entitlementsCore(db, workspaceId), meter, BUDGET_METERS[meter].period);
 }
 
 export interface Reservation { id: string; workspaceId: string; meter: BudgetMeter; period: string; amount: number; teamIds: string[] }
@@ -48,6 +79,8 @@ export interface ReserveInput {
   teamIds?: string[];
   ref?: string | null;
   ttlSeconds?: number;
+  /** V4 ledger: consumption with an already-recorded key is not charged again (consumeUsage). */
+  dedupeKey?: string | null;
 }
 
 const fmt = (meter: BudgetMeter, n: number) => {
@@ -58,12 +91,20 @@ const fmt = (meter: BudgetMeter, n: number) => {
   return n.toLocaleString('en');
 };
 
-export interface ExhaustedDetail { meter: BudgetMeter; scope: 'workspace' | 'team'; team_id: string | null; team_name: string | null; cap: number; used: number; reserved: number; needed: number; period: string }
+export interface ExhaustedDetail {
+  meter: BudgetMeter; scope: 'workspace' | 'team'; team_id: string | null; team_name: string | null; cap: number; used: number; reserved: number; needed: number; period: string;
+  /** V4: 'plan' when the binding limit is the plan allowance (upgrade), 'customer' for a customer-set budget. */
+  limit_source?: 'plan' | 'customer';
+}
 
 export function exhaustedMessage(d: ExhaustedDetail): string {
   const left = Math.max(0, d.cap - d.used - d.reserved);
   const who = d.scope === 'team' ? `The ${d.team_name ?? 'team'} team’s` : 'This workspace’s';
   const per = BUDGET_METERS[d.meter].period === 'month' ? 'monthly ' : '';
+  if (d.limit_source === 'plan') {
+    const when = d.period.startsWith('trial:') ? 'Trial allowances don’t reset; choose a plan in Billing to continue.' : 'It resets next billing period, or upgrade in Billing.';
+    return `${who} plan allowance for ${BUDGET_METERS[d.meter].label.replace(/ \/ month$/, '').toLowerCase()} is used up (${fmt(d.meter, left)} of ${fmt(d.meter, d.cap)} left; this needs ${fmt(d.meter, d.needed)}). ${when}`;
+  }
   switch (d.meter) {
     case 'ai.tokens':
       return `${who} ${per}AI allowance is used up (${fmt(d.meter, left)} of ${fmt(d.meter, d.cap)} tokens left; this needs up to ${fmt(d.meter, d.needed)}). It resets next month, or an owner can raise it.`;
@@ -75,6 +116,10 @@ export function exhaustedMessage(d: ExhaustedDetail): string {
       return `${who} media storage budget is full (${fmt(d.meter, left)} of ${fmt(d.meter, d.cap)} free; this file needs ${fmt(d.meter, d.needed)}). Archive unused media or ask an owner to raise it.`;
     case 'exports.count':
       return `${who} monthly export budget (${fmt(d.meter, d.cap)}) is used up. It resets next month, or an owner can raise it.`;
+    case 'mcp.calls':
+      return `${who} monthly MCP call budget (${fmt(d.meter, d.cap)}) is used up. It resets next month, or an owner can raise it.`;
+    case 'integration.jobs':
+      return `${who} monthly integration sync budget (${fmt(d.meter, d.cap)}) is used up. Sync jobs wait until it resets or the cap is raised.`;
   }
 }
 
@@ -103,9 +148,11 @@ async function lockCounters(tx: Queryable, workspaceId: string, meter: BudgetMet
 }
 
 /** Check every capped scope; returns the first exhausted one (or null). */
-async function firstExhausted(tx: Queryable, workspaceId: string, meter: BudgetMeter, period: string, rows: LockedRow[], amount: number): Promise<ExhaustedDetail | null> {
+async function firstExhausted(tx: Queryable, workspaceId: string, meter: BudgetMeter, period: string, rows: LockedRow[], amount: number, ceiling: number | null = null): Promise<ExhaustedDetail | null> {
   const ws = await maybeOne<{ limits: Record<string, unknown> }>(tx, `SELECT limits FROM workspaces WHERE id = $1`, [workspaceId]);
-  const wsCap = workspaceCap(ws?.limits, meter);
+  const wsCap = workspaceCap(ws?.limits, meter, ceiling);
+  const explicit = customerCap(ws?.limits, meter);
+  const wsSource: 'plan' | 'customer' = ceiling !== null && (explicit === null || ceiling <= explicit) ? 'plan' : 'customer';
   const teamCaps = rows.some((r) => r.team_id) ? await many<{ team_id: string; cap: string; name: string }>(tx,
     `SELECT b.team_id, b.cap, t.name FROM usage_budgets b JOIN teams t ON t.id = b.team_id
       WHERE b.workspace_id = $1 AND b.meter = $2 AND b.team_id = ANY($3::uuid[])`, [workspaceId, meter, rows.filter((r) => r.team_id).map((r) => r.team_id)]) : [];
@@ -115,7 +162,8 @@ async function firstExhausted(tx: Queryable, workspaceId: string, meter: BudgetM
     const tc = r.team_id ? teamCaps.find((c) => c.team_id === r.team_id) : null;
     const cap = r.team_id ? (tc ? Number(tc.cap) : null) : wsCap;
     if (cap !== null && used + reserved + amount > cap) {
-      return { meter, scope: r.team_id ? 'team' : 'workspace', team_id: r.team_id, team_name: tc?.name ?? null, cap, used, reserved, needed: amount, period };
+      return { meter, scope: r.team_id ? 'team' : 'workspace', team_id: r.team_id, team_name: tc?.name ?? null, cap, used, reserved, needed: amount, period,
+        limit_source: r.team_id ? 'customer' : wsSource };
     }
   }
   return null;
@@ -133,8 +181,21 @@ async function thresholds(tx: Queryable, workspaceId: string, meter: BudgetMeter
   }
 }
 
-async function applySettle(tx: Queryable, r: { workspaceId: string; meter: BudgetMeter; period: string; teamIds: string[]; amount: number }, actual: number, releasedReserve: boolean) {
+interface LedgerEntry { dedupeKey: string; source: 'reservation' | 'consume'; ref?: string | null; actorUserId?: string | null }
+
+/** Durable usage ledger (036): one row per consumption key; returns false when the key was already recorded. */
+async function recordUsageEvent(tx: Queryable, workspaceId: string, meter: BudgetMeter, period: string, amount: number, e: LedgerEntry): Promise<boolean> {
+  const r = await tx.query(
+    `INSERT INTO usage_events(workspace_id, meter, period, amount, dedupe_key, source, ref, actor_user_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (workspace_id, meter, dedupe_key) DO NOTHING`,
+    [workspaceId, meter, period, amount, e.dedupeKey.slice(0, 240), e.source, e.ref?.slice(0, 200) ?? null, e.actorUserId ?? null]);
+  return (r.rowCount ?? 0) === 1;
+}
+
+async function applySettle(tx: Queryable, r: { workspaceId: string; meter: BudgetMeter; period: string; teamIds: string[]; amount: number }, actual: number, releasedReserve: boolean, ledger?: LedgerEntry) {
   const rows = await lockCounters(tx, r.workspaceId, r.meter, r.period, r.teamIds);
+  if (ledger && actual > 0) await recordUsageEvent(tx, r.workspaceId, r.meter, r.period, actual, ledger);
+  const ceiling = (await rulesFor(tx, r.workspaceId, r.meter)).ceiling;
   const ws = await maybeOne<{ limits: Record<string, unknown> }>(tx, `SELECT limits FROM workspaces WHERE id = $1`, [r.workspaceId]);
   const teamCaps = r.teamIds.length ? await many<{ team_id: string; cap: string }>(tx,
     `SELECT team_id, cap FROM usage_budgets WHERE workspace_id = $1 AND meter = $2 AND team_id = ANY($3::uuid[])`, [r.workspaceId, r.meter, r.teamIds]) : [];
@@ -144,7 +205,7 @@ async function applySettle(tx: Queryable, r: { workspaceId: string; meter: Budge
       `UPDATE usage_counters SET reserved = greatest(0, reserved - $5), used = greatest(0, used + $6)
         WHERE workspace_id = $1 AND meter = $2 AND period = $3 AND team_id IS NOT DISTINCT FROM $4::uuid`,
       [r.workspaceId, r.meter, r.period, row.team_id, releasedReserve ? r.amount : 0, actual]);
-    const cap = row.team_id ? (teamCaps.find((c) => c.team_id === row.team_id)?.cap ?? null) : workspaceCap(ws?.limits, r.meter);
+    const cap = row.team_id ? (teamCaps.find((c) => c.team_id === row.team_id)?.cap ?? null) : workspaceCap(ws?.limits, r.meter, ceiling);
     await thresholds(tx, r.workspaceId, r.meter, r.period, row.team_id, before, before + actual, cap === null ? null : Number(cap));
   }
 }
@@ -161,10 +222,12 @@ export async function reserveUsage(input: ReserveInput, db?: Queryable): Promise
   const amount = Math.max(0, Math.ceil(input.amount));
   if (!db) await sweepExpiredReservations({ workspaceId: input.workspaceId, meter: input.meter }).catch(() => undefined);
   return inTx(db, async (tx) => {
-    const period = periodFor(input.meter);
+    const rules = await rulesFor(tx, input.workspaceId, input.meter);
+    if (!rules.gate.ok) throw entitlementError(rules.gate);
+    const period = rules.period;
     const teamIds = [...new Set(input.teamIds ?? await teamsOf(tx, input.workspaceId, input.userId))].sort();
     const rows = await lockCounters(tx, input.workspaceId, input.meter, period, teamIds);
-    const ex = await firstExhausted(tx, input.workspaceId, input.meter, period, rows, amount);
+    const ex = await firstExhausted(tx, input.workspaceId, input.meter, period, rows, amount, rules.ceiling);
     if (ex) throw new AppError('budget_exhausted', exhaustedMessage(ex), undefined, { ...ex });
     await tx.query(
       `UPDATE usage_counters SET reserved = reserved + $5
@@ -178,7 +241,7 @@ export async function reserveUsage(input: ReserveInput, db?: Queryable): Promise
   });
 }
 
-type ResRow = { id: string; workspace_id: string; meter: BudgetMeter; period: string; team_ids: string[]; amount: string; status: string };
+type ResRow = { id: string; workspace_id: string; meter: BudgetMeter; period: string; team_ids: string[]; amount: string; status: string; ref: string | null; actor_user_id: string | null };
 
 async function finish(id: string, actual: number, status: 'settled' | 'released' | 'expired', db?: Queryable): Promise<boolean> {
   const amount = Math.max(0, Math.round(actual));
@@ -190,14 +253,15 @@ async function finish(id: string, actual: number, status: 'settled' | 'released'
       [id, status, status === 'settled' ? amount : 0]);
     if (open) {
       await applySettle(tx, { workspaceId: open.workspace_id, meter: open.meter, period: open.period, teamIds: open.team_ids, amount: Number(open.amount) },
-        status === 'settled' ? amount : 0, true);
+        status === 'settled' ? amount : 0, true, { dedupeKey: `res:${open.id}`, source: 'reservation', ref: open.ref, actorUserId: open.actor_user_id });
       return true;
     }
     if (status !== 'settled') return false;
     const late = await maybeOne<ResRow>(tx,
       `UPDATE usage_reservations SET status = 'settled', settled_amount = $2, finished_at = now() WHERE id = $1 AND status = 'expired' RETURNING *`, [id, amount]);
     if (!late) return false;
-    await applySettle(tx, { workspaceId: late.workspace_id, meter: late.meter, period: late.period, teamIds: late.team_ids, amount: 0 }, amount, false);
+    await applySettle(tx, { workspaceId: late.workspace_id, meter: late.meter, period: late.period, teamIds: late.team_ids, amount: 0 }, amount, false,
+      { dedupeKey: `res:${late.id}`, source: 'reservation', ref: late.ref, actorUserId: late.actor_user_id });
     return true;
   });
 }
@@ -215,18 +279,30 @@ export async function settleByRef(workspaceId: string, ref: string, actual: numb
   return actual === null ? releaseUsage(r.id, db) : settleUsage(r.id, actual, db);
 }
 
+export type ConsumeResult =
+  | { ok: true; duplicate?: boolean }
+  | { ok: false; message: string; detail: ExhaustedDetail | null; reason: 'budget' | 'entitlement'; entitlement?: Record<string, unknown> };
+
 /**
  * Reserve + settle in the caller's transaction (provider calls at the send gate). Never throws for an
- * exhausted budget: returns { ok:false, message } so the engine can block just that job.
+ * exhausted budget or a missing entitlement: returns { ok:false, message } so the caller can hold just that job.
+ * With `dedupeKey`, a consumption already recorded in the ledger is not charged again (returns duplicate: true).
  */
-export async function consumeUsage(tx: Queryable, input: ReserveInput): Promise<{ ok: true } | { ok: false; message: string; detail: ExhaustedDetail }> {
+export async function consumeUsage(tx: Queryable, input: ReserveInput): Promise<ConsumeResult> {
   const amount = Math.max(0, Math.ceil(input.amount));
-  const period = periodFor(input.meter);
+  const rules = await rulesFor(tx, input.workspaceId, input.meter);
+  if (!rules.gate.ok) return { ok: false, message: rules.gate.message, detail: null, reason: 'entitlement', entitlement: { ...rules.gate.details } };
+  const period = rules.period;
   const teamIds = [...new Set(input.teamIds ?? await teamsOf(tx, input.workspaceId, input.userId))].sort();
   const rows = await lockCounters(tx, input.workspaceId, input.meter, period, teamIds);
-  const ex = await firstExhausted(tx, input.workspaceId, input.meter, period, rows, amount);
-  if (ex) return { ok: false, message: exhaustedMessage(ex), detail: ex };
-  await applySettle(tx, { workspaceId: input.workspaceId, meter: input.meter, period, teamIds, amount: 0 }, amount, false);
+  // Under the counter locks: a concurrent consumption with the same key has committed or not started.
+  if (input.dedupeKey && await maybeOne(tx, `SELECT 1 FROM usage_events WHERE workspace_id=$1 AND meter=$2 AND dedupe_key=$3`, [input.workspaceId, input.meter, input.dedupeKey.slice(0, 240)])) {
+    return { ok: true, duplicate: true };
+  }
+  const ex = await firstExhausted(tx, input.workspaceId, input.meter, period, rows, amount, rules.ceiling);
+  if (ex) return { ok: false, message: exhaustedMessage(ex), detail: ex, reason: 'budget' };
+  await applySettle(tx, { workspaceId: input.workspaceId, meter: input.meter, period, teamIds, amount: 0 }, amount, false,
+    { dedupeKey: input.dedupeKey ?? `consume:${randomUUID()}`, source: 'consume', ref: input.ref, actorUserId: input.userId });
   return { ok: true };
 }
 
@@ -245,7 +321,8 @@ export interface MeterUsage { meter: BudgetMeter; period: string; used: number; 
 
 /** Current-period usage for a workspace (and optionally one team). */
 export async function readMeterUsage(workspaceId: string, meter: BudgetMeter, opts: { teamId?: string | null } = {}, db: Queryable = getPool()): Promise<MeterUsage> {
-  const period = periodFor(meter);
+  const rules = await rulesFor(db, workspaceId, meter);
+  const period = rules.period;
   const row = await maybeOne<{ used: string; reserved: string }>(db,
     `SELECT used, reserved FROM usage_counters WHERE workspace_id = $1 AND meter = $2 AND period = $3 AND team_id IS NOT DISTINCT FROM $4::uuid`,
     [workspaceId, meter, period, opts.teamId ?? null]);
@@ -255,7 +332,7 @@ export async function readMeterUsage(workspaceId: string, meter: BudgetMeter, op
     cap = b ? Number(b.cap) : null;
   } else {
     const ws = await maybeOne<{ limits: Record<string, unknown> }>(db, `SELECT limits FROM workspaces WHERE id = $1`, [workspaceId]);
-    cap = workspaceCap(ws?.limits, meter);
+    cap = workspaceCap(ws?.limits, meter, rules.ceiling);
   }
   const used = Number(row?.used ?? 0);
   const reserved = Number(row?.reserved ?? 0);
@@ -273,6 +350,6 @@ export async function wouldFit(workspaceId: string, meter: BudgetMeter, amount: 
       [workspaceId, meter, period, teamIds]);
     for (const id of teamIds) rows.push(t.find((r) => r.team_id === id) ?? { team_id: id, used: '0', reserved: '0' });
   }
-  const detail = await firstExhausted(db, workspaceId, meter, period, rows, amount);
+  const detail = await firstExhausted(db, workspaceId, meter, period, rows, amount, (await rulesFor(db, workspaceId, meter)).ceiling);
   return { ok: !detail, detail, usage };
 }

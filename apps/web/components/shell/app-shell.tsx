@@ -7,7 +7,7 @@ import { usePathname } from 'next/navigation';
 import { Suspense, useEffect, useState, type ReactNode } from 'react';
 import {
   Activity, CalendarDays, PanelsTopLeft, ChartColumn, CheckCheck, Ellipsis, Flag, FolderOpen, LayoutDashboard, Plug, Settings, ShieldCheck, SquarePen, Users, Wrench,
-  type LucideIcon, ListTodo, Inbox, Radar, Sparkles, Blocks } from 'lucide-react';
+  type LucideIcon, ListTodo, Inbox, Radar, Sparkles, Blocks, LifeBuoy } from 'lucide-react';
 import type { Action, Permission } from '@social-lite/core';
 import { useSession } from '@/lib/client/session';
 import { useApi } from '@/lib/client/use-api';
@@ -51,6 +51,8 @@ export const NAV: NavItem[] = [
   { href: '/integrations', label: 'Integrations', icon: Blocks, v2: ['integrations.read'] },
   { href: '/team', label: 'Team', icon: Users, v2: ['members.read', 'teams.read'] },
   { href: '/settings', label: 'Settings', icon: Settings, also: ['/security', '/mcp/settings'] },
+  // V4: Relay support (Help → Contact support / My requests). Every member; never gated by billing restrictions.
+  { href: '/help', label: 'Help', icon: LifeBuoy },
 ];
 const ADMIN_NAV: NavItem[] = [
   { href: '/admin', label: 'Admin console', icon: PanelsTopLeft, v2: ['workspace.read'] },

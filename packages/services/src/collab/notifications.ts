@@ -15,7 +15,7 @@ import { assertUuid } from '../tenancy.js';
 import { authorize } from '../authz.js';
 import { entitledNow, staffAllowed, type Requirement } from './access.js';
 
-export const NOTIFICATION_EVENTS = ['mention', 'comment', 'review_requested', 'review_decided', 'assignment', 'reminder', 'publishing_problem', 'account_health', 'budget'] as const;
+export const NOTIFICATION_EVENTS = ['mention', 'comment', 'review_requested', 'review_decided', 'assignment', 'reminder', 'publishing_problem', 'account_health', 'budget', 'support'] as const;
 export type NotificationEvent = (typeof NOTIFICATION_EVENTS)[number];
 
 export interface Channels { in_app: boolean; email: boolean; digest: boolean }
@@ -30,6 +30,8 @@ export const DEFAULT_CHANNELS: Record<NotificationEvent, Channels> = {
   publishing_problem: { in_app: true, email: true, digest: false },
   account_health: { in_app: true, email: true, digest: false },
   budget: { in_app: true, email: true, digest: false },
+  // V4 Relay support replies (support/notify.ts): emailed individually or not at all (never batched into a digest).
+  support: { in_app: true, email: true, digest: false },
 };
 
 /** V1 notification kinds → preference event type. */
@@ -42,18 +44,19 @@ export function eventTypeForKind(kind: string): NotificationEvent {
   if (kind === 'mention') return 'mention';
   if (kind === 'assignment' || kind.startsWith('task.')) return kind.startsWith('task.reminder') ? 'reminder' : 'assignment';
   if (kind.startsWith('reminder')) return 'reminder';
+  if (kind.startsWith('support.')) return 'support';
   return 'comment';
 }
 
 interface Settings { timezone: string; quiet_start: number | null; quiet_end: number | null; digest_hour: number; last_digest_at: Date | null }
 
-async function settingsFor(db: Queryable, workspaceId: string, userId: string): Promise<Settings> {
+export async function settingsFor(db: Queryable, workspaceId: string, userId: string): Promise<Settings> {
   const s = await maybeOne<Settings>(db, `SELECT timezone, quiet_start, quiet_end, digest_hour, last_digest_at FROM notification_settings WHERE workspace_id=$1 AND user_id=$2`, [workspaceId, userId]);
   return s ?? { timezone: 'UTC', quiet_start: null, quiet_end: null, digest_hour: 8, last_digest_at: null };
 }
 
 /** The member's own choice, else the workspace default (admin), else the product default. */
-async function channelsFor(db: Queryable, workspaceId: string, userId: string, ev: NotificationEvent): Promise<Channels> {
+export async function channelsFor(db: Queryable, workspaceId: string, userId: string, ev: NotificationEvent): Promise<Channels> {
   const p = await maybeOne<Channels>(db, `SELECT in_app, email, digest FROM notification_preferences WHERE workspace_id=$1 AND user_id=$2 AND event_type=$3`, [workspaceId, userId, ev]);
   if (p) return p;
   return workspaceDefault(db, workspaceId, ev);
@@ -147,13 +150,18 @@ const EMAIL_MAX_ATTEMPTS = 3;
  */
 export async function sendNotificationEmail(db: Queryable, id: string): Promise<'sent' | 'skipped' | 'failed' | 'not_configured' | 'retry'> {
   const row = await maybeOne<{ id: string; workspace_id: string; user_id: string; title: string; reference_type: string | null; reference_id: string | null; link_path: string | null;
-    brand_id: string | null; required_permission: string | null; email_state: string; email: string; critical_security: boolean; email_attempts: number }>(db,
-    `SELECT n.id, n.workspace_id, n.user_id, n.title, n.reference_type, n.reference_id, n.link_path, n.brand_id, n.required_permission, n.email_state, u.email, n.critical_security, n.email_attempts
+    brand_id: string | null; required_permission: string | null; email_state: string; email: string; critical_security: boolean; email_attempts: number; kind: string; scope: string }>(db,
+    `SELECT n.id, n.workspace_id, n.user_id, n.title, n.reference_type, n.reference_id, n.link_path, n.brand_id, n.required_permission, n.email_state, u.email, n.critical_security, n.email_attempts,
+            n.kind, n.scope
        FROM notifications n JOIN users u ON u.id=n.user_id WHERE n.id=$1`, [id]);
   if (!row || row.email_state !== 'pending') return 'skipped';
   const req = parseRequirement(row);
-  const member = await maybeOne(db, `SELECT 1 FROM memberships WHERE workspace_id=$1 AND user_id=$2 AND status='active' AND removed_at IS NULL`, [row.workspace_id, row.user_id]);
-  if (!member || (req && !(await entitledNow(db, row.workspace_id, row.user_id, req)))) {
+  // V4: Relay support notifications (customer and platform-staff scope) re-check ticket visibility / staff role instead.
+  const allowed = row.kind.startsWith('support.') || row.scope === 'platform'
+    ? await (await import('../support/notify.js')).recipientStillAllowed(db, row)
+    : !!(await maybeOne(db, `SELECT 1 FROM memberships WHERE workspace_id=$1 AND user_id=$2 AND status='active' AND removed_at IS NULL`, [row.workspace_id, row.user_id]))
+      && !(req && !(await entitledNow(db, row.workspace_id, row.user_id, req)));
+  if (!allowed) {
     await db.query(`UPDATE notifications SET email_state='skipped', email_error='recipient_not_entitled' WHERE id=$1`, [id]);
     return 'skipped';
   }

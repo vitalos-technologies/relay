@@ -16,7 +16,7 @@ export default function PlatformOperatorsPage() {
   const { data, error, loading, refetch } = useApi<{ items: PlatformOperatorDto[] }>('/api/platform/operators');
   const [add, setAdd] = useState(false);
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<'operator' | 'support'>('support');
+  const [role, setRole] = useState<'operator' | 'support' | 'billing'>('support');
   const [revoke, setRevoke] = useState<PlatformOperatorDto | null>(null);
   return (
     <>
@@ -35,11 +35,11 @@ export default function PlatformOperatorsPage() {
         </Card>
       )}
       <ReasonDialog open={add} onOpenChange={setAdd} title="Add a platform operator" confirmLabel="Add"
-        description="They must already have signed in to Relay once. Support staff see platform metadata and can request support access."
+        description="They must already have signed in to Relay once. Support staff see platform metadata and can request support access. Billing staff manage billing records, trials and plans — no customer content or support access."
         onConfirm={async (reason) => { await api.post('/api/platform/operators', { email: email.trim(), role, reason }); setEmail(''); toast.success('Added'); await refetch(); }}>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Email"><Input type="email" inputMode="email" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
-          <Field label="Role"><Select value={role} onChange={(e) => setRole(e.target.value as 'operator' | 'support')}><option value="support">Support</option><option value="operator">Operator</option></Select></Field>
+          <Field label="Role"><Select value={role} onChange={(e) => setRole(e.target.value as 'operator' | 'support' | 'billing')}><option value="support">Support</option><option value="billing">Billing</option><option value="operator">Operator</option></Select></Field>
         </div>
       </ReasonDialog>
       <ReasonDialog open={!!revoke} onOpenChange={(o) => !o && setRevoke(null)} title={`Revoke ${revoke?.email}?`} confirmLabel="Revoke" confirmVariant="danger"

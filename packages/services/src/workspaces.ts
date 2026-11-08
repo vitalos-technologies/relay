@@ -101,7 +101,7 @@ export interface SessionInfo {
   /** V3.1: workspace policy for browser-side draft recovery (null without an active workspace). */
   draft_recovery?: DraftRecoveryPolicy | null;
   /** V3.1 Admin: platform operator role of this user (re-read every request; UI convenience only). */
-  platform_role?: 'operator' | 'support' | null;
+  platform_role?: 'operator' | 'support' | 'billing' | null;
   /** V3.1 Admin: support access open on the active workspace (banner). */
   support_access?: { active: number; pending: number; until: string | null; mine: boolean } | null;
 }
@@ -231,7 +231,8 @@ export async function setWorkspacePaused(ctx: Ctx, input: { paused: boolean; rea
  * session's active workspace. Allowed only for users without memberships, and in production only
  * while no workspace exists (bootstrap) or when ALLOW_SELF_SERVE_WORKSPACES=true.
  */
-export async function createWorkspace(session: SessionRecord, actor: Actor, input: { name: string; timezone: string; brand_name?: string }, correlationId?: string): Promise<{ workspace: WorkspaceDto; brand: BrandDto }> {
+export async function createWorkspace(session: SessionRecord, actor: Actor, input: { name: string; timezone: string; brand_name?: string }, correlationId?: string,
+  opts: { plan?: string | null; source?: 'signup' | 'onboarding' } = {}): Promise<{ workspace: WorkspaceDto; brand: BrandDto }> {
   const name = validName(input.name);
   const tz = validTz(input.timezone);
   const brandName = validName(input.brand_name ?? name, 'brand_name');
@@ -252,6 +253,9 @@ export async function createWorkspace(session: SessionRecord, actor: Actor, inpu
     await setActiveWorkspace(tx, session.id, w.id);
     await audit(tx, { workspaceId: w.id, actorUserId: actor.userId, action: 'workspace.created', resourceType: 'workspace', resourceId: w.id,
       diff: { name, timezone: tz, brand_id: b.id }, correlationId });
+    // V4 billing: the workspace's one 14-day no-card trial starts now, on the plan chosen at signup (default Standard).
+    const { startTrialTx } = await import('./billing/trials.js');
+    await startTrialTx(tx, { workspaceId: w.id, planId: opts.plan ?? 'standard', userId: actor.userId, source: opts.source ?? 'onboarding' });
     return { workspace: workspaceDto(w), brand: brandDto(b) };
   });
 }

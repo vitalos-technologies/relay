@@ -27,6 +27,7 @@ import { parseFilters, serializeFilters } from './filters.js';
 import { audience, channels, contentTable, defaultTimezone, overview, resolveScope, video, workflow } from './query.js';
 import { buildManifest, renderCsv, renderHtml, type ViewData } from './render.js';
 import { reportExporterFor } from './exporters.js';
+import { assertFeatureConfigurable } from '../entitlements/actions.js';
 import { renderPdf } from './pdf.js';
 
 export const QUEUE_REPORT_EXPORT = 'analytics-report-export'; // distinct from Content Hub's 'report-export' (destination writes)
@@ -72,6 +73,7 @@ function reportDto(ctx: Ctx, r: ReportRow): ReportDefinitionDto {
 
 export async function createReport(ctx: Ctx, raw: unknown): Promise<ReportDefinitionDto> {
   requireAction(ctx, 'analytics.read');
+  await assertFeatureConfigurable(getPool(), ctx.access.workspaceId, 'analytics_advanced'); // V4: saved reports are Professional
   const input = reportInput.parse(raw ?? {});
   const f = await filtersFrom(ctx, input);
   await resolveScope(ctx, f); // the creator must be able to see everything the view references

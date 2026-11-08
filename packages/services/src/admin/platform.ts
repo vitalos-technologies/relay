@@ -35,9 +35,15 @@ export async function loadOperatorRole(userId: string, db: Queryable = getPool()
   return r?.role ?? null;
 }
 
-/** 'operator' ⊇ 'support'. Throws forbidden (never reveals whether something exists). */
-export function requirePlatform(p: PlatformCtx, need: PlatformRole): void {
-  if (need === 'operator' && p.role !== 'operator') throw new AppError('forbidden', 'Platform operators only');
+/**
+ * 'operator' ⊇ 'support' and 'operator' ⊇ 'billing' (V4). 'staff' = any platform role (metadata-only views).
+ * 'support' excludes billing staff (support access reaches customer content); 'billing' excludes support staff (billing
+ * powers). Throws forbidden (never reveals whether something exists).
+ */
+export function requirePlatform(p: PlatformCtx, need: PlatformRole | 'staff'): void {
+  if (need === 'staff') return;
+  if (p.role === 'operator' || p.role === need) return;
+  throw new AppError('forbidden', need === 'operator' ? 'Platform operators only' : need === 'billing' ? 'Billing staff only' : 'Support staff only');
 }
 
 /** Sensitive platform changes need a fresh, MFA-verified sign-in (identity provider step-up). */
@@ -65,7 +71,7 @@ const reasonSchema = z.string().trim().min(10, 'Give a reason (10+ characters)')
 
 // ------------------------------------------------------------------ overview
 export async function platformOverview(p: PlatformCtx, db: Queryable = getPool()): Promise<PlatformOverview> {
-  requirePlatform(p, 'support');
+  requirePlatform(p, 'staff');
   const ws = await one<{ active: number; suspended: number; demo: number }>(db,
     `SELECT count(*) FILTER (WHERE state='active')::int active, count(*) FILTER (WHERE state='suspended')::int suspended, count(*) FILTER (WHERE is_demo)::int demo FROM workspaces`);
   const users = await one<{ total: number; disabled: number; signed_in_24h: number }>(db,
@@ -152,7 +158,7 @@ type WsRow = Omit<PlatformWorkspaceItem, 'created_at' | 'last_activity_at'> & { 
 const wsJson = (r: WsRow): PlatformWorkspaceItem => ({ ...r, created_at: r.created_at.toISOString(), last_activity_at: r.last_activity_at?.toISOString() ?? null });
 
 export async function listPlatformWorkspaces(p: PlatformCtx, raw: unknown, db: Queryable = getPool()): Promise<{ items: PlatformWorkspaceItem[]; next_cursor: string | null; total: number }> {
-  requirePlatform(p, 'support');
+  requirePlatform(p, 'staff');
   const q = listQuery.parse(raw ?? {});
   const limit = q.limit ?? 25;
   const params: unknown[] = [];
@@ -179,7 +185,7 @@ export async function listPlatformWorkspaces(p: PlatformCtx, raw: unknown, db: Q
 }
 
 export async function platformWorkspace(p: PlatformCtx, workspaceId: string, db: Queryable = getPool()): Promise<PlatformWorkspaceDetail> {
-  requirePlatform(p, 'support');
+  requirePlatform(p, 'staff');
   assertUuid(workspaceId, 'Workspace');
   const w = await maybeOne<WsRow & { suspended_at: Date | null; suspended_reason: string | null; paused_reason: string | null; limits: Record<string, unknown> }>(db,
     `SELECT ${WS_COLUMNS}, w.suspended_at, w.suspended_reason, w.paused_reason, w.limits FROM workspaces w WHERE w.id=$1`, [workspaceId]);
@@ -214,23 +220,32 @@ export async function suspendWorkspace(p: PlatformCtx, workspaceId: string, raw:
   requireFresh(p);
   assertUuid(workspaceId, 'Workspace');
   const { reason } = suspendSchema.parse(raw);
-  return withTx(async (tx) => {
-    const w = await maybeOne<{ state: string; name: string }>(tx, `SELECT state, name FROM workspaces WHERE id=$1 FOR UPDATE`, [workspaceId]);
-    if (!w) throw notFound('Workspace');
-    if (w.state === 'suspended') throw new AppError('invalid_state', 'This workspace is already suspended.');
-    const affected = await one<{ scheduled: number; in_flight: number }>(tx,
-      `SELECT count(*) FILTER (WHERE state IN ('scheduled','retry_wait'))::int scheduled, count(*) FILTER (WHERE state IN ('preparing','publishing','processing'))::int in_flight
-         FROM deliveries WHERE workspace_id=$1`, [workspaceId]);
-    await tx.query(`UPDATE workspaces SET state='suspended', suspended_at=now(), suspended_by=$2, suspended_reason=$3, policy_version=policy_version+1 WHERE id=$1`,
-      [workspaceId, p.actor.userId, reason]);
-    // Waiting deliveries move to Paused now; in-flight ones finish (the gate holds any that are claimed later).
-    const paused = await onScopePaused(tx, { workspaceId });
-    Object.assign(affected, { paused });
-    await platformAudit(tx, p, { action: 'workspace.suspended', targetType: 'workspace', targetId: workspaceId, workspaceId, reason, diff: { name: w.name, ...affected } });
-    await audit(tx, { workspaceId, actorUserId: p.actor.userId, action: 'platform.workspace_suspended', resourceType: 'workspace', resourceId: workspaceId,
-      diff: { reason, ...affected }, correlationId: p.correlationId });
-    return { ok: true as const, affected };
-  });
+  return withTx((tx) => suspendWorkspaceTx(tx, workspaceId, { p, reason }));
+}
+
+/**
+ * The suspension itself (inside a transaction). `p` = the acting operator; null = a staff-SCHEDULED suspension executed by
+ * the billing sweep (V4 billing_scheduled_actions), recorded with `actorService` and the scheduling operator in the diff.
+ */
+export async function suspendWorkspaceTx(tx: Queryable, workspaceId: string, by: { p: PlatformCtx | null; reason: string; actorService?: string; scheduledBy?: string | null }) {
+  const w = await maybeOne<{ state: string; name: string }>(tx, `SELECT state, name FROM workspaces WHERE id=$1 FOR UPDATE`, [workspaceId]);
+  if (!w) throw notFound('Workspace');
+  if (w.state === 'suspended') throw new AppError('invalid_state', 'This workspace is already suspended.');
+  const affected = await one<{ scheduled: number; in_flight: number }>(tx,
+    `SELECT count(*) FILTER (WHERE state IN ('scheduled','retry_wait'))::int scheduled, count(*) FILTER (WHERE state IN ('preparing','publishing','processing'))::int in_flight
+       FROM deliveries WHERE workspace_id=$1`, [workspaceId]);
+  const actorId = by.p?.actor.userId ?? by.scheduledBy ?? null;
+  await tx.query(`UPDATE workspaces SET state='suspended', suspended_at=now(), suspended_by=$2, suspended_reason=$3, policy_version=policy_version+1 WHERE id=$1`,
+    [workspaceId, actorId, by.reason]);
+  // Waiting deliveries move to Paused now; in-flight ones finish (the gate holds any that are claimed later).
+  const paused = await onScopePaused(tx, { workspaceId });
+  Object.assign(affected, { paused });
+  const extra = by.p ? {} : { scheduled_by: by.scheduledBy ?? null };
+  await platformAudit(tx, by.p, { action: 'workspace.suspended', targetType: 'workspace', targetId: workspaceId, workspaceId, reason: by.reason,
+    actorService: by.actorService ?? null, diff: { name: w.name, ...affected, ...extra } });
+  await audit(tx, { workspaceId, actorUserId: by.p ? by.p.actor.userId : null, actorService: by.p ? null : (by.actorService ?? 'system'), action: 'platform.workspace_suspended',
+    resourceType: 'workspace', resourceId: workspaceId, diff: { reason: by.reason, ...affected, ...extra }, correlationId: by.p?.correlationId ?? null });
+  return { ok: true as const, affected };
 }
 
 export async function reactivateWorkspace(p: PlatformCtx, workspaceId: string, raw: unknown) {
@@ -294,7 +309,7 @@ export async function setGlobalDispatch(p: PlatformCtx, raw: unknown) {
 
 // ------------------------------------------------------------------ feature flag rollouts (installation rows)
 export async function listPlatformFlags(p: PlatformCtx, db: Queryable = getPool()): Promise<{ items: PlatformFlag[] }> {
-  requirePlatform(p, 'support');
+  requirePlatform(p, 'staff');
   const rows = await many<{ key: string; description: string; default_enabled: boolean; rollout_percent: number; killed: boolean; updated_at: Date | null; updated_by: string | null; overrides: number }>(db,
     `SELECT f.*, (SELECT count(*)::int FROM workspace_feature_flags o WHERE o.key=f.key) overrides FROM feature_flags f ORDER BY f.key`);
   const keys = [...new Set([...FEATURE_FLAGS.map((f) => f.key), ...rows.map((r) => r.key)])].sort();
@@ -344,7 +359,7 @@ const auditQuery = z.object({
 });
 
 export async function platformAuditList(p: PlatformCtx, raw: unknown, db: Queryable = getPool()): Promise<{ items: PlatformAuditItem[]; next_cursor: string | null }> {
-  requirePlatform(p, 'support');
+  requirePlatform(p, 'staff');
   const q = auditQuery.parse(raw ?? {});
   const limit = q.limit ?? 50;
   const params: unknown[] = [];
@@ -368,14 +383,14 @@ export async function platformAuditList(p: PlatformCtx, raw: unknown, db: Querya
 
 // ------------------------------------------------------------------ operators
 export async function listOperators(p: PlatformCtx, db: Queryable = getPool()): Promise<{ items: PlatformOperatorDto[] }> {
-  requirePlatform(p, 'support');
+  requirePlatform(p, 'staff');
   const rows = await many<{ user_id: string; email: string; name: string | null; role: PlatformRole; granted_at: Date; granted_via: string; revoked_at: Date | null; note: string | null }>(db,
     `SELECT o.user_id, u.email::text, u.name, o.role, o.granted_at, o.granted_via, o.revoked_at, o.note FROM platform_operators o JOIN users u ON u.id=o.user_id
       ORDER BY o.revoked_at NULLS FIRST, u.email`);
   return { items: rows.map((r) => ({ ...r, granted_at: r.granted_at.toISOString(), revoked_at: r.revoked_at?.toISOString() ?? null })) };
 }
 
-const grantOperatorSchema = z.object({ email: z.string().trim().email().max(254), role: z.enum(['operator', 'support']), reason: reasonSchema }).strict();
+const grantOperatorSchema = z.object({ email: z.string().trim().email().max(254), role: z.enum(['operator', 'support', 'billing']), reason: reasonSchema }).strict();
 
 /** Operators may name other operators/support staff (existing Relay users only). Self-changes are refused. */
 export async function grantOperator(p: PlatformCtx, raw: unknown) {
@@ -417,7 +432,7 @@ const accountQuery = z.object({ q: z.string().trim().min(3).max(120) });
 
 /** Find accounts by email/name (min 3 chars). Returns identity + membership counts only. */
 export async function findAccounts(p: PlatformCtx, raw: unknown, db: Queryable = getPool()) {
-  requirePlatform(p, 'support');
+  requirePlatform(p, 'staff');
   const { q } = accountQuery.parse(raw ?? {});
   const like = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
   const rows = await many<{ id: string; email: string; name: string | null; disabled_at: Date | null; last_login_at: Date | null; workspaces: number; operator: string | null }>(db,
@@ -469,7 +484,7 @@ export interface PlatformIntegration {
 }
 
 export async function platformIntegrations(p: PlatformCtx, db: Queryable = getPool()): Promise<{ items: PlatformIntegration[] }> {
-  requirePlatform(p, 'support');
+  requirePlatform(p, 'staff');
   const { listProviderStatus } = await import('../connections/manage.js');
   const { googleContentConfig, notionConfig } = await import('../content-hub/config.js');
   const { mcpConfig } = await import('../mcp/config.js');

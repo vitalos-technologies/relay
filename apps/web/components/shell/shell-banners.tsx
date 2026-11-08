@@ -4,6 +4,7 @@ import { FlaskConical, LifeBuoy, OctagonPause, WifiOff } from 'lucide-react';
 import { useSession } from '@/lib/client/session';
 import { useOnline } from '@/lib/client/hooks';
 import { EmergencyPause } from './emergency-pause';
+import { EntitlementStrip } from '@/components/entitlements/shell-strip';
 
 /** Persistent shell-level status: offline, workspace paused, demo workspace. */
 export function ShellBanners() {
@@ -25,6 +26,8 @@ export function ShellBanners() {
           <EmergencyPause variant="banner" />
         </div>
       ) : null}
+      {/* V4 entitlements: paid actions paused (trial ended / payment problem) — billing + support links always shown */}
+      <EntitlementStrip />
       {session.support_access?.active ? (
         // V3.1 Admin §13: everyone in the workspace sees that Relay support currently has (read-only) access.
         <div role="status" className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 border-b border-[color-mix(in_srgb,var(--info)_35%,transparent)] bg-info-soft px-4 py-2 text-[13px]">

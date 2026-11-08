@@ -27,6 +27,7 @@ import { readMeterUsage, releaseUsage, settleUsage } from '../product/budgets.js
 import { NOT_CONFIGURED_MESSAGE, assistantConfigured, resolveAssistantClient, type AssistantModelOutput } from './client.js';
 import { checkOutput, countInjections, verifyQuote } from './guard.js';
 import { ASSISTANT_SYSTEM_PROMPT, buildAssistantPrompt } from './prompt.js';
+import { assertPaidAction } from '../entitlements/actions.js';
 import { contextBrand, retrieve, type RetrievedSource } from './retrieval.js';
 
 export const ASSISTANT_MAX_OUTPUT_TOKENS = 8_000;
@@ -131,6 +132,7 @@ export async function createRun(ctx: Ctx, raw: unknown): Promise<AssistantRunDto
   }
   const brandId = await contextBrand(ctx, input.context, db);
   requireAction(ctx, 'ai.use', { brandId });
+  await assertPaidAction(db, ctx.access.workspaceId, 'ai_drafting'); // V4 entitlements (re-checked by the reservation at run time)
   if (!(await assistantConfigured(db))) throw new AppError('provider_not_configured', NOT_CONFIGURED_MESSAGE);
   await enforceRateLimit('assistantRun', ctx.actor.userId, { capacity: 20, refillPerSecond: 20 / 600 }); // 20 burst, 20 per 10 min
   const usage = await readUsage(ctx.access.workspaceId, db);
@@ -277,7 +279,9 @@ export async function executeRun(runId: string, workerId: string): Promise<Assis
   try {
     reservation = await reserveTokens(r.workspace_id, ASSISTANT_MAX_OUTPUT_TOKENS + Math.ceil((ASSISTANT_SYSTEM_PROMPT.length + prompt.length) / 3) + 1_500, { userId: r.requested_by, ref: `ai-run:${r.id}` });
   } catch (err) {
-    if (err instanceof AppError && err.code === 'budget_exhausted') return done('budget_exhausted', 'The monthly AI budget is used up.');
+    if (err instanceof AppError && err.code === 'budget_exhausted') return done('budget_exhausted', err.details?.limit_source === 'plan' ? err.message : 'The monthly AI budget is used up.');
+    // V4 entitlements: AI not in the plan / paid actions paused ⇒ stopped with the reason (nothing generated or sent).
+    if (err instanceof AppError && err.code === 'entitlement_required') return done('blocked', err.message);
     throw err;
   }
   const t0 = Date.now();

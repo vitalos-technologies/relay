@@ -22,6 +22,7 @@ import { classifyText } from '../assistant/classify.js';
 import { listeningSourcesAvailable } from '../assistant/retrieval.js';
 import { conditionError, evaluateConditions } from './conditions.js';
 import { replyBlocker, type RuleRow } from './engine.js';
+import { assertFeatureConfigurable } from '../entitlements/actions.js';
 import { emergencyStopState, loadPolicy, type PolicyRow } from './policies.js';
 
 const actionSchema = z.discriminatedUnion('type', [
@@ -132,6 +133,7 @@ export async function createRule(ctx: Ctx, raw: unknown): Promise<AutomationRule
   requireAction(ctx, 'automation.manage');
   const input = ruleSchema.parse(raw);
   const r = await withTx(async (tx) => {
+    await assertFeatureConfigurable(tx, ctx.access.workspaceId, 'automation'); // V4: automations are a plan feature
     const p = await loadPolicy(ctx, input.policy_id, tx);
     await validateRule(ctx, input, p, tx);
     const row = await one<RuleRow>(tx,

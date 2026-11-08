@@ -23,7 +23,7 @@ export interface SessionInfo {
   /** V3.1 §9: browser-side draft recovery policy for this user + workspace. */
   draft_recovery?: import('@social-lite/core/contracts/v31-data').DraftRecoveryPolicy | null;
   /** V3.1 Admin: platform operator role (UI convenience; the server re-checks). */
-  platform_role?: 'operator' | 'support' | null;
+  platform_role?: 'operator' | 'support' | 'billing' | null;
   /** V3.1 Admin: open support access on the active workspace. */
   support_access?: { active: number; pending: number; until: string | null; mine: boolean } | null;
 }

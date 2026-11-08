@@ -6,7 +6,8 @@
 //  - Feature flags admin (workspace-scoped overrides; safe default off).
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { CircleCheck, Flag, Sparkles } from 'lucide-react';
+import { CircleCheck, Flag, Send, Sparkles } from 'lucide-react';
+import { ShareReportDialog } from './share-report';
 import {
   SUPPORT_CATEGORIES, type FeatureFlagsResponse, type ReleaseNotesResponse, type SupportCategory, type SupportReportDto,
 } from '@social-lite/core/contracts/v31-gov';
@@ -66,6 +67,19 @@ function previewRedact(input: string): { text: string; count: number } {
   return { text, count };
 }
 
+/** Browser family only (never the user agent string). */
+function browserFamily(): string | null {
+  if (typeof navigator === 'undefined') return null;
+  const ua = navigator.userAgent;
+  if (/SamsungBrowser/i.test(ua)) return 'samsung';
+  if (/Edg\//.test(ua)) return 'edge';
+  if (/OPR\/|Opera/.test(ua)) return 'opera';
+  if (/Firefox\//.test(ua)) return 'firefox';
+  if (/Chrome\/|CriOS\//.test(ua)) return 'chrome';
+  if (/Safari\//.test(ua)) return 'safari';
+  return 'other';
+}
+
 const CATEGORY_LABEL: Record<SupportCategory, string> = { bug: 'Something broke', publishing: 'Publishing', integration: 'Connection', performance: 'Slow', account: 'Account', other: 'Other' };
 
 export function ReportProblemDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
@@ -80,6 +94,7 @@ export function ReportProblemDialog({ open, onOpenChange }: { open: boolean; onO
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<unknown>(null);
   const [sent, setSent] = useState<SupportReportDto | null>(null);
+  const [sharing, setSharing] = useState(false);
   const refs = useMemo(() => (open ? recentCorrelationIds() : []), [open]);
   const postId = /^\/posts\/([0-9a-f-]{36})/.exec(pathname ?? '')?.[1] ?? null;
   useEffect(() => { if (open) { setSent(null); setErr(null); setWithRoute(false); setWithRefs(false); setWithDraft(false); } }, [open]);
@@ -90,6 +105,7 @@ export function ReportProblemDialog({ open, onOpenChange }: { open: boolean; onO
       const r = await api.post<SupportReportDto>('/api/support/reports', {
         category, summary: summary.trim(), route: withRoute ? pathname : null, app_version: notes.data?.current_version ?? null,
         occurred_at: new Date().toISOString(), correlation_ids: withRefs ? refs.map((r) => r.id) : [], include_draft_post_id: withDraft && postId ? postId : null,
+        browser_family: browserFamily(),
       }, { idempotent: true });
       setSent(r);
       setSummary('');
@@ -103,7 +119,10 @@ export function ReportProblemDialog({ open, onOpenChange }: { open: boolean; onO
       size="lg"
       busy={busy}
       title="Report a problem"
-      footer={sent ? <Button variant="primary" onClick={() => onOpenChange(false)}>Done</Button> : <>
+      footer={sent ? <>
+        <Button variant="ghost" onClick={() => setSharing(true)} icon={<Send aria-hidden className="size-4" />}>Send to Relay support</Button>
+        <Button variant="primary" onClick={() => onOpenChange(false)}>Done</Button>
+      </> : <>
         <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
         <Button variant="primary" loading={busy} onClick={() => void send()} disabledReason={!summary.trim() ? 'Describe the problem.' : null}>Send</Button>
       </>}
@@ -112,6 +131,8 @@ export function ReportProblemDialog({ open, onOpenChange }: { open: boolean; onO
         <div className="flex flex-col gap-2 text-[13px]" data-testid="support-sent">
           <p className="flex items-center gap-2 font-medium"><CircleCheck aria-hidden className="size-4 text-success" />Sent · reference {sent.id.slice(0, 8)}</p>
           <p className="text-muted">{sent.redactions ? `${sent.redactions} value${sent.redactions === 1 ? '' : 's'} redacted by the server.` : 'Nothing needed redacting.'}</p>
+          <p className="text-muted">Saved for your workspace admins. Relay staff only see it if you send it.</p>
+          <ShareReportDialog reportId={sent.id} open={sharing} onOpenChange={setSharing} />
         </div>
       ) : (
         <div className="flex flex-col gap-4">

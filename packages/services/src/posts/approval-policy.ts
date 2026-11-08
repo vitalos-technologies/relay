@@ -13,6 +13,7 @@ import { audit } from '../audit.js';
 import { writeOutbox } from '../outbox.js';
 import { authorize, loadUserAuthz, type AuthzState } from '../authz.js';
 import { stableStringify } from '../idempotency.js';
+import { assertFeatureConfigurable } from '../entitlements/actions.js';
 import { assertBrand, authorizeCtx, requireAction } from '../tenancy.js';
 
 // ------------------------------------------------------------------ policy model
@@ -469,6 +470,9 @@ export async function saveApprovalPolicy(ctx: Ctx, brandId: string, input: Polic
     };
     const weakening = isWeakening(before, after);
     if (weakening) requireAction(ctx, 'brands.manage', { brandId, stepUp: true });
+    // V4 entitlements: ADDING a second review stage is a Professional capability. Existing multi-step policies stay in
+    // force (and editable) after a downgrade — an approval control is never weakened by a plan change.
+    if (after.stages.length > 1 && before.stages.length < 2) await assertFeatureConfigurable(tx, ctx.access.workspaceId, 'approvals_advanced');
     const gen = lock.generation + 1;
     await tx.query(`INSERT INTO approval_policy_versions(workspace_id, brand_id, generation, separation_of_duties, stage_count, created_by, reason)
                     VALUES ($1,$2,$3,$4,$5,$6,$7)`, [ctx.access.workspaceId, brand.id, gen, after.separation_of_duties, after.stages.length, ctx.actor.userId, input.reason?.slice(0, 500) ?? null]);

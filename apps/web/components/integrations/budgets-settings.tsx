@@ -9,11 +9,11 @@ import { api, isApiError } from '@/lib/client/api';
 import { useSession } from '@/lib/client/session';
 import { Card, CardHeader, EmptyState, ErrorNotice, ErrorState, InfoTip, Input, MetaChip, Skeleton, Button, useToast } from '@/components/ui';
 
-type Unit = 'tokens' | 'calls' | 'bytes' | 'exports';
+type Unit = 'tokens' | 'calls' | 'bytes' | 'exports' | 'jobs';
 interface MeterRow { cap: number | null; used: number; reserved: number; percent: number | null; unit: Unit; label: string }
 interface LimitsView {
   period: string; can_edit: boolean;
-  items: Array<MeterRow & { key: string; meter: string; effective_cap: number | null; period: string }>;
+  items: Array<MeterRow & { key: string; meter: string; effective_cap: number | null; plan_limit?: number | null; period: string }>;
   teams: Array<{ id: string; name: string; meters: Array<MeterRow & { meter: string }> }>;
 }
 
@@ -23,6 +23,8 @@ const HELP: Record<string, string> = {
   ai_monthly_tokens: 'AI drafting tokens this month. Default 200,000 when empty.',
   storage_bytes: 'Media originals stored (all time). Enter megabytes.',
   monthly_exports: 'Activity and client handover exports this month.',
+  mcp_monthly_calls: 'Tool calls from connected AI clients this month.',
+  integration_monthly_jobs: 'Business-integration sync jobs this month.',
 };
 
 const MB = 1_048_576;
@@ -88,7 +90,7 @@ export function BudgetsSettings() {
   return (
     <div className="flex max-w-2xl flex-col gap-6">
       <Card>
-        <CardHeader title={<span className="flex items-center gap-1">Workspace <InfoTip>Monthly meters reset each calendar month (UTC). Storage is a running total. Empty = no cap.</InfoTip></span>}
+        <CardHeader title={<span className="flex items-center gap-1">Workspace <InfoTip>Monthly meters reset each billing period. Storage is a running total. A budget can only lower your plan’s allowance. Empty = plan limit (or no cap).</InfoTip></span>}
           actions={data.can_edit ? <MetaChip>{data.period}</MetaChip> : <MetaChip>Read only · {data.period}</MetaChip>} />
         <ul className="divide-y divide-border">
           {data.items.map((i) => (
@@ -100,7 +102,7 @@ export function BudgetsSettings() {
               {data.can_edit ? (
                 <label className="flex flex-col gap-1 text-xs text-muted">
                   <span className="sr-only">{i.label} cap</span>
-                  <Input type="number" inputMode="decimal" min={0} step={i.unit === 'bytes' ? 'any' : 1} placeholder={i.effective_cap !== null && i.cap === null ? `Default ${fmt(i.unit, i.effective_cap)}` : 'No cap'}
+                  <Input type="number" inputMode="decimal" min={0} step={i.unit === 'bytes' ? 'any' : 1} placeholder={i.effective_cap !== null && i.cap === null ? `${i.plan_limit != null ? 'Plan' : 'Default'} ${fmt(i.unit, i.effective_cap)}` : 'No cap'}
                     value={draft[i.key] ?? ''} aria-invalid={!!fe?.[i.key] || !valid(parsed[i.key] ?? null)}
                     onChange={(e) => setDraft({ ...draft, [i.key]: e.target.value })} className="tabular" />
                   {i.unit === 'bytes' ? <span aria-hidden>MB</span> : null}

@@ -20,11 +20,17 @@ const AUDIENCE_LINE: Record<ComposerAudience, { icon: ReactNode; text: string }>
 };
 
 export function ConversationComposer<T extends string>({
-  modes, mode, onModeChange, body, onBodyChange, onSubmit, busy, banner, toolbar, maxLength = 2000, placeholder, className, mentions, footnote,
+  modes, mode, onModeChange, body, onBodyChange, onSubmit, busy, banner, toolbar, maxLength = 2000, placeholder, className, mentions, footnote, audienceText, below, submitDisabledReason,
 }: {
   modes: Array<ComposerMode<T>>; mode: T; onModeChange: (m: T) => void; body: string; onBodyChange: (v: string) => void;
   onSubmit: () => void; busy?: boolean; banner?: ReactNode; toolbar?: ReactNode; maxLength?: number; placeholder?: string; className?: string;
   mentions?: ComposerMentions; footnote?: ReactNode;
+  /** Override the visibility line per audience (e.g. support tickets: "Sent to the customer"). */
+  audienceText?: Partial<Record<ComposerAudience, string>>;
+  /** Extra row inside the frame, above the footer (e.g. attachments). */
+  below?: ReactNode;
+  /** Extra reason to block sending (e.g. uploads still being checked). */
+  submitDisabledReason?: string | null;
 }) {
   const id = useId();
   const cur = modes.find((m) => m.value === mode) ?? modes[0]!;
@@ -55,8 +61,10 @@ export function ConversationComposer<T extends string>({
   return (
     <div className={cn('flex flex-col gap-2', className)}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Segmented label="Reply type" size="sm" value={mode} onChange={onModeChange}
-          options={modes.map((m) => ({ value: m.value, label: m.label, icon: m.audience === 'internal' ? <Lock aria-hidden className="size-3.5" /> : undefined }))} />
+        {modes.length > 1 ? (
+          <Segmented label="Reply type" size="sm" value={mode} onChange={onModeChange}
+            options={modes.map((m) => ({ value: m.value, label: m.label, icon: m.audience === 'internal' ? <Lock aria-hidden className="size-3.5" /> : undefined }))} />
+        ) : <span />}
         {toolbar}
       </div>
       {banner}
@@ -76,7 +84,7 @@ export function ConversationComposer<T extends string>({
                 if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); pick(matches[active]!); return; }
                 if (e.key === 'Escape') { e.preventDefault(); setQuery(null); return; }
               }
-              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !blocked && body.trim() && !over) { e.preventDefault(); onSubmit(); }
+              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !blocked && body.trim() && !over && !submitDisabledReason) { e.preventDefault(); onSubmit(); }
             }} />
           {matches.length ? (
             <ul id={`${id}-mentions`} role="listbox" aria-label="Mention a teammate" className="absolute bottom-full left-2 z-20 mb-1 w-64 max-w-[calc(100%-1rem)] overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-lg">
@@ -88,14 +96,15 @@ export function ConversationComposer<T extends string>({
             </ul>
           ) : null}
         </div>
+        {below ? <div className="px-3 pb-2">{below}</div> : null}
         <div className="flex flex-wrap items-center gap-2 border-t border-border/70 px-3 py-2">
           <span className={cn('flex min-w-0 flex-1 items-center gap-1.5 text-xs', internal ? 'text-warn' : 'text-muted')}>
-            {AUDIENCE_LINE[cur.audience].icon}<span className="truncate">{blocked ?? AUDIENCE_LINE[cur.audience].text}</span>
+            {AUDIENCE_LINE[cur.audience].icon}<span className="truncate">{blocked ?? audienceText?.[cur.audience] ?? AUDIENCE_LINE[cur.audience].text}</span>
           </span>
           <span className={cn('tabular text-xs', over ? 'text-danger' : 'text-subtle')}>{body.length}/{maxLength}</span>
           <Button variant={internal ? 'secondary' : 'primary'} size="sm" loading={busy} onClick={onSubmit}
             icon={internal ? <Lock aria-hidden className="size-4" /> : <Send aria-hidden className="size-4" />}
-            disabledReason={blocked ?? (over ? 'Too long' : !body.trim() ? 'Write something first' : null)}>
+            disabledReason={blocked ?? (over ? 'Too long' : !body.trim() ? 'Write something first' : submitDisabledReason ?? null)}>
             {internal ? 'Add note' : 'Send'}
           </Button>
         </div>

@@ -116,7 +116,8 @@ export interface SupportAccessDto {
 }
 
 // ------------------------------------------------------------------ platform (§4)
-export const PLATFORM_ROLES = ['operator', 'support'] as const;
+// V4 (BIL): 'billing' = billing records + plan/trial/override actions; no ticket internal notes, customer content or support access.
+export const PLATFORM_ROLES = ['operator', 'support', 'billing'] as const;
 export type PlatformRole = (typeof PLATFORM_ROLES)[number];
 export interface PlatformMe { operator: boolean; role: PlatformRole | null; fresh: boolean }
 

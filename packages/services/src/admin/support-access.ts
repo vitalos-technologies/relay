@@ -58,6 +58,7 @@ export async function endSupportAccessTx(tx: Queryable, id: string, by: { userId
     await bumpPolicyVersion(tx, g.workspace_id);
   }
   const action = g.status === 'requested' ? 'support_access.cancelled' : 'support_access.ended';
+  await ticketAccessActivity(tx, id, 'access.ended', { userId: by.userId, staff: by.reason === 'ended_by_operator' });
   await tx.query(
     `INSERT INTO platform_audit_events(actor_user_id, actor_service, action, target_type, target_id, workspace_id, reason, diff, correlation_id)
      VALUES ($1,$2,$3,'support_access',$4,$5,$6,'{}'::jsonb,$7)`, [by.userId, by.userId ? null : 'support-access-expiry', action, id, g.workspace_id, by.reason, by.correlationId ?? null]);
@@ -97,7 +98,20 @@ const requestSchema = z.object({
   reason: z.string().trim().min(10, 'Give a reason (10+ characters)').max(500),
   ticket_ref: z.string().trim().max(80).optional().nullable(),
   duration_minutes: z.number().int().min(15).max(1440),
+  /** V4: the Relay support ticket this request is for (must belong to the workspace). */
+  support_ticket_id: z.string().uuid().optional().nullable(),
 }).strict();
+
+/**
+ * V4 (support tickets): a customer-visible line on the linked ticket for each step of a support-access request
+ * (requested / approved / declined / ended). Content-free; raw SQL keeps this module free of support/** imports.
+ */
+async function ticketAccessActivity(tx: Queryable, grantId: string, kind: 'access.requested' | 'access.approved' | 'access.declined' | 'access.ended', actor: { userId: string | null; staff: boolean }): Promise<void> {
+  await tx.query(
+    `INSERT INTO support_activity(ticket_id, audience, kind, actor_kind, actor_user_id, ref_id)
+     SELECT support_ticket_id, 'customer', $2, $3, $4, id FROM support_access_grants WHERE id=$1 AND support_ticket_id IS NOT NULL`,
+    [grantId, kind, actor.userId ? (actor.staff ? 'staff' : 'member') : 'system', actor.userId]);
+}
 
 export async function requestSupportAccess(p: PlatformCtx, raw: unknown): Promise<SupportAccessDto> {
   requirePlatform(p, 'support');
@@ -108,12 +122,21 @@ export async function requestSupportAccess(p: PlatformCtx, raw: unknown): Promis
     if (!w) throw notFound('Workspace');
     const open = await maybeOne(tx, `SELECT 1 FROM support_access_grants WHERE workspace_id=$1 AND operator_user_id=$2 AND status IN ('requested','active')`, [input.workspace_id, p.actor.userId]);
     if (open) throw new AppError('conflict', 'You already have an open request or active access for this workspace.');
+    let ticketRef = input.ticket_ref ?? null;
+    if (input.support_ticket_id) {
+      const t = await maybeOne<{ reference: string }>(tx, `SELECT reference FROM support_tickets WHERE id=$1 AND workspace_id=$2`, [input.support_ticket_id, input.workspace_id]);
+      if (!t) throw notFound('Support ticket');
+      ticketRef = t.reference;
+    }
     const r = await one<{ id: string }>(tx,
-      `INSERT INTO support_access_grants(workspace_id, operator_user_id, reason, ticket_ref, duration_minutes, request_expires_at, correlation_id)
-       VALUES ($1,$2,$3,$4,$5, now() + make_interval(hours => $6), $7) RETURNING id`,
-      [input.workspace_id, p.actor.userId, input.reason, input.ticket_ref ?? null, input.duration_minutes, REQUEST_TTL_HOURS, p.correlationId]);
+      `INSERT INTO support_access_grants(workspace_id, operator_user_id, reason, ticket_ref, duration_minutes, request_expires_at, correlation_id, support_ticket_id)
+       VALUES ($1,$2,$3,$4,$5, now() + make_interval(hours => $6), $7, $8) RETURNING id`,
+      [input.workspace_id, p.actor.userId, input.reason, ticketRef, input.duration_minutes, REQUEST_TTL_HOURS, p.correlationId, input.support_ticket_id ?? null]);
+    // V4: owners/admins are notified of the request (worker → support/notify.ts), and the linked ticket shows it.
+    await tx.query(`INSERT INTO outbox(workspace_id, aggregate_type, aggregate_id, event_type, payload) VALUES ($1,'support_access',$2,'support.access_requested','{}'::jsonb)`, [input.workspace_id, r.id]);
+    await ticketAccessActivity(tx, r.id, 'access.requested', { userId: p.actor.userId, staff: true });
     await platformAudit(tx, p, { action: 'support_access.requested', targetType: 'support_access', targetId: r.id, workspaceId: input.workspace_id, reason: input.reason,
-      diff: { duration_minutes: input.duration_minutes, ticket_ref: input.ticket_ref ?? null } });
+      diff: { duration_minutes: input.duration_minutes, ticket_ref: ticketRef, support_ticket_id: input.support_ticket_id ?? null } });
     await audit(tx, { workspaceId: input.workspace_id, actorUserId: p.actor.userId, action: 'support_access.requested', resourceType: 'support_access', resourceId: r.id,
       diff: { reason: input.reason, duration_minutes: input.duration_minutes }, correlationId: p.correlationId });
     return r.id;
@@ -196,6 +219,8 @@ export async function decideSupportAccess(ctx: Ctx, id: string, raw: unknown): P
       await bumpPolicyVersion(tx, g.workspace_id);
     }
     const action = input.decision === 'approve' ? 'support_access.approved' : 'support_access.declined';
+    await ticketAccessActivity(tx, id, input.decision === 'approve' ? 'access.approved' : 'access.declined', { userId: ctx.actor.userId, staff: false });
+    await tx.query(`INSERT INTO outbox(workspace_id, aggregate_type, aggregate_id, event_type, payload) VALUES ($1,'support_access',$2,'support.access_decided','{}'::jsonb)`, [g.workspace_id, id]);
     await audit(tx, { workspaceId: g.workspace_id, actorUserId: ctx.actor.userId, action, resourceType: 'support_access', resourceId: id,
       diff: { duration_minutes: g.duration_minutes, note: input.note ?? null }, correlationId: ctx.correlationId });
     await tx.query(`INSERT INTO platform_audit_events(actor_user_id, action, target_type, target_id, workspace_id, reason, diff, correlation_id)

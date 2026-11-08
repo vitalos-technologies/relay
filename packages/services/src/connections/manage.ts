@@ -21,6 +21,7 @@ import { revokeXToken } from '@social-lite/providers/x/index';
 import { oauthConnectorFor, startOAuth } from './oauth.js';
 import { connectBluesky } from './bluesky.js';
 import { buildAdapterContext, isOAuthProvider, oauthRedirectUri, providerAppConfig, setupContext } from './runtime.js';
+import { assertCanConnectAccount } from '../entitlements/actions.js';
 import {
   healthDetail, insertCredential, loadConnection, replaceCredential, toConnectionJson, toPublishConnection, upsertConnectionFromDestination,
   type ConnectionJson, type ConnectionRow,
@@ -167,6 +168,7 @@ export async function connectMock(ctx: Ctx, brandId: string, body: unknown): Pro
   });
   const scenario = input.scenario ?? 'success';
   const row = await withTx(async (tx) => {
+    await assertCanConnectAccount(tx, ctx.access.workspaceId); // V4: simulated accounts count like real ones
     const credentialId = await insertCredential(tx, ctx.access.workspaceId, { kind: 'mock', token: randomBytes(24).toString('base64url') }, { expiresAt: null, scopes: [] });
     const r = await one<ConnectionRow>(tx,
       `INSERT INTO connections(workspace_id, brand_id, provider, provider_account_id, display_name, username, status, is_mock, credential_id,

@@ -1,11 +1,11 @@
 // Platform operators (V3.1 Admin, migration 026). Bootstrap/break-glass CLI: run on the server with the app database URL.
 //   tsx --env-file=.env scripts/platform-operator.ts list
-//   tsx --env-file=.env scripts/platform-operator.ts grant <email> [operator|support] [--via seed]
+//   tsx --env-file=.env scripts/platform-operator.ts grant <email> [operator|support|billing] [--via seed]
 //   tsx --env-file=.env scripts/platform-operator.ts revoke <email>
 // The user must have signed in once (a users row). Every change is written to platform_audit_events (actor 'cli').
 import { closePool, getPool, maybeOne, withTx } from '@social-lite/db';
 
-export async function grantOperatorCli(email: string, role: 'operator' | 'support', via: 'cli' | 'seed' = 'cli'): Promise<boolean> {
+export async function grantOperatorCli(email: string, role: 'operator' | 'support' | 'billing', via: 'cli' | 'seed' = 'cli'): Promise<boolean> {
   const db = getPool();
   const u = await maybeOne<{ id: string }>(db, `SELECT id FROM users WHERE email=$1`, [email]);
   if (!u) return false;
@@ -26,7 +26,7 @@ async function main() {
     const r = await db.query(`SELECT u.email, o.role, o.granted_via, o.granted_at, o.revoked_at FROM platform_operators o JOIN users u ON u.id=o.user_id ORDER BY u.email`);
     console.table(r.rows);
   } else if (cmd === 'grant' && email) {
-    const role = roleArg === 'support' ? 'support' : 'operator';
+    const role = roleArg === 'support' ? 'support' : roleArg === 'billing' ? 'billing' : 'operator';
     const via = process.argv.includes('--via') && process.argv[process.argv.indexOf('--via') + 1] === 'seed' ? 'seed' : 'cli';
     if (!(await grantOperatorCli(email, role, via))) throw new Error(`No user ${email}: they must sign in once first`);
     console.log(JSON.stringify({ msg: 'platform operator granted', email, role }));
@@ -38,7 +38,7 @@ async function main() {
     });
     console.log(JSON.stringify({ msg: 'platform operator revoked', email }));
   } else {
-    console.log('usage: platform-operator.ts list | grant <email> [operator|support] | revoke <email>');
+    console.log('usage: platform-operator.ts list | grant <email> [operator|support|billing] | revoke <email>');
     process.exitCode = 2;
   }
 }

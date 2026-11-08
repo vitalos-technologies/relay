@@ -21,6 +21,10 @@ import { writeOutbox } from '../outbox.js';
 import { assertUuid } from '../tenancy.js';
 import { inboundHandler, isConnectorKey, syncExecutor, verifierFor } from './registry.js';
 import { loadIntegration, recordActivity, upsertExternalLink } from './store.js';
+import { assertFeatureConfigurable } from '../entitlements/actions.js';
+import { HOLD_RECHECK_MINUTES, syncHold } from '../entitlements/holds.js';
+import { consumeUsage } from '../product/budgets.js';
+import { ENTITLEMENT_HOLD } from '@social-lite/core/contracts/v4-entitlements';
 
 const MAX_BODY = 512 * 1024;
 const LEASE_MS = 2 * 60_000;
@@ -177,6 +181,8 @@ export async function enqueueSyncJob(ctx: Ctx, req: SyncJobRequest, db?: Queryab
   const run = async (tx: Queryable) => {
     const integ = await loadIntegration(ctx, req.integrationId, 'integrations.read', tx);
     if (integ.disconnected_at || integ.status === 'reconnect_required') throw new AppError('invalid_state', 'Reconnect this integration first.');
+    // V4 entitlements: business integrations must be in the plan (a restricted workspace may queue; the job is held at run time).
+    await assertFeatureConfigurable(tx, ctx.access.workspaceId, 'integrations_business');
     const key = (req.idempotencyKey ?? `${req.kind}:${req.relayType}:${req.relayId}`).slice(0, 300);
     const existing = await maybeOne<JobRow>(tx, `SELECT * FROM integration_sync_jobs WHERE workspace_id=$1 AND idempotency_key=$2`, [ctx.access.workspaceId, key]);
     if (existing) return { job: toJobJson(existing), created: false };
@@ -229,6 +235,17 @@ export async function runSyncJob(jobId: string, workerId: string): Promise<SyncJ
   if (!exec) {
     await finish(db, job, 'failed', { code: 'no_executor', message: 'This sync action is not available.' });
     return 'failed';
+  }
+  // V4 entitlements: re-checked at run time and one integration_jobs unit consumed (charged once per job, even across
+  // retries — ledger dedupe). Not allowed / allowance used up ⇒ HELD (back to waiting with the reason), never dropped.
+  const hold = await syncHold(db, job.workspace_id);
+  const charge = hold.held ? null : await withTx((tx) => consumeUsage(tx, { workspaceId: job.workspace_id, meter: 'integration.jobs', amount: 1, userId: requester, ref: `sync:${job.id}`, dedupeKey: `sync:${job.id}` }));
+  if (hold.held || (charge && !charge.ok)) {
+    const message = hold.held ? hold.message : `Held: ${(charge as { message: string }).message}`;
+    await db.query(`UPDATE integration_sync_jobs SET state=CASE WHEN attempts <= 1 THEN 'queued' ELSE 'waiting_retry' END, attempts=greatest(attempts-1, 0), lease_owner=NULL, lease_expires_at=NULL,
+                     last_error_code=$2, last_error=$3, next_attempt_at=now() + make_interval(mins => $4), updated_at=now() WHERE id=$1 AND state='running'`,
+      [job.id, ENTITLEMENT_HOLD, message.slice(0, 300), HOLD_RECHECK_MINUTES]);
+    return 'waiting_retry';
   }
   let outcome;
   try {

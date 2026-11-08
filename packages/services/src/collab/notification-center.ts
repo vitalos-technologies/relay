@@ -7,7 +7,7 @@ import type { Ctx } from '../context.js';
 import { assertUuid, isUuid } from '../tenancy.js';
 import { filterReadable, safeLinkPath } from './notifications.js';
 
-export const NOTIFICATION_CATEGORIES = ['mentions', 'discussion', 'tasks', 'reviews', 'reminders', 'publishing'] as const;
+export const NOTIFICATION_CATEGORIES = ['mentions', 'discussion', 'tasks', 'reviews', 'reminders', 'publishing', 'support'] as const;
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
 
 const CATEGORY_SQL: Record<NotificationCategory, string> = {
@@ -17,9 +17,12 @@ const CATEGORY_SQL: Record<NotificationCategory, string> = {
   reviews: `n.event_type IN ('review_requested','review_decided') OR (n.kind LIKE 'approval.%' AND n.kind <> 'approval.overdue')`,
   reminders: `n.event_type = 'reminder' OR n.kind LIKE 'task.reminder%' OR n.kind = 'approval.overdue'`,
   publishing: `n.event_type IN ('publishing_problem','account_health','budget') OR n.kind LIKE 'delivery.%' OR n.kind LIKE 'connection.%' OR n.kind IN ('budget','security')`,
+  // V4: Relay support replies and support-access requests (support/notify.ts).
+  support: `n.kind LIKE 'support.%'`,
 };
 
 export function categoryOfNotification(n: { kind: string; event_type: string | null }): NotificationCategory {
+  if (n.kind.startsWith('support.')) return 'support';
   if (n.event_type === 'mention') return 'mentions';
   if (n.event_type === 'reminder' || n.kind.startsWith('task.reminder') || n.kind === 'approval.overdue') return 'reminders';
   if (n.event_type === 'comment') return 'discussion';

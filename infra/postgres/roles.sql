@@ -106,6 +106,22 @@ BEGIN
   IF to_regclass('public.care_case_events') IS NOT NULL THEN
     EXECUTE 'REVOKE UPDATE, DELETE, TRUNCATE ON care_case_events FROM socialite_app, socialite_worker';
   END IF;
+  -- V4 (034): Relay support ticket history is append-only for the same roles (ticket purge cascades as owner).
+  IF to_regclass('public.support_activity') IS NOT NULL THEN
+    EXECUTE 'REVOKE UPDATE, DELETE, TRUNCATE ON support_activity FROM socialite_app, socialite_worker';
+  END IF;
+  -- V4 (036): the usage ledger is append-only for the same roles (dedupe by UNIQUE key; workspace deletion cascades as owner).
+  IF to_regclass('public.usage_events') IS NOT NULL THEN
+    EXECUTE 'REVOKE UPDATE, DELETE, TRUNCATE ON usage_events FROM socialite_app, socialite_worker';
+  END IF;
+  -- V4 (035): billing lifecycle history is append-only; trial redemptions are never deleted (one trial per workspace, ever;
+  -- a trigger also refuses changes other than an extension). Workspace deletion cascades as owner.
+  IF to_regclass('public.billing_lifecycle_events') IS NOT NULL THEN
+    EXECUTE 'REVOKE UPDATE, DELETE, TRUNCATE ON billing_lifecycle_events FROM socialite_app, socialite_worker';
+  END IF;
+  IF to_regclass('public.billing_trial_redemptions') IS NOT NULL THEN
+    EXECUTE 'REVOKE DELETE, TRUNCATE ON billing_trial_redemptions FROM socialite_app, socialite_worker';
+  END IF;
 END $$;
 -- Migration bookkeeping is read-only outside the migrator.
 DO $$

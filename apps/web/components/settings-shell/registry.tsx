@@ -4,7 +4,7 @@
 // server still authorizes every request. Search only ever sees visible entries.
 import type { ReactNode } from 'react';
 import {
-  BadgeCheck, Bell, BookText, Building2, Cable, CalendarClock, Clock, FileDown, Fingerprint, FolderInput, Gauge, HardDrive, HeartPulse, KeyRound, Link2, Mail, MessageSquareQuote,
+  BadgeCheck, Bell, BookText, Building2, Cable, CalendarClock, Clock, CreditCard, FileDown, Fingerprint, FolderInput, Gauge, HardDrive, HeartPulse, KeyRound, Link2, Mail, MessageSquareQuote,
   Palette, Plug, Radar, ScrollText, Inbox, Timer, MessageSquareText, ShieldCheck, ShieldHalf, Stamp, Tag, UserRound, ToggleRight, Users, UsersRound, Webhook, type LucideIcon,
 } from 'lucide-react';
 import type { Action, Permission } from '@social-lite/core';
@@ -28,6 +28,7 @@ const InboxChannelsSettings = dynamic(() => import('@/components/inbox/settings'
 const ServiceLevelsSettings = dynamic(() => import('@/components/inbox/settings').then((m) => m.ServiceLevelsSettings), { loading });
 const SavedRepliesSettings = dynamic(() => import('@/components/inbox/settings').then((m) => m.SavedRepliesSettings), { loading });
 const ListeningSourcesSettings = dynamic(() => import('@/components/listening/sources-settings').then((m) => m.ListeningSourcesSettings), { loading });
+const BillingSettings = dynamic(() => import('@/components/billing/billing-settings').then((m) => m.BillingSettings), { loading });
 const FeatureFlagsSettings = dynamic(() => import('@/components/support/support').then((m) => m.FeatureFlagsSettings), { loading });
 import {
   AppearanceSection, ApprovalPoliciesSection, BrandingSection, BrandVoiceSection, DataExportSection, ProfileSection, PublishingDefaultsSection,
@@ -68,6 +69,7 @@ export const SETTINGS: SettingsGroup[] = [
     { slug: 'general', label: 'General', icon: Building2, keywords: 'name workspace', render: () => <WorkspaceSection part="general" /> },
     { slug: 'branding', label: 'Brands', icon: Tag, keywords: 'brand create new', render: () => <BrandingSection /> },
     { slug: 'timezone', label: 'Time zone and locale', icon: Clock, keywords: 'timezone date format', render: () => <WorkspaceSection part="timezone" /> },
+    { slug: 'billing', label: 'Plan and billing', icon: CreditCard, keywords: 'plan subscription trial invoices payment card seats upgrade downgrade cancel', render: () => <BillingSettings />, visible: (p) => p.canV2('billing.read') },
     { slug: 'drafts', label: 'Draft recovery', icon: HardDrive, keywords: 'autosave offline local browser unsaved recovery', render: () => <DraftRecoverySettings /> },
   ]),
   G('people', 'People and access', [

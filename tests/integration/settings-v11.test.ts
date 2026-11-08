@@ -76,9 +76,9 @@ describe('workspace budgets', () => {
     await expect(getWorkspaceLimits(editorCtx)).rejects.toMatchObject({ code: 'forbidden' });
     const initial = await getWorkspaceLimits(adminCtx);
     expect(initial.can_edit).toBe(false);
-    // V2 (stream D): storage and export budgets join the V1.1 meters.
+    // V2 (stream D): storage and export budgets join the V1.1 meters. V4 (entitlements): MCP calls and integration jobs too.
     expect(initial.items.map((i) => [i.key, i.cap, i.used])).toEqual([['x_monthly_writes', null, 0], ['x_monthly_reads', null, 0], ['ai_monthly_tokens', null, 0],
-      ['storage_bytes', null, 0], ['monthly_exports', null, 0]]);
+      ['storage_bytes', null, 0], ['monthly_exports', null, 0], ['mcp_monthly_calls', null, 0], ['integration_monthly_jobs', null, 0]]);
     await expect(updateWorkspaceLimits(adminCtx, { x_monthly_reads: 10 })).rejects.toMatchObject({ code: 'forbidden' });
     await expect(updateWorkspaceLimits(t.ownerCtx, { x_monthly_reads: -1 })).rejects.toThrow();
     await expect(updateWorkspaceLimits(t.ownerCtx, { unknown_key: 1 })).rejects.toThrow();

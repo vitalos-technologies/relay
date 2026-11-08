@@ -3,7 +3,7 @@
 // Only items you can still open are listed (access is re-checked on every load).
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { AtSign, Bell, CalendarClock, CheckCheck, ListTodo, MessageSquare, Send, ShieldCheck } from 'lucide-react';
+import { AtSign, Bell, CalendarClock, CheckCheck, LifeBuoy, ListTodo, MessageSquare, Send, ShieldCheck } from 'lucide-react';
 import { api } from '@/lib/client/api';
 import { useApi } from '@/lib/client/use-api';
 import { useQueryState } from '@/lib/client/hooks';
@@ -19,8 +19,9 @@ interface Feed { items: Item[]; unread_count: number; next_cursor: string | null
 const CATS = [
   { value: 'mentions', label: 'Mentions' }, { value: 'discussion', label: 'Discussions' }, { value: 'tasks', label: 'Tasks' },
   { value: 'reviews', label: 'Reviews' }, { value: 'reminders', label: 'Reminders' }, { value: 'publishing', label: 'Publishing' },
+  { value: 'support', label: 'Support' },
 ];
-const ICON: Record<string, typeof Bell> = { mentions: AtSign, discussion: MessageSquare, tasks: ListTodo, reviews: ShieldCheck, reminders: CalendarClock, publishing: Send };
+const ICON: Record<string, typeof Bell> = { mentions: AtSign, discussion: MessageSquare, tasks: ListTodo, reviews: ShieldCheck, reminders: CalendarClock, publishing: Send, support: LifeBuoy };
 
 export default function NotificationsPage() {
   const toast = useToast();

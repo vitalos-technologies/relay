@@ -28,6 +28,9 @@ import { isAutomated } from '../automation/origin.js';
 import { onBusinessReply } from './cases.js';
 import { attemptDto } from './conversations.js';
 import { inboxEvent, loadChannelRow, loadConversation, people, type ConversationRow } from './shared.js';
+import { assertPaidAction } from '../entitlements/actions.js';
+import { HOLD_RECHECK_MINUTES, replyHold } from '../entitlements/holds.js';
+import { ENTITLEMENT_HOLD } from '@social-lite/core/contracts/v4-entitlements';
 
 const LEASE_MS = 90_000;
 const MAX_RETRIES = 5;
@@ -79,6 +82,8 @@ export async function requestReply(ctx: Ctx, conversationId: string, input: Repl
       if (prior.conversation_id !== conversationId || prior.body_sha256 !== sha(input.body) || prior.mode !== input.mode) throw new AppError('idempotency_conflict', 'This send key was already used for a different reply.');
       return { attempt: prior, created: false };
     }
+    // V4 entitlements: sending replies is a paid action (held while access is restricted; reading/notes stay available).
+    await assertPaidAction(tx, ctx.access.workspaceId, 'inbox');
     const ch = await loadChannelRow(tx, conv.channel_id);
     const adapter = ch ? getInboxAdapter(ch.kind) : null;
     if (!ch || !adapter || ch.disconnected_at) throw new AppError('invalid_state', 'This channel is no longer connected.', undefined, { reason: 'channel_unavailable' });
@@ -184,6 +189,14 @@ export async function dispatchReply(attemptId: string, workerId: string): Promis
     `UPDATE inbox_reply_attempts SET state='sending', attempts=attempts+1, lease_owner=$2, lease_expires_at=now() + make_interval(secs => $3), updated_at=now()
       WHERE id=$1 AND state='queued' AND next_attempt_at <= now() RETURNING *`, [attemptId, workerId, LEASE_MS / 1000]);
   if (!a) return 'skipped';
+  // V4 entitlements: re-checked at dispatch. Not allowed ⇒ back to 'queued' with the reason and a later re-check (HELD:
+  // nothing is sent, nothing is dropped; released when access returns — entitlements/holds.ts).
+  const hold = await replyHold(db, a.workspace_id);
+  if (hold.held) {
+    await db.query(`UPDATE inbox_reply_attempts SET state='queued', attempts=greatest(attempts-1, 0), lease_owner=NULL, lease_expires_at=NULL, error_code=$2, error_message=$3,
+                     next_attempt_at=now() + make_interval(mins => $4), updated_at=now() WHERE id=$1 AND state='sending'`, [a.id, ENTITLEMENT_HOLD, hold.message.slice(0, 300), HOLD_RECHECK_MINUTES]);
+    return 'queued';
+  }
   const conv = await maybeOne<ConversationRow>(db, `SELECT * FROM inbox_conversations WHERE id=$1`, [a.conversation_id]);
   const ch = conv ? await loadChannelRow(db, conv.channel_id) : null;
   const adapter = ch ? getInboxAdapter(ch.kind) : null;

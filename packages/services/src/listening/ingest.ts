@@ -14,6 +14,7 @@ import { writeOutbox } from '../outbox.js';
 import { onInboxEvent } from '../inbox/hooks.js';
 import { detectLanguage, extractTerms, fingerprint, scoreSentiment } from './classify.js';
 import { sourceKeyFor } from './sources.js';
+import { matchableSearchFilter } from '../entitlements/holds.js';
 import type { ObservationRow, SearchRow } from './shared.js';
 
 const REPEAT_WINDOW_DAYS = 7;
@@ -99,7 +100,10 @@ export async function observeMessage(messageId: string): Promise<ObserveResult> 
       [m.workspace_id, m.brand_id, sourceKeyFor(m.channel_kind), m.channel_id, m.id, m.conversation_id, m.kind, m.external_id, m.body, language, fp, dup,
         extractTerms(m.body!), s.label, s.score, s.confidence, s.method, s.evidence, m.provider_created_at, m.is_simulated]);
     if (!o) return { state: 'skipped' as const, observationId: null, matched: [] as string[], ws: null, brand: null, sim: false };
-    const matched = await matchObservation(tx, o, await activeSearches(tx, m.workspace_id, m.brand_id));
+    // V4 entitlements: the observation is kept either way; only searches the plan allows now (listening included, paid
+    // access, within the active-search limit) match new items. Restored access re-matches stored observations.
+    const matchable = await matchableSearchFilter(tx, m.workspace_id);
+    const matched = await matchObservation(tx, o, (await activeSearches(tx, m.workspace_id, m.brand_id)).filter((x) => matchable(x.id)));
     return { state: dup ? 'duplicate' as const : 'observed' as const, observationId: o.id, matched, ws: m.workspace_id, brand: m.brand_id, sim: m.is_simulated };
   });
   if (r.matched.length && r.ws) {

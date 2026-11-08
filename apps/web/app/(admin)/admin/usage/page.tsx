@@ -1,10 +1,11 @@
 'use client';
-// Usage and limits (V3.1 Admin §14): the real workspace caps and team budgets (enforced in services, workers and MCP by
-// atomic reservations). There is no billing system: plans, invoices and payment status are shown as not available.
+// Usage and limits (V4 entitlements): plan, allowances (included / used / reserved / limit / warning), held work, what
+// stays active under a lowered limit, plan features — then the workspace's own budgets, which can only lower a plan
+// allowance. Enforcement lives in the shared entitlement service (services, workers, MCP); this page reads stored state.
 import dynamic from 'next/dynamic';
 import { PageHeader, Skeleton } from '@/components/ui';
-import { NotAvailable } from '@/components/admin/ui';
 
+const WorkspaceUsage = dynamic(() => import('@/components/entitlements/workspace-usage').then((m) => m.WorkspaceUsage), { loading: () => <Skeleton className="h-64 w-full rounded-xl" /> });
 const BudgetsSettings = dynamic(() => import('@/components/integrations/budgets-settings').then((m) => m.BudgetsSettings), { loading: () => <Skeleton className="h-64 w-full rounded-xl" /> });
 
 export default function AdminUsagePage() {
@@ -12,8 +13,11 @@ export default function AdminUsagePage() {
     <>
       <PageHeader title="Usage and limits" />
       <div className="flex max-w-4xl flex-col gap-6">
-        <BudgetsSettings />
-        <NotAvailable title="Plans and billing" why="Relay has no billing system yet: no plans, seats pricing, invoices or payment status exist. Caps above are the only limits." />
+        <WorkspaceUsage />
+        <section aria-labelledby="budgets-h" className="flex flex-col gap-3">
+          <h2 id="budgets-h" className="text-sm font-semibold">Your budgets</h2>
+          <BudgetsSettings />
+        </section>
       </div>
     </>
   );

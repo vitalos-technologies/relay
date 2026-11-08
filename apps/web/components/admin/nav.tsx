@@ -5,12 +5,12 @@
 import {
   Activity, BadgeCheck, BookOpen, Building2, Cable, ChartColumn, CheckCheck, Cog, FileStack, Flag, Gauge, HandHelping, HeartPulse, KeyRound,
   LayoutDashboard, LifeBuoy, ListChecks, MessageSquareWarning, Plug, ScrollText, Send, ServerCog, ShieldCheck, Stethoscope, Tag, ToggleRight, UserCog, Users, UsersRound,
-  Webhook, Wrench, Workflow, MessagesSquare, UserRoundCog, BellRing, SlidersHorizontal, Radar, Sparkles, type LucideIcon,
+  Webhook, Wrench, Workflow, MessagesSquare, UserRoundCog, BellRing, SlidersHorizontal, Radar, Sparkles, CreditCard, Layers, Inbox, MessageSquareText, type LucideIcon,
 } from 'lucide-react';
 import type { Action, Permission } from '@social-lite/core';
 import { SETTINGS, itemAllowed, type Perms } from '@/components/settings-shell/registry';
 
-export interface AdminPerms extends Perms { platform: 'operator' | 'support' | null }
+export interface AdminPerms extends Perms { platform: 'operator' | 'support' | 'billing' | null }
 export interface AdminNavItem { href: string; label: string; icon: LucideIcon; keywords?: string; visible?: (p: AdminPerms) => boolean; also?: string[] }
 export interface AdminNavGroup { id: string; label: string; icon: LucideIcon; items: AdminNavItem[] }
 
@@ -94,6 +94,7 @@ export const WORKSPACE_NAV: AdminNavGroup[] = [
   { id: 'operations', label: 'Operations', icon: Activity, items: [
     { href: '/admin/operations', label: 'Queues and workers', icon: Activity, visible: v1('diagnostics.read'), keywords: 'workload dead letter outbox dispatch pause' },
     { href: '/admin/usage', label: 'Usage and limits', icon: Gauge, visible: v1('workspace.settings'), keywords: 'budgets caps billing seats storage' },
+    settings('workspace', 'billing'),
     settings('operations', 'features', 'Feature flags', ToggleRight),
     settings('operations', 'export'),
   ] },
@@ -113,12 +114,24 @@ export const WORKSPACE_NAV: AdminNavGroup[] = [
 
 const operator = (p: AdminPerms) => p.platform === 'operator';
 const anyStaff = (p: AdminPerms) => !!p.platform;
+// V4: support access reaches customer content (never billing staff); billing records never reach support staff.
+const supportStaff = (p: AdminPerms) => p.platform === 'operator' || p.platform === 'support';
+const billingStaff = (p: AdminPerms) => p.platform === 'operator' || p.platform === 'billing';
 
 export const PLATFORM_NAV: AdminNavGroup[] = [
   { id: 'p-overview', label: 'Directory', icon: ServerCog, items: [
     { href: '/admin/platform', label: 'Health', icon: HeartPulse, visible: anyStaff, keywords: 'workers queues circuits dispatch' },
     { href: '/admin/platform/workspaces', label: 'Workspaces', icon: Building2, visible: anyStaff, also: ['/admin/platform/workspaces/'], keywords: 'suspend tenants lifecycle' },
     { href: '/admin/platform/accounts', label: 'Accounts', icon: UserCog, visible: anyStaff, keywords: 'users suspend sign-in' },
+  ] },
+  // V4 Relay support (SUP): the staff inbox for customer ↔ Relay conversations (never the social inbox).
+  { id: 'p-support', label: 'Support', icon: LifeBuoy, items: [
+    { href: '/admin/platform/support', label: 'Support inbox', icon: Inbox, visible: supportStaff, also: ['/admin/platform/support/RLY-'], keywords: 'tickets requests customers help queue reply' },
+    { href: '/admin/platform/support/saved-replies', label: 'Saved replies', icon: MessageSquareText, visible: supportStaff, keywords: 'templates canned answers knowledge' },
+  ] },
+  { id: 'p-billing', label: 'Billing', icon: CreditCard, items: [
+    { href: '/admin/platform/billing', label: 'Subscriptions', icon: CreditCard, visible: billingStaff, keywords: 'billing trials past due payment failed invoices stripe' },
+    { href: '/admin/platform/plans', label: 'Plans', icon: Layers, visible: anyStaff, keywords: 'catalogue prices versions standard professional legacy' },
   ] },
   { id: 'p-ops', label: 'Operations', icon: Activity, items: [
     { href: '/admin/platform/rollouts', label: 'Rollouts', icon: Flag, visible: anyStaff, keywords: 'feature flags kill switch percent' },
@@ -127,7 +140,7 @@ export const PLATFORM_NAV: AdminNavGroup[] = [
     { href: '/admin/platform/care', label: 'Inbox and AI pipeline', icon: HeartPulse, visible: anyStaff, keywords: 'inbox replies sync listening ai automation counts' },
   ] },
   { id: 'p-security', label: 'Security', icon: ShieldCheck, items: [
-    { href: '/admin/platform/support', label: 'Support access', icon: LifeBuoy, visible: anyStaff, keywords: 'request time-boxed' },
+    { href: '/admin/platform/support/access', label: 'Support access', icon: KeyRound, visible: supportStaff, keywords: 'request time-boxed' },
     { href: '/admin/platform/audit', label: 'Platform audit', icon: ScrollText, visible: anyStaff },
     { href: '/admin/platform/operators', label: 'Operators', icon: BadgeCheck, visible: operator, keywords: 'staff roles' },
   ] },

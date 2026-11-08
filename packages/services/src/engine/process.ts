@@ -16,6 +16,8 @@ import { cropsFromOptions, type CropSpec } from '../crops/index.js';
 import { approvalGate } from '../posts/approval-policy.js';
 import { AUTHORITY_HOLD, checkPublicationAuthority } from './authority.js';
 import { ensureRemoteSchedule, onPausedRemoteSchedule, releasePending, remoteScheduleOf } from './remote-schedule.js';
+import { publishingHold } from '../entitlements/holds.js';
+import { ENTITLEMENT_HOLD } from '@social-lite/core/contracts/v4-entitlements';
 
 /** Thrown by EngineDeps.getCredentials when the connection cannot be used (revoked, refresh failed). */
 export class CredentialsUnavailable extends Error {
@@ -101,6 +103,10 @@ async function gate(db: Queryable, d: ClaimedDelivery): Promise<GateResult> {
   if (await brandRuleHold(db, d)) {
     return { ok: false, state: 'blocked', code: BRAND_RULE_HOLD, message: 'A brand rule changed after this was scheduled. Review it in Brand rules; it publishes once someone keeps it.' };
   }
+  // V4 entitlements (entitlements/holds.ts): plan/billing state re-checked at dispatch AND again in the send gate (this
+  // function runs in both). Not allowed ⇒ HOLD with the reason; released when access returns (never dropped or resent).
+  const ent = await publishingHold(db, d.workspace_id, d.connection_id);
+  if (ent.held) return { ok: false, state: 'blocked', code: ENTITLEMENT_HOLD, message: ent.message };
   return { ok: true };
 }
 

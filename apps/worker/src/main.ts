@@ -157,6 +157,15 @@ async function main(): Promise<void> {
       const { sweepExpiredReservations } = await import('@social-lite/services/product/budgets');
       await sweepExpiredReservations({ limit: 200 });
     }),
+    // V4 entitlements: safety net for a missed billing.access_changed — re-evaluate workspaces with held work or without
+    // full access (release when access returns; mark newly affected waiting work). Bounded per tick.
+    every('entitlement-holds', 5 * 60_000, async () => {
+      const { sweepEntitlementHolds } = await import('@social-lite/services/entitlements/holds');
+      await sweepEntitlementHolds(50);
+    }),
+    // V4 billing: webhook retries, trial expiry/notice, provider reconciliation (missed events), clock-driven access changes,
+    // staff-scheduled lifecycle actions, webhook body retention (billing/reconcile.ts).
+    every('billing-sweep', 60_000, async () => { const { runBillingSweeps } = await import('@social-lite/services/billing/reconcile'); await runBillingSweeps(); }),
     // V3 MCP: report exports started by MCP clients (leased; authority re-checked when each job runs).
     every('mcp-jobs', 5_000, async () => {
       const { runMcpJobs } = await import('@social-lite/services/mcp/jobs');
@@ -170,6 +179,9 @@ async function main(): Promise<void> {
     every('collab-sweeps', 60_000, async () => { const { runCollabSweeps } = await import('@social-lite/services/collab/sweeps'); await workload.run('notifications', { queue: 'collab-sweeps' }, () => runCollabSweeps()); }),
     // G7: revoke expired grants (already ignored at access time), audit, refresh summaries, revalidate authority.
     every('grant-expiry', 5 * 60_000, async () => { const { sweepExpiredGrants } = await import('@social-lite/services/grant-expiry'); await sweepExpiredGrants(); }),
+    // V4 Relay support: end expired / lapse unanswered support access (revokes grants for open sessions), stale uploads,
+    // auto-archive and retention purge (support/sweeps.ts).
+    every('support-sweeps', 60_000, async () => { const { runSupportSweeps } = await import('@social-lite/services/support/sweeps'); await runSupportSweeps(); }),
     // V3 Content Hub: writeback sweep (app-owned facts only), Drive channel renewal, snapshot retention.
     every('content-hub', 2 * 60_000, () => workload.run('interactive_import', { queue: 'content-hub-sweeps' }, () => contentHub.runContentHubSweeps())),
     // V3.1: resume bulk jobs whose wake-up was lost or whose runner died; purge trash past retention (references re-checked).

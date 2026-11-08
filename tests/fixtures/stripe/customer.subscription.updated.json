@@ -1,0 +1,41 @@
+{
+  "id": "evt_1QfixtureSubUpdated000001",
+  "object": "event",
+  "api_version": "2026-10-28.endive",
+  "created": 1794000100,
+  "livemode": false,
+  "type": "customer.subscription.updated",
+  "data": {
+    "object": {
+      "id": "sub_1QfixtureSub0001",
+      "object": "subscription",
+      "customer": "cus_Tfixture0001",
+      "status": "active",
+      "cancel_at_period_end": true,
+      "cancel_at": 1796592000,
+      "canceled_at": 1794000100,
+      "ended_at": null,
+      "trial_start": null,
+      "trial_end": null,
+      "latest_invoice": "in_1QfixtureInvoice01",
+      "default_payment_method": "pm_1Qfixture",
+      "metadata": { "relay_workspace_id": "4b0f6c55-58a3-4c50-9d77-8e8c3c7e0a11" },
+      "created": 1794000000,
+      "livemode": false,
+      "items": {
+        "object": "list",
+        "data": [
+          {
+            "id": "si_Tfixture0001",
+            "object": "subscription_item",
+            "current_period_start": 1794000000,
+            "current_period_end": 1796592000,
+            "price": { "id": "price_1QfixtureStandard", "object": "price", "unit_amount": 1000, "currency": "gbp", "recurring": { "interval": "month" } },
+            "quantity": 3
+          }
+        ]
+      }
+    },
+    "previous_attributes": { "cancel_at_period_end": false }
+  }
+}

@@ -13,6 +13,7 @@ import { FEATURE_FLAGS, RELEASE_NOTES, SUPPORT_CATEGORIES, type EffectiveFlag, t
 import { getPool, many, maybeOne, one, withTx, type Queryable } from '@social-lite/db';
 import type { Ctx } from '../context.js';
 import { audit } from '../audit.js';
+import { enforceRateLimit } from '../ratelimit.js';
 import { authorizeCtx, requireAction } from '../tenancy.js';
 import { loadPost } from '../posts/service.js';
 import { safeCorrelationId } from './diagnostics.js';
@@ -114,18 +115,29 @@ export const supportReportSchema = z.object({
   correlation_ids: z.array(z.string().max(200)).max(50).default([]),
   /** Explicit selection only: include a bounded, redacted excerpt of this draft. */
   include_draft_post_id: z.string().uuid().nullish(),
+  // V4 (support): browser family only (never the user agent) and a stable error code.
+  browser_family: z.enum(['chrome', 'edge', 'firefox', 'safari', 'opera', 'samsung', 'other']).nullish(),
+  error_code: z.string().trim().regex(/^[a-z0-9_.-]{1,64}$/).nullish(),
 }).passthrough();
 
 const EXCERPT_MAX = 500;
 
 interface ReportRow { id: string; category: SupportReportDto['category']; summary: string; route: string | null; app_version: string | null; occurred_at: Date | null;
-  correlation_ids: string[]; attachments: SupportReportDto['attachments']; redactions: number; status: 'open' | 'closed'; created_at: Date }
-const reportDto = (r: ReportRow): SupportReportDto => ({ id: r.id, category: r.category, summary: r.summary, route: r.route, app_version: r.app_version,
-  occurred_at: r.occurred_at?.toISOString() ?? null, correlation_ids: r.correlation_ids, attachments: r.attachments, redactions: r.redactions, status: r.status, created_at: r.created_at.toISOString() });
+  correlation_ids: string[]; attachments: SupportReportDto['attachments']; redactions: number; status: 'open' | 'closed'; created_at: Date;
+  user_id?: string | null; browser_family?: string | null; error_code?: string | null; support_ticket_id?: string | null; shared_at?: Date | null; reporter_email?: string | null; ticket_reference?: string | null }
+// V4: also the sharing state ("Send to Relay support") and who filed it (admin list).
+const reportDto = (r: ReportRow): SupportReportDto & { browser_family: string | null; error_code: string | null; shared: { ticket_id: string; reference: string | null; at: string | null } | null; reporter_email?: string | null; mine?: boolean } => ({
+  id: r.id, category: r.category, summary: r.summary, route: r.route, app_version: r.app_version,
+  occurred_at: r.occurred_at?.toISOString() ?? null, correlation_ids: r.correlation_ids, attachments: r.attachments, redactions: r.redactions, status: r.status, created_at: r.created_at.toISOString(),
+  browser_family: r.browser_family ?? null, error_code: r.error_code ?? null,
+  shared: r.support_ticket_id ? { ticket_id: r.support_ticket_id, reference: r.ticket_reference ?? null, at: r.shared_at?.toISOString() ?? null } : null,
+  ...(r.reporter_email !== undefined ? { reporter_email: r.reporter_email } : {}) });
 
 export async function createSupportReport(ctx: Ctx, raw: unknown): Promise<SupportReportDto> {
   // Unknown fields (e.g. a client trying to attach logs, cookies or a whole draft) are accepted but DROPPED.
   const input = supportReportSchema.parse(raw);
+  // V4: bounded per person (problem reports can now be forwarded to Relay staff).
+  await enforceRateLimit('supportReport', ctx.actor.userId, { capacity: 10, refillPerSecond: 10 / 3600 });
   let redactions = 0;
   const s = redactText(input.summary);
   redactions += s.count;
@@ -141,10 +153,11 @@ export async function createSupportReport(ctx: Ctx, raw: unknown): Promise<Suppo
   }
   const row = await withTx(async (tx) => {
     const r = await one<ReportRow>(tx,
-      `INSERT INTO support_reports(workspace_id, user_id, category, summary, route, app_version, occurred_at, correlation_ids, attachments, redactions)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+      `INSERT INTO support_reports(workspace_id, user_id, category, summary, route, app_version, occurred_at, correlation_ids, attachments, redactions, browser_family, error_code)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
       [ctx.access.workspaceId, ctx.actor.userId, input.category, s.text.slice(0, 2000), safeRoute(input.route), input.app_version || null,
-        input.occurred_at ? new Date(input.occurred_at) : null, [...new Set(ids.filter((x): x is string => !!x))].slice(0, 20), JSON.stringify(attachments), redactions]);
+        input.occurred_at ? new Date(input.occurred_at) : null, [...new Set(ids.filter((x): x is string => !!x))].slice(0, 20), JSON.stringify(attachments), redactions,
+        input.browser_family ?? null, input.error_code ?? null]);
     await audit(tx, { workspaceId: ctx.access.workspaceId, actorUserId: ctx.actor.userId, action: 'support_report.created', resourceType: 'support_report', resourceId: r.id,
       diff: { category: input.category, draft_excerpt: !!attachments.draft_excerpt, redactions }, correlationId: ctx.correlationId });
     return r;
@@ -154,7 +167,9 @@ export async function createSupportReport(ctx: Ctx, raw: unknown): Promise<Suppo
 
 export async function listSupportReports(ctx: Ctx, q: { limit?: number } = {}): Promise<{ items: SupportReportDto[] }> {
   requireAction(ctx, 'audit.read');
-  const rows = await many<ReportRow>(getPool(), `SELECT * FROM support_reports WHERE workspace_id=$1 ORDER BY created_at DESC LIMIT $2`,
+  const rows = await many<ReportRow>(getPool(),
+    `SELECT r.*, u.email::text AS reporter_email, t.reference AS ticket_reference FROM support_reports r LEFT JOIN users u ON u.id=r.user_id
+       LEFT JOIN support_tickets t ON t.id=r.support_ticket_id WHERE r.workspace_id=$1 ORDER BY r.created_at DESC LIMIT $2`,
     [ctx.access.workspaceId, Math.min(Math.max(q.limit ?? 50, 1), 200)]);
   return { items: rows.map(reportDto) };
 }

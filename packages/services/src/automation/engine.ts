@@ -28,6 +28,7 @@ import { withOrigin } from './origin.js';
 import { policyCtx } from './actor.js';
 import { emergencyStopState, escalationOf, policyActive, policyUsage, type PolicyRow } from './policies.js';
 import { evaluateConditions, type Facts } from './conditions.js';
+import { automationHold } from '../entitlements/holds.js';
 
 export interface RuleRow {
   id: string; workspace_id: string; policy_id: string; name: string; trigger: AutomationTrigger; trigger_params: { minutes_before?: number }; conditions: import('@social-lite/core/contracts/v35-automation').RuleCondition[];
@@ -297,6 +298,10 @@ async function runRule(rule: RuleRow, p: PolicyRow, e: EngineEvent): Promise<str
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending',$9) ON CONFLICT (rule_id, event_key) WHERE NOT is_test DO NOTHING RETURNING *`,
     [e.workspaceId, rule.id, p.id, e.trigger, e.eventKey.slice(0, 300), e.subject.type, e.subject.id, e.brandId, JSON.stringify(cond.results)]);
   if (!ins) return null; // duplicate delivery: already handled
+  // V4 entitlements: automations need the plan feature and paid access; otherwise the run is recorded as blocked with
+  // the reason (visible in the run log). Rules and policies are kept, never deleted or switched off.
+  const ent = await automationHold(db, e.workspaceId);
+  if (ent.held) { await updateRun(db, ins.id, 'blocked', ent.message, []); return ins.id; }
   const active = await policyActive(p, db);
   if (!active.ok) { await updateRun(db, ins.id, 'blocked', active.reason, []); return ins.id; }
   if (rule.schedule.mode !== 'always') {

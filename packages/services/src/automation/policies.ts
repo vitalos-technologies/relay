@@ -13,6 +13,7 @@ import type { Ctx } from '../context.js';
 import { audit } from '../audit.js';
 import { loadUserAuthz } from '../authz.js';
 import { staffAllowed } from '../collab/access.js';
+import { assertFeatureConfigurable } from '../entitlements/actions.js';
 import { assertBrand, assertUuid, requireAction } from '../tenancy.js';
 
 export interface PolicyRow {
@@ -137,6 +138,7 @@ export async function createPolicy(ctx: Ctx, raw: unknown): Promise<AutomationPo
   requireAction(ctx, 'automation.manage');
   const input = policySchema.parse(raw);
   const p = await withTx(async (tx) => {
+    await assertFeatureConfigurable(tx, ctx.access.workspaceId, 'automation'); // V4: automations are a plan feature
     await validate(ctx, input, tx);
     const r = await one<PolicyRow>(tx,
       `INSERT INTO automation_policies(workspace_id, name, brand_ids, channel_ids, allowed_actions, knowledge_source_ids, reply_categories, max_actions_per_hour, max_auto_replies_per_day,
@@ -187,6 +189,7 @@ export async function setPolicyStatus(ctx: Ctx, id: string, to: 'active' | 'paus
   const p = await withTx(async (tx) => {
     const cur = await loadPolicy(ctx, id, tx, true);
     if (to === 'active') {
+      await assertFeatureConfigurable(tx, ctx.access.workspaceId, 'automation'); // V4: pausing/stopping always allowed
       if (cur.expires_at.getTime() <= Date.now()) throw new AppError('invalid_state', 'This policy has expired. Set a new expiry date first.');
       const gaps = await ownerGaps(tx, ctx.access.workspaceId, ctx.actor.userId, cur);
       if (gaps.length) throw new AppError('forbidden', `You need ${gaps.join(', ')} on every brand in this policy to activate it.`);
