@@ -23,6 +23,10 @@ export const PERMISSIONS = [
   // conversations need inbox.read; platform operators never get it implicitly.
   'inbox.read', 'inbox.reply', 'inbox.assign', 'inbox.manage', 'cases.manage',
   'integrations.read', 'integrations.manage', 'listening.read', 'listening.manage', 'ai.use', 'automation.manage',
+  // V4 (reserved by the lead; docs/V4_WORKSTREAMS.md). Billing never implies content access and vice versa. Any active
+  // member may open their own Relay support requests (no permission); support.workspace = see the workspace's
+  // non-restricted requests (owners/admins).
+  'billing.read', 'billing.manage', 'support.workspace',
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -58,12 +62,14 @@ export const PRESET_PERMISSIONS: Record<RolePreset, readonly Permission[]> = {
 export const WORKSPACE_ONLY: ReadonlySet<Permission> = new Set([
   'workspace.read', 'workspace.manage', 'workspace.transfer_owner', 'members.read', 'members.invite', 'members.manage',
   'teams.read', 'teams.manage', 'audit.read', 'security.manage', 'service_accounts.manage',
+  'billing.read', 'billing.manage', 'support.workspace',
 ]);
 
 /** Actions that always require verified MFA in the current session (when the policy requires MFA for the role). */
 export const SENSITIVE_PERMISSIONS: ReadonlySet<Permission> = new Set([
   'workspace.manage', 'workspace.transfer_owner', 'members.invite', 'members.manage', 'teams.manage', 'connections.manage',
   'security.manage', 'service_accounts.manage', 'content.publish', 'content.schedule', 'exports.create', 'integrations.manage', 'automation.manage',
+  'billing.manage',
 ]);
 
 export interface Grant {

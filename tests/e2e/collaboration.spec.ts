@@ -50,7 +50,7 @@ test.describe('Collaboration', () => {
     await box.pressSequentially('Can you check the opening line? @vic');
     await expect(eden.getByRole('option', { name: /Vic Viewer/ })).toBeVisible();
     await box.press('Enter');
-    await expect(box).toHaveValue(/@Vic Viewer $/);
+    await expect(box).toHaveValue(/@Vic Viewer( \(demo\))? $/); // seeded name until the IdP profile syncs
     const t0 = Date.now();
     await panel(eden).getByRole('button', { name: 'Comment' }).click();
     await expect(panel(eden).getByText('Can you check the opening line?')).toBeVisible();

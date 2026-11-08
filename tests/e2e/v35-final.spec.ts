@@ -97,8 +97,8 @@ test.describe('V3.5 admin + final', () => {
     await page.goto('/integrations');
     await expect(page.getByTestId('hub-asana').getByTestId('hub-status')).toContainText(/Reconnect|Needs attention/);
     expect(await page.evaluate(noScroll)).toBe(true);
-    await a.send('PUT', `/api/connectors/hub/${id}/scenario`, { scenario: 'success' });
-    await a.send('POST', `/api/connectors/hub/${id}/diagnose`);
+    // Leave no revoked installation behind (other specs add their own simulated Asana install).
+    expect((await a.send('DELETE', `/api/connectors/hub/${id}`)).status).toBeLessThan(300);
 
     await page.goto('/admin/care');
     await expect(page.getByRole('heading', { name: 'Inbox, listening and AI' })).toBeVisible();
