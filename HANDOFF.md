@@ -1,6 +1,6 @@
 # Relay — handoff (read this first)
 
-Last updated: 2026-11-08 14:20 UTC
+Last updated: 2026-11-08 13:52 UTC
 
 ## Resume in a new session / another Claude account
 1. Clone `https://github.com/vitalos-technologies/relay` (branch `main`; the lead pushes after each milestone). Working dir used here: `/home/user/social-lite`.
@@ -70,7 +70,7 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
 6b. (Support inbox proposal → superseded by V4.) Platform host restriction (ops.<domain>, office/VPN IPs) is an activation item.
 7. **V3.5** (`docs/queue/03f_V3_5_PROMPT.md`) **done** — foundation (102498a), streams B–E (33f3e12), stream F (admin + MCP + wiring + final docs; `docs/v3-5/*`). Open for user: Inbox in phone bottom bar; main nav grouping (copy-cleanup pass). → 7b. **V4 done** commercial + customer support (`docs/queue/03g_V4_PROMPT.md`: Relay support tickets, Platform → Support, plans/trials/subscriptions/billing via Stripe test mode behind a billing service, entitlements, tenant lifecycle; no Stripe keys in this environment → build against a provider interface with a test double + locally signed webhook fixtures; never request keys in chat) → 7c. **V5 done** (`docs/queue/03h_V5_PROMPT.md`, queued by the user 2026-11-08: one-page marketing site, Standard £10 / Professional £25 per user per month + 14-day trial on V4's billing, marketing support widget → Platform → Support, AI workspace with real workflows) → 8. Copy cleanup (03e) → 9. Docs + Help Centre (04) → 10. One consolidated activation checklist + user reminder.
 
-## Current state (keep updated) — 2026-11-08 14:20 UTC
+## Current state (keep updated) — 2026-11-08 13:52 UTC
 - Working branch for this session: **`claude/dazzling-pasteur-8yny50`** (pushed after each milestone; merge to `main` via PR
   when the user asks). Working dir `/home/user/relay`.
 - **V3.5 complete** (stream F committed: 8eb8d35): tsc clean, unit 564, integration 489/489,
