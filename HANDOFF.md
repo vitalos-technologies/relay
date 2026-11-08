@@ -1,6 +1,6 @@
 # Relay — handoff (read this first)
 
-Last updated: 2026-11-08 07:35 UTC · Lead agent keeps this current after every milestone.
+Last updated: 2026-11-08 11:30 UTC
 
 ## Resume in a new session / another Claude account
 1. Clone `https://github.com/vitalos-technologies/relay` (branch `main`; the lead pushes after each milestone). Working dir used here: `/home/user/social-lite`.
@@ -68,9 +68,9 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
 5. V3.1 Admin **done** (see below; tag v3.1.1 suggested on the admin commit)
 6. Collaboration completion **done** (0f0bcd9; migration 027; docs/collaboration/*). Full E2E 56 passed / 1 skipped; unit 505; integration 413. Open: security.spec back-channel logout test needs its own user isolation; decisions taken by lead: email never includes post titles, clients can comment on shared reviews (on), change feed 7 d / presence 10 min retention, demo collab data kept.
 6b. (Support inbox proposal → superseded by V4.) Platform host restriction (ops.<domain>, office/VPN IPs) is an activation item.
-7. **V3.5** (`docs/queue/03f_V3_5_PROMPT.md`) **done** — foundation (102498a), streams B–E (33f3e12), stream F (admin + MCP + wiring + final docs; `docs/v3-5/*`). Open for user: Inbox in phone bottom bar; main nav grouping (copy-cleanup pass). → 7b. **V4 (running: SUP/BIL/ENT streams)** commercial + customer support (`docs/queue/03g_V4_PROMPT.md`: Relay support tickets, Platform → Support, plans/trials/subscriptions/billing via Stripe test mode behind a billing service, entitlements, tenant lifecycle; no Stripe keys in this environment → build against a provider interface with a test double + locally signed webhook fixtures; never request keys in chat) → 7c. **V5** (`docs/queue/03h_V5_PROMPT.md`, queued by the user 2026-11-08: one-page marketing site, Standard £10 / Professional £25 per user per month + 14-day trial on V4's billing, marketing support widget → Platform → Support, AI workspace with real workflows) → 8. Copy cleanup (03e) → 9. Docs + Help Centre (04) → 10. One consolidated activation checklist + user reminder.
+7. **V3.5** (`docs/queue/03f_V3_5_PROMPT.md`) **done** — foundation (102498a), streams B–E (33f3e12), stream F (admin + MCP + wiring + final docs; `docs/v3-5/*`). Open for user: Inbox in phone bottom bar; main nav grouping (copy-cleanup pass). → 7b. **V4 done** commercial + customer support (`docs/queue/03g_V4_PROMPT.md`: Relay support tickets, Platform → Support, plans/trials/subscriptions/billing via Stripe test mode behind a billing service, entitlements, tenant lifecycle; no Stripe keys in this environment → build against a provider interface with a test double + locally signed webhook fixtures; never request keys in chat) → 7c. **V5 (running: MKT/WID/AIW)** (`docs/queue/03h_V5_PROMPT.md`, queued by the user 2026-11-08: one-page marketing site, Standard £10 / Professional £25 per user per month + 14-day trial on V4's billing, marketing support widget → Platform → Support, AI workspace with real workflows) → 8. Copy cleanup (03e) → 9. Docs + Help Centre (04) → 10. One consolidated activation checklist + user reminder.
 
-## Current state (keep updated) — 2026-11-08 07:35 UTC
+## Current state (keep updated) — 2026-11-08 11:30 UTC
 - Working branch for this session: **`claude/dazzling-pasteur-8yny50`** (pushed after each milestone; merge to `main` via PR
   when the user asks). Working dir `/home/user/relay`.
 - **V3.5 complete** (stream F committed: 8eb8d35): tsc clean, unit 564, integration 489/489,
@@ -78,19 +78,21 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
   Full E2E on the production build ran 2026-11-08: 2 failures were test-state issues (seeded display name; a revoked
   simulated Asana install left by v35-final) — both specs fixed in 74f3e89; re-run of those specs pending in the lead's
   notes, results go into `docs/v3-5/TEST_REPORT.md`.
-- **V4 running** as three parallel streams (contract `docs/V4_WORKSTREAMS.md`, briefing `docs/v4-progress/STREAM_BRIEFING.md`,
-  baseline `docs/v4/BASELINE.md`): **SUP** support (migration 034), **BIL** plans/billing/trials/seats (035), **ENT**
-  entitlements/usage/restriction policy (036). Progress notes `docs/v4-progress/{sup,bil,ent}.md`. Lead contracts:
-  `packages/core/src/contracts/v4-plans.ts` (catalogue = V5 prices: Standard £10 / Professional £25 per user per month, GBP,
-  14-day no-card trial; `legacy` plan for pre-V4 workspaces) and `v4-billing.ts`. Permissions `billing.read`,
-  `billing.manage`, `support.workspace` reserved in `core/authz.ts`. After the streams report: lead F4 (wiring, full E2E,
-  mobile, perf, docs, activation checklist), then **V5** (`docs/queue/03h_V5_PROMPT.md`).
+- **V4 complete** (be6e8a6 streams + a437bd5/31729c0 final): support (034), billing/trials/seats (035), entitlements
+  (036). Full E2E 93 passed / 0 failed / 7 skipped; unit 600; integration 551/552 (known flaky v31-analytics-summary);
+  mobile QA 98 checks 0 overflow. Docs `docs/v4/*` incl. `TEST_REPORT.md`, `IMPLEMENTATION_GAPS.md`,
+  `FINAL_ACTIVATION_CHECKLIST.md`.
+- **V5 running** as three parallel streams (contract `docs/V5_WORKSTREAMS.md`, briefing `docs/v5-progress/STREAM_BRIEFING.md`,
+  decisions D21–D25): **MKT** marketing site at `/` (app home → `/overview`), pricing presentation, signup flow (039 if
+  needed); **WID** support widget → Platform → Support (037); **AIW** AI workspace + agent execution (038). Progress notes
+  `docs/v5-progress/{mkt,wid,aiw}.md`. After they report: lead F5 (full E2E, mobile/a11y, perf, docs, activation), then
+  copy cleanup (03e) → Docs + Help Centre (04) → consolidated activation checklist + user reminder.
 - **If this session is gone:** uncommitted stream files are on disk only — the lead snapshots them to `wip/streams` at
   stops. Restore with `git cherry-pick --no-commit origin/wip/streams` on a clean tree, then relaunch each stream with
   its progress note + the briefing.
 - **Dev environment:** `.env` from `.env.example` with generated `SESSION_SECRET` / `KEY_ENCRYPTION_KEYS` (never commit);
   `dockerd` + `docker compose -f infra/compose.yaml up -d --wait`; `pnpm db:roles && pnpm db:migrate && pnpm db:roles &&
-  pnpm db:seed && pnpm db:seed:e2e`. Migrations 001–032 applied; V4 owns 034–036; next free **037**. Web = production
+  pnpm db:seed && pnpm db:seed:e2e`. Migrations 001–036 applied (033 unused); V5 owns 037 (WID), 038 (AIW), 039 (MKT, optional); next free **040**. Web = production
   build on :3000 (`next start`), worker = `apps/worker/dist/main.mjs`; rebuild/restart/Playwright only under
   `flock -o .data/devserver-v2.lock …`, servers started with `3>&- 9>&-`.
 - **Open user decisions:** Inbox in the phone bottom bar for inbox users (lead recommends replacing Planner for them);
