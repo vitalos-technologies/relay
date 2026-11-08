@@ -1,9 +1,0 @@
-{
-  "identities": [
-    {
-      "name": "socialite-local",
-      "credentials": [{ "accessKey": "socialite-local-access", "secretKey": "socialite-local-secret-not-for-production" }],
-      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
-    }
-  ]
-}
