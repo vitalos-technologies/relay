@@ -10,7 +10,7 @@ const DAY = 86_400_000;
 const P = 'facebook' as const;
 
 export const SIMULATED_TEMPLATES = [
-  { name: 'order_update', language: 'en', status: 'APPROVED', category: 'UTILITY', components: [{ type: 'BODY', text: 'Hi {{1}}, there is an update on order {{2}}. Reply here if you have questions.' }] },
+  { name: 'order_update', language: 'en', status: 'APPROVED', category: 'UTILITY', components: [{ type: 'BODY', text: 'Hi {{1}}, there is an update on order {{2}}. Reply here if you have questions.', example: { body_text: [['Alex', 'A-1042']] } }] },
   { name: 'we_miss_you', language: 'en', status: 'APPROVED', category: 'MARKETING', components: [{ type: 'BODY', text: 'Hi {{1}}, it has been a while. Reply to this message and we will help.' }] },
   { name: 'support_follow_up', language: 'en', status: 'APPROVED', category: 'UTILITY', components: [{ type: 'BODY', text: 'Hi {{1}}, following up on your support request. Reply to continue.' }] },
   { name: 'old_promo', language: 'en', status: 'PAUSED', category: 'MARKETING', components: [{ type: 'BODY', text: 'Old promotion.' }] },

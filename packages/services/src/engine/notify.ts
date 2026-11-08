@@ -90,6 +90,16 @@ export async function handleEvent(evt: { event_type: string; workspace_id: strin
       return;
     case 'approval.decided':
       await onApprovalDecided(db, { workspace_id: evt.workspace_id, aggregate_id: evt.aggregate_id });
+      // V3.5 bridge (stream F): an approval that completed becomes 'content.approved' on the inbox-events queue, where
+      // automation (trigger 'content.approved') subscribes. A redelivered event may write a second row; subscribers are
+      // idempotent per approval (automation: one run per rule + approval).
+      if (evt.payload.decision === 'approved') {
+        await db.query(
+          `INSERT INTO outbox(workspace_id, aggregate_type, aggregate_id, event_type, payload)
+           SELECT $1, 'approval', $2::text, 'content.approved', jsonb_build_object('postId', a.post_id, 'brandId', a.brand_id, 'origin', coalesce($3::jsonb, '{"kind":"user","id":null}'::jsonb))
+             FROM approvals a WHERE a.id=$2::uuid AND a.workspace_id=$1 AND a.decision='approved'`,
+          [evt.workspace_id, evt.aggregate_id, evt.payload.origin ? JSON.stringify(evt.payload.origin) : null]);
+      }
       return;
     case 'comment.created':
       await onCommentCreated(db, evt.aggregate_id);

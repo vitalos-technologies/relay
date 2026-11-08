@@ -143,3 +143,15 @@ export function Ago({ at, className }: { at: string | null | undefined; classNam
   const v = abs < 60 ? `${abs}s` : abs < 3600 ? `${Math.round(abs / 60)}m` : abs < 86400 ? `${Math.round(abs / 3600)}h` : `${Math.round(abs / 86400)}d`;
   return <time dateTime={at} title={new Date(at).toLocaleString()} className={cn('tabular', className)}>{s >= 0 ? `${v} ago` : `in ${v}`}</time>;
 }
+
+/** Human duration for admin numbers: "45 s", "12 min", "3 h 20 min", "14 d" (lead review: never "20315 min"). */
+export function duration(seconds: number | null | undefined): string {
+  if (seconds === null || seconds === undefined || !Number.isFinite(seconds)) return '—';
+  const s = Math.max(0, Math.round(seconds));
+  if (s < 60) return `${s} s`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 48) return m % 60 ? `${h} h ${m % 60} min` : `${h} h`;
+  return `${Math.round(h / 24)} d`;
+}

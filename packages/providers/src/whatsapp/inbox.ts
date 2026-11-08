@@ -189,12 +189,15 @@ export const whatsAppInboxAdapter: InboxAdapter = {
     const t = token(creds);
     if (!t) return { ok: false, code: 'no_credentials', message: 'Reconnect WhatsApp.' };
     try {
-      const r = await call<{ data?: Array<{ name?: string; language?: string; status?: string; category?: string; components?: Array<{ type?: string; text?: string }> }> }>(ctx,
+      const r = await call<{ data?: Array<{ name?: string; language?: string; status?: string; category?: string; components?: Array<{ type?: string; text?: string; example?: { body_text?: unknown } }> }> }>(ctx,
         { method: 'GET', url: `${base(ctx)}/${waIds(conn).wabaId}/message_templates`, bearer: t, query: { fields: 'name,language,status,category,components', limit: '100' }, op: 'whatsapp.templates' }, parseWhatsAppError);
       const items: TemplateInfo[] = (r.data.data ?? []).filter((x) => x.name && x.language).map((x) => {
-        const body = x.components?.find((c) => c.type === 'BODY')?.text ?? '';
+        const bodyC = x.components?.find((c) => c.type === 'BODY');
+        const body = bodyC?.text ?? '';
         const cat = String(x.category ?? '').toLowerCase();
-        return { name: String(x.name), language: String(x.language), status: String(x.status ?? 'UNKNOWN'), category: (['marketing', 'utility', 'authentication'].includes(cat) ? cat : null) as TemplateInfo['category'], body: body.slice(0, 1024), param_count: new Set(body.match(/\{\{\d+\}\}/g) ?? []).size };
+        // Meta returns sample values for positional parameters as example.body_text[[...]] (shown as field hints only).
+        const ex = Array.isArray(bodyC?.example?.body_text) && Array.isArray((bodyC!.example!.body_text as unknown[])[0]) ? ((bodyC!.example!.body_text as unknown[][])[0]!).map((v) => String(v).slice(0, 60)) : undefined;
+        return { name: String(x.name), language: String(x.language), status: String(x.status ?? 'UNKNOWN'), category: (['marketing', 'utility', 'authentication'].includes(cat) ? cat : null) as TemplateInfo['category'], body: body.slice(0, 1024), param_count: new Set(body.match(/\{\{\d+\}\}/g) ?? []).size, ...(ex?.length ? { examples: ex.slice(0, 20) } : {}) };
       });
       return { ok: true, items };
     } catch (err) {

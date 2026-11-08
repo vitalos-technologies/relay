@@ -43,7 +43,7 @@ Settings → Inbox → Channels) and `packages/services/src/connectors/registry.
 | Asana | OAuth (PKCE) `tasks:read/write`, `projects:read`, `users:read`, `webhooks:write` | Handshake echoes `X-Hook-Secret`; events `X-Hook-Signature` = HMAC-SHA256(hook secret, body) | **At-most-once**, retries with backoff ≤ 24 h, then the webhook is deleted; events are compact (fetch state); heartbeats | Operator-registered app; polling fallback required for completeness | Verifier + ingress built; connector (C) |
 | monday.com | OAuth `boards:read/write`, `users:read`, `webhooks:write` | URL challenge echoed; app webhooks carry a JWT (HS256, signing secret) in Authorization | Retries once a minute for 30 min | App with OAuth + signing secret (JWT only when created with the app token) | Verifier + ingress built; connector (C) |
 | HubSpot | OAuth `crm.objects.contacts.read`, `crm.objects.companies.read`, `tickets`, `crm.objects.owners.read` | `X-HubSpot-Signature-v3` = base64 HMAC-SHA256(client secret, method + URI + body + timestamp), ≤ 5 min | Batched events with ids | Public app; tickets need Service Hub | Verifier + ingress built; connector (C) |
-| Google Business Profile | OAuth `business.manage` | Pub/Sub push (Google-signed OIDC token) | Pub/Sub at-least-once | API access approval; Pub/Sub topic (billed Google Cloud service); chat discontinued | Verifier refuses until stream C adds OIDC/JWKS check |
+| Google Business Profile | OAuth `business.manage` | Pub/Sub push (Google-signed OIDC token) | Pub/Sub at-least-once | API access approval; Pub/Sub topic (billed Google Cloud service); chat discontinued | **Built (C)** — Pub/Sub OIDC verifier; review notifications poll the location's inbox channel (F) |
 | Google Cloud Translation | Service account / OAuth `cloud-translation` | n/a | Synchronous API | Cloud project + billing (per character); glossaries need Advanced (v3); pricing page not machine-readable here — verify current rates before estimating cost | Connector (C) |
 | Slack | OAuth v2 `chat:write`, `channels:read`, `groups:read`, `users:read`, `users:read.email` | `X-Slack-Signature` = `v0=` hex HMAC-SHA256(signing secret, `v0:ts:body`), ≤ 5 min | Retries; interactive payloads form-encoded | App + signing secret + interactivity URL | Verifier (incl. rotation) + ingress built; connector (C) |
 | Mailchimp | OAuth (Marketing API; account-wide, no granular scopes) | Optional `X-Mailchimp-Signature` (HMAC over timestamp + body — exact join to confirm) **or** secret in callback URL | Retries over 75 min; may be disabled | OAuth app | URL-key verifier built; signature mode pending confirmation (C) |
@@ -80,3 +80,27 @@ Stream B (2026-11-08): Instagram, WhatsApp, Google reviews, YouTube, Bluesky, Te
 exercised on simulated transports; see `docs/v3-5/INBOX_NETWORKS.md`. Sources re-checked 2026-11-08: Instagram Send API +
 private replies + comment replies (developers.facebook.com), WhatsApp Cloud API messages reference, GBP
 `reviews.updateReply`, Telegram `setWebhook`/`getWebhookInfo`.
+
+## Final status (stream F, 2026-11-08)
+
+Nothing below is **verified against a live provider** (no credentials/approvals/test accounts). "Local" = implemented and
+tested on simulated transports or signed fixtures, on real Postgres and a production build.
+
+| Capability | Local | Live | Blocked on |
+|---|---|---|---|
+| Facebook Page DMs + comments | Yes | No | Meta App Review (checklist 1.1) |
+| Instagram DMs + comments | Yes | No | Meta App Review (1.2) |
+| WhatsApp DMs + templates (charge acknowledged) | Yes | No | WABA, verification, billing (1.3) |
+| Google reviews (read + owner reply, Pub/Sub → poll) | Yes | No | GBP API access (1.4, 2.4) |
+| YouTube comments | Yes | No | Reconnect with `youtube.force-ssl` (1.5) |
+| Bluesky replies/mentions/DMs | Yes | No | App password (1.6) |
+| Telegram bot chats (explicit webhook ownership; removal releases Relay's webhook) | Yes | No | Per-bot claim (1.7) |
+| Threads replies | Yes | No | App Review (1.8) |
+| X / LinkedIn / TikTok inbox | No adapter | No | Provider access (1.9) |
+| Pinterest / Threads DMs / TikTok DMs | — | — | Unsupported by the provider |
+| Asana, monday.com, HubSpot, Slack, Mailchimp, Cloud Translation, GBP posts | Yes | No | App registrations / billing (2.1–2.7) |
+| Connected-source listening | Yes | No | Live inbox channels |
+| Broader listening | Interface + states only | No | Licensed data (3.2) |
+| Relay AI assistant + AI replies | Yes (no output without a key) | No | AI key + budget (4.1–4.2) |
+| Rules + bounded automation (all five triggers) | Yes | n/a | — |
+| MCP inbox/cases/listening/AI-prep tools | Yes | n/a | Clients re-consent to new scopes (5.1) |

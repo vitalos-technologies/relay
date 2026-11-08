@@ -1,6 +1,7 @@
 'use client';
 // Support access, workspace side (V3.1 Admin §13). Relay staff can only see private content after an owner/admin here
 // approves a reasoned, time-boxed, read-only request. Approval needs a fresh sign-in; either side can end it any time.
+import { duration } from '@/components/admin/ui';
 import { useState } from 'react';
 import { LifeBuoy } from 'lucide-react';
 import type { SupportAccessDto } from '@social-lite/core/contracts/v31-admin';
@@ -12,7 +13,7 @@ import { useAdminTopics } from '@/components/admin/sync';
 import { Ago } from '@/components/admin/ui';
 import { SUPPORT_TONE } from '@/components/admin/badges';
 
-const mins = (m: number) => (m >= 60 ? `${Math.round(m / 60)} h` : `${m} min`);
+const mins = (m: number) => duration(m * 60);
 
 export default function WorkspaceSupportAccessPage() {
   const { refresh } = useSession();

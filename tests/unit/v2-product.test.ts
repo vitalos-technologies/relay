@@ -63,7 +63,7 @@ describe('activity categories', () => {
   it.each([
     ['member.removed', 'permissions'], ['grant.revoked', 'permissions'], ['connection.disconnected', 'connections'],
     ['schedule.created', 'publishing'], ['approval.approved', 'publishing'], ['session.revoked', 'security'],
-    ['export.handover', 'security'], ['asset.uploaded', 'content'],
+    ['export.handover', 'security'], ['asset.uploaded', 'content'], ['inbox.assigned', 'care'], ['case.updated', 'care'], ['automation.rule_updated', 'care'], ['mcp.client_revoked', 'security'],
   ])('%s → %s', (a, c) => expect(categoryOf(a)).toBe(c));
 });
 

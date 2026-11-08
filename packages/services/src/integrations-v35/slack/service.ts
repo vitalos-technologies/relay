@@ -142,9 +142,11 @@ async function routeAllows(r: Pick<RouteRow, 'brand_ids' | 'created_by' | 'works
   return !brandId || access.brandIds === null || access.brandIds.includes(brandId);
 }
 
-export async function enqueueSlackEvent(e: { workspaceId: string; integrationId?: string | null; category: SlackCategory; eventKey: string; brandId: string | null; text: string; linkPath: string | null; referenceType?: string | null; referenceId?: string | null; approvalId?: string | null }): Promise<number> {
+export async function enqueueSlackEvent(e: { workspaceId: string; integrationId?: string | null; category: SlackCategory; eventKey: string; brandId: string | null; text: string; linkPath: string | null; referenceType?: string | null; referenceId?: string | null; approvalId?: string | null; simulated?: boolean }): Promise<number> {
+  // `simulated` (stream F): an event from simulated data reaches only simulated installs, and a live event only live ones.
   const routes = await many<RouteRow>(getPool(), `${ROUTE_SELECT} JOIN integration_connections i ON i.id=r.integration_id
-      WHERE r.workspace_id=$1 AND r.enabled AND $2 = ANY(r.categories) AND i.disconnected_at IS NULL AND ($3::uuid IS NULL OR r.integration_id=$3)`, [e.workspaceId, e.category, e.integrationId ?? null]);
+      WHERE r.workspace_id=$1 AND r.enabled AND $2 = ANY(r.categories) AND i.disconnected_at IS NULL AND ($3::uuid IS NULL OR r.integration_id=$3)
+        AND ($4::boolean IS NULL OR i.is_simulated = $4)`, [e.workspaceId, e.category, e.integrationId ?? null, e.simulated ?? null]);
   let n = 0;
   for (const r of routes) {
     if (SLACK_PRIVATE_ONLY.includes(e.category) && !r.channel_private) continue;
@@ -202,8 +204,12 @@ export function registerSlackHooks(): void {
       text: change === 'breach' ? `Case #${c.number} breached its service level` : `Case #${c.number} was escalated`, linkPath: `/inbox?case=${e.aggregateId}`, referenceType: 'case', referenceId: e.aggregateId });
   });
   onInboxEvent('listening.alert_fired', 'slack-listening-alerts', async (e) => {
-    const brandId = typeof e.payload.brandId === 'string' ? e.payload.brandId : null;
-    await enqueueSlackEvent({ workspaceId: e.workspaceId, category: 'listening_alerts', eventKey: `listening:${e.aggregateId}`, brandId, text: 'Listening alert', linkPath: `/listening?alert=${e.aggregateId}`, referenceType: 'listening_alert', referenceId: e.aggregateId });
+    // Stream F: load the alert (ids in the event are hints only); simulated alerts go only to simulated Slack installs.
+    const a = await maybeOne<{ brand_id: string; is_simulated: boolean; name: string }>(getPool(),
+      `SELECT a.brand_id, a.is_simulated, s.name FROM listening_alerts a JOIN listening_searches s ON s.id=a.search_id WHERE a.id=$1 AND a.workspace_id=$2`, [e.aggregateId, e.workspaceId]);
+    if (!a) return;
+    await enqueueSlackEvent({ workspaceId: e.workspaceId, category: 'listening_alerts', eventKey: `listening:${e.aggregateId}`, brandId: a.brand_id, text: `Listening alert: ${a.name.replace(/[\r\n]+/g, ' ').slice(0, 80)}`,
+      linkPath: `/listening/alerts/${e.aggregateId}`, referenceType: 'listening_alert', referenceId: e.aggregateId, simulated: a.is_simulated });
   });
 }
 

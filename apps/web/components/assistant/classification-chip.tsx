@@ -18,7 +18,7 @@ export function ClassificationChip({ conversationId }: { conversationId: string 
   return (
     <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted" title="Automatic classification (rules, not AI). An estimate.">
       <Tag aria-hidden className="size-3.5" />
-      <span>{CATEGORY[c.category] ?? c.category}{c.uncertain ? '?' : ''} · {c.sentiment}{c.urgency === 'high' ? ' · urgent' : ''}</span>
+      <span>{CATEGORY[c.category] ?? c.category}{c.uncertain ? ' · unsure' : ''} · {c.sentiment}{c.urgency === 'high' ? ' · urgent' : ''}</span>
       {c.injection_suspected ? <Badge tone="warn" icon={<ShieldAlert aria-hidden className="size-3" />} className="h-5 px-1.5 text-[11px]">Contains instructions</Badge> : null}
     </p>
   );

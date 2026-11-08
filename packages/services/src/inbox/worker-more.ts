@@ -5,6 +5,7 @@ import type { PgBoss } from 'pg-boss';
 import { getPool } from '@social-lite/db';
 import { log } from '../log.js';
 import { deleteObject } from '../storage.js';
+import { registerGbpReviewNotifications } from './channels-gbp-notify.js';
 import type { V35WorkerDeps } from './worker.js';
 import { onInboxEvent } from './hooks.js';
 import { registerWhatsAppInbound } from './channels-whatsapp.js';
@@ -16,6 +17,7 @@ import { refreshIntegrationChannels } from './channels-integration.js';
 /** Register handlers that must exist in every process that processes events (worker + tests). Idempotent. */
 export function registerInboxMoreHandlers(): void {
   registerWhatsAppInbound();
+  registerGbpReviewNotifications();   // stream F: verified GBP Pub/Sub review notifications → poll the location's channel
   onInboxEvent('inbox.inbound_received', 'stream-b:inbound-store', async (e) => { await processInboundEvents(e.aggregateId); });
 }
 

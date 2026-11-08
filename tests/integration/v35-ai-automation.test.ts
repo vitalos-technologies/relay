@@ -400,12 +400,12 @@ describe('V3.5 automation — classification, routing, bounded replies', () => {
     await expect(createRule(w.owner, { policy_id: policy.id, name: 'x', trigger: 'case.changed', conditions: [], actions: [{ type: 'reply_saved', saved_reply_id: savedReplyId, mode: 'private_message' }], scope: { brand_ids: [w.brand], channel_ids: [] } })).rejects.toMatchObject({ code: 'validation_failed' });
     await expect(createRule(w.owner, { policy_id: policy.id, name: 'x', trigger: 'inbox.message_received', conditions: [], actions: [{ type: 'assign', assignee_id: null }], scope: { brand_ids: [w.brandB], channel_ids: [] } })).rejects.toMatchObject({ code: 'validation_failed' });
     await expect(createRule(w.owner, { policy_id: policy.id, name: 'x', trigger: 'inbox.message_received', conditions: [{ field: 'minutes_to_deadline', op: 'lte', value: 5 }], actions: [{ type: 'assign', assignee_id: null }], scope: { brand_ids: [w.brand], channel_ids: [] } })).rejects.toMatchObject({ code: 'validation_failed' });
-    // Not available triggers cannot be enabled.
+    // Alert/approval triggers have no conversation: conversation actions are refused (stream F: TRIGGER_ACTIONS).
     await expect(createRule(w.owner, { policy_id: policy.id, name: 'x', trigger: 'content.approved', enabled: true, conditions: [], actions: [{ type: 'add_note', body: 'x' }], scope: { brand_ids: [w.brand], channel_ids: [] } })).rejects.toMatchObject({ code: 'validation_failed' });
     // Care agents cannot manage automation.
     await expect(createRule(w.ann, { policy_id: policy.id, name: 'x', trigger: 'inbox.message_received', conditions: [], actions: [{ type: 'add_note', body: 'x' }], scope: { brand_ids: [w.brand], channel_ids: [] } })).rejects.toMatchObject({ code: 'forbidden' });
     const cat = await automationCatalog(w.owner);
-    expect(cat.triggers.find((t) => t.trigger === 'content.approved')).toMatchObject({ available: false });
+    expect(cat.triggers.find((t) => t.trigger === 'content.approved')).toMatchObject({ available: true });
   });
 
   it('test preview evaluates recent conversations without changing or sending anything', async () => {

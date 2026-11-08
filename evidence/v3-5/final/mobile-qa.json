@@ -1,0 +1,845 @@
+{
+ "at": "2026-11-08T04:57:25.351Z",
+ "widths": [
+  320,
+  360,
+  390,
+  430,
+  768,
+  1024,
+  1440
+ ],
+ "screens": [
+  "inbox",
+  "inbox-list",
+  "inbox-assistant",
+  "settings-channels",
+  "settings-sla",
+  "integrations",
+  "integrations-asana",
+  "integrations-slack",
+  "listening",
+  "listening-search",
+  "listening-alert",
+  "listening-mention",
+  "assistant",
+  "automation",
+  "automation-rule-test",
+  "post-deliveries",
+  "admin-care",
+  "admin-inbox",
+  "admin-integrations",
+  "admin-listening",
+  "admin-ai",
+  "admin-audit-care",
+  "platform-care"
+ ],
+ "horizontal_scroll_issues": 0,
+ "rows": [
+  {
+   "screen": "inbox",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "inbox-list",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "inbox-assistant",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "settings-channels",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "settings-sla",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "integrations",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "integrations-asana",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "integrations-slack",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "listening",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "listening-search",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "listening-alert",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "listening-mention",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "assistant",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "automation",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "automation-rule-test",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "post-deliveries",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-care",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-inbox",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-integrations",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-listening",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-ai",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-audit-care",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-care",
+   "width": 320,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "inbox",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "inbox-list",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "inbox-assistant",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "settings-channels",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "settings-sla",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "integrations",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "integrations-asana",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "integrations-slack",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "listening",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "listening-search",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "listening-alert",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "listening-mention",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "assistant",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "automation",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "automation-rule-test",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "post-deliveries",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-care",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-inbox",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-integrations",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-listening",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-ai",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-audit-care",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-care",
+   "width": 360,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "inbox",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "inbox-list",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "inbox-assistant",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "settings-channels",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "settings-sla",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "integrations",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "integrations-asana",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "integrations-slack",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "listening",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "listening-search",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "listening-alert",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "listening-mention",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "assistant",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "automation",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "automation-rule-test",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "post-deliveries",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-care",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-inbox",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-integrations",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-listening",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-ai",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-audit-care",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-care",
+   "width": 390,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "inbox",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "inbox-list",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "inbox-assistant",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "settings-channels",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "settings-sla",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "integrations",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "integrations-asana",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "integrations-slack",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "listening",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "listening-search",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "listening-alert",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "listening-mention",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "assistant",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "automation",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "automation-rule-test",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "post-deliveries",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-care",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-inbox",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-integrations",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-listening",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-ai",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-audit-care",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-care",
+   "width": 430,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "inbox",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "inbox-list",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "inbox-assistant",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "settings-channels",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "settings-sla",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "integrations",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "integrations-asana",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "integrations-slack",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "listening",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "listening-search",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "listening-alert",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "listening-mention",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "assistant",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "automation",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "automation-rule-test",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "post-deliveries",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-care",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-inbox",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-integrations",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-listening",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-ai",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-audit-care",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-care",
+   "width": 768,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "inbox",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "inbox-list",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "inbox-assistant",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "settings-channels",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "settings-sla",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "integrations",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "integrations-asana",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "integrations-slack",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "listening",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "listening-search",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "listening-alert",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "listening-mention",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "assistant",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "automation",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "automation-rule-test",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "post-deliveries",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-care",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-inbox",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-integrations",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-listening",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-ai",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-audit-care",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-care",
+   "width": 1024,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "inbox",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "inbox-list",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "inbox-assistant",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "settings-channels",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "settings-sla",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "integrations",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "integrations-asana",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "integrations-slack",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "listening",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "listening-search",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "listening-alert",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "listening-mention",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "assistant",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "automation",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "automation-rule-test",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "post-deliveries",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-care",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-inbox",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-integrations",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-listening",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-ai",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "admin-audit-care",
+   "width": 1440,
+   "horizontal_scroll": false
+  },
+  {
+   "screen": "platform-care",
+   "width": 1440,
+   "horizontal_scroll": false
+  }
+ ]
+}

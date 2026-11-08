@@ -17,7 +17,7 @@ export const AUTOMATION_TRIGGERS = [
   'case.sla_nearing',         // an open case is within N minutes of a service-level deadline (worker sweep)
   'case.changed',             // case created / escalated / breached
   'listening.alert',          // a listening alert fired (stream D)
-  'content.approved',         // a post was approved (needs the collaboration event bridge)
+  'content.approved',         // a post's approval completed (bridge: outbox 'approval.decided' → 'content.approved', stream F)
 ] as const;
 export type AutomationTrigger = (typeof AUTOMATION_TRIGGERS)[number];
 
@@ -53,6 +53,24 @@ export type AutomationActionType = (typeof AUTOMATION_ACTIONS)[number];
 
 /** Actions that send something to a customer. */
 export const CUSTOMER_FACING_ACTIONS: readonly AutomationActionType[] = ['reply_saved', 'reply_ai'];
+
+/** Actions each trigger can run. Alert/approval triggers have no conversation: people notifications + integration jobs only. */
+export const TRIGGER_ACTIONS: Record<AutomationTrigger, readonly AutomationActionType[]> = {
+  'inbox.message_received': AUTOMATION_ACTIONS,
+  'case.sla_nearing': AUTOMATION_ACTIONS.filter((a) => !CUSTOMER_FACING_ACTIONS.includes(a)),
+  'case.changed': AUTOMATION_ACTIONS.filter((a) => !CUSTOMER_FACING_ACTIONS.includes(a)),
+  'listening.alert': ['notify', 'integration_job'],
+  'content.approved': ['notify', 'integration_job'],
+};
+
+/** Integration action kinds per trigger subject (HubSpot tickets need a case; Mailchimp drafts are made from posts in Relay). */
+export const TRIGGER_INTEGRATION_KINDS: Record<AutomationTrigger, readonly string[]> = {
+  'inbox.message_received': ['slack.post_message', 'asana.create_task', 'monday.create_item', 'hubspot.create_ticket'],
+  'case.sla_nearing': ['slack.post_message', 'asana.create_task', 'monday.create_item', 'hubspot.create_ticket'],
+  'case.changed': ['slack.post_message', 'asana.create_task', 'monday.create_item', 'hubspot.create_ticket'],
+  'listening.alert': ['slack.post_message', 'asana.create_task', 'monday.create_item'],
+  'content.approved': ['slack.post_message', 'asana.create_task', 'monday.create_item'],
+};
 
 export type RuleAction =
   | { type: 'assign'; assignee_id?: string | null; team_id?: string | null }

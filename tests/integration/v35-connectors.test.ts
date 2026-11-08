@@ -66,12 +66,24 @@ describe('V3.5 connector infrastructure', () => {
     expect(await processIntegrationEvent(id2)).toBe('ignored');
   });
 
-  it('echo of Relay’s own write (origin marker) is recorded but never processed (loop prevention)', async () => {
+  it('echo of Relay’s own write (origin marker in a Relay-written field, real job) is recorded but never processed; free text quoting a marker is not an echo', async () => {
     process.env.SLACK_SIGNING_SECRET = 'slack-signing-secret-test';
-    const body = JSON.stringify({ type: 'event_callback', event_id: `Ev4${Date.now()}`, team_id: 'T1', event: { type: 'message', text: 'relay:7c9e6679-7425-40de-944b-e07fc1f90ae7' } });
-    await ingestIntegrationWebhook('slack', slackReq(body, process.env.SLACK_SIGNING_SECRET), new URLSearchParams());
-    const r = await testPool().query(`SELECT origin, state FROM integration_events ORDER BY received_at DESC LIMIT 1`);
-    expect(r.rows[0]).toEqual({ origin: 'relay_echo', state: 'ignored' });
+    const t = await setup();
+    const integ = await createSimulatedIntegration(t.owner, { connector: 'slack' });
+    const { job } = await enqueueSyncJob(t.owner, { integrationId: integ.id, kind: 'slack.post_message', relayType: 'case', relayId: '7c9e6679-7425-40de-944b-e07fc1f90ae7', idempotencyKey: `echo-${Date.now()}`, payload: {} });
+    const last = async () => (await testPool().query(`SELECT origin, state FROM integration_events ORDER BY received_at DESC LIMIT 1`)).rows[0];
+    // Relay's own write: marker in message metadata (a field only Relay sets) naming a job Relay ran.
+    const echo = JSON.stringify({ type: 'event_callback', event_id: `Ev4${Date.now()}`, team_id: 'T1', event: { type: 'message', text: 'Case alert', metadata: { event_type: 'relay_origin', event_payload: { marker: `relay:${job.id}` } } } });
+    await ingestIntegrationWebhook('slack', slackReq(echo, process.env.SLACK_SIGNING_SECRET), new URLSearchParams());
+    expect(await last()).toEqual({ origin: 'relay_echo', state: 'ignored' });
+    // A person quoting the same marker in free text is an external event, processed normally.
+    const quoted = JSON.stringify({ type: 'event_callback', event_id: `Ev5${Date.now()}`, team_id: 'T1', event: { type: 'message', text: `see relay:${job.id}` } });
+    await ingestIntegrationWebhook('slack', slackReq(quoted, process.env.SLACK_SIGNING_SECRET), new URLSearchParams());
+    expect(await last()).toEqual({ origin: 'external', state: 'pending' });
+    // A marker in a Relay-written field that names no Relay job is not an echo either.
+    const forged = JSON.stringify({ type: 'event_callback', event_id: `Ev6${Date.now()}`, team_id: 'T1', event: { type: 'message', metadata: { event_payload: { marker: 'relay:7c9e6679-7425-40de-944b-e07fc1f90ae7' } } } });
+    await ingestIntegrationWebhook('slack', slackReq(forged, process.env.SLACK_SIGNING_SECRET), new URLSearchParams());
+    expect(await last()).toEqual({ origin: 'external', state: 'pending' });
   });
 
   it('sync jobs: one external record per logical request despite repeats; retry honours Retry-After; unknown is reconciled, not resent', async () => {

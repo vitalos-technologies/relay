@@ -116,7 +116,7 @@ describe('MCP discovery and protocol', () => {
   it('serves RFC 9728 protected-resource metadata and challenges unauthenticated requests', async () => {
     const meta = protectedResourceMetadata();
     expect(OAuthProtectedResourceMetadataSchema.parse(meta)).toMatchObject({ resource: RESOURCE, authorization_servers: [ISS] });
-    expect(meta.scopes_supported).toEqual(ALL.split(' '));
+    expect(meta.scopes_supported).toEqual([...ALL.split(' '), 'inbox.read', 'inbox.draft', 'inbox.assign', 'cases.manage', 'listening.read', 'ai.prepare']);
     const res = await raw(INIT);
     expect(res.status).toBe(401);
     const www = res.headers.get('www-authenticate')!;

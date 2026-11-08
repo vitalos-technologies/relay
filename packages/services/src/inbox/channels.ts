@@ -8,11 +8,12 @@ import { getPool, many, maybeOne, one, withTx } from '@social-lite/db';
 import { z } from 'zod';
 import type { Ctx } from '../context.js';
 import { audit } from '../audit.js';
+import { log } from '../log.js';
 import { loadConnection, toPublishConnection, type ConnectionStoreRow } from '../connections/index.js';
 import { assertUuid, authorizeCtx, brandAllowed, requireAction } from '../tenancy.js';
 import { CHANNEL_CAPABILITIES } from './capabilities.js';
 import { iso, type ChannelRow } from './shared.js';
-import { channelOptions, telegramGate } from './channels-telegram.js';
+import { channelOptions, releaseTelegramWebhook, telegramGate } from './channels-telegram.js';
 
 /** Stream B: status of an integration-backed channel (WhatsApp, Google Business Profile) on resume. */
 async function integrationStatus(db: Parameters<typeof maybeOne>[0], r: ChannelRow): Promise<{ status: ChannelRow['status']; detail: string | null; missing: string[] }> {
@@ -122,11 +123,26 @@ export async function setChannelPaused(ctx: Ctx, id: string, paused: boolean): P
 
 /** Remove a channel from the inbox. Conversations and history are kept (read-only); no new messages are routed to it. */
 export async function removeChannel(ctx: Ctx, id: string): Promise<void> {
+  // Telegram (stream F): hand the bot's update stream back first — releaseTelegramWebhook deletes the webhook ONLY if it
+  // is still Relay's own. If Telegram cannot be reached the channel is still removed (its secret is cleared below, so
+  // Relay's receiver rejects further updates) and the audit row says the release did not happen.
+  let telegramRelease: 'released' | 'not_relay' | 'failed' | null = null;
+  const pre = await loadChannelFor(ctx, id, 'inbox.manage');
+  if (pre.kind === 'telegram_bot' && !pre.disconnected_at) {
+    const owner = (pre.settings?.telegram as { owner?: string } | undefined)?.owner;
+    try {
+      await releaseTelegramWebhook(ctx, id);
+      telegramRelease = owner === 'relay' ? 'released' : 'not_relay';
+    } catch (err) {
+      telegramRelease = 'failed';
+      log.warn('inbox.telegram_release_failed', { channelId: id, err: err as Error });
+    }
+  }
   await withTx(async (tx) => {
     const r = await loadChannelFor(ctx, id, 'inbox.manage', true, tx);
-    await tx.query(`UPDATE inbox_channels SET disconnected_at=now(), status='disconnected', updated_at=now() WHERE id=$1`, [id]);
+    await tx.query(`UPDATE inbox_channels SET disconnected_at=now(), status='disconnected', updated_at=now()${r.kind === 'telegram_bot' ? ', secret_enc=NULL' : ''} WHERE id=$1`, [id]);
     await tx.query(`UPDATE inbox_reply_attempts SET state='cancelled', error_code='channel_removed', error_message='The channel was removed before sending.', finished_at=now(), updated_at=now() WHERE channel_id=$1 AND state='queued'`, [id]);
-    await audit(tx, { workspaceId: r.workspace_id, brandId: r.brand_id, actorUserId: ctx.actor.userId, action: 'inbox.channel_removed', resourceType: 'inbox_channel', resourceId: id, correlationId: ctx.correlationId });
+    await audit(tx, { workspaceId: r.workspace_id, brandId: r.brand_id, actorUserId: ctx.actor.userId, action: 'inbox.channel_removed', resourceType: 'inbox_channel', resourceId: id, correlationId: ctx.correlationId, ...(telegramRelease ? { diff: { telegram_webhook: telegramRelease } } : {}) });
   });
 }
 

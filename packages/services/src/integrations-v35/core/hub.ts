@@ -19,6 +19,7 @@ import {
   CONNECTORS, createSimulatedIntegration, disconnectIntegration, listIntegrations, listResources, loadIntegration, recordActivity, toIntegrationJson, upsertIntegrationConnection,
   type IntegrationRow,
 } from '../../connectors/index.js';
+import { canSeeInstanceSetup } from '../../setup.js';
 import { appErrorFrom, hubAdapter, liveTransport, openConn, operatorConfig, simulationAllowed, transportFor, webhookUrlFor } from './runtime.js';
 
 const STATE_TTL_MS = 10 * 60_000;
@@ -39,17 +40,25 @@ export async function connectorSetup(connector: HubConnector): Promise<Connector
   };
 }
 
+/** Stream F: setup values only for the instance owner / platform operators; others get the state without the details. */
+async function setupFor(ctx: Ctx, connector: HubConnector, visible?: boolean): Promise<ConnectorSetupJson> {
+  const s = await connectorSetup(connector);
+  const show = visible ?? await canSeeInstanceSetup(ctx);
+  return show ? { ...s, setup_details_visible: true } : { ...s, missing_settings: [], redirect_uri: null, webhook_url: null, setup_details_visible: false };
+}
+
 export async function hubOverview(ctx: Ctx): Promise<HubOverviewJson> {
   requireAction(ctx, 'integrations.read');
   const { items } = await listIntegrations(ctx);
-  const connectors = await Promise.all(HUB_CONNECTORS.map(async (c) => ({ ...(await connectorSetup(c)), installations: items.filter((i) => i.connector === c) })));
+  const visible = await canSeeInstanceSetup(ctx);
+  const connectors = await Promise.all(HUB_CONNECTORS.map(async (c) => ({ ...(await setupFor(ctx, c, visible)), installations: items.filter((i) => i.connector === c) })));
   return { connectors, can_manage: authorizeCtx(ctx, 'integrations.manage', { brandId: null }).allowed || (ctx.access.brandIds ?? []).some((b) => authorizeCtx(ctx, 'integrations.manage', { brandId: b }).allowed) };
 }
 
 export async function installationDetail(ctx: Ctx, id: string): Promise<InstallationDetailJson> {
   const r = await loadIntegration(ctx, id, 'integrations.read');
   const { items } = await listResources(ctx, id);
-  return { integration: toIntegrationJson(r), setup: await connectorSetup(r.connector as HubConnector), resources: items,
+  return { integration: toIntegrationJson(r), setup: await setupFor(ctx, r.connector as HubConnector), resources: items,
     can_manage: authorizeCtx(ctx, 'integrations.manage', { brandId: r.brand_id }).allowed };
 }
 

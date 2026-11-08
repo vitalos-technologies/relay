@@ -9,11 +9,12 @@
 // daily cap is reached — and never on model confidence alone. Anything else escalates to a person.
 import { AppError } from '@social-lite/core';
 import { ALWAYS_ESCALATE, type ClassificationDto } from '@social-lite/core/contracts/v35-ai';
-import type { AutomationRunDto, AutomationTrigger, RuleAction, RuleLimits, RuleSchedule, RuleScope, RunActionResult, RunOutcome } from '@social-lite/core/contracts/v35-automation';
+import { TRIGGER_ACTIONS, TRIGGER_INTEGRATION_KINDS, type AutomationRunDto, type AutomationTrigger, type RuleAction, type RuleLimits, type RuleSchedule, type RuleScope, type RunActionResult, type RunOutcome } from '@social-lite/core/contracts/v35-automation';
 import { businessMsBetween } from '@social-lite/core/contracts/v35-sla';
 import { getPool, many, maybeOne, one, withTx, type Queryable } from '@social-lite/db';
 import type { Ctx } from '../context.js';
 import { log } from '../log.js';
+import { requireAction } from '../tenancy.js';
 import { addNote, assignConversation, updateConversation } from '../inbox/conversations.js';
 import { requestReply } from '../inbox/replies.js';
 import { calendarOf, createCase } from '../inbox/cases.js';
@@ -37,7 +38,7 @@ export interface EngineEvent {
   workspaceId: string;
   trigger: AutomationTrigger;
   eventKey: string;
-  subject: { type: 'conversation' | 'case'; id: string };
+  subject: { type: 'conversation' | 'case' | 'listening_alert' | 'post'; id: string };
   brandId: string;
   channelId: string | null;
   conversationId: string | null;
@@ -47,6 +48,15 @@ export interface EngineEvent {
   conversationVersion: number | null;
   /** The new customer message (keyword conditions/escalation only; never stored). */
   messageText?: string | null;
+  /** Simulated source data (listening alerts on the simulated dataset): never sent to live integrations. */
+  simulated?: boolean;
+}
+
+/** Relay link + notification requirement for non-conversation subjects (listening alerts, approved posts). */
+function subjectRef(e: EngineEvent): { path: string; referenceType: string; permission: 'listening.read' | 'content.read' } | null {
+  if (e.subject.type === 'listening_alert') return { path: `/listening/alerts/${e.subject.id}`, referenceType: 'listening_alert', permission: 'listening.read' };
+  if (e.subject.type === 'post') return { path: `/posts/${e.subject.id}`, referenceType: 'post', permission: 'content.read' };
+  return null;
 }
 
 interface RunRow { id: string; workspace_id: string; rule_id: string | null; policy_id: string | null; outcome: RunOutcome; actions: RunActionResult[] }
@@ -143,6 +153,7 @@ function replyError(type: 'reply_saved' | 'reply_ai', err: unknown): RunActionRe
 // ------------------------------------------------------------------ action execution
 async function runAction(ctx: Ctx, p: PolicyRow, rule: RuleRow, run: { id: string; rule_id: string | null }, e: EngineEvent, a: RuleAction, index: number, state: { escalated: boolean; text: string | null }): Promise<RunActionResult> {
   if (!p.allowed_actions.includes(a.type)) return blocked(a.type, 'Not allowed by the policy.');
+  if (!TRIGGER_ACTIONS[e.trigger].includes(a.type)) return blocked(a.type, 'Not available for this trigger.');
   const convId = e.conversationId;
   const needConv = async () => {
     if (!convId) throw new AppError('invalid_state', 'No conversation for this event.');
@@ -177,6 +188,19 @@ async function runAction(ctx: Ctx, p: PolicyRow, rule: RuleRow, run: { id: strin
         return done(a.type, `Case #${c.number} created.`, { case_id: c.id });
       }
       case 'notify': {
+        const ref = subjectRef(e);
+        if (ref) {
+          // Alert/approval subjects: chosen people only, each re-checked for the subject's permission at delivery.
+          let sent = 0;
+          for (const u of (a.to === 'users' ? a.user_ids ?? [] : []).slice(0, 20)) {
+            const r = await deliverNotification(getPool(), {
+              workspaceId: p.workspace_id, userId: u, event: 'assignment', kind: 'automation.notify', title: `Automation: ${rule.name}`, referenceType: ref.referenceType, referenceId: e.subject.id,
+              dedupeKey: `auto:${run.id}:${index}:${u}`, requirement: { brandId: e.brandId, permission: ref.permission }, linkPath: ref.path, actorId: null,
+            });
+            if (r === 'created') sent++;
+          }
+          return sent ? done(a.type, `Notified ${sent}.`) : { type: a.type, status: 'skipped', detail: 'Nobody to notify.', refs: {} };
+        }
         const conv = await needConv();
         let users: string[] = [];
         if (a.to === 'assignee' && conv.assignee_id) users = [conv.assignee_id];
@@ -219,13 +243,18 @@ async function runAction(ctx: Ctx, p: PolicyRow, rule: RuleRow, run: { id: strin
       }
       case 'integration_job': {
         if (!syncExecutor(a.kind)) return blocked(a.type, 'This integration action is not available yet.');
-        const integ = await maybeOne<{ connector: string }>(getPool(), `SELECT connector FROM integration_connections WHERE id=$1 AND workspace_id=$2 AND disconnected_at IS NULL`, [a.integration_id, p.workspace_id]);
+        const integ = await maybeOne<{ connector: string; is_simulated: boolean }>(getPool(), `SELECT connector, is_simulated FROM integration_connections WHERE id=$1 AND workspace_id=$2 AND disconnected_at IS NULL`, [a.integration_id, p.workspace_id]);
         if (!integ || !a.kind.startsWith(`${integ.connector}.`)) return blocked(a.type, 'The integration is not connected.');
-        const relayType = e.subject.type === 'case' ? 'case' : 'conversation';
+        if (!(TRIGGER_INTEGRATION_KINDS[e.trigger] ?? []).includes(a.kind)) return blocked(a.type, 'This integration action does not apply to this trigger.');
+        if (e.simulated && !integ.is_simulated) return blocked(a.type, 'Simulated data is never sent to a live integration.');
+        const relayType = e.subject.type;
+        const ref = subjectRef(e);
+        // The policy owner (service actor) must be able to see what the job links to.
+        if (ref) requireAction(ctx, ref.permission, { brandId: e.brandId });
         // Minimal payload: ids, category and a secure Relay link — never the customer's private messages.
         const r = await enqueueSyncJob(ctx, {
           integrationId: a.integration_id, kind: a.kind, relayType, relayId: e.subject.id, idempotencyKey: `automation:${rule.id}:${e.eventKey}:${index}`,
-          payload: { source: 'relay_automation', rule: rule.name, category: e.classification?.category ?? null, link: convId ? `/inbox?c=${convId}` : null, brand_id: e.brandId },
+          payload: { source: 'relay_automation', rule: rule.name, category: e.classification?.category ?? null, link: ref ? ref.path : convId ? `/inbox?c=${convId}` : null, brand_id: e.brandId },
         });
         return done(a.type, r.created ? 'Integration job queued.' : 'Integration job already queued.', { sync_job_id: r.job.id });
       }
@@ -360,6 +389,29 @@ export async function onCaseChanged(ev: { workspaceId: string; aggregateId: stri
     workspaceId: ev.workspaceId, trigger: 'case.changed', eventKey: `case:${c.id}:${change}:${c.version}${ev.payload.which ? `:${String(ev.payload.which)}` : ''}`, subject: { type: 'case', id: c.id }, brandId: c.brand_id,
     channelId: conv?.channel_id ?? null, conversationId: conv?.id ?? null, classification: null, conversationVersion: conv?.version ?? null,
     facts: { case_change: change, priority: c.priority, assigned: !!c.owner_id },
+  });
+}
+
+/** listening.alert_fired hook (stream D outbox event): one run per rule + alert. Ignores automation-origin events. */
+export async function onListeningAlert(ev: { workspaceId: string; aggregateId: string; payload: Record<string, unknown>; origin: { kind: string } }): Promise<string[]> {
+  if (ev.origin.kind === 'automation') return [];
+  const a = await maybeOne<{ id: string; brand_id: string; is_simulated: boolean }>(getPool(),
+    `SELECT a.id, a.brand_id, coalesce(a.is_simulated, false) AS is_simulated FROM listening_alerts a WHERE a.id=$1 AND a.workspace_id=$2`, [ev.aggregateId, ev.workspaceId]);
+  if (!a) return [];
+  return processEvent({
+    workspaceId: ev.workspaceId, trigger: 'listening.alert', eventKey: `alert:${a.id}`, subject: { type: 'listening_alert', id: a.id }, brandId: a.brand_id,
+    channelId: null, conversationId: null, classification: null, conversationVersion: null, facts: {}, simulated: a.is_simulated || ev.payload.simulated === true,
+  });
+}
+
+/** content.approved hook (bridge from 'approval.decided'): one run per rule + approval. */
+export async function onContentApproved(ev: { workspaceId: string; aggregateId: string; payload: Record<string, unknown>; origin: { kind: string } }): Promise<string[]> {
+  if (ev.origin.kind === 'automation') return [];
+  const a = await maybeOne<{ post_id: string; brand_id: string }>(getPool(), `SELECT post_id, brand_id FROM approvals WHERE id=$1 AND workspace_id=$2 AND decision='approved'`, [ev.aggregateId, ev.workspaceId]);
+  if (!a) return [];
+  return processEvent({
+    workspaceId: ev.workspaceId, trigger: 'content.approved', eventKey: `approval:${ev.aggregateId}`, subject: { type: 'post', id: a.post_id }, brandId: a.brand_id,
+    channelId: null, conversationId: null, classification: null, conversationVersion: null, facts: {},
   });
 }
 

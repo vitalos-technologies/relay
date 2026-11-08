@@ -9,7 +9,7 @@ import { audit } from './audit.js';
 import { config } from './config.js';
 import type { Ctx } from './context.js';
 import { envSetting, isSettingKey, setSetting, SETTING_DEFS, settingSource, type SettingKey } from './settings.js';
-import { requireAction } from './tenancy.js';
+import { authorizeCtx, requireAction } from './tenancy.js';
 
 export interface SetupItem {
   key: string; label: string; secret: boolean; is_set: boolean; source: 'env' | 'setup' | null; hint: string;
@@ -113,6 +113,18 @@ async function settingItem(key: SettingKey, db: Queryable): Promise<SetupItem> {
   }
   if (key === 'META_GRAPH_VERSION' && source === null) { item.value = 'v26.0'; item.is_set = true; item.hint = `${def.hint} (default in use)`; }
   return item;
+}
+
+/** Non-throwing: may this person see instance setup details (setup values, redirect/webhook URLs)? Instance owner
+ *  (setup.manage in the primary workspace in production; any setup.manage holder in development) or a platform operator. */
+export async function canSeeInstanceSetup(ctx: Ctx, db: Queryable = getPool()): Promise<boolean> {
+  if (authorizeCtx(ctx, 'setup.manage').allowed) {
+    if (!prod()) return true;
+    const first = await maybeOne<{ id: string }>(db, `SELECT id FROM workspaces WHERE NOT is_demo ORDER BY created_at, id LIMIT 1`);
+    if (first?.id === ctx.access.workspaceId) return true;
+  }
+  const op = await maybeOne(db, `SELECT 1 FROM platform_operators o JOIN users u ON u.id=o.user_id WHERE o.user_id=$1 AND o.role='operator' AND o.revoked_at IS NULL AND u.disabled_at IS NULL`, [ctx.actor.userId]);
+  return !!op;
 }
 
 /** In production only the owner of the first (bootstrap) workspace manages instance-wide settings. */

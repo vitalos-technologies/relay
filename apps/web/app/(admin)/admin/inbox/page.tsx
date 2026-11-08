@@ -5,7 +5,7 @@
 import Link from 'next/link';
 import { useApi } from '@/lib/client/use-api';
 import { Badge, Card, CardHeader, ErrorState, InfoTip, PageHeader, SimulatedBadge, SkeletonRows } from '@/components/ui';
-import { Ago, StatTile } from '@/components/admin/ui';
+import { Ago, StatTile, duration } from '@/components/admin/ui';
 import type { InboxAdminOverview } from '@social-lite/services/inbox/admin';
 import { CHANNEL_LABEL } from '@/components/inbox/labels';
 
@@ -18,7 +18,7 @@ export default function AdminInboxPage() {
         <div className="flex flex-col gap-6">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <StatTile label="Waiting for a reply" state={data.backlog.unanswered ? 'degraded' : 'healthy'} value={data.backlog.unanswered}
-              detail={data.backlog.oldest_unanswered_minutes !== null ? `Oldest ${data.backlog.oldest_unanswered_minutes} min · ${data.backlog.unassigned} unassigned` : `${data.backlog.unassigned} unassigned`} href="/inbox" />
+              detail={data.backlog.oldest_unanswered_minutes !== null ? `Oldest ${duration(data.backlog.oldest_unanswered_minutes * 60)} · ${data.backlog.unassigned} unassigned` : `${data.backlog.unassigned} unassigned`} href="/inbox" />
             <StatTile label="Replies not confirmed" state={data.replies.unknown ? 'degraded' : 'healthy'} value={data.replies.unknown} detail={`${data.replies.queued + data.replies.sending} sending now`} href="/inbox?queue=all" />
             <StatTile label="Failed replies (24 h)" state={data.replies.failed_24h ? 'failed' : 'healthy'} value={data.replies.failed_24h} detail={`${data.replies.sent_24h} sent in 24 h`} href="/inbox?queue=all" />
             <StatTile label="Service-level breaches" state={data.sla.breached_open ? 'failed' : data.sla.at_risk_1h ? 'degraded' : 'healthy'} value={data.sla.breached_open} detail={`${data.sla.at_risk_1h} due within an hour`} href="/inbox" />

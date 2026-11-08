@@ -5,7 +5,7 @@
 import {
   Activity, BadgeCheck, BookOpen, Building2, Cable, ChartColumn, CheckCheck, Cog, FileStack, Flag, Gauge, HandHelping, HeartPulse, KeyRound,
   LayoutDashboard, LifeBuoy, ListChecks, MessageSquareWarning, Plug, ScrollText, Send, ServerCog, ShieldCheck, Stethoscope, Tag, ToggleRight, UserCog, Users, UsersRound,
-  Webhook, Wrench, Workflow, MessagesSquare, UserRoundCog, BellRing, SlidersHorizontal, type LucideIcon,
+  Webhook, Wrench, Workflow, MessagesSquare, UserRoundCog, BellRing, SlidersHorizontal, Radar, Sparkles, type LucideIcon,
 } from 'lucide-react';
 import type { Action, Permission } from '@social-lite/core';
 import { SETTINGS, itemAllowed, type Perms } from '@/components/settings-shell/registry';
@@ -54,10 +54,16 @@ export const WORKSPACE_NAV: AdminNavGroup[] = [
     { href: '/admin/collaboration/notifications', label: 'Notification delivery', icon: BellRing, visible: v2('workspace.manage'), keywords: 'email failed smtp digest diagnose' },
     { href: '/admin/collaboration/settings', label: 'Collaboration settings', icon: SlidersHorizontal, visible: v2('workspace.manage'), keywords: 'client comments reminders presence defaults reviewers permissions' },
   ] },
-  { id: 'inbox', label: 'Inbox and integrations', icon: MessagesSquare, items: [
-    { href: '/admin/inbox', label: 'Inbox health', icon: HeartPulse, visible: v1('diagnostics.read'), keywords: 'backlog replies failed unknown sla breaches channels webhooks integrations sync' },
+  // V3.5 (stream F): one area for inbox, integrations, listening, AI and automation — counts and states only.
+  { id: 'inbox', label: 'Inbox, listening and AI', icon: MessagesSquare, items: [
+    { href: '/admin/care', label: 'Overview', icon: LayoutDashboard, visible: v1('diagnostics.read'), keywords: 'v3.5 care inbox listening ai automation health summary' },
+    { href: '/admin/inbox', label: 'Inbox health', icon: HeartPulse, visible: v1('diagnostics.read'), keywords: 'backlog replies failed unknown sla breaches channels webhooks' },
+    { href: '/admin/integrations', label: 'Integrations and sync', icon: Cable, visible: v1('diagnostics.read'), keywords: 'connector health sync lag jobs webhooks slack translation asana monday hubspot mailchimp' },
+    { href: '/admin/listening', label: 'Listening coverage', icon: Radar, visible: v2('workspace.read'), keywords: 'sources coverage ingestion failures alerts mentions' },
+    { href: '/admin/ai', label: 'AI and automation', icon: Sparkles, visible: v1('diagnostics.read'), keywords: 'ai usage budget tokens runs automation policies rules emergency stop' },
     settings('inbox', 'channels', 'Inbox channels'),
     settings('inbox', 'service-levels'),
+    settings('listening', 'sources', 'Listening sources'),
   ] },
   { id: 'content', label: 'Content and media', icon: FileStack, items: [
     { href: '/admin/content', label: 'Jobs and storage', icon: FileStack, visible: v2('content.read'), keywords: 'imports exports writeback media trash storage' },
@@ -118,6 +124,7 @@ export const PLATFORM_NAV: AdminNavGroup[] = [
     { href: '/admin/platform/rollouts', label: 'Rollouts', icon: Flag, visible: anyStaff, keywords: 'feature flags kill switch percent' },
     { href: '/admin/platform/integrations', label: 'Integrations', icon: ListChecks, visible: anyStaff, keywords: 'providers apps configured matrix' },
     { href: '/admin/platform/collaboration', label: 'Collaboration pipeline', icon: MessagesSquare, visible: anyStaff, keywords: 'notifications email reminders outbox' },
+    { href: '/admin/platform/care', label: 'Inbox and AI pipeline', icon: HeartPulse, visible: anyStaff, keywords: 'inbox replies sync listening ai automation counts' },
   ] },
   { id: 'p-security', label: 'Security', icon: ShieldCheck, items: [
     { href: '/admin/platform/support', label: 'Support access', icon: LifeBuoy, visible: anyStaff, keywords: 'request time-boxed' },

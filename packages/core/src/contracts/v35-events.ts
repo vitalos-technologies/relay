@@ -24,6 +24,7 @@ export const V35_OUTBOX_EVENTS = [
   'listening.rematch_requested', // aggregate: listening_searches.id  payload: { version } (stream D)
   'listening.alert_fired',       // aggregate: listening_alerts.id    payload: { ruleId, searchId, brandId } (stream D; onInboxEvent subscribers)
   'inbox.inbound_received',      // aggregate: inbox_channels.id  payload: { eventId } (stream B; Relay-owned channel webhook, e.g. Telegram)
+  'content.approved',            // aggregate: approvals.id  payload: { postId, brandId } (stream F bridge from 'approval.decided'; automation trigger)
 ] as const;
 export type V35OutboxEvent = (typeof V35_OUTBOX_EVENTS)[number];
 
@@ -50,6 +51,7 @@ export const V35_EVENT_QUEUES: Record<V35OutboxEvent, string> = {
   'listening.rematch_requested': V35_QUEUES.listeningIngest,
   'listening.alert_fired': V35_QUEUES.inboxEvents,
   'inbox.inbound_received': V35_QUEUES.inboxEvents,
+  'content.approved': V35_QUEUES.inboxEvents,
 };
 
 /** New workload classes (added to WORKLOAD_CLASSES in v31-perf.ts; DB check widened in 028). */

@@ -8,6 +8,9 @@ export const MCP_SDK_VERSION = '1.32.2';
 
 export const MCP_SCOPES = [
   'social.read', 'drafts.write', 'reviews.submit', 'publishing.schedule', 'publishing.publish', 'analytics.read', 'reports.export',
+  // V3.5 (stream F): inbox, cases, listening and AI preparation. Never a send scope: replies are DRAFTED for a person to
+  // send in Relay (send-once path), and there is no mass-mention or notification tool.
+  'inbox.read', 'inbox.draft', 'inbox.assign', 'cases.manage', 'listening.read', 'ai.prepare',
 ] as const;
 export type McpScope = (typeof MCP_SCOPES)[number];
 export const isMcpScope = (s: string): s is McpScope => (MCP_SCOPES as readonly string[]).includes(s);
@@ -23,6 +26,12 @@ export const MCP_SCOPE_LABEL: Record<McpScope, string> = {
   'publishing.publish': 'Prepare and commit immediate publications',
   'analytics.read': 'Read analytics, metric definitions and data coverage',
   'reports.export': 'Create report exports',
+  'inbox.read': 'Read inbox conversations and cases (internal notes excluded)',
+  'inbox.draft': 'Save reply drafts for a person to review and send in Relay (never sends)',
+  'inbox.assign': 'Assign conversations to people who can access them',
+  'cases.manage': 'Create cases and change case state, owner and priority',
+  'listening.read': 'Read listening searches, mentions, timelines and alerts with coverage',
+  'ai.prepare': 'Ask Relay AI to prepare summaries, reply suggestions and triage (suggestions only)',
 };
 
 /**
@@ -38,11 +47,22 @@ export const MCP_SCOPE_PERMISSIONS: Record<McpScope, readonly Permission[]> = {
   'publishing.publish': ['content.schedule', 'content.publish'],
   'analytics.read': ['analytics.read'],
   'reports.export': ['exports.create'],
+  'inbox.read': ['workspace.read', 'brands.read', 'inbox.read'],
+  'inbox.draft': ['inbox.read', 'inbox.reply'],
+  'inbox.assign': ['inbox.read', 'inbox.assign'],
+  'cases.manage': ['inbox.read', 'cases.manage'],
+  'listening.read': ['workspace.read', 'brands.read', 'listening.read'],
+  // AI preparation adds only ai.use: reading the conversation/search it prepares from still needs inbox.read or
+  // listening.read granted to the same client (retrieval runs with the caller's permissions).
+  'ai.prepare': ['ai.use'],
 };
+
+/** Scopes whose tools touch customer conversations (shown separately at consent; never in MCP_DEFAULT_SCOPES). */
+export const MCP_CUSTOMER_DATA_SCOPES: McpScope[] = ['inbox.read', 'inbox.draft', 'inbox.assign', 'cases.manage', 'ai.prepare'];
 
 export interface McpToolInfo {
   name: string;
-  group: 'discover' | 'find' | 'draft' | 'review' | 'publish' | 'recover' | 'analyse' | 'reports';
+  group: 'discover' | 'find' | 'draft' | 'review' | 'publish' | 'recover' | 'analyse' | 'reports' | 'inbox' | 'cases' | 'listening' | 'assist';
   /** Any one of these scopes admits the call (the tool re-checks argument-specific scopes). */
   scopes: McpScope[];
   readOnly: boolean;
@@ -51,7 +71,8 @@ export interface McpToolInfo {
 }
 
 export const MCP_TOOLS: McpToolInfo[] = [
-  { name: 'list_workspaces', group: 'discover', scopes: ['social.read'], readOnly: true, destructive: false, idempotent: true },
+  // Discovery works with any granted scope (a V3.5 inbox-only client must still find its workspace).
+  { name: 'list_workspaces', group: 'discover', scopes: [...MCP_SCOPES], readOnly: true, destructive: false, idempotent: true },
   { name: 'list_brands', group: 'discover', scopes: ['social.read'], readOnly: true, destructive: false, idempotent: true },
   { name: 'list_connections', group: 'discover', scopes: ['social.read'], readOnly: true, destructive: false, idempotent: true },
   { name: 'get_capabilities', group: 'discover', scopes: ['social.read'], readOnly: true, destructive: false, idempotent: true },
@@ -87,6 +108,21 @@ export const MCP_TOOLS: McpToolInfo[] = [
   // V3.1 GOV (services/mcp/tools-gov.ts): read-only brand rules + integration diagnostics (same services/permissions as the app).
   { name: 'get_brand_rules', group: 'discover', scopes: ['social.read'], readOnly: true, destructive: false, idempotent: true },
   { name: 'get_integration_diagnostics', group: 'discover', scopes: ['social.read'], readOnly: true, destructive: false, idempotent: true },
+  // V3.5 (services/mcp/tools-v35.ts): the same inbox, case, listening and assistant services as the app.
+  { name: 'list_conversations', group: 'inbox', scopes: ['inbox.read'], readOnly: true, destructive: false, idempotent: true },
+  { name: 'get_conversation', group: 'inbox', scopes: ['inbox.read'], readOnly: true, destructive: false, idempotent: true },
+  { name: 'draft_reply', group: 'inbox', scopes: ['inbox.draft'], readOnly: false, destructive: false, idempotent: true },
+  { name: 'assign_conversation', group: 'inbox', scopes: ['inbox.assign'], readOnly: false, destructive: false, idempotent: true },
+  { name: 'list_cases', group: 'cases', scopes: ['inbox.read'], readOnly: true, destructive: false, idempotent: true },
+  { name: 'get_case', group: 'cases', scopes: ['inbox.read'], readOnly: true, destructive: false, idempotent: true },
+  { name: 'create_case', group: 'cases', scopes: ['cases.manage'], readOnly: false, destructive: false, idempotent: true },
+  { name: 'update_case', group: 'cases', scopes: ['cases.manage'], readOnly: false, destructive: false, idempotent: true },
+  { name: 'list_listening_searches', group: 'listening', scopes: ['listening.read'], readOnly: true, destructive: false, idempotent: true },
+  { name: 'query_listening', group: 'listening', scopes: ['listening.read'], readOnly: true, destructive: false, idempotent: true },
+  { name: 'list_listening_alerts', group: 'listening', scopes: ['listening.read'], readOnly: true, destructive: false, idempotent: true },
+  { name: 'get_listening_alert', group: 'listening', scopes: ['listening.read'], readOnly: true, destructive: false, idempotent: true },
+  { name: 'prepare_with_ai', group: 'assist', scopes: ['ai.prepare'], readOnly: false, destructive: false, idempotent: true },
+  { name: 'get_ai_result', group: 'assist', scopes: ['ai.prepare'], readOnly: true, destructive: false, idempotent: true },
 ];
 
 /** Stable, safe error codes returned in tool results (structuredContent.error.code). */
@@ -94,7 +130,7 @@ export const MCP_ERROR_CODES = [
   'not_found', 'forbidden', 'insufficient_scope', 'consent_required', 'client_revoked', 'mfa_required', 'validation_failed',
   'version_conflict', 'conflict', 'invalid_state', 'idempotency_conflict', 'in_progress', 'rate_limited', 'budget_exhausted',
   'approval_required', 'needs_choice', 'intent_stale', 'intent_expired', 'confirmation_required', 'unsupported_principal',
-  'source_connections_unavailable', 'result_too_large', 'cancelled', 'internal',
+  'source_connections_unavailable', 'result_too_large', 'cancelled', 'not_configured', 'internal',
 ] as const;
 export type McpErrorCode = (typeof MCP_ERROR_CODES)[number];
 

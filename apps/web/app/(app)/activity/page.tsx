@@ -13,7 +13,7 @@ import {
 } from '@/components/ui';
 import { postDownload } from '@/components/product/download';
 
-type Category = 'all' | 'permissions' | 'connections' | 'publishing' | 'security' | 'collaboration' | 'content';
+type Category = 'all' | 'permissions' | 'connections' | 'publishing' | 'security' | 'collaboration' | 'care' | 'content';
 interface Event {
   id: string; category: Category; action: string; resource_type: string; resource_id: string | null; brand_id: string | null; brand_name: string | null;
   actor: string; actor_user_id: string | null; diff: Record<string, unknown>; correlation_id: string | null; created_at: string;
@@ -22,10 +22,10 @@ interface ActivityPage { items: Event[]; next_cursor: string | null; can_export:
 
 const CATS: Array<{ value: Category; label: string }> = [
   { value: 'all', label: 'All' }, { value: 'permissions', label: 'Access' }, { value: 'connections', label: 'Accounts' },
-  { value: 'publishing', label: 'Publishing' }, { value: 'security', label: 'Security' }, { value: 'collaboration', label: 'Collaboration' }, { value: 'content', label: 'Content' },
+  { value: 'publishing', label: 'Publishing' }, { value: 'security', label: 'Security' }, { value: 'collaboration', label: 'Collaboration' }, { value: 'care', label: 'Inbox and AI' }, { value: 'content', label: 'Content' },
 ];
 const TONE: Record<Category, 'info' | 'warn' | 'danger' | 'success' | 'neutral' | 'accent'> = {
-  all: 'neutral', permissions: 'warn', connections: 'info', publishing: 'success', security: 'danger', collaboration: 'accent', content: 'neutral',
+  all: 'neutral', permissions: 'warn', connections: 'info', publishing: 'success', security: 'danger', collaboration: 'accent', care: 'info', content: 'neutral',
 };
 const isDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s);
 

@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { AppError, notFound } from '@social-lite/core';
 import { MESSAGE_CATEGORIES } from '@social-lite/core/contracts/v35-ai';
 import {
-  AUTOMATION_ACTIONS, AUTOMATION_TRIGGERS, CONDITION_FIELDS, CONDITION_OPS, CUSTOMER_FACING_ACTIONS, type AutomationCatalogDto, type AutomationRuleDto, type AutomationRunDto,
+  AUTOMATION_ACTIONS, AUTOMATION_TRIGGERS, CONDITION_FIELDS, CONDITION_OPS, CUSTOMER_FACING_ACTIONS, TRIGGER_ACTIONS, TRIGGER_INTEGRATION_KINDS, type AutomationCatalogDto, type AutomationRuleDto, type AutomationRunDto,
   type RuleAction, type RuleTestResult, type RunActionResult,
 } from '@social-lite/core/contracts/v35-automation';
 import { CONVERSATION_KINDS, PRIORITIES } from '@social-lite/core/contracts/v35-inbox';
@@ -57,13 +57,12 @@ export const INTEGRATION_ACTIONS: Record<string, { kind: string; label: string }
   slack: { kind: 'slack.post_message', label: 'Post to Slack channel' },
   asana: { kind: 'asana.create_task', label: 'Create Asana task' },
   monday: { kind: 'monday.create_item', label: 'Create monday.com item' },
-  mailchimp: { kind: 'mailchimp.create_campaign_draft', label: 'Create Mailchimp draft' },
+  // mailchimp.create_campaign_draft: deliberately not offered (drafts are made from approved posts in Relay; no executor).
   hubspot: { kind: 'hubspot.create_ticket', label: 'Create HubSpot ticket' },
 };
 
 function triggerAvailability(t: string): string | null {
   if (t === 'listening.alert') return listeningSourcesAvailable() ? null : 'Needs Listening alerts.';
-  if (t === 'content.approved') return 'Not available yet.';
   return null;
 }
 
@@ -76,11 +75,15 @@ async function validateRule(ctx: Ctx, input: RuleInput, p: PolicyRow, db: Querya
   for (const c of input.conditions) { const e = conditionError(input.trigger, c); if (e) err('conditions', e); }
   for (const a of input.actions) {
     if (!p.allowed_actions.includes(a.type)) err('actions', `The policy does not allow “${a.type}”.`);
+    if (!TRIGGER_ACTIONS[input.trigger].includes(a.type)) err('actions', `“${a.type}” is not available for this trigger.`);
+    if (a.type === 'notify' && (input.trigger === 'listening.alert' || input.trigger === 'content.approved') && (a.to !== 'users' || !a.user_ids?.length)) err('actions', 'Choose who to notify.');
+    if (a.type === 'integration_job' && !TRIGGER_INTEGRATION_KINDS[input.trigger].includes(a.kind)) err('actions', 'This integration action does not apply to this trigger.');
     if (CUSTOMER_FACING_ACTIONS.includes(a.type) && input.trigger !== 'inbox.message_received') err('actions', 'Automatic replies only answer new customer messages.');
     const people = a.type === 'assign' || a.type === 'escalate' ? [a.assignee_id] : a.type === 'notify' ? (a.user_ids ?? []) : [];
     for (const u of people.filter((x): x is string => !!x)) {
       const s = await loadUserAuthz(u, ctx.access.workspaceId, null, db);
-      if (s.subject.status !== 'active' || !input.scope.brand_ids.every((b) => staffAllowed(s, 'inbox.read', b))) err('actions', 'Choose people with inbox access on every brand in scope.');
+      const perm = input.trigger === 'listening.alert' ? 'listening.read' : input.trigger === 'content.approved' ? 'content.read' : 'inbox.read';
+      if (s.subject.status !== 'active' || !input.scope.brand_ids.every((b) => staffAllowed(s, perm, b))) err('actions', perm === 'inbox.read' ? 'Choose people with inbox access on every brand in scope.' : 'Choose people who can see this on every brand in scope.');
     }
     if ((a.type === 'assign' || a.type === 'escalate') && a.team_id && !(await maybeOne(db, `SELECT 1 FROM teams WHERE id=$1 AND workspace_id=$2 AND archived_at IS NULL`, [a.team_id, ctx.access.workspaceId]))) err('actions', 'Unknown team.');
     if (a.type === 'reply_saved' && !(await maybeOne(db, `SELECT 1 FROM inbox_saved_replies WHERE id=$1 AND workspace_id=$2 AND archived_at IS NULL AND (brand_id IS NULL OR brand_id = ANY($3::uuid[]))`, [a.saved_reply_id, ctx.access.workspaceId, input.scope.brand_ids]))) err('actions', 'Choose a saved reply for these brands.');
@@ -221,6 +224,12 @@ export async function testRule(ctx: Ctx, raw: unknown): Promise<RuleTestResult> 
       const matched = ev.matched && nearing;
       samples.push({ conversation_id: r.conv ?? r.id, matched, category: 'other', conditions: ev.results, actions: matched ? input.actions.map((a) => wouldRun(p, a, null, null)) : [] });
     }
+  } else {
+    // listening.alert / content.approved have no conditions: every recent alert/approval in scope would run the actions.
+    const rows = input.trigger === 'listening.alert'
+      ? await many<{ id: string }>(db, `SELECT id FROM listening_alerts WHERE workspace_id=$1 AND brand_id = ANY($2::uuid[]) ORDER BY created_at DESC LIMIT 10`, [ctx.access.workspaceId, input.scope.brand_ids])
+      : await many<{ id: string }>(db, `SELECT post_id AS id FROM approvals WHERE workspace_id=$1 AND brand_id = ANY($2::uuid[]) AND decision='approved' ORDER BY decided_at DESC NULLS LAST LIMIT 10`, [ctx.access.workspaceId, input.scope.brand_ids]);
+    for (const r of rows) samples.push({ conversation_id: r.id, matched: true, category: 'other', conditions: [], actions: input.actions.map((a) => wouldRun(p, a, null, null)) });
   }
   return { evaluated: samples.length, matched: samples.filter((s) => s.matched).length, samples: samples.slice(0, 25) };
 }
@@ -252,7 +261,8 @@ export async function automationCatalog(ctx: Ctx): Promise<AutomationCatalogDto>
     `SELECT id, connector, display_name, status, paused FROM integration_connections WHERE workspace_id=$1 AND disconnected_at IS NULL ORDER BY connector LIMIT 100`, [ctx.access.workspaceId]).catch(() => []);
   const integrationJobs = integ.flatMap((i) => {
     const a = INTEGRATION_ACTIONS[i.connector];
-    if (!a) return [];
+    // Kinds without an executor in this process are hidden, not offered (Mailchimp drafts are made from approved posts).
+    if (!a || !syncExecutor(a.kind)) return [];
     const reason = !syncExecutor(a.kind) ? 'Not available yet.' : i.paused ? 'Paused.' : i.status !== 'active' ? 'Needs attention.' : null;
     return [{ integration_id: i.id, connector: i.connector, display_name: `${a.label} · ${i.display_name}`, kind: a.kind, available: !reason, reason }];
   });
@@ -261,7 +271,7 @@ export async function automationCatalog(ctx: Ctx): Promise<AutomationCatalogDto>
     actions: AUTOMATION_ACTIONS.map((t) => ({
       type: t, customer_facing: CUSTOMER_FACING_ACTIONS.includes(t),
       available: t === 'integration_job' ? integrationJobs.some((j) => j.available) : true,
-      reason: t === 'integration_job' && !integrationJobs.some((j) => j.available) ? (integ.length ? 'Not available yet.' : 'Connect an integration first.') : null,
+      reason: t === 'integration_job' && !integrationJobs.some((j) => j.available) ? (integrationJobs.length ? 'Needs attention.' : 'Connect an integration first.') : null,
     })),
     integration_jobs: integrationJobs, channels, conversation_kinds: CONVERSATION_KINDS, categories: MESSAGE_CATEGORIES,
     emergency_stop: await emergencyStopState(ctx.access.workspaceId, db),

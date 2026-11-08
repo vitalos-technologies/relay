@@ -1,0 +1,111 @@
+{
+ "at": "2026-11-08T06:56:19.205Z",
+ "workload": {
+  "conversations": 5000,
+  "messages": 20000,
+  "listening_observations": 7500
+ },
+ "budget_note": "docs/PERFORMANCE_BUDGETS.md: page read model ≤ 100 ms p95 (Medium) / ≤ 200 ms (Large); search ≤ 100 ms server. This workload is between Medium and Large; checked against 100 ms.",
+ "rows": [
+  {
+   "name": "inbox list (first page, all)",
+   "samples": 30,
+   "p50_ms": 8.9,
+   "p95_ms": 15.2,
+   "max_ms": 16.2,
+   "payload_kb": 17.9,
+   "budget_p95_ms": 100,
+   "within_budget": true
+  },
+  {
+   "name": "inbox list (cursor page)",
+   "samples": 30,
+   "p50_ms": 8.7,
+   "p95_ms": 9.9,
+   "max_ms": 10.3,
+   "payload_kb": 17.9,
+   "budget_p95_ms": 100,
+   "within_budget": true
+  },
+  {
+   "name": "inbox list (unassigned queue)",
+   "samples": 30,
+   "p50_ms": 2.7,
+   "p95_ms": 3.8,
+   "max_ms": 3.8,
+   "payload_kb": 17.9,
+   "budget_p95_ms": 100,
+   "within_budget": true
+  },
+  {
+   "name": "inbox search (q)",
+   "samples": 30,
+   "p50_ms": 7.8,
+   "p95_ms": 10.5,
+   "max_ms": 16.1,
+   "payload_kb": 0.6,
+   "budget_p95_ms": 100,
+   "within_budget": true
+  },
+  {
+   "name": "inbox thread",
+   "samples": 30,
+   "p50_ms": 5.2,
+   "p95_ms": 9.5,
+   "max_ms": 12.5,
+   "payload_kb": 3.1,
+   "budget_p95_ms": 100,
+   "within_budget": true
+  },
+  {
+   "name": "listening mentions (30 days, page)",
+   "samples": 30,
+   "p50_ms": 55.8,
+   "p95_ms": 78.8,
+   "max_ms": 80.6,
+   "payload_kb": 22,
+   "budget_p95_ms": 100,
+   "within_budget": true
+  },
+  {
+   "name": "listening timeline (30 days)",
+   "samples": 30,
+   "p50_ms": 49.6,
+   "p95_ms": 61.3,
+   "max_ms": 67.3,
+   "payload_kb": 4.5,
+   "budget_p95_ms": 100,
+   "within_budget": true
+  },
+  {
+   "name": "integrations hub",
+   "samples": 30,
+   "p50_ms": 3.9,
+   "p95_ms": 8,
+   "max_ms": 8.6,
+   "payload_kb": 5.9,
+   "budget_p95_ms": 100,
+   "within_budget": true
+  },
+  {
+   "name": "assistant status (drawer open)",
+   "samples": 30,
+   "p50_ms": 1.3,
+   "p95_ms": 1.8,
+   "max_ms": 2.8,
+   "payload_kb": 0.2,
+   "budget_p95_ms": 100,
+   "within_budget": true
+  },
+  {
+   "name": "admin summary (care)",
+   "samples": 30,
+   "p50_ms": 14.9,
+   "p95_ms": 27.4,
+   "max_ms": 28.9,
+   "payload_kb": 3.3,
+   "budget_p95_ms": 100,
+   "within_budget": true
+  }
+ ]
+}

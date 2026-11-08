@@ -143,7 +143,7 @@ test.describe('Inbox — remaining networks', () => {
     await page.getByRole('button', { name: 'Template', exact: true }).click();
     const d = page.getByRole('dialog', { name: 'Send a WhatsApp template' });
     await d.getByLabel('Template').selectOption({ label: 'we_miss_you · en · marketing' });
-    await d.getByLabel('Value {{1}}').fill('Wes');
+    await d.getByLabel(/^Value 1/).fill('Wes');
     await expect(d.getByText('Hi Wes, it has been a while.', { exact: false })).toBeVisible();
     await expect(d.getByText('This message is charged', { exact: true })).toBeVisible();
     await expect(d.getByRole('button', { name: 'Send (charged)' })).toHaveAttribute('aria-disabled', 'true');

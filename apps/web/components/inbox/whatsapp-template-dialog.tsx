@@ -42,7 +42,7 @@ function TemplateDialog({ channelId, conversationId, baseVersion, windowOpen, on
   const [busy, setBusy] = useState(false);
   const key = useRef<string | null>(null);
   const values = Array.from({ length: t?.param_count ?? 0 }, (_, i) => params[i] ?? '');
-  const preview = t ? t.body.replace(/\{\{(\d+)\}\}/g, (_m, n: string) => values[Number(n) - 1] || `{{${n}}}`) : '';
+  const preview = t ? t.body.replace(/\{\{(\d+)\}\}/g, (_m, n: string) => values[Number(n) - 1] || `[Value ${n}]`) : '';
   const charge = chargeFor(t, windowOpen, data?.rates ?? null);
   const missing = values.some((v) => !v.trim());
   return (
@@ -65,7 +65,7 @@ function TemplateDialog({ channelId, conversationId, baseVersion, windowOpen, on
           <Field label="Template"><Select value={t ? `${t.name}:${t.language}` : ''} onChange={(e) => { setSel(e.target.value); setParams([]); setAck(false); }}>
             {approved.map((x) => <option key={`${x.name}:${x.language}`} value={`${x.name}:${x.language}`}>{x.name} · {x.language} · {x.category ?? 'other'}</option>)}
           </Select></Field>
-          {values.map((v, i) => <Field key={i} label={`Value {{${i + 1}}}`}><Input value={v} maxLength={1000} onChange={(e) => { const n = [...values]; n[i] = e.target.value; setParams(n); }} /></Field>)}
+          {values.map((v, i) => <Field key={i} label={t?.examples?.[i] ? `Value ${i + 1} · e.g. ${t.examples[i]}` : `Value ${i + 1}`}><Input value={v} maxLength={1000} onChange={(e) => { const n = [...values]; n[i] = e.target.value; setParams(n); }} /></Field>)}
           <div className="rounded-lg border border-border bg-raised px-3 py-2 text-[13px]"><p className="mb-1 text-xs font-medium text-subtle">Will be sent exactly as</p><p className="whitespace-pre-wrap break-words">{preview}</p></div>
           {charge.billable ? (
             <Banner tone="warn" title="This message is charged">

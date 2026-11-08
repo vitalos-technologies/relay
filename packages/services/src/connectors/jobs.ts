@@ -8,12 +8,13 @@
 //    (never blindly retried), activity + rate-limit history, paused/disconnected integrations never run.
 import { AppError, notFound } from '@social-lite/core';
 import {
-  ORIGIN_MARKER_PREFIX, SYNC_RETRY, originMarker, syncBackoffMs, type ConnectorKey, type InboundRequest, type RelayObjectType, type SyncJobJson,
+  SYNC_RETRY, originMarker, syncBackoffMs, type ConnectorKey, type InboundRequest, type RelayObjectType, type SyncJobJson,
   type SyncJobRequest, type SyncJobState,
 } from '@social-lite/core/contracts/v35-connectors';
 import { getPool, many, maybeOne, one, withTx, type Queryable } from '@social-lite/db';
 import type { Ctx } from '../context.js';
 import { audit } from '../audit.js';
+import { authorize, loadUserAuthz } from '../authz.js';
 import { decryptSecret, settingAad } from '../crypto.js';
 import { log } from '../log.js';
 import { writeOutbox } from '../outbox.js';
@@ -75,7 +76,7 @@ export async function ingestIntegrationWebhook(connector: string, req: Omit<Inbo
     }
     return { raw_form: true };
   })();
-  const echo = req.rawBody.includes(ORIGIN_MARKER_PREFIX) && /relay:[0-9a-f-]{36}/i.test(req.rawBody);
+  const echo = await isRelayEcho(connector, body, inst?.id ?? null);
   const ins = await maybeOne<{ id: string }>(getPool(),
     `INSERT INTO integration_events(connector, dedupe_key, workspace_id, integration_id, external_account_id, event_type, origin, occurred_at, summary, body, state)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT (connector, dedupe_key) DO NOTHING RETURNING id`,
@@ -86,6 +87,48 @@ export async function ingestIntegrationWebhook(connector: string, req: Omit<Inbo
   }
   // Duplicates are acknowledged so providers stop redelivering; they are never processed twice.
   return { status: 200, body: JSON.stringify({ ok: true, duplicate: !ins }) };
+}
+
+/**
+ * Fields Relay itself writes on external records (stream F). Only these are searched for an origin marker — never free
+ * text such as a customer's message or a person's comment, which may quote a marker without being Relay's own write.
+ *  - Asana: the app-owned `external` field (external.gid = relay:<job id>);
+ *  - monday.com: the update Relay posts on items it creates (event.textBody);
+ *  - Slack: message metadata (event.metadata.event_payload);
+ *  - everything else: none (HubSpot/WhatsApp use their own tokens; their echoes are matched by provider id).
+ */
+const RELAY_WRITTEN_KEYS: Partial<Record<string, readonly string[]>> = { asana: ['external'], monday: ['textBody'], slack: ['metadata'] };
+const MARKER_RE = /relay:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/gi;
+
+export function relayWrittenMarkers(connector: string, body: unknown): string[] {
+  const keys = RELAY_WRITTEN_KEYS[connector];
+  if (!keys?.length) return [];
+  const out = new Set<string>();
+  const collect = (v: unknown, depth: number) => {
+    if (depth > 8) return;
+    if (typeof v === 'string') { for (const m of v.matchAll(MARKER_RE)) out.add(m[1]!.toLowerCase()); return; }
+    if (Array.isArray(v)) { for (const x of v.slice(0, 200)) collect(x, depth + 1); return; }
+    if (v && typeof v === 'object') for (const x of Object.values(v as Record<string, unknown>)) collect(x, depth + 1);
+  };
+  const walk = (v: unknown, depth: number) => {
+    if (depth > 8 || !v || typeof v !== 'object') return;
+    if (Array.isArray(v)) { for (const x of v.slice(0, 200)) walk(x, depth + 1); return; }
+    for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+      if (keys.includes(k)) collect(x, depth + 1); else walk(x, depth + 1);
+    }
+  };
+  walk(body, 0);
+  return [...out].slice(0, 20);
+}
+
+/** An echo = a marker in a Relay-written field that names a sync job Relay really ran for this installation/connector. */
+async function isRelayEcho(connector: string, body: unknown, integrationId: string | null): Promise<boolean> {
+  const ids = relayWrittenMarkers(connector, body);
+  if (!ids.length) return false;
+  const hit = await maybeOne(getPool(),
+    `SELECT 1 FROM integration_sync_jobs j JOIN integration_connections i ON i.id=j.integration_id
+      WHERE j.id = ANY($1::uuid[]) AND i.connector=$2 AND ($3::uuid IS NULL OR j.integration_id=$3) LIMIT 1`, [ids, connector, integrationId]);
+  return !!hit;
 }
 
 /** Worker: process one verified event through the connector's handler. */
@@ -170,6 +213,18 @@ export async function runSyncJob(jobId: string, workerId: string): Promise<SyncJ
         AND NOT i.paused AND i.disconnected_at IS NULL AND i.status NOT IN ('reconnect_required','disconnected')
       RETURNING j.*, i.paused AS integ_paused, i.status AS integ_status, i.disconnected_at AS integ_disconnected, i.brand_id`, [jobId, workerId, LEASE_MS / 1000]);
   if (!job) return 'skipped';
+  // Revocation (stream F): the person who requested the job (or the automation policy owner acting for it) must still
+  // be an active member with integrations.read where the job runs — the same check enqueueSyncJob made.
+  const requester = (job as JobRow & { created_by?: string | null }).created_by ?? null;
+  if (requester) {
+    const s = await loadUserAuthz(requester, job.workspace_id, null, db).catch(() => null);
+    // Same semantics as loadIntegration: brand installations need the brand; workspace ones need the permission anywhere.
+    const scopes = job.brand_id ? [job.brand_id] : [null, ...(s?.subject.grants.map((g) => g.brandId) ?? [])];
+    if (!s || s.subject.status !== 'active' || !scopes.some((b) => authorize(s, 'integrations.read', { brandId: b }).allowed)) {
+      await finish(db, job, 'failed', { code: 'requester_lost_access', message: 'The person who requested this no longer has access. Nothing was sent.' });
+      return 'failed';
+    }
+  }
   const exec = syncExecutor(job.kind);
   if (!exec) {
     await finish(db, job, 'failed', { code: 'no_executor', message: 'This sync action is not available.' });

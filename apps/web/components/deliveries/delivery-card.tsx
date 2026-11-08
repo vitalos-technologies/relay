@@ -30,7 +30,8 @@ export function DeliveryCard({ delivery: d, tz, onChanged, canAct = true, expand
             <span className="truncate text-sm font-medium">{d.display_name}</span>
             {d.is_mock ? <SimulatedBadge className="shrink-0" /> : null}
           </div>
-          <p className="truncate text-xs text-muted tabular">
+          {/* relative: the sr-only label is absolutely positioned and would otherwise escape the truncation (320 px overflow). */}
+          <p className="relative truncate text-xs text-muted tabular">
             {d.state === 'published' && d.published_at ? (
               <>{d.is_mock ? 'Simulated delivery' : 'Published'} <TimeWithZone instant={d.published_at} tz={tz} /></>
             ) : (
@@ -58,7 +59,7 @@ export function DeliveryCard({ delivery: d, tz, onChanged, canAct = true, expand
           </a>
         ) : null}
         {d.provider_ids.length ? (
-          <span className="min-w-0 max-w-[40%] truncate text-xs text-subtle" title={d.provider_ids.join(', ')}>
+          <span className="relative min-w-0 max-w-[40%] truncate text-xs text-subtle" title={d.provider_ids.join(', ')}>
             ID <code className="font-mono text-[11px]">{d.provider_ids.join(', ')}</code>
           </span>
         ) : null}

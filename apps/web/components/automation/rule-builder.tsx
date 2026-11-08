@@ -3,8 +3,9 @@
 // (dry run over recent conversations; changes and sends nothing) · Save. Options outside the chosen policy are hidden;
 // unavailable triggers/actions are shown with the reason.
 import { useState } from 'react';
-import { FlaskConical, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, FlaskConical, Plus, Trash2 } from 'lucide-react';
 import { PRIORITIES } from '@social-lite/core/contracts/v35-inbox';
+import { TRIGGER_ACTIONS, TRIGGER_INTEGRATION_KINDS } from '@social-lite/core/contracts/v35-automation';
 import type {
   AutomationActionType, AutomationCatalogDto, AutomationPolicyDto, AutomationRuleDto, AutomationTrigger, ConditionField, RuleAction, RuleCondition, RuleTestResult,
 } from '@social-lite/core/contracts/v35-automation';
@@ -35,7 +36,7 @@ function defaultAction(t: AutomationActionType): RuleAction {
     case 'add_labels': return { type: 'add_labels', labels: [] };
     case 'add_note': return { type: 'add_note', body: '' };
     case 'create_case': return { type: 'create_case', title: null };
-    case 'notify': return { type: 'notify', to: 'assignee' };
+    case 'notify': return { type: 'notify', to: 'assignee' };  // alert/approval triggers switch to chosen people (see ActionParams)
     case 'escalate': return { type: 'escalate', team_id: null, assignee_id: null, reason: null };
     case 'reply_saved': return { type: 'reply_saved', saved_reply_id: '', mode: 'private_message' };
     case 'reply_ai': return { type: 'reply_ai', mode: 'private_message' };
@@ -65,7 +66,9 @@ export function RuleBuilder({ catalog, policies, rule, onClose, onSaved }: { cat
   const [error, setError] = useState<unknown>(null);
   const [test, setTest] = useState<RuleTestResult | null>(null);
 
-  const allowed = policy?.allowed_actions ?? [];
+  const allowed = (policy?.allowed_actions ?? []).filter((t) => TRIGGER_ACTIONS[trigger].includes(t));
+  const noConversation = trigger === 'listening.alert' || trigger === 'content.approved';
+  const members = useApi<{ members: Array<{ user_id: string; name: string | null; email: string; status?: string }> }>(noConversation ? '/api/members?status=active' : null);
   const actionAvail = new Map(catalog.actions.map((a) => [a.type, a]));
   const customerFacing = actions.some((a) => a.type === 'reply_saved' || a.type === 'reply_ai');
   const brandName = (id: string) => session.brands.find((b) => b.id === id)?.name ?? 'Brand';
@@ -107,11 +110,19 @@ export function RuleBuilder({ catalog, policies, rule, onClose, onSaved }: { cat
 
         <section className="flex flex-col gap-3 rounded-xl border border-border p-3">
           <h3 className="text-xs font-medium uppercase tracking-[0.06em] text-subtle">When</h3>
-          <Select aria-label="Trigger" value={trigger} onChange={(e) => { setTrigger(e.target.value as AutomationTrigger); setConditions([]); }}>
+          <Select aria-label="Trigger" value={trigger} onChange={(e) => {
+            const t = e.target.value as AutomationTrigger;
+            setTrigger(t); setConditions([]);
+            // Keep only actions this trigger can run; alert/approval triggers notify chosen people.
+            const kept = actions.filter((a) => TRIGGER_ACTIONS[t].includes(a.type)).map((a) => (a.type === 'notify' && (t === 'listening.alert' || t === 'content.approved') ? { ...a, to: 'users' as const, user_ids: a.user_ids ?? [] } : a));
+            const first = (policy?.allowed_actions ?? []).find((x) => TRIGGER_ACTIONS[t].includes(x));
+            setActions(kept.length ? kept : first ? [defaultAction(first)] : []);
+          }}>
             {catalog.triggers.map((t) => <option key={t.trigger} value={t.trigger} disabled={!t.available}>{TRIGGER_LABEL[t.trigger]}{t.reason ? ` — ${t.reason}` : ''}</option>)}
           </Select>
           {trigger === 'case.sla_nearing' ? <Field label="Minutes before the deadline"><Input type="number" min={5} max={1440} value={minutesBefore} onChange={(e) => setMinutesBefore(e.target.value)} /></Field> : null}
           {trigger === 'inbox.message_received' ? <p className="text-xs text-muted">Messages are classified first (category, sentiment, urgency).</p> : null}
+          {noConversation ? <p className="text-xs text-muted">{trigger === 'listening.alert' ? 'Runs once per alert.' : 'Runs once per approved post.'} Notify people or create external work.</p> : null}
         </section>
 
         <section className="flex flex-col gap-3 rounded-xl border border-border p-3">
@@ -141,10 +152,12 @@ export function RuleBuilder({ catalog, policies, rule, onClose, onSaved }: { cat
                 </Select>
                 <IconButton label="Remove action" icon={<Trash2 className="size-4" />} variant="ghost" onClick={() => setActions(actions.filter((_, j) => j !== i))} />
               </div>
-              <ActionParams a={a} onChange={(x) => setAction(i, x)} teams={teams.data?.items ?? []} saved={(saved.data?.items ?? []).filter((s) => !s.brand_id || brands.includes(s.brand_id))} catalog={catalog} />
+              <ActionParams a={a} onChange={(x) => setAction(i, x)} teams={teams.data?.items ?? []} saved={(saved.data?.items ?? []).filter((s) => !s.brand_id || brands.includes(s.brand_id))}
+                catalog={{ ...catalog, integration_jobs: catalog.integration_jobs.filter((j) => TRIGGER_INTEGRATION_KINDS[trigger].includes(j.kind)) }}
+                people={noConversation ? (members.data?.members ?? []).map((m) => ({ id: m.user_id, name: m.name || m.email })) : null} />
             </div>
           ))}
-          {actions.length < 10 && allowed.length ? <Button size="sm" variant="ghost" icon={<Plus aria-hidden className="size-4" />} className="self-start" onClick={() => setActions([...actions, defaultAction(allowed[0]!)])}>Add action</Button> : null}
+          {actions.length < 10 && allowed.length ? <Button size="sm" variant="ghost" icon={<Plus aria-hidden className="size-4" />} className="self-start" onClick={() => { const a = defaultAction(allowed[0]!); setActions([...actions, a.type === 'notify' && noConversation ? { ...a, to: 'users', user_ids: [] } : a]); }}>Add action</Button> : null}
         </section>
 
         <fieldset className="flex flex-col gap-2">
@@ -193,7 +206,7 @@ function ConditionValue({ c, catalog, onChange }: { c: RuleCondition; catalog: A
   return <Input aria-label="Values" className="min-w-0 flex-1" placeholder="Comma-separated" value={list.join(', ')} onChange={(e) => onChange({ value: e.target.value.split(',').map((x) => x.trim()).filter(Boolean) })} />;
 }
 
-function ActionParams({ a, onChange, teams, saved, catalog }: { a: RuleAction; onChange: (a: RuleAction) => void; teams: Array<{ id: string; name: string }>; saved: Array<{ id: string; title: string }>; catalog: AutomationCatalogDto }) {
+function ActionParams({ a, onChange, teams, saved, catalog, people }: { a: RuleAction; onChange: (a: RuleAction) => void; teams: Array<{ id: string; name: string }>; saved: Array<{ id: string; title: string }>; catalog: AutomationCatalogDto; people: Array<{ id: string; name: string }> | null }) {
   const teamSelect = (value: string | null | undefined, set: (v: string | null) => void) => (
     <Select aria-label="Team" value={value ?? ''} onChange={(e) => set(e.target.value || null)}>
       <option value="">No team</option>{teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -209,7 +222,23 @@ function ActionParams({ a, onChange, teams, saved, catalog }: { a: RuleAction; o
     case 'add_labels': return <Input aria-label="Labels" placeholder="Labels, comma-separated" value={a.labels.join(', ')} onChange={(e) => onChange({ ...a, labels: e.target.value.split(',').map((x) => x.trim()).filter(Boolean) })} />;
     case 'add_note': return <Input aria-label="Note" placeholder="Internal note" value={a.body} maxLength={1000} onChange={(e) => onChange({ ...a, body: e.target.value })} />;
     case 'create_case': return <Input aria-label="Case title" placeholder="Case title (optional)" value={a.title ?? ''} maxLength={200} onChange={(e) => onChange({ ...a, title: e.target.value || null })} />;
-    case 'notify': return <Select aria-label="Notify" value={a.to} onChange={(e) => onChange({ ...a, to: e.target.value as typeof a.to })}><option value="assignee">Assignee</option><option value="case_owner">Case owner</option></Select>;
+    case 'notify':
+      if (people) {
+        const ids = a.user_ids ?? [];
+        return (
+          <div className="flex flex-col gap-1.5" role="group" aria-label="People to notify">
+            <div className="flex flex-wrap gap-1.5">
+              {people.slice(0, 50).map((p) => {
+                const on = ids.includes(p.id);
+                return <button key={p.id} type="button" aria-pressed={on} onClick={() => onChange({ ...a, to: 'users', user_ids: on ? ids.filter((x) => x !== p.id) : [...ids, p.id].slice(0, 20) })}
+                  className={`max-w-full truncate rounded-full border px-2.5 py-1 text-xs ${on ? 'border-[var(--accent-text)] bg-accent-soft text-accent-text' : 'border-border text-muted hover:bg-raised'}`}>{p.name}</button>;
+              })}
+            </div>
+            {!ids.length ? <p className="text-xs text-muted">Choose who to notify.</p> : null}
+          </div>
+        );
+      }
+      return <Select aria-label="Notify" value={a.to} onChange={(e) => onChange({ ...a, to: e.target.value as typeof a.to })}><option value="assignee">Assignee</option><option value="case_owner">Case owner</option></Select>;
     case 'reply_saved': return (
       <div className="grid gap-2 sm:grid-cols-2">
         <Select aria-label="Saved reply" value={a.saved_reply_id} onChange={(e) => onChange({ ...a, saved_reply_id: e.target.value })}><option value="">Choose saved reply…</option>{saved.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}</Select>
@@ -227,19 +256,30 @@ function ActionParams({ a, onChange, teams, saved, catalog }: { a: RuleAction; o
 }
 
 function TestResult({ r }: { r: RuleTestResult }) {
+  // Matches first; non-matches collapse into one expandable line (lead review: no wall of "No match").
+  const [showMisses, setShowMisses] = useState(false);
+  const hits = r.samples.filter((s) => s.matched);
+  const misses = r.samples.filter((s) => !s.matched);
+  const row = (s: RuleTestResult['samples'][number]) => (
+    <li key={s.conversation_id} className="flex flex-wrap items-center gap-1.5 text-xs">
+      <Badge tone={s.matched ? 'success' : 'neutral'} className="h-5 px-1.5 text-[11px]">{s.matched ? 'Match' : 'No match'}</Badge>
+      <span className="text-muted">{CATEGORY_LABEL[s.category] ?? s.category}</span>
+      {s.actions.map((a, i) => <span key={i} className={`min-w-0 break-words ${a.status === 'would_run' ? 'text-info' : 'text-warn'}`}>{ACTION_LABEL[a.type]}: {a.status === 'would_run' ? 'would run' : a.detail}</span>)}
+    </li>
+  );
   return (
     <section aria-label="Test result" className="flex flex-col gap-2 rounded-xl border border-border p-3">
       <p className="font-medium">Test · {r.matched} of {r.evaluated} recent matched</p>
       <p className="text-xs text-muted">Dry run: nothing was changed or sent.</p>
-      <ul className="flex flex-col gap-1.5">
-        {r.samples.slice(0, 10).map((s) => (
-          <li key={s.conversation_id} className="flex flex-wrap items-center gap-1.5 text-xs">
-            <Badge tone={s.matched ? 'success' : 'neutral'} className="h-5 px-1.5 text-[11px]">{s.matched ? 'Match' : 'No match'}</Badge>
-            <span className="text-muted">{CATEGORY_LABEL[s.category] ?? s.category}</span>
-            {s.actions.map((a, i) => <span key={i} className={`min-w-0 break-words ${a.status === 'would_run' ? 'text-info' : 'text-warn'}`}>{ACTION_LABEL[a.type]}: {a.status === 'would_run' ? 'would run' : a.detail}</span>)}
-          </li>
-        ))}
-      </ul>
+      {hits.length ? <ul className="flex flex-col gap-1.5">{hits.slice(0, 10).map(row)}</ul> : null}
+      {misses.length ? (
+        <div>
+          <button type="button" aria-expanded={showMisses} onClick={() => setShowMisses(!showMisses)} className="inline-flex items-center gap-1 text-xs text-muted hover:text-[var(--text)]">
+            <ChevronDown aria-hidden className={`size-3.5 transition-transform ${showMisses ? 'rotate-180' : ''}`} />{misses.length} didn’t match
+          </button>
+          {showMisses ? <ul className="mt-1.5 flex flex-col gap-1.5">{misses.slice(0, 25).map(row)}</ul> : null}
+        </div>
+      ) : null}
     </section>
   );
 }

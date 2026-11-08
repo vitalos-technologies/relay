@@ -2,6 +2,7 @@
 // Automation: rules (trigger → conditions → actions, scope, schedule, limits, test preview, enable/disable), the bounded
 // policies they run under, execution history and a workspace-wide emergency stop. automation.manage only.
 import { useState } from 'react';
+import Link from 'next/link';
 import { CirclePause, CirclePlay, History, OctagonX, Plus, ShieldCheck, Workflow } from 'lucide-react';
 import type { AutomationCatalogDto, AutomationPolicyDto, AutomationRuleDto, AutomationRunDto } from '@social-lite/core/contracts/v35-automation';
 import { api } from '@/lib/client/api';
@@ -23,13 +24,13 @@ export function AutomationApp() {
   const policies = useApi<{ items: AutomationPolicyDto[] }>(canV2('automation.manage') ? '/api/automation/policies' : null);
   const [tab, setTab] = useState('rules');
   const [stopOpen, setStopOpen] = useState(false);
-  if (!canV2('automation.manage')) return <div><PageHeader title="Automation" /><Banner tone="info" title="Owners and admins manage automation">Ask an owner or admin for access.</Banner></div>;
+  if (!canV2('automation.manage')) return <div><PageHeader title="Automation" eyebrow={<nav aria-label="Breadcrumb"><Link href="/assistant" className="hover:underline">Assistant</Link><span aria-hidden> / </span><span aria-current="page">Automation</span></nav>} /><Banner tone="info" title="Owners and admins manage automation">Ask an owner or admin for access.</Banner></div>;
   if (catalog.error && !catalog.data) return <ErrorState error={catalog.error} onRetry={() => void catalog.refetch()} />;
   const stop = catalog.data?.emergency_stop;
   const refresh = () => { void catalog.refetch(); void policies.refetch(); };
   return (
     <div>
-      <PageHeader title="Automation" meta={stop?.active ? 'Stopped' : undefined}
+      <PageHeader title="Automation" eyebrow={<nav aria-label="Breadcrumb"><Link href="/assistant" className="hover:underline">Assistant</Link><span aria-hidden> / </span><span aria-current="page">Automation</span></nav>} meta={stop?.active ? 'Stopped' : undefined}
         actions={stop ? (stop.active
           ? <Button variant="primary" icon={<CirclePlay aria-hidden className="size-4" />} onClick={async () => { try { await api.post('/api/automation/emergency-stop', { active: false }); toast.success('Automation resumed'); refresh(); } catch (e) { toast.error(e); } }}>Resume automation</Button>
           : <Button variant="danger" icon={<OctagonX aria-hidden className="size-4" />} onClick={() => setStopOpen(true)}>Emergency stop</Button>) : null} />

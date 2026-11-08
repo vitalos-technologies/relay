@@ -1,5 +1,6 @@
 'use client';
 // Platform health (V3.1 Admin §4): installation-wide aggregates only — no customer content, credentials or post text.
+import { duration } from '@/components/admin/ui';
 import { useState } from 'react';
 import { CircleCheck, OctagonX, Power, RefreshCw } from 'lucide-react';
 import { PROVIDER_LABEL } from '@social-lite/core';
@@ -10,7 +11,7 @@ import { useSession } from '@/lib/client/session';
 import { Badge, Banner, Button, Card, CardHeader, ErrorState, PageHeader, PlatformIcon, SkeletonRows, useToast } from '@/components/ui';
 import { Ago, ReasonDialog } from '@/components/admin/ui';
 
-const secs = (s: number) => (s < 90 ? `${s} s` : s < 5400 ? `${Math.round(s / 60)} min` : `${Math.round(s / 3600)} h`);
+const secs = (s: number) => duration(s);
 
 export default function PlatformHealthPage() {
   const { session } = useSession();

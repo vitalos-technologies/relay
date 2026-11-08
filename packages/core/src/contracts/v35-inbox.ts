@@ -103,7 +103,7 @@ export type ModerationAction = 'hide' | 'unhide' | 'delete_own';
 /** WhatsApp template (approved at Meta) chosen by the agent; body params fill {{1}}, {{2}}, … in order. */
 export interface TemplateSend { name: string; language: string; category: 'marketing' | 'utility' | 'authentication' | 'service' | null; params: string[] }
 
-export interface TemplateInfo { name: string; language: string; category: 'marketing' | 'utility' | 'authentication' | null; status: string; body: string; param_count: number }
+export interface TemplateInfo { name: string; language: string; category: 'marketing' | 'utility' | 'authentication' | null; status: string; body: string; param_count: number; /** Meta's sample values per parameter (hints only). */ examples?: string[] }
 
 /** Poll page: items + the next cursor. `cursor` is opaque to Relay (stored in integration_cursors). */
 export type PollResult =

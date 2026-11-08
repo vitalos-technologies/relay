@@ -38,7 +38,12 @@ export function InboxContextPanel({ id, onChanged, onOpenConversation }: { id: s
         <h3 id="ctx-customer" className="mb-2 text-xs font-medium uppercase tracking-[0.06em] text-subtle">Customer</h3>
         {/* Stream B: explicit identity linking + history */}
         <IdentityPanel conversationId={id} brandId={c.brand_id} onOpen={onOpenConversation} />
-        <p className="mt-2 text-xs text-muted">Waiting since: {c.unanswered_since ? new Date(c.unanswered_since).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'answered'}</p>
+        <p className="mt-2 text-xs text-muted">{(() => {
+          const fmt = (at: string) => new Date(at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+          if (c.unanswered_since) return `Waiting since ${fmt(c.unanswered_since)}`;
+          const reply = [...c.timeline].reverse().find((e): e is Extract<typeof e, { type: 'message' }> => e.type === 'message' && e.message.direction === 'outbound');
+          return reply ? `Answered · ${fmt(reply.at)}` : 'Answered';
+        })()}</p>
       </section>
 
       <section aria-labelledby="ctx-csat">

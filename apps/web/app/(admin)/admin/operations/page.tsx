@@ -2,6 +2,7 @@
 // Workspace operations (V3.1 Admin §8, §17): emergency pause scopes (workspace / brand; connections on Social accounts),
 // queue age vs dispatch delay vs processing (workload classes), workers, dead-lettered events with safe requeue, and
 // read-only diagnostics. Pauses are enforced at dispatch time by the engine gate; in-flight sends are shown, not hidden.
+import { duration } from '@/components/admin/ui';
 import { useState } from 'react';
 import { CircleCheck, OctagonX, Pause, Play, RefreshCw, RotateCcw } from 'lucide-react';
 import { api } from '@/lib/client/api';
@@ -20,7 +21,7 @@ interface Ops {
   dispatch_lateness_seconds: { p50: number | null; p95: number | null; sample: number; target_p95: number };
   alerts: Array<{ severity: string; message: string }>;
 }
-const secs = (s: number | null | undefined) => (s === null || s === undefined ? '—' : s < 90 ? `${Math.round(s)} s` : s < 5400 ? `${Math.round(s / 60)} min` : `${Math.round(s / 3600)} h`);
+const secs = (s: number | null | undefined) => duration(s);
 const ms = (v: number | null) => (v === null ? '—' : v < 1000 ? `${v} ms` : `${(v / 1000).toFixed(1)} s`);
 
 export default function AdminOperationsPage() {

@@ -78,7 +78,9 @@ function ConnectCard({ connector, setup, canManage, onDone }: { connector: HubCo
       <div className="flex flex-col gap-4 px-4 pb-4">
         {!setup.configured ? (
           <Banner tone="warn" title="Needs app setup">
-            <span className="[overflow-wrap:anywhere]">Missing: {setup.missing_settings.join(', ')}. {can('setup.manage') ? <a className="font-medium text-accent-text underline" href="/setup">Open Setup</a> : 'Ask an owner to add them in Setup.'}</span>
+            {setup.setup_details_visible
+              ? <span className="[overflow-wrap:anywhere]">Missing: {setup.missing_settings.join(', ')}. {can('setup.manage') ? <a className="font-medium text-accent-text underline" href="/setup">Open Setup</a> : 'Add them in Setup.'}</span>
+              : <span>Ask your Relay admin to set up {setup.name}.</span>}
           </Banner>
         ) : null}
         <Facts items={[
@@ -135,7 +137,7 @@ function InstallationPanel({ id, connector, onChanged }: { id: string; connector
   return (
     <>
       <Card aria-labelledby="h-inst" data-testid="installation">
-        <CardHeader id="h-inst" title={<span className="flex flex-wrap items-center gap-2">{i.display_name}<Badge tone={st.tone}>{st.label}</Badge>{i.is_simulated ? <SimulatedBadge /> : null}<MetaChip>{i.brand_id ? 'Brand' : 'Workspace'}</MetaChip></span>}
+        <CardHeader id="h-inst" title={<span className="flex flex-wrap items-center gap-2">{i.display_name}{i.is_simulated && i.status === 'active' ? null : <Badge tone={st.tone}>{st.label}</Badge>}{i.is_simulated ? <SimulatedBadge /> : null}<MetaChip>{i.brand_id ? 'Brand' : 'Workspace'}</MetaChip></span>}
           actions={manage ? <>
             <Button size="sm" variant="ghost" icon={<Stethoscope aria-hidden className="size-4" />} loading={busy === 'diag'} onClick={() => run('diag', async () => { const r = await api.post<{ message: string }>(`/api/connectors/hub/${id}/diagnose`); toast.info(r.message); })}>Diagnose</Button>
             {i.status === 'reconnect_required' && !i.is_simulated ? (

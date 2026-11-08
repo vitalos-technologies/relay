@@ -60,4 +60,21 @@ Recovery loops (worker, every 5–60 s): due replies/jobs, expired leases → un
 | Inbox events (content-free) | 90 days | worker retention |
 | Presence | 10 minutes | sweep |
 | Messages deleted at the provider | body + revisions erased on the deletion event | ingest |
-| Messages, notes, attempts, cases | workspace lifetime (policy-based purge = stream F) | — |
+| Messages, notes, attempts, cases | workspace lifetime; configurable purge not implemented (see `SECURITY_AND_RETENTION.md`) | — |
+
+## Cross-stream event wiring (stream F, final)
+
+| Event (outbox → queue) | Producer | Subscribers (`onInboxEvent`) |
+|---|---|---|
+| `inbox.message_received` → inbox-events | ingest (foundation/B) | automation (classify → rules, E); listening ingest request (D) |
+| `case.changed` → inbox-events | cases | automation (E); Slack care escalations (C) |
+| `listening.alert_fired` → inbox-events | listening alerts (D) | automation trigger `listening.alert` (E, wired by F); Slack listening alerts (C; loads the alert, simulated → simulated installs only) |
+| `content.approved` → inbox-events (**new, F**) | bridge in the collaboration consumer (`engine/notify.ts`): `approval.decided` with decision approved ⇒ one outbox row `{ postId, brandId }` | automation trigger `content.approved` (one run per rule + approval) |
+| `inbox.inbound_received` → inbox-events | Telegram receiver (B) | stored-update processor (B) |
+| GBP Pub/Sub review notification (integration event) | C's verified handler → `onGbpNotification` | `inbox/channels-gbp-notify.ts` (F) → `pollChannel` for the location's channel(s) |
+
+Alert/approval triggers have no conversation: their rules may only `notify` chosen people (re-checked for
+`listening.read` / `content.read` at delivery) or create external work (Slack, Asana, monday.com) with ids + a Relay link
+(`TRIGGER_ACTIONS`, `TRIGGER_INTEGRATION_KINDS` in `contracts/v35-automation.ts`). Simulated listening alerts never reach
+live integrations. Queued sync jobs re-check their requester before running (`requester_lost_access`).
+

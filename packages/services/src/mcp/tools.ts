@@ -39,6 +39,7 @@ import { listSourceItems, previewDocument } from '../content-hub/items.js';
 import { getImport, requestImport } from '../content-hub/imports.js';
 import { registerDataTools } from './tools-data.js';
 import { registerGovTools } from './tools-gov.js';
+import { registerV35Tools } from './tools-v35.js';
 
 // ------------------------------------------------------------------ shared schema pieces
 
@@ -93,7 +94,7 @@ function errorResult(e: McpToolError): CallToolResult {
 }
 
 /** Idempotent wrapper for mutations whose service has no built-in idempotency (stored per client + tool + key). */
-async function idempotent<T extends object>(s: CallScope, tool: string, key: string, body: unknown, fn: () => Promise<T>): Promise<T & { duplicate?: boolean }> {
+export async function idempotent<T extends object>(s: CallScope, tool: string, key: string, body: unknown, fn: () => Promise<T>): Promise<T & { duplicate?: boolean }> {
   const db = getPool();
   const action = `mcp.${tool}`;
   const k = `mcp:${s.client.id}:${key}`;
@@ -755,6 +756,9 @@ export function registerTools(server: McpServer, hooks: ToolHooks = {}): void {
 
   // ---------------- V3.1 governance tools (brand rules, integration diagnostics; read-only)
   registerGovTools(server, hooks, register);
+
+  // ---------------- V3.5 inbox, cases, listening, AI preparation (drafts only; never sends)
+  registerV35Tools(server, hooks, register);
 }
 
 /** Units for provider-native metric names (counts unless known otherwise). */

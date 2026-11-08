@@ -31,12 +31,21 @@ async function subject(job: Job): Promise<{ brandId: string | null; title: strin
     const c = await maybeOne<{ brand_id: string; name: string }>(getPool(), `SELECT c.brand_id, ch.display_name AS name FROM inbox_conversations c JOIN inbox_channels ch ON ch.id=c.channel_id WHERE c.id=$1 AND c.workspace_id=$2`, [job.relayId, job.workspaceId]);
     return c ? { brandId: c.brand_id, title: `${c.name} conversation`, path: `/inbox?c=${job.relayId}` } : null;
   }
+  // Stream F: listening.alert and content.approved triggers (ids + names only; never mention or post text).
+  if (job.relayType === 'listening_alert') {
+    const a = await maybeOne<{ brand_id: string; name: string }>(getPool(), `SELECT a.brand_id, s.name FROM listening_alerts a JOIN listening_searches s ON s.id=a.search_id WHERE a.id=$1 AND a.workspace_id=$2`, [job.relayId, job.workspaceId]);
+    return a ? { brandId: a.brand_id, title: `Listening alert: ${safe(a.name, 80)}`, path: `/listening/alerts/${job.relayId}` } : null;
+  }
+  if (job.relayType === 'post') {
+    const p = await maybeOne<{ brand_id: string; title: string | null }>(getPool(), `SELECT brand_id, title FROM posts WHERE id=$1 AND workspace_id=$2`, [job.relayId, job.workspaceId]);
+    return p ? { brandId: p.brand_id, title: `Approved post: ${safe(p.title || 'Untitled', 80)}`, path: `/posts/${job.relayId}` } : null;
+  }
   return null;
 }
 
 async function runTask(job: Job, connector: 'asana' | 'monday'): Promise<SyncOutcome> {
   const s = await subject(job);
-  if (!s) return { kind: 'failed', code: 'not_found', message: 'The case or conversation no longer exists.' };
+  if (!s) return { kind: 'failed', code: 'not_found', message: 'The Relay item no longer exists.' };
   const integ = await maybeOne<{ brand_id: string | null; settings: Record<string, unknown> }>(getPool(), `SELECT brand_id, settings FROM integration_connections WHERE id=$1`, [job.integrationId]);
   if (integ?.brand_id && integ.brand_id !== s.brandId) return { kind: 'failed', code: 'scope', message: 'This integration belongs to another brand.' };
   const targets = await many<{ id: string; external_id: string }>(getPool(),
@@ -97,10 +106,11 @@ async function runTicket(job: Job): Promise<SyncOutcome> {
 async function runSlack(job: Job): Promise<SyncOutcome> {
   const s = await subject(job);
   if (!s) return { kind: 'failed', code: 'not_found', message: 'The case or conversation no longer exists.' };
-  const n = await enqueueSlackEvent({ workspaceId: job.workspaceId, integrationId: job.integrationId, category: 'care_escalations', eventKey: `automation:${job.id}`, brandId: s.brandId,
-    text: `${safe(job.payload.rule, 80) || 'Automation'}: ${job.relayType === 'case' ? s.title.split(':')[0] : 'conversation needs attention'}`, linkPath: s.path, referenceType: job.relayType, referenceId: job.relayId });
+  const care = job.relayType === 'case' || job.relayType === 'conversation';
+  const n = await enqueueSlackEvent({ workspaceId: job.workspaceId, integrationId: job.integrationId, category: care ? 'care_escalations' : job.relayType === 'listening_alert' ? 'listening_alerts' : 'approvals', eventKey: `automation:${job.id}`, brandId: s.brandId,
+    text: `${safe(job.payload.rule, 80) || 'Automation'}: ${job.relayType === 'case' ? s.title.split(':')[0] : care ? 'conversation needs attention' : s.title}`, linkPath: s.path, referenceType: job.relayType, referenceId: job.relayId });
   const already = await maybeOne(getPool(), `SELECT 1 FROM slack_deliveries WHERE integration_id=$1 AND event_key=$2`, [job.integrationId, `automation:${job.id}`]);
-  if (!n && !already) return { kind: 'failed', code: 'no_route', message: 'No Slack channel of this integration receives care escalations.' };
+  if (!n && !already) return { kind: 'failed', code: 'no_route', message: care ? 'No Slack channel of this integration receives care escalations.' : 'No Slack channel of this integration receives this kind of alert.' };
   // Queued for the Slack sender (quiet hours, rate limits, retries, delivery history apply).
   return { kind: 'succeeded', result: { deliveries_queued: n } };
 }

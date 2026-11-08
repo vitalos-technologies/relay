@@ -2,7 +2,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { PERMISSIONS } from '@social-lite/core';
 import type { PostRow } from '@social-lite/services';
-import { MCP_SCOPES, MCP_SCOPE_PERMISSIONS, MCP_TOOLS } from '@social-lite/core/contracts/mcp';
+import { MCP_CUSTOMER_DATA_SCOPES, MCP_DEFAULT_SCOPES, MCP_SCOPES, MCP_SCOPE_PERMISSIONS, MCP_TOOLS } from '@social-lite/core/contracts/mcp';
 import { resetConfigCache } from '@social-lite/services';
 
 beforeAll(() => {
@@ -30,13 +30,31 @@ describe('MCP scopes', () => {
 
   it('catalogue: every tool has scopes; read-only tools are never destructive', () => {
     expect(new Set(MCP_TOOLS.map((t) => t.name)).size).toBe(MCP_TOOLS.length);
-    // 27 V3 tools + 4 V3.1 DATA (search, recovery, bulk preview/status) + 2 V3.1 GOV (get_brand_rules, get_integration_diagnostics).
-    expect(MCP_TOOLS).toHaveLength(33);
+    // 27 V3 tools + 4 V3.1 DATA (search, recovery, bulk preview/status) + 2 V3.1 GOV (get_brand_rules, get_integration_diagnostics)
+    // + 14 V3.5 (inbox reads, draft_reply, assignment, cases, listening, AI preparation).
+    expect(MCP_TOOLS).toHaveLength(47);
     for (const t of MCP_TOOLS) {
       expect(t.scopes.length).toBeGreaterThan(0);
       if (t.readOnly) expect(t.destructive).toBe(false);
       expect(t.name).toMatch(/^[a-z_]{3,64}$/);
     }
+  });
+
+  it('V3.5: no send, notification or mass-mention tool; customer-data scopes are opt-in; AI preparation adds only ai.use', () => {
+    const names = MCP_TOOLS.map((t) => t.name);
+    for (const n of names) expect(n).not.toMatch(/send|notify|mention|broadcast|publish_reply|apply_action/);
+    expect(names).toEqual(expect.arrayContaining(['list_conversations', 'get_conversation', 'draft_reply', 'assign_conversation', 'list_cases', 'get_case', 'create_case', 'update_case',
+      'list_listening_searches', 'query_listening', 'list_listening_alerts', 'get_listening_alert', 'prepare_with_ai', 'get_ai_result']));
+    for (const s of MCP_CUSTOMER_DATA_SCOPES) expect(MCP_DEFAULT_SCOPES).not.toContain(s);
+    expect([...MCP_SCOPE_PERMISSIONS['ai.prepare']]).toEqual(['ai.use']);
+    // Drafting a reply grants inbox.reply but no tool can send: the only inbox.draft tool is draft_reply.
+    expect(MCP_TOOLS.filter((t) => t.scopes.includes('inbox.draft') && t.name !== 'list_workspaces').map((t) => t.name)).toEqual(['draft_reply']);
+    // Reads stay read-only; every V3.5 mutation is idempotent (idempotency_key) and never destructive.
+    for (const t of MCP_TOOLS.filter((x) => ['inbox', 'cases', 'listening', 'assist'].includes(x.group))) {
+      expect(t.idempotent).toBe(true);
+      expect(t.destructive).toBe(false);
+    }
+    for (const s of ['inbox.read', 'listening.read'] as const) expect(MCP_SCOPE_PERMISSIONS[s].every((p) => p.endsWith('.read'))).toBe(true);
   });
 
   it('builds RFC 6750 challenges with resource metadata, ASCII-only descriptions', async () => {

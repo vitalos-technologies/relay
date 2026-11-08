@@ -21,9 +21,11 @@ export const ACTIVITY_CATEGORIES = {
   connections: ['connection', 'connections', 'integration', 'credential', 'credentials'],
   publishing: ['schedule', 'approval', 'delivery', 'post', 'publication', 'publishing', 'review', 'campaign', 'slot', 'import', 'source_event'],
   security: ['auth', 'session', 'sessions', 'mfa', 'security', 'api_key', 'service_account', 'step_up', 'login', 'logout', 'recovery', 'passkey',
-    'export', 'budget', 'workspace', 'brand', 'support_access', 'platform'],
+    'export', 'budget', 'workspace', 'brand', 'support_access', 'platform', 'mcp'],
   // Collaboration completion: discussions, visibility changes, tasks, reassignments, collaboration settings.
   collaboration: ['comment', 'thread', 'task', 'collaboration'],
+  // V3.5 (stream F): inbox, cases, listening, AI and automation.
+  care: ['inbox', 'case', 'listening', 'ai', 'automation'],
 } as const;
 export type ActivityCategory = keyof typeof ACTIVITY_CATEGORIES | 'content' | 'all';
 const KNOWN = Object.values(ACTIVITY_CATEGORIES).flat() as string[];
@@ -35,7 +37,7 @@ export function categoryOf(action: string): ActivityCategory {
 }
 
 export const activityQuerySchema = z.object({
-  category: z.enum(['all', 'permissions', 'connections', 'publishing', 'security', 'collaboration', 'content']).default('all'),
+  category: z.enum(['all', 'permissions', 'connections', 'publishing', 'security', 'collaboration', 'care', 'content']).default('all'),
   brand_id: z.string().uuid().nullish(),
   actor_user_id: z.string().uuid().nullish(),
   action: z.string().regex(/^[a-z_]+(\.[a-z_]+)*$/).max(64).nullish(),

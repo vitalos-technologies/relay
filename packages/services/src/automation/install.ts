@@ -1,5 +1,6 @@
 // Wires automation into the shared services (idempotent; called by the worker registration and tests):
-//  - inbox hooks: 'inbox.message_received' (classification → rules) and 'case.changed';
+//  - inbox hooks: 'inbox.message_received' (classification → rules), 'case.changed', 'listening.alert_fired' and
+//    'content.approved' (stream F bridge);
 //  - the dispatch-time guard for automated replies (inbox/replies.ts): every automated attempt is re-checked against
 //    its policy (active, unexpired, no emergency stop, owner still allowed) right before the provider call;
 //  - the assistant bridge for policy-driven AI runs (service-actor context + approved knowledge + token budget).
@@ -9,7 +10,7 @@ import { onInboxEvent } from '../inbox/hooks.js';
 import { registerAutomatedReplyGuard } from '../inbox/replies.js';
 import { registerAutomationAiBridge } from '../assistant/runs.js';
 import { policyCtx } from './actor.js';
-import { onAutomationAiRunFinished, onCaseChanged, onMessageReceived } from './engine.js';
+import { onAutomationAiRunFinished, onCaseChanged, onContentApproved, onListeningAlert, onMessageReceived } from './engine.js';
 import { ownerGaps, policyActive, policyUsage, type PolicyRow } from './policies.js';
 
 let installed = false;
@@ -19,6 +20,9 @@ export function installAutomation(): void {
   installed = true;
   onInboxEvent('inbox.message_received', 'automation', async (e) => { await onMessageReceived(e); });
   onInboxEvent('case.changed', 'automation', async (e) => { await onCaseChanged(e); });
+  // Stream F wiring: stream D's alert event and the approval bridge (engine/notify.ts) drive the two remaining triggers.
+  onInboxEvent('listening.alert_fired', 'automation', async (e) => { await onListeningAlert(e); });
+  onInboxEvent('content.approved', 'automation', async (e) => { await onContentApproved(e); });
 
   registerAutomatedReplyGuard(async (a) => {
     const db = getPool();

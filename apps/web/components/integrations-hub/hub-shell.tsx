@@ -18,7 +18,8 @@ function dot(c: HubOverviewJson['connectors'][number] | undefined): string {
   if (!c) return 'bg-border';
   const live = c.installations.filter((i) => !i.disconnected_at);
   if (live.some((i) => i.status === 'reconnect_required' || i.status === 'needs_attention')) return 'bg-warn';
-  if (live.some((i) => i.status === 'active')) return 'bg-success';
+  if (live.some((i) => i.status === 'active' && !i.is_simulated)) return 'bg-success';
+  if (live.some((i) => i.status === 'active')) return 'bg-subtle';   // simulated only: neutral (lead review)
   return 'bg-border';
 }
 

@@ -2,7 +2,7 @@
 // Platform → Collaboration pipeline: installation-wide counts and ages only (no workspace content, names or discussions).
 import { useApi } from '@/lib/client/use-api';
 import { Card, CardHeader, ErrorState, Facts, MetricCard, PageHeader, SkeletonRows } from '@/components/ui';
-import { HealthBadge } from '@/components/admin/ui';
+import { HealthBadge, duration } from '@/components/admin/ui';
 
 interface Health {
   window_hours: number; email_configured: boolean;
@@ -29,7 +29,7 @@ export default function PlatformCollaborationPage() {
             <div className="px-4 pb-4">
               <Facts items={[
                 ['Email', data.email_configured ? 'Configured' : 'Not configured (in-app only)'],
-                ['Oldest waiting event', data.outbox.pending ? `${data.outbox.oldest_pending_seconds}s` : '—'],
+                ['Oldest waiting event', data.outbox.pending ? duration(data.outbox.oldest_pending_seconds) : '—'],
                 ['Dead-lettered events', String(data.outbox.dead)],
                 ['Workspaces with email failures', String(data.notifications.workspaces_with_failures)],
                 ['Not configured (24 h)', String(data.notifications.not_configured)],

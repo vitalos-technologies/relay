@@ -30,6 +30,9 @@ export interface ConnectorSetupJson {
   /** Simulated installs allowed here (development/demo only; never production). */
   simulation_available: boolean;
   capabilities: string[];
+  /** Setup values (missing setting names, redirect/webhook URLs) are shown only to the instance owner and platform
+   *  operators (stream F); everyone else sees "Ask your Relay admin to set up …". */
+  setup_details_visible?: boolean;
 }
 
 export interface HubConnectorJson extends ConnectorSetupJson {

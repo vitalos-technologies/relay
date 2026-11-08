@@ -1,0 +1,605 @@
+{
+ "at": "2026-11-08T07:02:30.900Z",
+ "base": "http://localhost:3000",
+ "note": "Production build on the shared dev host; Demo Workspace data; Chromium headless 1440 px.",
+ "rows": [
+  {
+   "screen": "inbox",
+   "run": "cold",
+   "dom_content_loaded_ms": 90,
+   "first_api_ms": 405,
+   "settled_ms": 1182,
+   "api_calls": 9,
+   "slowest_api": {
+    "u": "/api/approvals?status=pending",
+    "at": 473,
+    "s": 200
+   }
+  },
+  {
+   "screen": "inbox",
+   "run": "warm",
+   "dom_content_loaded_ms": 67,
+   "first_api_ms": 334,
+   "settled_ms": 1097,
+   "api_calls": 9,
+   "slowest_api": {
+    "u": "/api/feature-flags",
+    "at": 416,
+    "s": 200
+   }
+  },
+  {
+   "screen": "inbox-list",
+   "run": "cold",
+   "dom_content_loaded_ms": 71,
+   "first_api_ms": 400,
+   "settled_ms": 1144,
+   "api_calls": 9,
+   "slowest_api": {
+    "u": "/api/approvals?status=pending",
+    "at": 451,
+    "s": 200
+   }
+  },
+  {
+   "screen": "inbox-list",
+   "run": "warm",
+   "dom_content_loaded_ms": 73,
+   "first_api_ms": 329,
+   "settled_ms": 1087,
+   "api_calls": 9,
+   "slowest_api": {
+    "u": "/api/approvals?status=pending",
+    "at": 395,
+    "s": 200
+   }
+  },
+  {
+   "screen": "inbox-assistant",
+   "run": "cold",
+   "dom_content_loaded_ms": 67,
+   "first_api_ms": 396,
+   "settled_ms": 1168,
+   "api_calls": 9,
+   "slowest_api": {
+    "u": "/api/approvals?status=pending",
+    "at": 487,
+    "s": 200
+   }
+  },
+  {
+   "screen": "inbox-assistant",
+   "run": "warm",
+   "dom_content_loaded_ms": 74,
+   "first_api_ms": 367,
+   "settled_ms": 1185,
+   "api_calls": 9,
+   "slowest_api": {
+    "u": "/api/feature-flags",
+    "at": 446,
+    "s": 200
+   }
+  },
+  {
+   "screen": "settings-channels",
+   "run": "cold",
+   "dom_content_loaded_ms": 122,
+   "first_api_ms": 547,
+   "settled_ms": 1445,
+   "api_calls": 6,
+   "slowest_api": {
+    "u": "/api/inbox/channels",
+    "at": 631,
+    "s": 200
+   }
+  },
+  {
+   "screen": "settings-channels",
+   "run": "warm",
+   "dom_content_loaded_ms": 109,
+   "first_api_ms": 376,
+   "settled_ms": 1294,
+   "api_calls": 6,
+   "slowest_api": {
+    "u": "/api/inbox/channels",
+    "at": 489,
+    "s": 200
+   }
+  },
+  {
+   "screen": "settings-sla",
+   "run": "cold",
+   "dom_content_loaded_ms": 80,
+   "first_api_ms": 350,
+   "settled_ms": 1143,
+   "api_calls": 5,
+   "slowest_api": {
+    "u": "/api/inbox/sla-policies",
+    "at": 392,
+    "s": 200
+   }
+  },
+  {
+   "screen": "settings-sla",
+   "run": "warm",
+   "dom_content_loaded_ms": 55,
+   "first_api_ms": 346,
+   "settled_ms": 1157,
+   "api_calls": 5,
+   "slowest_api": {
+    "u": "/api/inbox/sla-policies",
+    "at": 405,
+    "s": 200
+   }
+  },
+  {
+   "screen": "integrations",
+   "run": "cold",
+   "dom_content_loaded_ms": 69,
+   "first_api_ms": 398,
+   "settled_ms": 1136,
+   "api_calls": 6,
+   "slowest_api": {
+    "u": "/api/connectors/hub",
+    "at": 442,
+    "s": 200
+   }
+  },
+  {
+   "screen": "integrations",
+   "run": "warm",
+   "dom_content_loaded_ms": 77,
+   "first_api_ms": 297,
+   "settled_ms": 1042,
+   "api_calls": 6,
+   "slowest_api": {
+    "u": "/api/approvals?status=pending",
+    "at": 317,
+    "s": 200
+   }
+  },
+  {
+   "screen": "integrations-asana",
+   "run": "cold",
+   "dom_content_loaded_ms": 67,
+   "first_api_ms": 370,
+   "settled_ms": 1103,
+   "api_calls": 6,
+   "slowest_api": {
+    "u": "/api/connectors/hub",
+    "at": 419,
+    "s": 200
+   }
+  },
+  {
+   "screen": "integrations-asana",
+   "run": "warm",
+   "dom_content_loaded_ms": 87,
+   "first_api_ms": 324,
+   "settled_ms": 1075,
+   "api_calls": 6,
+   "slowest_api": {
+    "u": "/api/connectors/hub",
+    "at": 339,
+    "s": 200
+   }
+  },
+  {
+   "screen": "integrations-slack",
+   "run": "cold",
+   "dom_content_loaded_ms": 83,
+   "first_api_ms": 370,
+   "settled_ms": 1083,
+   "api_calls": 6,
+   "slowest_api": {
+    "u": "/api/connectors/hub",
+    "at": 388,
+    "s": 200
+   }
+  },
+  {
+   "screen": "integrations-slack",
+   "run": "warm",
+   "dom_content_loaded_ms": 78,
+   "first_api_ms": 271,
+   "settled_ms": 993,
+   "api_calls": 6,
+   "slowest_api": {
+    "u": "/api/approvals?status=pending",
+    "at": 275,
+    "s": 200
+   }
+  },
+  {
+   "screen": "listening",
+   "run": "cold",
+   "dom_content_loaded_ms": 61,
+   "first_api_ms": 373,
+   "settled_ms": 1070,
+   "api_calls": 8,
+   "slowest_api": {
+    "u": "/api/approvals?status=pending",
+    "at": 428,
+    "s": 200
+   }
+  },
+  {
+   "screen": "listening",
+   "run": "warm",
+   "dom_content_loaded_ms": 88,
+   "first_api_ms": 307,
+   "settled_ms": 990,
+   "api_calls": 8,
+   "slowest_api": {
+    "u": "/api/feature-flags",
+    "at": 325,
+    "s": 200
+   }
+  },
+  {
+   "screen": "listening-search",
+   "run": "cold",
+   "dom_content_loaded_ms": 66,
+   "first_api_ms": 348,
+   "settled_ms": 1049,
+   "api_calls": 8,
+   "slowest_api": {
+    "u": "/api/approvals?status=pending",
+    "at": 371,
+    "s": 200
+   }
+  },
+  {
+   "screen": "listening-search",
+   "run": "warm",
+   "dom_content_loaded_ms": 64,
+   "first_api_ms": 303,
+   "settled_ms": 1067,
+   "api_calls": 8,
+   "slowest_api": {
+    "u": "/api/approvals?status=pending",
+    "at": 339,
+    "s": 200
+   }
+  },
+  {
+   "screen": "listening-alert",
+   "run": "cold",
+   "dom_content_loaded_ms": 72,
+   "first_api_ms": 331,
+   "settled_ms": 1075,
+   "api_calls": 8,
+   "slowest_api": {
+    "u": "/api/approvals?status=pending",
+    "at": 387,
+    "s": 200
+   }
+  },
+  {
+   "screen": "listening-alert",
+   "run": "warm",
+   "dom_content_loaded_ms": 69,
+   "first_api_ms": 330,
+   "settled_ms": 1056,
+   "api_calls": 8,
+   "slowest_api": {
+    "u": "/api/approvals?status=pending",
+    "at": 381,
+    "s": 200
+   }
+  },
+  {
+   "screen": "listening-mention",
+   "run": "cold",
+   "dom_content_loaded_ms": 62,
+   "first_api_ms": 353,
+   "settled_ms": 1096,
+   "api_calls": 8,
+   "slowest_api": {
+    "u": "/api/approvals?status=pending",
+    "at": 361,
+    "s": 200
+   }
+  },
+  {
+   "screen": "listening-mention",
+   "run": "warm",
+   "dom_content_loaded_ms": 78,
+   "first_api_ms": 286,
+   "settled_ms": 1010,
+   "api_calls": 8,
+   "slowest_api": {
+    "u": "/api/feature-flags",
+    "at": 328,
+    "s": 200
+   }
+  },
+  {
+   "screen": "assistant",
+   "run": "cold",
+   "dom_content_loaded_ms": 61,
+   "first_api_ms": 383,
+   "settled_ms": 1081,
+   "api_calls": 5,
+   "slowest_api": {
+    "u": "/api/approvals?status=pending",
+    "at": 405,
+    "s": 200
+   }
+  },
+  {
+   "screen": "assistant",
+   "run": "warm",
+   "dom_content_loaded_ms": 79,
+   "first_api_ms": 319,
+   "settled_ms": 1010,
+   "api_calls": 5,
+   "slowest_api": {
+    "u": "/api/feature-flags",
+    "at": 324,
+    "s": 200
+   }
+  },
+  {
+   "screen": "automation",
+   "run": "cold",
+   "dom_content_loaded_ms": 72,
+   "first_api_ms": 376,
+   "settled_ms": 1071,
+   "api_calls": 7,
+   "slowest_api": {
+    "u": "/api/automation/rules",
+    "at": 430,
+    "s": 200
+   }
+  },
+  {
+   "screen": "automation",
+   "run": "warm",
+   "dom_content_loaded_ms": 72,
+   "first_api_ms": 340,
+   "settled_ms": 1048,
+   "api_calls": 7,
+   "slowest_api": {
+    "u": "/api/automation/rules",
+    "at": 397,
+    "s": 200
+   }
+  },
+  {
+   "screen": "automation-rule-test",
+   "run": "cold",
+   "dom_content_loaded_ms": 78,
+   "first_api_ms": 348,
+   "settled_ms": 1076,
+   "api_calls": 7,
+   "slowest_api": {
+    "u": "/api/automation/rules",
+    "at": 443,
+    "s": 200
+   }
+  },
+  {
+   "screen": "automation-rule-test",
+   "run": "warm",
+   "dom_content_loaded_ms": 57,
+   "first_api_ms": 304,
+   "settled_ms": 998,
+   "api_calls": 7,
+   "slowest_api": {
+    "u": "/api/automation/rules",
+    "at": 356,
+    "s": 200
+   }
+  },
+  {
+   "screen": "post-deliveries",
+   "run": "cold",
+   "dom_content_loaded_ms": 68,
+   "first_api_ms": 354,
+   "settled_ms": 1050,
+   "api_calls": 5,
+   "slowest_api": {
+    "u": "/api/planner?from=2026-11-02T00%3A00%3A00.000Z&to=2026-11-09T00%3A00%3A00.000Z&l",
+    "at": 380,
+    "s": 200
+   }
+  },
+  {
+   "screen": "post-deliveries",
+   "run": "warm",
+   "dom_content_loaded_ms": 67,
+   "first_api_ms": 295,
+   "settled_ms": 995,
+   "api_calls": 5,
+   "slowest_api": {
+    "u": "/api/planner?from=2026-11-02T00%3A00%3A00.000Z&to=2026-11-09T00%3A00%3A00.000Z&l",
+    "at": 308,
+    "s": 200
+   }
+  },
+  {
+   "screen": "admin-care",
+   "run": "cold",
+   "dom_content_loaded_ms": 72,
+   "first_api_ms": 365,
+   "settled_ms": 1034,
+   "api_calls": 4,
+   "slowest_api": {
+    "u": "/api/admin/care",
+    "at": 380,
+    "s": 200
+   }
+  },
+  {
+   "screen": "admin-care",
+   "run": "warm",
+   "dom_content_loaded_ms": 68,
+   "first_api_ms": 327,
+   "settled_ms": 992,
+   "api_calls": 4,
+   "slowest_api": {
+    "u": "/api/admin/care",
+    "at": 362,
+    "s": 200
+   }
+  },
+  {
+   "screen": "admin-inbox",
+   "run": "cold",
+   "dom_content_loaded_ms": 72,
+   "first_api_ms": 376,
+   "settled_ms": 1049,
+   "api_calls": 4,
+   "slowest_api": {
+    "u": "/api/feature-flags",
+    "at": 376,
+    "s": 200
+   }
+  },
+  {
+   "screen": "admin-inbox",
+   "run": "warm",
+   "dom_content_loaded_ms": 64,
+   "first_api_ms": 274,
+   "settled_ms": 912,
+   "api_calls": 4,
+   "slowest_api": {
+    "u": "/api/feature-flags",
+    "at": 309,
+    "s": 200
+   }
+  },
+  {
+   "screen": "admin-integrations",
+   "run": "cold",
+   "dom_content_loaded_ms": 73,
+   "first_api_ms": 339,
+   "settled_ms": 982,
+   "api_calls": 4,
+   "slowest_api": {
+    "u": "/api/feature-flags",
+    "at": 345,
+    "s": 200
+   }
+  },
+  {
+   "screen": "admin-integrations",
+   "run": "warm",
+   "dom_content_loaded_ms": 58,
+   "first_api_ms": 301,
+   "settled_ms": 957,
+   "api_calls": 4,
+   "slowest_api": {
+    "u": "/api/feature-flags",
+    "at": 302,
+    "s": 200
+   }
+  },
+  {
+   "screen": "admin-listening",
+   "run": "cold",
+   "dom_content_loaded_ms": 71,
+   "first_api_ms": 323,
+   "settled_ms": 1022,
+   "api_calls": 4,
+   "slowest_api": {
+    "u": "/api/admin/changes",
+    "at": 343,
+    "s": 200
+   }
+  },
+  {
+   "screen": "admin-listening",
+   "run": "warm",
+   "dom_content_loaded_ms": 64,
+   "first_api_ms": 287,
+   "settled_ms": 915,
+   "api_calls": 4,
+   "slowest_api": {
+    "u": "/api/admin/changes",
+    "at": 293,
+    "s": 200
+   }
+  },
+  {
+   "screen": "admin-ai",
+   "run": "cold",
+   "dom_content_loaded_ms": 67,
+   "first_api_ms": 339,
+   "settled_ms": 980,
+   "api_calls": 4,
+   "slowest_api": {
+    "u": "/api/admin/changes",
+    "at": 340,
+    "s": 200
+   }
+  },
+  {
+   "screen": "admin-ai",
+   "run": "warm",
+   "dom_content_loaded_ms": 84,
+   "first_api_ms": 278,
+   "settled_ms": 959,
+   "api_calls": 4,
+   "slowest_api": {
+    "u": "/api/automation/admin",
+    "at": 302,
+    "s": 200
+   }
+  },
+  {
+   "screen": "admin-audit-care",
+   "run": "cold",
+   "dom_content_loaded_ms": 69,
+   "first_api_ms": 344,
+   "settled_ms": 974,
+   "api_calls": 4,
+   "slowest_api": {
+    "u": "/api/admin/changes",
+    "at": 364,
+    "s": 200
+   }
+  },
+  {
+   "screen": "admin-audit-care",
+   "run": "warm",
+   "dom_content_loaded_ms": 84,
+   "first_api_ms": 343,
+   "settled_ms": 977,
+   "api_calls": 4,
+   "slowest_api": {
+    "u": "/api/activity?category=care&limit=50",
+    "at": 349,
+    "s": 200
+   }
+  },
+  {
+   "screen": "platform-care",
+   "run": "cold",
+   "dom_content_loaded_ms": 85,
+   "first_api_ms": 418,
+   "settled_ms": 1019,
+   "api_calls": 3,
+   "slowest_api": {
+    "u": "/api/feature-flags",
+    "at": 430,
+    "s": 200
+   }
+  },
+  {
+   "screen": "platform-care",
+   "run": "warm",
+   "dom_content_loaded_ms": 67,
+   "first_api_ms": 287,
+   "settled_ms": 872,
+   "api_calls": 3,
+   "slowest_api": {
+    "u": "/api/feature-flags",
+    "at": 290,
+    "s": 200
+   }
+  }
+ ]
+}
