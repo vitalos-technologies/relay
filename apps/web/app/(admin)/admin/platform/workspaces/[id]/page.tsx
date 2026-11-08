@@ -57,6 +57,8 @@ export default function PlatformWorkspacePage() {
               ['Publishing', w.publishing_paused ? `Paused${w.paused_reason ? ` · ${w.paused_reason}` : ''}` : 'On'],
               ['Dispatch share', <span key="d" className="inline-flex items-center gap-2">{w.dispatch_concurrency ?? 'Default'}{operator ? <Button size="sm" variant="ghost" onClick={() => { setCc(String(w.dispatch_concurrency ?? '')); setDialog('concurrency'); }}>Change</Button> : null}</span>],
               ['Flag overrides', w.flag_overrides.map((f) => `${f.key} ${f.enabled ? 'on' : 'off'}`).join(', ') || 'None'],
+              ['Open support requests', session.platform_role === 'billing' ? w.open_support_requests
+                : <Link key="s" href={`/admin/platform/support?queue=open&workspace=${w.id}`} className="font-medium text-accent-text hover:underline">{w.open_support_requests}</Link>],
             ]} />
           </Card>
           <Card>

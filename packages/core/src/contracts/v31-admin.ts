@@ -155,6 +155,8 @@ export interface PlatformWorkspaceDetail extends PlatformWorkspaceItem {
   flag_overrides: Array<{ key: string; enabled: boolean }>;
   support_access: SupportAccessDto[];
   audit: PlatformAuditItem[];
+  /** V4: open Relay support requests for this workspace (count only; ticket content stays in Platform → Support). */
+  open_support_requests: number;
 }
 
 export interface PlatformAuditItem {

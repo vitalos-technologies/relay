@@ -309,6 +309,8 @@ describe('platform scope (§4, §13)', () => {
     expect(blobs).toContain('Private Co');
     expect(blobs).not.toContain(secret);
     expect(blobs).not.toMatch(/Brand A/);
+    // V4: the detail carries an open support request COUNT only (no ticket content).
+    expect((await platformWorkspace(op, t.ws)).open_support_requests).toBe(0);
     // Operators have no workspace membership: the normal policy path denies them.
     expect(await loadAccess(op.actor.userId, t.ws)).toBeNull();
   });

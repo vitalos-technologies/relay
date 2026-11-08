@@ -209,6 +209,8 @@ export async function platformWorkspace(p: PlatformCtx, workspaceId: string, db:
     deliveries_7d: Object.fromEntries(del.map((d) => [d.state, d.n])),
     dispatch_concurrency: typeof dc === 'number' ? dc : null, flag_overrides: flags,
     support_access: await listSupportAccessFor(db, { workspaceId }), audit: audit.items,
+    // V4: count only (metadata); lazy import keeps admin/platform free of a static dependency on support/*.
+    open_support_requests: await (await import('../support/staff.js')).openTicketCount(workspaceId, db),
   };
 }
 

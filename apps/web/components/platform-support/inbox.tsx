@@ -96,6 +96,7 @@ export function SupportInbox() {
   const queue = (params.get('queue') as SupportQueue | null) ?? 'unassigned';
   const category = params.get('category') ?? '';
   const priority = params.get('priority') ?? '';
+  const workspace = params.get('workspace') ?? ''; // from Platform → Workspaces → [id]
   const [q, setQ] = useState(params.get('q') ?? '');
   const [query, setQuery] = useState(q);
   useEffect(() => { const t = setTimeout(() => setQuery(q.trim()), 300); return () => clearTimeout(t); }, [q]);
@@ -104,7 +105,7 @@ export function SupportInbox() {
     if (v) next.set(k, v); else next.delete(k);
     router.replace(`/admin/platform/support?${next.toString()}`, { scroll: false });
   };
-  const path = `/api/platform/support/tickets?${new URLSearchParams({ queue, ...(category ? { category } : {}), ...(priority ? { priority } : {}), ...(query ? { q: query } : {}) }).toString()}`;
+  const path = `/api/platform/support/tickets?${new URLSearchParams({ queue, ...(category ? { category } : {}), ...(priority ? { priority } : {}), ...(workspace ? { workspace_id: workspace } : {}), ...(query ? { q: query } : {}) }).toString()}`;
   const { data, error, loading, refetch } = useApi<StaffTicketsResponse>(path, { keepPrevious: true, poll: 60_000 });
   useStaffFeed(() => void refetch());
   return (
@@ -118,6 +119,7 @@ export function SupportInbox() {
           </button>
         ))}
       </nav>
+      {workspace ? <p className="mb-3 text-[13px] text-muted">One workspace · <button type="button" className="font-medium text-accent-text hover:underline" onClick={() => set('workspace', null)}>Show all</button></p> : null}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="relative min-w-0 flex-1 basis-[220px]">
           <Search aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-subtle" />
