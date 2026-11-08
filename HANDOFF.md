@@ -1,6 +1,6 @@
 # Relay — handoff (read this first)
 
-Last updated: 2026-11-07 07:25 UTC · Lead agent keeps this current after every milestone.
+Last updated: 2026-11-08 07:35 UTC · Lead agent keeps this current after every milestone.
 
 ## Resume in a new session / another Claude account
 1. Clone `https://github.com/vitalos-technologies/relay` (branch `main`; the lead pushes after each milestone). Working dir used here: `/home/user/social-lite`.
@@ -68,42 +68,41 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
 5. V3.1 Admin **done** (see below; tag v3.1.1 suggested on the admin commit)
 6. Collaboration completion **done** (0f0bcd9; migration 027; docs/collaboration/*). Full E2E 56 passed / 1 skipped; unit 505; integration 413. Open: security.spec back-channel logout test needs its own user isolation; decisions taken by lead: email never includes post titles, clients can comment on shared reviews (on), change feed 7 d / presence 10 min retention, demo collab data kept.
 6b. (Support inbox proposal → superseded by V4.) Platform host restriction (ops.<domain>, office/VPN IPs) is an activation item.
-7. **V3.5** (`docs/queue/03f_V3_5_PROMPT.md`) — foundation (102498a) + streams B–E (33f3e12) **done and committed** (migrations 028–032; docs `docs/v3-5/*`; unit 559, integration 479). **Running:** stream F — admin + MCP + cross-stream wiring + full verification + final docs/activation checklist (progress `docs/v3-5-progress/final.md`; fix list `docs/v3-5-progress/lead-notes.md`). Open for user: Inbox in phone bottom bar; main nav grouping (copy-cleanup pass). → 7b. **V4** commercial + customer support (`docs/queue/03g_V4_PROMPT.md`: Relay support tickets, Platform → Support, plans/trials/subscriptions/billing via Stripe test mode behind a billing service, entitlements, tenant lifecycle; no Stripe keys in this environment → build against a provider interface with a test double + locally signed webhook fixtures; never request keys in chat) → 7c. **V5** (`docs/queue/03h_V5_PROMPT.md`, queued by the user 2026-11-08: one-page marketing site, Standard £10 / Professional £25 per user per month + 14-day trial on V4's billing, marketing support widget → Platform → Support, AI workspace with real workflows) → 8. Copy cleanup (03e) → 9. Docs + Help Centre (04) → 10. One consolidated activation checklist + user reminder.
+7. **V3.5** (`docs/queue/03f_V3_5_PROMPT.md`) **done** — foundation (102498a), streams B–E (33f3e12), stream F (admin + MCP + wiring + final docs; `docs/v3-5/*`). Open for user: Inbox in phone bottom bar; main nav grouping (copy-cleanup pass). → 7b. **V4 (running: SUP/BIL/ENT streams)** commercial + customer support (`docs/queue/03g_V4_PROMPT.md`: Relay support tickets, Platform → Support, plans/trials/subscriptions/billing via Stripe test mode behind a billing service, entitlements, tenant lifecycle; no Stripe keys in this environment → build against a provider interface with a test double + locally signed webhook fixtures; never request keys in chat) → 7c. **V5** (`docs/queue/03h_V5_PROMPT.md`, queued by the user 2026-11-08: one-page marketing site, Standard £10 / Professional £25 per user per month + 14-day trial on V4's billing, marketing support widget → Platform → Support, AI workspace with real workflows) → 8. Copy cleanup (03e) → 9. Docs + Help Centre (04) → 10. One consolidated activation checklist + user reminder.
 
-## Current state (keep updated) — 2026-11-08 05:20 UTC
-- **main** = 33f3e12 + handoff commits: everything through V3.5 streams B–E is committed. Last verified on main: tsc clean,
-  unit 559/559, integration 479/479 (58 files), secret scan clean. Last full E2E on a production build: 59 passed / 2 skipped
-  (V3.5 foundation); stream F re-runs the full suite on the combined code.
-- **Running now:** V3.5 stream F (admin + MCP + cross-stream wiring + polish + full verification + final docs). Progress
-  `docs/v3-5-progress/final.md`; fix list `docs/v3-5-progress/lead-notes.md`. Code done: wiring (listening.alert_fired →
-  automation + Slack; content.approved bridge; echo detection scoped to Relay-written fields; Telegram release on remove;
-  GBP Pub/Sub → pollChannel), sync-job revocation re-check, admin pages `/admin/{care,integrations,listening,ai}` +
-  `/admin/platform/care`, 14 MCP tools / 6 scopes (`mcp/tools-v35.ts`), UI polish. Remaining: full E2E, mobile/perf,
-  docs incl. `docs/v3-5/FINAL_ACTIVATION_CHECKLIST.md`. Its uncommitted files are snapshotted on `wip/streams`.
-- **If this session is gone:** `git checkout origin/wip/streams -- .` on top of main, then relaunch stream F with: read
-  `docs/v3-5-progress/STREAM_BRIEFING.md`, the F row of `docs/V3_5_WORKSTREAMS.md`, `docs/v3-5-progress/lead-notes.md`,
-  resume from `docs/v3-5-progress/final.md`. When F reports: verify (tsc, unit, integration, E2E stats in
-  `evidence/e2e/results.json`, secret scan), commit, then start **V4** (`docs/queue/03g_V4_PROMPT.md`).
-- **Dev environment:** Docker + infra via `docker compose -f infra/compose.yaml up -d` (after a container restart: `rm -f
-  /var/run/docker.pid; nohup dockerd &` first). Migrations 001–017, 019–032 applied and frozen; **next migration 033**
-  (reserved for F) then **034+** for V4. Web = production build on :3000, worker = `apps/worker/dist/main.mjs`; rebuild/
-  restart only under `flock -o .data/devserver-v2.lock …` and start servers with `3>&- 9>&-` (the old devserver.lock is
-  retired). E2E uses seeded workspaces (`pnpm db:seed:e2e`); demo seeds `scripts/seed-*-demo.ts`.
-- **Usage limits / restarts:** agents stop on usage limits and container restarts; resume them with SendMessage (same
-  session) or relaunch from their progress notes (new session). Nothing is lost: files stay on disk + wip/streams.
+## Current state (keep updated) — 2026-11-08 07:35 UTC
+- Working branch for this session: **`claude/dazzling-pasteur-8yny50`** (pushed after each milestone; merge to `main` via PR
+  when the user asks). Working dir `/home/user/relay`.
+- **V3.5 complete** (stream F committed: 8eb8d35): tsc clean, unit 564, integration 489/489,
+  v35-final E2E 3/3, server perf within budget at 5k conversations / 20k messages / 7.5k observations, secret scan clean.
+  Full E2E on the production build ran 2026-11-08: 2 failures were test-state issues (seeded display name; a revoked
+  simulated Asana install left by v35-final) — both specs fixed in 74f3e89; re-run of those specs pending in the lead's
+  notes, results go into `docs/v3-5/TEST_REPORT.md`.
+- **V4 running** as three parallel streams (contract `docs/V4_WORKSTREAMS.md`, briefing `docs/v4-progress/STREAM_BRIEFING.md`,
+  baseline `docs/v4/BASELINE.md`): **SUP** support (migration 034), **BIL** plans/billing/trials/seats (035), **ENT**
+  entitlements/usage/restriction policy (036). Progress notes `docs/v4-progress/{sup,bil,ent}.md`. Lead contracts:
+  `packages/core/src/contracts/v4-plans.ts` (catalogue = V5 prices: Standard £10 / Professional £25 per user per month, GBP,
+  14-day no-card trial; `legacy` plan for pre-V4 workspaces) and `v4-billing.ts`. Permissions `billing.read`,
+  `billing.manage`, `support.workspace` reserved in `core/authz.ts`. After the streams report: lead F4 (wiring, full E2E,
+  mobile, perf, docs, activation checklist), then **V5** (`docs/queue/03h_V5_PROMPT.md`).
+- **If this session is gone:** uncommitted stream files are on disk only — the lead snapshots them to `wip/streams` at
+  stops. Restore with `git cherry-pick --no-commit origin/wip/streams` on a clean tree, then relaunch each stream with
+  its progress note + the briefing.
+- **Dev environment:** `.env` from `.env.example` with generated `SESSION_SECRET` / `KEY_ENCRYPTION_KEYS` (never commit);
+  `dockerd` + `docker compose -f infra/compose.yaml up -d --wait`; `pnpm db:roles && pnpm db:migrate && pnpm db:roles &&
+  pnpm db:seed && pnpm db:seed:e2e`. Migrations 001–032 applied; V4 owns 034–036; next free **037**. Web = production
+  build on :3000 (`next start`), worker = `apps/worker/dist/main.mjs`; rebuild/restart/Playwright only under
+  `flock -o .data/devserver-v2.lock …`, servers started with `3>&- 9>&-`.
 - **Open user decisions:** Inbox in the phone bottom bar for inbox users (lead recommends replacing Planner for them);
-  main nav grouping (it is long now) — decide in the copy-cleanup pass; V3.1 Admin G-A1 / G-A5.
-- **Activation items collected so far** (final consolidated list comes after Docs + Help Centre): Meta App Review (inbox +
-  Instagram permissions, Human Agent; webhook fields), WhatsApp Business (verification, payment, templates), Google
-  Business Profile API approval (+ optional Pub/Sub), Cloud Translation billing project, app registrations for Asana /
-  monday.com / HubSpot / Slack / Mailchimp, YouTube force-ssl, Bluesky app password, HTTPS APP_BASE_URL (Telegram), Threads
-  review, X/LinkedIn/TikTok access, AI provider key + budgets, SMTP_URL + EMAIL_FROM, Platform on a separate restricted
-  host, worker restart after deploy.
+  main nav grouping (proposal in `docs/v3-5-progress/final.md`) — decide in the copy-cleanup pass; V3.1 Admin G-A1 / G-A5;
+  marketing palette (V5 mockup is purple; app brand is orange) — record in DECISIONS when V5 starts.
+- **Activation items collected so far** (final consolidated list after Docs + Help Centre): see
+  `docs/v3-5/FINAL_ACTIVATION_CHECKLIST.md` (V3.5) — plus V4/V5: Stripe live keys + products/prices for Standard and
+  Professional + webhook endpoint, final allowances and grace policy, support staff assignments, email sender, billing/
+  customer policy text.
 - **Known gaps carried forward:** `docs/V2_IMPLEMENTATION_GAPS.md`, `docs/V3_IMPLEMENTATION_GAPS.md`,
   `docs/V3_1_IMPLEMENTATION_GAPS.md`, `docs/admin/IMPLEMENTATION_GAPS.md`, `docs/collaboration/IMPLEMENTATION_GAPS.md`,
-  `docs/v3-5/*` (planner payload, Zod in browser bundles, flags gate UI only, storage orphans, no follower data, TikTok
-  handoff download, lint, security.spec back-channel logout isolation).
-- Earlier milestones (Admin, Collaboration, V3.5 foundation) are summarised in the Queue section above.
+  `docs/v3-5/IMPLEMENTATION_GAPS.md`.
 
 ## Uncommitted work (who owns what)
 Backup: branch `wip/streams` on GitHub is a snapshot of all uncommitted stream work (refreshed by the lead at each stop). In a new session, `git checkout origin/wip/streams -- .` restores it on top of `main`. Then re-launch the streams from their progress notes.
