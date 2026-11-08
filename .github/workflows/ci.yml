@@ -1,0 +1,66 @@
+name: CI
+on:
+  push: { branches: [main] }
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: socialite, POSTGRES_PASSWORD: socialite-local-only, POSTGRES_DB: socialite_test }
+        ports: ["54329:5432"]
+        options: >-
+          --health-cmd "pg_isready -U socialite" --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      TEST_DATABASE_URL: postgres://socialite:socialite-local-only@localhost:54329/socialite_test
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.28.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Start S3-compatible storage for media tests
+        run: |
+          docker run -d --name s3 -p 8333:8333 -v $PWD/infra/seaweedfs/s3.json:/etc/s3.json:ro chrislusf/seaweedfs:3.80 \
+            server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/s3.json -volume.max=0
+          for i in $(seq 1 60); do curl -s -o /dev/null localhost:8333 && break; sleep 2; done
+      - name: Start Keycloak (OIDC, MFA, step-up, back-channel logout) and Mailpit for integration tests
+        run: |
+          docker run -d --name kc -p 5556:5556 -p 9000:9000 --add-host host.docker.internal:host-gateway \
+            -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=socialite-kc-admin-local-only \
+            -v $PWD/infra/keycloak/social-lite-realm.json:/opt/keycloak/data/import/social-lite-realm.json:ro \
+            keycloak/keycloak:26.4 start-dev --import-realm --http-port=5556 --hostname=http://localhost:5556 --health-enabled=true
+          docker run -d --name mail -p 1025:1025 -p 8025:8025 axllent/mailpit:latest
+          for i in $(seq 1 90); do curl -sf localhost:9000/health/ready >/dev/null && break; sleep 2; done
+          curl -sf localhost:5556/realms/social-lite/.well-known/openid-configuration >/dev/null
+      - name: Secret scan (tracked files)
+        run: ./scripts/secret-scan.sh
+      - name: Dependency audit (production dependencies)
+        run: pnpm audit --prod
+      - name: Typecheck
+        run: npx tsc -p tsconfig.json --noEmit && (cd apps/web && npx tsc --noEmit)
+      - name: Unit and provider contract tests
+        run: pnpm test
+      - name: Integration tests (real PostgreSQL)
+        run: pnpm test:integration
+      - name: Migration check (fresh database, twice — idempotent)
+        run: |
+          DATABASE_URL=$TEST_DATABASE_URL APP_ENV=test pnpm db:reset >/dev/null 2>&1 || true
+          DATABASE_URL=$TEST_DATABASE_URL pnpm db:migrate && DATABASE_URL=$TEST_DATABASE_URL pnpm db:migrate
+      - name: Production builds
+        run: pnpm build
+      - name: Production config fails closed
+        run: npx vitest run --project unit tests/unit/config.test.ts
+
+  images:
+    runs-on: ubuntu-latest
+    needs: verify
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f infra/docker/Dockerfile --target web -t social-lite-web:${{ github.sha }} .
+      - run: docker build -f infra/docker/Dockerfile --target worker -t social-lite-worker:${{ github.sha }} .

@@ -1,0 +1,737 @@
+{
+  "label": "baseline",
+  "profile": {
+    "name": "medium",
+    "brands": 20,
+    "connections": 100,
+    "posts": 50000,
+    "neighbours": 3,
+    "neighbourScale": 0.1,
+    "analytics": {
+      "days": 365,
+      "postsPerDay": 1,
+      "connectionsPerProvider": 1
+    },
+    "dispatchBacklog": 300
+  },
+  "database": "relay_bench_medium_mw658vxb",
+  "started_at": "2026-11-07T08:30:54.734Z",
+  "finished_at": "2026-11-07T08:34:01.040Z",
+  "conditions": {
+    "host": {
+      "hostname": "vm",
+      "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+      "cpus": 4,
+      "total_mem_gb": 16.9,
+      "free_mem_gb_at_start": 7.3,
+      "loadavg_at_end": [
+        6.63,
+        4.01,
+        3.04
+      ],
+      "node": "v22.23.4"
+    },
+    "postgres": {
+      "server_version": "16.15",
+      "shared_buffers": "128MB",
+      "work_mem": "4MB",
+      "effective_cache_size": "4GB",
+      "random_page_cost": "4",
+      "max_connections": "100",
+      "database_bytes": 483974167,
+      "database_mb": 462,
+      "largest_tables": [
+        {
+          "table": "deliveries",
+          "est_rows": 116772,
+          "mb": 85
+        },
+        {
+          "table": "metric_observations",
+          "est_rows": 122143,
+          "mb": 69
+        },
+        {
+          "table": "posts",
+          "est_rows": 68643,
+          "mb": 58
+        },
+        {
+          "table": "metric_cumulative_facts",
+          "est_rows": 122143,
+          "mb": 58
+        },
+        {
+          "table": "variants",
+          "est_rows": 118194,
+          "mb": 38
+        },
+        {
+          "table": "metric_daily_facts",
+          "est_rows": 101798,
+          "mb": 37
+        },
+        {
+          "table": "schedules",
+          "est_rows": 60926,
+          "mb": 27
+        },
+        {
+          "table": "delivery_attempts",
+          "est_rows": 96386,
+          "mb": 24
+        },
+        {
+          "table": "post_revisions",
+          "est_rows": 60926,
+          "mb": 21
+        },
+        {
+          "table": "metric_rollups",
+          "est_rows": 47916,
+          "mb": 16
+        },
+        {
+          "table": "metric_resource_latest",
+          "est_rows": 20345,
+          "mb": 8
+        },
+        {
+          "table": "approvals",
+          "est_rows": 14807,
+          "mb": 6
+        }
+      ]
+    },
+    "cache_state": "warm: 3 warm-up calls per scenario before 30 timed samples; shared_buffers 128MB vs database 462 MB",
+    "buffer_hit_ratio_during_page_samples": 0.9819968362198662,
+    "concurrency": "sequential single caller (latency); shared host — other agents may be running tests concurrently (see loadavg)",
+    "measured_layer": "service functions called by the API routes (authz + SQL + serialisation); excludes Next.js, session cookie lookup and network",
+    "pool_max": 8,
+    "samples": 30,
+    "warmup": 3
+  },
+  "dataset": {
+    "totals": {
+      "workspaces": 4,
+      "brands": 27,
+      "connections": 140,
+      "posts": 68643,
+      "schedules": 60926,
+      "deliveries": 116772,
+      "delivery_attempts": 96386,
+      "approvals": 14807,
+      "metric_observations": 122143,
+      "metric_rollups": 47916
+    },
+    "measured_workspace": {
+      "brands": 21,
+      "connections": 110,
+      "posts": 53643,
+      "deliveries": 90886
+    },
+    "analytics_history": {
+      "posts": 3643,
+      "points": 122143,
+      "days": 365,
+      "postsPerDay": 1,
+      "connectionsPerProvider": 1
+    },
+    "migrations": [
+      "001_core.sql",
+      "002_mock_provider_store.sql",
+      "003_connection_flows.sql",
+      "004_tipsignal.sql",
+      "005_ai.sql",
+      "006_media_expansion.sql",
+      "007_slots_crops_analytics.sql",
+      "008_rate_limits_and_deletion.sql",
+      "009_v2_authz.sql",
+      "010_v2_identity.sql",
+      "011_v2_tenancy.sql",
+      "012_v2_collaboration.sql",
+      "013_v2_product.sql",
+      "014_v3_providers.sql",
+      "015_v3_analytics.sql",
+      "016_v3_content_hub.sql",
+      "017_v3_mcp.sql",
+      "019_v3_engine.sql",
+      "021_v31_data.sql",
+      "022_v31_gov.sql"
+    ],
+    "timings": {
+      "migrate_ms": 1161,
+      "generate_core_ms": 31004,
+      "generate_analytics_ms": 36928,
+      "analyze_ms": 3853
+    }
+  },
+  "results": [
+    {
+      "scenario": "request.context (loadAccess)",
+      "ms": {
+        "n": 30,
+        "p50": 2.74,
+        "p95": 3.29,
+        "mean": 2.83,
+        "stdev": 0.24,
+        "cv": 0.09,
+        "min": 2.5,
+        "max": 3.57
+      },
+      "first_call_ms": 3.49,
+      "queries_per_call": 5,
+      "response_bytes": 664
+    },
+    {
+      "scenario": "planner.week (all brands)",
+      "ms": {
+        "n": 30,
+        "p50": 80.87,
+        "p95": 103.39,
+        "mean": 81.92,
+        "stdev": 10.35,
+        "cv": 0.13,
+        "min": 67.7,
+        "max": 112.98
+      },
+      "first_call_ms": 95.83,
+      "queries_per_call": 5,
+      "response_bytes": 697247
+    },
+    {
+      "scenario": "planner.month (all brands)",
+      "ms": {
+        "n": 30,
+        "p50": 81.2,
+        "p95": 101.9,
+        "mean": 84.77,
+        "stdev": 10.02,
+        "cv": 0.12,
+        "min": 75.18,
+        "max": 124.68
+      },
+      "first_call_ms": 83.77,
+      "queries_per_call": 5,
+      "response_bytes": 780522
+    },
+    {
+      "scenario": "planner.month (one brand)",
+      "ms": {
+        "n": 30,
+        "p50": 12.71,
+        "p95": 17.95,
+        "mean": 13.46,
+        "stdev": 1.81,
+        "cv": 0.13,
+        "min": 11.26,
+        "max": 18.59
+      },
+      "first_call_ms": 16.11,
+      "queries_per_call": 5,
+      "response_bytes": 133030
+    },
+    {
+      "scenario": "planner.month (brand-restricted editor)",
+      "ms": {
+        "n": 30,
+        "p50": 81.52,
+        "p95": 115.39,
+        "mean": 85.69,
+        "stdev": 15.09,
+        "cv": 0.18,
+        "min": 68.18,
+        "max": 124.87
+      },
+      "first_call_ms": 74.13,
+      "queries_per_call": 5,
+      "response_bytes": 787837
+    },
+    {
+      "scenario": "posts.list (first page)",
+      "ms": {
+        "n": 30,
+        "p50": 17.2,
+        "p95": 20.17,
+        "mean": 17.27,
+        "stdev": 1.42,
+        "cv": 0.08,
+        "min": 14.74,
+        "max": 21.26
+      },
+      "first_call_ms": 25.95,
+      "queries_per_call": 4,
+      "response_bytes": 17777
+    },
+    {
+      "scenario": "posts.list (page 5, cursor)",
+      "ms": {
+        "n": 30,
+        "p50": 13.42,
+        "p95": 21.12,
+        "mean": 14.61,
+        "stdev": 2.98,
+        "cv": 0.2,
+        "min": 11.61,
+        "max": 24.43
+      },
+      "first_call_ms": 15.23,
+      "queries_per_call": 4,
+      "response_bytes": 18849
+    },
+    {
+      "scenario": "posts.search (q=launch)",
+      "ms": {
+        "n": 30,
+        "p50": 20.34,
+        "p95": 35.98,
+        "mean": 22.63,
+        "stdev": 5.29,
+        "cv": 0.23,
+        "min": 17.75,
+        "max": 39.15
+      },
+      "first_call_ms": 17.68,
+      "queries_per_call": 4,
+      "response_bytes": 19178
+    },
+    {
+      "scenario": "post.detail",
+      "ms": {
+        "n": 30,
+        "p50": 6.65,
+        "p95": 10.2,
+        "mean": 7.27,
+        "stdev": 2.26,
+        "cv": 0.31,
+        "min": 3.92,
+        "max": 17.6
+      },
+      "first_call_ms": 11.79,
+      "queries_per_call": 10,
+      "response_bytes": 6567
+    },
+    {
+      "scenario": "dashboard",
+      "ms": {
+        "n": 30,
+        "p50": 131.75,
+        "p95": 197.51,
+        "mean": 141.7,
+        "stdev": 30.61,
+        "cv": 0.22,
+        "min": 102.87,
+        "max": 260.17
+      },
+      "first_call_ms": 143.51,
+      "queries_per_call": 15,
+      "response_bytes": 243159
+    },
+    {
+      "scenario": "history (first page)",
+      "ms": {
+        "n": 30,
+        "p50": 75.19,
+        "p95": 128.68,
+        "mean": 80.09,
+        "stdev": 21.33,
+        "cv": 0.27,
+        "min": 47.26,
+        "max": 156.49
+      },
+      "first_call_ms": 88.91,
+      "queries_per_call": 1,
+      "response_bytes": 49441
+    },
+    {
+      "scenario": "history (failed, one brand)",
+      "ms": {
+        "n": 30,
+        "p50": 5.99,
+        "p95": 12.77,
+        "mean": 6.91,
+        "stdev": 2.28,
+        "cv": 0.33,
+        "min": 5.25,
+        "max": 12.92
+      },
+      "first_call_ms": 16.87,
+      "queries_per_call": 1,
+      "response_bytes": 49938
+    },
+    {
+      "scenario": "history (page 21, cursor)",
+      "ms": {
+        "n": 30,
+        "p50": 77.48,
+        "p95": 111.98,
+        "mean": 80,
+        "stdev": 14.38,
+        "cv": 0.18,
+        "min": 61.67,
+        "max": 121.98
+      },
+      "first_call_ms": 110.76,
+      "queries_per_call": 1,
+      "response_bytes": 49445
+    },
+    {
+      "scenario": "history (brand-restricted editor)",
+      "ms": {
+        "n": 30,
+        "p50": 51.14,
+        "p95": 101.23,
+        "mean": 59.51,
+        "stdev": 20.11,
+        "cv": 0.34,
+        "min": 40.12,
+        "max": 137.4
+      },
+      "first_call_ms": 60.84,
+      "queries_per_call": 1,
+      "response_bytes": 49436
+    },
+    {
+      "scenario": "approvals (pending)",
+      "ms": {
+        "n": 30,
+        "p50": 564.94,
+        "p95": 744.65,
+        "mean": 576.47,
+        "stdev": 83.86,
+        "cv": 0.15,
+        "min": 408.78,
+        "max": 755.13
+      },
+      "first_call_ms": 493.71,
+      "queries_per_call": 1216,
+      "response_bytes": 132404
+    },
+    {
+      "scenario": "approvals (decided)",
+      "ms": {
+        "n": 30,
+        "p50": 42.41,
+        "p95": 61.89,
+        "mean": 44.65,
+        "stdev": 6.97,
+        "cv": 0.16,
+        "min": 37.73,
+        "max": 71.5
+      },
+      "first_call_ms": 46.05,
+      "queries_per_call": 16,
+      "response_bytes": 136412
+    },
+    {
+      "scenario": "ops (operations)",
+      "ms": {
+        "n": 30,
+        "p50": 37.03,
+        "p95": 51.28,
+        "mean": 37.89,
+        "stdev": 4.44,
+        "cv": 0.12,
+        "min": 33.16,
+        "max": 51.57
+      },
+      "first_call_ms": 52.07,
+      "queries_per_call": 9,
+      "response_bytes": 1013
+    },
+    {
+      "scenario": "analytics.overview (28 d)",
+      "ms": {
+        "n": 30,
+        "p50": 196.62,
+        "p95": 287.27,
+        "mean": 206.09,
+        "stdev": 37.13,
+        "cv": 0.18,
+        "min": 156.53,
+        "max": 292.05
+      },
+      "first_call_ms": 309.75,
+      "queries_per_call": 15,
+      "response_bytes": 122740
+    },
+    {
+      "scenario": "analytics.overview (365 d)",
+      "ms": {
+        "n": 30,
+        "p50": 803.32,
+        "p95": 1287.88,
+        "mean": 827.47,
+        "stdev": 166.28,
+        "cv": 0.2,
+        "min": 690.98,
+        "max": 1401.93
+      },
+      "first_call_ms": 1170.82,
+      "queries_per_call": 15,
+      "response_bytes": 652821
+    },
+    {
+      "scenario": "analytics.content (28 d, sort ER)",
+      "ms": {
+        "n": 30,
+        "p50": 49.6,
+        "p95": 88.43,
+        "mean": 54.25,
+        "stdev": 12.8,
+        "cv": 0.24,
+        "min": 36.96,
+        "max": 89.35
+      },
+      "first_call_ms": 62.5,
+      "queries_per_call": 11,
+      "response_bytes": 87548
+    }
+  ],
+  "dispatch": {
+    "backlog": 300,
+    "processed": 300,
+    "states": {
+      "published": 300
+    },
+    "duplicate_sends": 0,
+    "claim_ms": {
+      "n": 300,
+      "p50": 8.1,
+      "p95": 16.01,
+      "mean": 9.38,
+      "stdev": 3.46,
+      "cv": 0.37,
+      "min": 6.5,
+      "max": 32.97
+    },
+    "idle_claim_ms": {
+      "n": 30,
+      "p50": 4.76,
+      "p95": 8.94,
+      "mean": 5.16,
+      "stdev": 1.88,
+      "cv": 0.36,
+      "min": 3.38,
+      "max": 13.29
+    },
+    "process_total_ms": {
+      "n": 300,
+      "p50": 37.61,
+      "p95": 64.47,
+      "mean": 41.37,
+      "stdev": 11.42,
+      "cv": 0.28,
+      "min": 27.87,
+      "max": 96.05
+    },
+    "process_app_ms": {
+      "n": 300,
+      "p50": 35.74,
+      "p95": 59.08,
+      "mean": 39.18,
+      "stdev": 10.74,
+      "cv": 0.27,
+      "min": 27.08,
+      "max": 91.26
+    },
+    "process_provider_ms": {
+      "n": 300,
+      "p50": 1.49,
+      "p95": 6.03,
+      "mean": 2.19,
+      "stdev": 1.95,
+      "cv": 0.89,
+      "min": 0.71,
+      "max": 13.36
+    },
+    "outbox_batch50_ms": {
+      "n": 6,
+      "p50": 18.3,
+      "p95": 27.9,
+      "mean": 20.02,
+      "stdev": 5.62,
+      "cv": 0.28,
+      "min": 12.37,
+      "max": 27.9
+    },
+    "simulated_provider_latency_ms": 0
+  },
+  "mcp": [
+    {
+      "tool": "list_workspaces",
+      "client_ms": {
+        "n": 30,
+        "p50": 13.39,
+        "p95": 33.45,
+        "mean": 15.34,
+        "stdev": 9.37,
+        "cv": 0.61,
+        "min": 6.26,
+        "max": 53.72
+      },
+      "server_ms": {
+        "n": 30,
+        "p50": 2,
+        "p95": 8,
+        "mean": 2.87,
+        "stdev": 2.42,
+        "cv": 0.84,
+        "min": 1,
+        "max": 9
+      },
+      "provider_ms": 0,
+      "errors": 0
+    },
+    {
+      "tool": "list_brands",
+      "client_ms": {
+        "n": 30,
+        "p50": 8.19,
+        "p95": 18.9,
+        "mean": 10.12,
+        "stdev": 3.74,
+        "cv": 0.37,
+        "min": 7.11,
+        "max": 19.65
+      },
+      "server_ms": {
+        "n": 30,
+        "p50": 3,
+        "p95": 7,
+        "mean": 3.93,
+        "stdev": 1.55,
+        "cv": 0.39,
+        "min": 3,
+        "max": 10
+      },
+      "provider_ms": 0,
+      "errors": 0
+    },
+    {
+      "tool": "search_content",
+      "client_ms": {
+        "n": 30,
+        "p50": 38.68,
+        "p95": 82.13,
+        "mean": 44.13,
+        "stdev": 19.61,
+        "cv": 0.44,
+        "min": 25.64,
+        "max": 107.62
+      },
+      "server_ms": {
+        "n": 30,
+        "p50": 29,
+        "p95": 61,
+        "mean": 33.07,
+        "stdev": 12.94,
+        "cv": 0.39,
+        "min": 21,
+        "max": 63
+      },
+      "provider_ms": 0,
+      "errors": 0
+    },
+    {
+      "tool": "get_post",
+      "client_ms": {
+        "n": 30,
+        "p50": 14.86,
+        "p95": 25.35,
+        "mean": 16.62,
+        "stdev": 4.17,
+        "cv": 0.25,
+        "min": 13.37,
+        "max": 31.46
+      },
+      "server_ms": {
+        "n": 30,
+        "p50": 10,
+        "p95": 13,
+        "mean": 10.43,
+        "stdev": 1.43,
+        "cv": 0.14,
+        "min": 9,
+        "max": 14
+      },
+      "provider_ms": 0,
+      "errors": 0
+    },
+    {
+      "tool": "get_delivery_status",
+      "client_ms": {
+        "n": 30,
+        "p50": 10.3,
+        "p95": 20.26,
+        "mean": 12.42,
+        "stdev": 4.55,
+        "cv": 0.37,
+        "min": 8.53,
+        "max": 26.02
+      },
+      "server_ms": {
+        "n": 30,
+        "p50": 5,
+        "p95": 10,
+        "mean": 5.87,
+        "stdev": 2.1,
+        "cv": 0.36,
+        "min": 3,
+        "max": 12
+      },
+      "provider_ms": 0,
+      "errors": 0
+    },
+    {
+      "tool": "list_calendar",
+      "client_ms": {
+        "n": 30,
+        "p50": 99.47,
+        "p95": 166.28,
+        "mean": 105.42,
+        "stdev": 25.63,
+        "cv": 0.24,
+        "min": 70.92,
+        "max": 176.25
+      },
+      "server_ms": {
+        "n": 30,
+        "p50": 84,
+        "p95": 139,
+        "mean": 90.03,
+        "stdev": 22.04,
+        "cv": 0.24,
+        "min": 61,
+        "max": 154
+      },
+      "provider_ms": 0,
+      "errors": 0
+    },
+    {
+      "tool": "analytics_overview",
+      "client_ms": {
+        "n": 30,
+        "p50": 9.46,
+        "p95": 15.93,
+        "mean": 10.69,
+        "stdev": 2.38,
+        "cv": 0.22,
+        "min": 8.65,
+        "max": 17.81
+      },
+      "server_ms": {
+        "n": 30,
+        "p50": 5,
+        "p95": 9,
+        "mean": 5.73,
+        "stdev": 1.68,
+        "cv": 0.29,
+        "min": 5,
+        "max": 13
+      },
+      "provider_ms": 0,
+      "errors": 0
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+# Migration rehearsal 2026-11-07T07:53:05Z from backup-20261106T233102Z.dump
+UPDATE 1
+before: migrations=3 members=6 posts=5 deliveries=12 published=7
+{"msg":"migrations","applied":["004_tipsignal.sql","005_ai.sql","006_media_expansion.sql","007_slots_crops_analytics.sql","008_rate_limits_and_deletion.sql","009_v2_authz.sql","010_v2_identity.sql","011_v2_tenancy.sql","012_v2_collaboration.sql","013_v2_product.sql","014_v3_providers.sql","015_v3_analytics.sql","016_v3_content_hub.sql","017_v3_mcp.sql","019_v3_engine.sql"],"alreadyApplied":3}
+after:  migrations=18 members=6 posts=5 deliveries=12 published=7
+PASS posts preserved (5)
+PASS deliveries preserved (12)
+PASS published history preserved (7)
+PASS memberships preserved (6)
+PASS dispatch still disabled (false)
+PASS every active member has a grant (0)
+PASS no broadened owner/admin grants (0)
+PASS brand-restricted members not widened to workspace (0)
+PASS no publisher grants created by backfill (0)
+PASS every workspace keeps an owner (0)
+review items: v1_approver_scheduling=1 
+Rollback: schema is additive (no destructive down-migrations), but V1.1 app images must NOT run against a V2 schema (they ignore suspension, guest expiry and publication authority). Roll back by restoring the pre-upgrade backup. See docs/V2_MIGRATION_RUNBOOK.md. Rehearsal DB kept: socialite_migration_rehearsal
+RESULT: PASS

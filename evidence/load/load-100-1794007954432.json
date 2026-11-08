@@ -1,0 +1,23 @@
+{
+  "measured_at": "2026-11-06T23:32:34.432Z",
+  "jobs": 100,
+  "destinations": 25,
+  "simulated_provider_latency_ms": 250,
+  "enqueue_seconds": 2.915,
+  "completed": 100,
+  "wall_seconds_to_complete": 3.054,
+  "dispatch_start_latency_seconds": {
+    "p50": 1.3981355,
+    "p95": 2.5990537999999996,
+    "max": "2.681071"
+  },
+  "fraction_started_within_60s": 1,
+  "target": "95% of eligible due jobs begin within 60 s",
+  "states": [
+    {
+      "state": "published",
+      "n": 100
+    }
+  ],
+  "deliveries_sent_more_than_once": 0
+}
