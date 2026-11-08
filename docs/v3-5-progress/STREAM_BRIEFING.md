@@ -10,8 +10,10 @@ from official docs.
 
 ## Running in parallel with other streams (B inbox, C integrations, D listening, E AI/automation)
 - One shared dev host. The web app on :3000 is a production build. **Any rebuild/restart of web or worker, and any
-  Playwright run, must hold the lock**: `flock /home/user/social-lite/.data/devserver.lock <command>` (it serialises with
-  the other streams). Rebuild web: `pnpm --filter web build` then restart `next start --port 3000` (check no stale
+  Playwright run, must hold the lock**: `flock -o /home/user/social-lite/.data/devserver-v2.lock <command>` (it serialises with
+  the other streams). Always use `-o` so long-running processes started inside the command (web, worker) do NOT inherit the
+  lock; when backgrounding a server inside the command also add `3>&- 9>&-` to be safe. (The old `devserver.lock` is
+  retired: a worker started without `-o` holds it forever.) Rebuild web: `pnpm --filter web build` then restart `next start --port 3000` (check no stale
   `next dev` holds :3000). Worker: `pnpm --filter worker build` and restart (see `.data/worker.pid`).
 - Run only YOUR E2E spec(s) during development; stream F runs the full suite at the end. Integration tests use disposable
   per-run DBs, so they are safe in parallel.
