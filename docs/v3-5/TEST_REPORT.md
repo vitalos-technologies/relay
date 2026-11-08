@@ -131,3 +131,25 @@ horizontal-scroll issues at 1440 px in this run. Evidence: `evidence/v3-5/final/
 
 Pages never wait for providers or AI: every V3.5 page renders from stored rows; AI runs are queued and polled, provider
 work runs in the worker.
+
+## Post-rebuild runs (2026-11-08, fresh dev database)
+
+Re-verified after restoring stream F in a new container (fresh Postgres, seeds, production build of the stream F tree):
+
+| Check | Result |
+|---|---|
+| Typecheck | clean |
+| Unit + contracts | 564 / 564 |
+| Integration (full suite, 2 runs) | 489 / 489 on the second run; the first run had 2 failures in one analytics file that passed 3/3 when re-run alone and in the next full run — recorded as a flaky test under load |
+| `v35-final.spec.ts` (stream F) | 3 passed (desktop ×2, @mobile ×1) |
+| Full E2E suite (85 tests, 1 worker, 38.8 min) | **77 passed, 2 failed, 6 skipped** (log kept locally: `.data/logs/f-e2e-full.log`; `*.log` is gitignored) |
+| Re-run of the affected specs after fixes | collaboration + integrations + v35-final: **14 passed, 0 failed, 2 skipped** (`.data/logs/f-e2e-rerun.log`) |
+
+Both full-suite failures were test-state problems, not product defects:
+- `collaboration.spec` expected the mention to insert "@Vic Viewer"; on a fresh database the seeded display name is
+  "Vic Viewer (demo)" until the identity-provider profile syncs. The assertion now accepts the seeded name.
+- `integrations.spec` could not choose Asana projects because an earlier `v35-final.spec` run had left a simulated Asana
+  install in `reconnect_required` (a revoked install correctly stays that way until reconnected). `v35-final.spec` now
+  disconnects the install it revokes; the leftover install was disconnected through the normal disconnect service.
+
+Skips are the desktop project skipping `@mobile` tests (by design).
