@@ -9,6 +9,7 @@ import { useSession } from '@/lib/client/session';
 import { Button, Card, Dialog, EmptyState, ErrorState, Field, FilterBar, FilterSelect, InfoTip, MetricCard, PageHeader, Select, SkeletonRows } from '@/components/ui';
 import { TaskDrawer, TaskForm, TaskRow } from '@/components/collab/tasks';
 import type { TaskDto } from '@/components/collab/types';
+import { HelpLink } from '@/components/help/help-link';
 
 type View = 'mine' | 'created' | 'team';
 interface Workload { mine: { open: number; overdue: number; due_soon: number; created_open: number }; people: Array<{ user_id: string | null; name: string | null; email: string | null; open: number; overdue: number; due_soon: number; blocked: number }> }
@@ -35,7 +36,7 @@ export default function TasksPage() {
   return (
     <>
       <PageHeader title="Tasks" meta={<InfoTip label="About tasks">Task deadlines never change when a post publishes, and finishing a task never approves anything.</InfoTip>}
-        actions={<Button variant="primary" icon={<Plus aria-hidden className="size-4" />} onClick={() => setCreating(true)} disabledReason={!session.brands.length ? 'No brands yet.' : null}>New task</Button>} />
+        actions={<><HelpLink slug="tasks-and-deadlines" label="About tasks and deadlines" /><Button variant="primary" icon={<Plus aria-hidden className="size-4" />} onClick={() => setCreating(true)} disabledReason={!session.brands.length ? 'No brands yet.' : null}>New task</Button></>} />
       {w ? (
         <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <MetricCard label="Assigned to me" value={w.mine.open} />

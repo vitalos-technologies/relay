@@ -35,7 +35,7 @@ test.describe('marketing page (public)', () => {
     const hrefs = await page.$$eval('a[href]', (as) => as.map((a) => a.getAttribute('href')!));
     for (const h of hrefs.filter((x) => x.startsWith('#') && x !== '#support' /* opens the support widget (WID) */)) expect(await page.locator(h === '#' ? 'body' : h).count(), h).toBeGreaterThan(0);
     const leaving = [...new Set(hrefs.filter((h) => !h.startsWith('#')))];
-    for (const h of leaving) expect(h, 'only account / support / legal links leave the page').toMatch(/^\/(signup(\?plan=(standard|professional)&seats=\d+)?|login(\?returnTo=.*)?|overview|help\/contact)$|^mailto:|^https:/);
+    for (const h of leaving) expect(h, 'only account / support / help / legal links leave the page').toMatch(/^\/(signup(\?plan=(standard|professional)&seats=\d+)?|login(\?returnTo=.*)?|overview|help|help\/contact)$|^mailto:|^https:/); // HC: footer links the public Help Centre
     // Explore Relay scrolls to the product demonstrations (no fake demo video).
     await page.goto('/');
     await page.getByTestId('mkt-hero-explore').click();

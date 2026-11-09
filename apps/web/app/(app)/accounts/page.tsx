@@ -23,6 +23,7 @@ import {
 import { ConnectionsTabs } from '@/components/shell/connections-tabs';
 import { BlueskyDialog, MOCK_SCENARIOS, MOCK_SCENARIO_LABEL, MockDialog, NotConfiguredDialog, TelegramDialog } from '@/components/accounts/connect-dialogs';
 import dynamic from 'next/dynamic';
+import { HelpLink } from '@/components/help/help-link';
 // Content sources (Google/Notion) render below the social accounts; their code loads after the page.
 const SourceConnectionsSettings = dynamic(() => import('@/components/content-hub/source-connections').then((m) => m.SourceConnectionsSettings));
 
@@ -57,6 +58,7 @@ export default function ConnectionsPage() {
   return (
     <>
       <PageHeader title="Connections" actions={<>
+        <HelpLink slug="connect-social-accounts" label="About connecting social accounts" />
         {diagOn ? <LinkButton href={brand ? `/accounts/diagnostics?brand=${brand}` : '/accounts/diagnostics'} variant="ghost" icon={<Stethoscope aria-hidden className="size-4" />}>Test centre</LinkButton> : null}
         <LinkButton href={brand ? `/accounts/health?brand=${brand}` : '/accounts/health'} icon={<HeartPulse aria-hidden className="size-4" />}>Health</LinkButton>
       </>} />
@@ -64,6 +66,7 @@ export default function ConnectionsPage() {
       {err ? (
         <Banner tone="danger" role="alert" className="mb-6" title="Couldn’t connect" actions={<Button size="sm" variant="ghost" onClick={() => setParams({ error: null })}>Dismiss</Button>}>
           {CALLBACK_ERRORS[err] ?? 'Something went wrong.'} <span className="font-mono text-[11px] text-subtle">({err})</span>
+          {' '}<HelpLink slug="connect-social-accounts" anchor="common-errors-when-connecting" label="Common connection errors" />
         </Banner>
       ) : null}
       {connected ? (

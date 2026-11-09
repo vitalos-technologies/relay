@@ -13,6 +13,7 @@ import {
   SkeletonRows, Textarea, Tooltip, useToast,
 } from '@/components/ui';
 import { StatusBadge, TeamNav, V2_ROLE_LABEL, ROLE_HINT, type InvitationView } from '@/components/team/shared';
+import { HelpLink } from '@/components/help/help-link';
 
 const MEMBER_ROLES = ['editor', 'publisher', 'approver', 'brand_manager', 'analyst', 'viewer', 'exporter', 'admin'] as const;
 
@@ -44,6 +45,7 @@ export default function InvitationsPage() {
   return (
     <>
       <PageHeader title="Team" actions={<>
+        <HelpLink slug="invite-people" label="About inviting people" />
         <Button icon={<ListPlus aria-hidden className="size-4" />} onClick={() => setBulk(true)}>Bulk</Button>
         <Button variant="primary" icon={<UserPlus aria-hidden className="size-4" />} onClick={() => setOpen(true)}>Invite</Button>
       </>} />

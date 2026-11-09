@@ -7,6 +7,7 @@ import { api, isApiError } from '@/lib/client/api';
 import { useSession } from '@/lib/client/session';
 import type { Connection, MockScenario, ProviderStatus } from '@/lib/client/types';
 import { Banner, Button, buttonClass, Dialog, ErrorNotice, Field, Input, Select } from '@/components/ui';
+import { HelpLink } from '@/components/help/help-link';
 
 export const MOCK_SCENARIO_LABEL: Record<MockScenario, string> = {
   success: 'Always succeeds',
@@ -41,6 +42,7 @@ export function NotConfiguredDialog({ provider, status, open, onOpenChange }: { 
         ) : null}
         {status?.notes ? <p className="text-muted">{status.notes}</p> : null}
         {can('setup.manage') ? null : <p className="text-muted">Ask the workspace owner.</p>}
+        <p><HelpLink slug="set-up-social-network-apps" label="Set up social network apps" /></p>
       </div>
     </Dialog>
   );

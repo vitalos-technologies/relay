@@ -40,6 +40,14 @@ jobs:
           curl -sf localhost:5556/realms/social-lite/.well-known/openid-configuration >/dev/null
       - name: Secret scan (tracked files)
         run: ./scripts/secret-scan.sh
+      - name: Docs check (Help Centre content, links, in-app help links, secrets)
+        run: node scripts/docs-check.mjs
+      - name: API and MCP reference is current (generated docs)
+        run: node scripts/docs-api-check.mjs
+      - name: Role and permission matrix matches the policy (docs)
+        run: npx tsx scripts/docs-role-matrix.ts --check
+      - name: Docs bundle builds (offline Help Centre zip)
+        run: node scripts/docs-bundle.mjs --out dist/help/relay-help.zip
       - name: Dependency audit (production dependencies)
         run: pnpm audit --prod
       - name: Typecheck

@@ -8,6 +8,7 @@ import { ConnectionsTabs } from '@/components/shell/connections-tabs';
 import { Badge, ErrorState, FeatureTile, IntegrationCard, PageHeader, SkeletonRows } from '@/components/ui';
 import { CONNECTOR_META } from './meta';
 import { useHub } from './hub-shell';
+import { HelpLink } from '@/components/help/help-link';
 
 export function stateBadge(c: HubOverviewJson['connectors'][number]) {
   const live = c.installations.filter((i) => !i.disconnected_at);
@@ -25,7 +26,7 @@ export function IntegrationsHub() {
   const hub = useHub();
   return (
     <>
-      <PageHeader title="Connections" />
+      <PageHeader title="Connections" actions={<HelpLink slug="business-apps-overview" label="About business apps" />} />
       <ConnectionsTabs />
       {hub.error ? <ErrorState error={hub.error} onRetry={hub.refetch} /> : !hub.data ? <SkeletonRows rows={6} /> : (
         <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3" data-testid="integrations-hub">

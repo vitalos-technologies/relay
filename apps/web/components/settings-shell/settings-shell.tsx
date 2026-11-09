@@ -10,6 +10,7 @@ import { useSession } from '@/lib/client/session';
 import { cn } from '@/components/ui';
 import { useFlags } from '@/lib/client/flags';
 import { itemHref, visibleSettings, type SettingsGroup, type SettingsItem } from './registry';
+import { HelpLink } from '@/components/help/help-link';
 
 function useActive(groups: SettingsGroup[]) {
   const pathname = usePathname();
@@ -57,7 +58,10 @@ export function SettingsShell({ children }: { children: ReactNode }) {
           </ol>
         </nav>
         {active && !active.item.ownHeader ? (
-          <h1 className="mb-6 text-[24px] font-semibold leading-tight tracking-[-0.02em] md:mb-8 md:text-[28px]">{active.item.label}</h1>
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 md:mb-8">
+            <h1 className="text-[24px] font-semibold leading-tight tracking-[-0.02em] md:text-[28px]">{active.item.label}</h1>
+            {active.item.help ? <HelpLink href={active.item.help} label={`About ${active.item.label}`} /> : null}
+          </div>
         ) : null}
         {children}
       </div>

@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { CircleCheck, Download, Inbox, LifeBuoy, Lock, MessageSquarePlus, RotateCcw, Search, ShieldCheck, UserPlus } from 'lucide-react';
+import { BookOpen, CircleCheck, Download, Inbox, LifeBuoy, Lock, MessageSquarePlus, RotateCcw, Search, ShieldCheck, UserPlus } from 'lucide-react';
 import {
   RESTRICTED_SUPPORT_CATEGORIES, SUPPORT_CATEGORY_LABEL, SUPPORT_TICKET_CATEGORIES, type CustomerTicketDetail, type CustomerTicketsResponse, type SupportTicketCategory,
   type SupportTicketStatus,
@@ -38,6 +38,8 @@ const ago = (iso: string) => {
 
 // ------------------------------------------------------------------ shell (left sub-navigation)
 const HELP_NAV = [
+  // HC: the Help Centre home (articles + search) sits above V4's support pages.
+  { href: '/help', label: 'Help Centre', icon: BookOpen },
   { href: '/help/contact', label: 'Contact support', icon: MessageSquarePlus },
   { href: '/help/requests', label: 'My requests', icon: Inbox },
 ];
@@ -51,7 +53,7 @@ export function HelpShell({ children }: { children: ReactNode }) {
           <p className="mb-3 text-[13px] font-semibold text-muted">Help</p>
           <ul className="flex flex-col gap-0.5">
             {HELP_NAV.map((n) => {
-              const active = pathname === n.href || pathname.startsWith(`${n.href}/`);
+              const active = pathname === n.href || (n.href !== '/help' && pathname.startsWith(`${n.href}/`));
               return (
                 <li key={n.href}>
                   <Link href={n.href} aria-current={active ? 'page' : undefined}
@@ -67,7 +69,7 @@ export function HelpShell({ children }: { children: ReactNode }) {
       <div className="min-w-0">
         <nav aria-label="Help" className="-mx-1 mb-4 flex gap-1 overflow-x-auto px-1 lg:hidden">
           {HELP_NAV.map((n) => {
-            const active = pathname === n.href || pathname.startsWith(`${n.href}/`);
+            const active = pathname === n.href || (n.href !== '/help' && pathname.startsWith(`${n.href}/`));
             return (
               <Link key={n.href} href={n.href} aria-current={active ? 'page' : undefined}
                 className={cn('touch-target inline-flex h-9 shrink-0 items-center gap-2 rounded-full border px-3 text-[13px] font-medium', active ? 'border-[var(--accent)] bg-accent-soft text-fg' : 'border-border text-muted')}>

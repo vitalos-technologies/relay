@@ -1,7 +1,7 @@
 'use client';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Bug, LifeBuoy, LogOut, MessageSquarePlus, Monitor, Moon, ShieldCheck, Sparkles, Sun, UserRound } from 'lucide-react';
+import { BookOpen, Bug, LifeBuoy, LogOut, MessageSquarePlus, Monitor, Moon, ShieldCheck, Sparkles, Sun, UserRound } from 'lucide-react';
 import { useFlag } from '@/lib/client/flags';
 import { ReportProblemDialog, WhatsNewDrawer, useReleaseNotes } from '@/components/support/support';
 import { api } from '@/lib/client/api';
@@ -79,6 +79,7 @@ export function UserMenu({ compact }: { compact?: boolean }) {
             <span className="flex-1">What’s new</span>{unseen ? <span className="rounded-full bg-accent px-1.5 text-[11px] font-semibold text-on-accent tabular">{unseen}</span> : null}
           </MenuItem>
         ) : null}
+        <MenuItem icon={<BookOpen aria-hidden />} onSelect={() => router.push('/help')}>Help Centre</MenuItem>
         <MenuItem icon={<MessageSquarePlus aria-hidden />} onSelect={() => router.push('/help/contact')}>Contact support</MenuItem>
         <MenuItem icon={<LifeBuoy aria-hidden />} onSelect={() => router.push('/help/requests')}>My requests</MenuItem>
         <MenuItem icon={<Bug aria-hidden />} onSelect={() => setReportOpen(true)}>Report a problem</MenuItem>

@@ -8,6 +8,7 @@ import { useSession } from '@/lib/client/session';
 import { useApi } from '@/lib/client/use-api';
 import { Badge, Button, Card, Dialog, EmptyState, ErrorNotice, ErrorState, Field, Input, PageHeader, SkeletonRows, Tooltip, useToast } from '@/components/ui';
 import { TeamNav, V2_ROLE_LABEL, type TeamView, useTeamHref } from '@/components/team/shared';
+import { HelpLink } from '@/components/help/help-link';
 
 
 export default function TeamsPage() {
@@ -18,7 +19,7 @@ export default function TeamsPage() {
   if (!canV2('teams.read')) return (<><PageHeader title="Team" /><TeamNav /><EmptyState icon={<ShieldAlert aria-hidden />} title="No access" /></>);
   return (
     <>
-      <PageHeader title="Team" actions={canV2('teams.manage') ? <Button variant="primary" icon={<Plus aria-hidden className="size-4" />} onClick={() => setOpen(true)}>New team</Button> : null} />
+      <PageHeader title="Team" actions={<><HelpLink slug="teams-and-delegated-administration" label="About teams and delegated administration" />{canV2('teams.manage') ? <Button variant="primary" icon={<Plus aria-hidden className="size-4" />} onClick={() => setOpen(true)}>New team</Button> : null}</>} />
       <TeamNav />
       {error && !data ? <ErrorState error={error} onRetry={refetch} /> : loading || !data ? <SkeletonRows rows={3} /> : !data.items.length ? (
         <EmptyState icon={<Users aria-hidden />} title="No teams yet" />

@@ -31,6 +31,7 @@ export function SiteFooter({ signedIn, config }: { signedIn: boolean; config: Ma
               ? <li><a href="/overview" className={linkCls}>Open dashboard</a></li>
               : <><li><a href="/signup" className={linkCls}>Start free trial</a></li><li><a href="/login" className={linkCls}>Log in</a></li></>}
             {/* With the support widget on, #support opens it (WID launcher intercepts the link); otherwise in-app Help. */}
+            <li><a href="/help" className={linkCls} data-testid="mkt-footer-help">Help Centre</a></li>
             <li><a href={config.widget_enabled ? '#support' : signedIn ? '/help/contact' : '/login?returnTo=%2Fhelp%2Fcontact'} className={linkCls} data-testid="mkt-footer-support">Support</a></li>
             {config.support_email ? <li><a href={`mailto:${config.support_email}`} className={linkCls}>{config.support_email}</a></li> : null}
           </ul>

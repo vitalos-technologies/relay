@@ -26,6 +26,8 @@
     "test:integration": "vitest run --project integration",
     "test:e2e": "playwright test --trace off",
     "test:all": "pnpm test && pnpm test:integration",
+    "docs:check": "node scripts/docs-check.mjs",
+    "docs:bundle": "node scripts/docs-bundle.mjs",
     "bench": "tsx scripts/bench/run.ts",
     "bench:compare": "tsx scripts/bench/compare.ts",
     "load:isolation": "tsx --env-file=.env scripts/load-test.ts --isolation"

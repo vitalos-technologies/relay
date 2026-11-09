@@ -44,6 +44,9 @@ RUN useradd --uid 10001 --create-home app
 COPY --from=build --chown=app /repo/apps/web/.next/standalone ./
 COPY --from=build --chown=app /repo/apps/web/.next/static ./apps/web/.next/static
 COPY --from=build --chown=app /repo/packages/db/migrations ./packages/db/migrations
+# Help Centre (HC): the standalone output has no public/ folder and doesn't trace content read at runtime.
+COPY --from=build --chown=app /repo/apps/web/public ./apps/web/public
+COPY --from=build --chown=app /repo/content/help ./content/help
 USER app
 EXPOSE 3000
 HEALTHCHECK --interval=15s --timeout=3s --retries=5 CMD node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"

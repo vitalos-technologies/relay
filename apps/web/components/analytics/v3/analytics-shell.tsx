@@ -9,6 +9,7 @@ import { Button, EmptyState, Menu, MenuContent, MenuItem, MenuTrigger, PageHeade
 import { AnalyticsTabs, useAnalyticsQuery } from './shared';
 import { AssistantButton } from '@/components/assistant/assistant-panel'; // V3.5 stream E
 import { useBrandFilter } from '@/lib/client/hooks';
+import { HelpLink } from '@/components/help/help-link';
 
 export function AnalyticsShell({ children }: { children: ReactNode }) {
   const { canV2 } = useSession();
@@ -16,7 +17,7 @@ export function AnalyticsShell({ children }: { children: ReactNode }) {
   if (!canV2('analytics.read')) return <><PageHeader title="Analytics" /><EmptyState icon={<ChartColumn aria-hidden />} title="No access" /></>;
   return (
     <>
-      <PageHeader title="Analytics" actions={<><AssistantButton surface="analytics" size="md" brandId={brand || null} />{canV2('exports.create') ? <ExportMenu /> : null}</>} />
+      <PageHeader title="Analytics" actions={<><HelpLink slug="analytics-metric-dictionary" label="What each metric means" /><AssistantButton surface="analytics" size="md" brandId={brand || null} />{canV2('exports.create') ? <ExportMenu /> : null}</>} />
       <AnalyticsTabs />
       {children}
     </>

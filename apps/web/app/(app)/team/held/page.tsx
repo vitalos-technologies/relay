@@ -10,6 +10,7 @@ import { useApi } from '@/lib/client/use-api';
 import { fmtRelative } from '@/lib/client/format';
 import { Badge, Button, Card, EmptyState, ErrorState, PageHeader, SkeletonRows, Tooltip, useToast } from '@/components/ui';
 import { TeamNav } from '@/components/team/shared';
+import { HelpLink } from '@/components/help/help-link';
 
 interface Held {
   schedule_id: string; post_id: string; title: string | null; brand_name: string; due_at: string; publish_before: string; hold_code: string | null;
@@ -34,7 +35,7 @@ export default function HeldPage() {
   };
   return (
     <>
-      <PageHeader title="Team" />
+      <PageHeader title="Team" actions={<HelpLink slug="reassign-work-and-held-posts" label="About held posts" />} />
       <TeamNav />
       {error && !data ? <ErrorState error={error} onRetry={refetch} /> : loading || !data ? <SkeletonRows rows={3} /> : !data.items.length ? (
         <EmptyState icon={<PauseCircle aria-hidden />} title="Nothing held" />

@@ -24,6 +24,7 @@ import {
 import { DestinationDots } from '@/components/planner/agenda-item';
 import { PostDrawer } from '@/components/planner/post-drawer';
 import { OnboardingChecklist, ResumeOnboarding, useOnboarding } from '@/components/onboarding/checklist';
+import { HelpLink } from '@/components/help/help-link';
 
 const DAY = 86_400_000;
 // Severity: an unconfirmed send may already be live (reconcile first), then hard failures, then missed deadlines, then blocked.
@@ -135,7 +136,8 @@ export default function OverviewPage() {
             <div className="flex min-w-0 flex-col gap-6">
               {/* Attention queue */}
               <Card aria-labelledby="h-attention" id="attention" className="scroll-mt-20">
-                <CardHeader id="h-attention" title={<>Needs attention{issues ? <span className="ml-2 font-normal text-muted tabular">{issues}</span> : null}</>} />
+                <CardHeader id="h-attention" title={<>Needs attention{issues ? <span className="ml-2 font-normal text-muted tabular">{issues}</span> : null}</>}
+                  actions={<HelpLink slug="delivery-statuses" iconOnly label="What delivery statuses mean" />} />
                 <div className="px-4 pb-4">
                   {loading && !data ? <SkeletonRows rows={2} /> : !issues ? (
                     <p className="flex items-center gap-2 pb-1 text-[13px] text-muted"><CircleCheck aria-hidden className="size-4 text-success" /> All clear</p>

@@ -1,0 +1,37 @@
+/* Help Centre article typography (HC). Rendered Markdown only (sanitised server-side); app tokens, both themes. */
+.help-prose { color: var(--text); font-size: 15px; line-height: 1.65; overflow-wrap: break-word; max-width: 72ch; }
+.help-prose p, .help-prose li { overflow-wrap: anywhere; }
+.help-prose > :first-child { margin-top: 0; }
+.help-prose h2 { font-size: 19px; font-weight: 600; line-height: 1.3; margin: 2rem 0 0.6rem; letter-spacing: -0.005em; scroll-margin-top: 88px; }
+.help-prose h3 { font-size: 16px; font-weight: 600; margin: 1.5rem 0 0.4rem; scroll-margin-top: 88px; }
+.help-prose h4, .help-prose h5, .help-prose h6 { font-size: 15px; font-weight: 600; margin: 1.25rem 0 0.3rem; scroll-margin-top: 88px; }
+.help-prose p { margin: 0.65rem 0; }
+.help-prose ul, .help-prose ol { margin: 0.65rem 0; padding-left: 1.4rem; }
+.help-prose ul { list-style: disc; }
+.help-prose ol { list-style: decimal; }
+.help-prose li { margin: 0.3rem 0; padding-left: 0.15rem; }
+.help-prose li > ul, .help-prose li > ol { margin: 0.25rem 0; }
+.help-prose a { color: var(--accent-text); text-decoration: underline; text-underline-offset: 2px; }
+.help-prose a:hover { text-decoration-thickness: 2px; }
+.help-prose strong { font-weight: 600; }
+.help-prose code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.87em; background: var(--raised); border-radius: 5px; padding: 0.1em 0.35em; }
+.help-prose pre { background: var(--sunken); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; overflow-x: auto; margin: 1rem 0; font-size: 13px; line-height: 1.55; }
+.help-prose pre code { background: none; padding: 0; font-size: inherit; }
+.help-prose hr { border: 0; border-top: 1px solid var(--border); margin: 2rem 0; }
+.help-prose img { display: block; max-width: 100%; height: auto; border: 1px solid var(--border); border-radius: var(--radius); margin: 1rem 0; }
+.help-prose blockquote { margin: 1rem 0; padding: 10px 14px; border-left: 3px solid var(--border-strong); background: var(--raised); border-radius: 0 var(--radius) var(--radius) 0; }
+.help-prose blockquote > :first-child { margin-top: 0; }
+.help-prose blockquote > :last-child { margin-bottom: 0; }
+.help-prose blockquote.callout-note, .help-prose blockquote.callout-tip { border-left-color: var(--info); background: var(--info-soft); }
+.help-prose blockquote.callout-important, .help-prose blockquote.callout-warning { border-left-color: var(--warn); background: var(--warn-soft); }
+.help-prose .help-table { overflow-x: auto; margin: 1rem 0; border: 1px solid var(--border); border-radius: var(--radius); }
+.help-prose .help-table:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.help-prose table { border-collapse: collapse; width: 100%; font-size: 13.5px; line-height: 1.5; }
+.help-prose th, .help-prose td { padding: 8px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); overflow-wrap: normal; min-width: 7rem; }
+.help-prose td:first-child, .help-prose th:first-child { min-width: 8.5rem; }
+.help-prose th { background: var(--raised); font-weight: 600; white-space: nowrap; }
+.help-prose tr:last-child td { border-bottom: 0; }
+.help-prose td code, .help-prose th code { white-space: nowrap; }
+.help-prose .help-path { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
+.help-prose .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-width: 640px) { .help-prose { font-size: 15px; } .help-prose h2 { font-size: 18px; } }

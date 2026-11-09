@@ -1,7 +1,12 @@
-'use client';
-// Admin help (V3.1 Admin §20): who can act, what changes, reversibility, delay — one line each. Full guides in docs/admin/.
+// Admin help (V3.1 Admin §20): who can act, what changes, reversibility, delay — one line each. HC: the full guides are
+// the Help Centre's admin articles (content/help, audience admin), listed below for readers who may open them.
 import Link from 'next/link';
-import { Card, PageHeader } from '@/components/ui';
+import { helpLibrary, readableArticles } from '@social-lite/services/help/library';
+import { helpSection } from '@social-lite/services/help/schema';
+import { Card, PageHeader } from '@/components/ui/card';
+import { getHelpViewer } from '@/lib/help-server';
+
+export const dynamic = 'force-dynamic';
 
 const TOPICS: Array<{ title: string; href: string; who: string; what: string; undo: string }> = [
   { title: 'Members and roles', href: '/admin/people', who: 'Owners, admins; team managers within their team', what: 'Grants take effect on the next request in every open tab. No one can grant more than they hold.', undo: 'Revoke the grant. Removing a member shows drafts, approvals and schedules affected first.' },
@@ -18,10 +23,13 @@ const TOPICS: Array<{ title: string; href: string; who: string; what: string; un
   { title: 'Live updates', href: '/admin', who: 'Everyone in admin', what: 'Pages refresh within about 10 seconds of a change; “Reconnecting” means showing the last data while retrying.', undo: '—' },
 ];
 
-export default function AdminHelpPage() {
+export default async function AdminHelpPage() {
+  const viewer = await getHelpViewer();
+  // Admin articles first (workspace admins and platform staff only), then the administration section's other articles.
+  const articles = readableArticles(helpLibrary(), viewer.audiences).filter((a) => a.audience === 'admin' || a.section === 'administration');
   return (
     <>
-      <PageHeader title="Admin guide" />
+      <PageHeader title="Admin guide" actions={<Link href="/help" className="text-[13px] font-medium text-accent-text hover:underline">Help Centre</Link>} />
       <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         {TOPICS.map((t) => (
           <Card as="li" key={t.title} className="p-4">
@@ -34,7 +42,24 @@ export default function AdminHelpPage() {
           </Card>
         ))}
       </ul>
-      <p className="mt-6 text-xs text-muted">Full guides ship with the installation in docs/admin.</p>
+      <section aria-labelledby="admin-articles-h" className="mt-8">
+        <h2 id="admin-articles-h" className="mb-3 text-[15px] font-semibold">Admin articles</h2>
+        {articles.length ? (
+          <ul className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+            {articles.map((a) => (
+              <li key={a.slug}>
+                <Link href={a.href} className="block h-full rounded-xl border border-border bg-surface px-4 py-3 hover:border-border-strong">
+                  <span className="block text-[12px] text-muted">{helpSection(a.section)?.title}</span>
+                  <span className="mt-0.5 block text-[14px] font-semibold">{a.title}</span>
+                  <span className="mt-0.5 block text-[13px] text-muted">{a.summary}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-[13px] text-muted">Admin articles are for workspace owners and admins.</p>
+        )}
+      </section>
     </>
   );
 }

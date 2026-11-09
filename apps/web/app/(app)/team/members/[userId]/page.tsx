@@ -15,6 +15,7 @@ import {
   SkeletonRows, Tooltip, useToast,
 } from '@/components/ui';
 import { GRANT_ROLES, GrantChip, ROLE_HINT, StatusBadge, TeamNav, V2_ROLE_LABEL, type MemberView, useTeamHref } from '@/components/team/shared';
+import { HelpLink } from '@/components/help/help-link';
 
 interface Source { grant_id: string; role: string; via: 'direct' | 'team'; team_name: string | null; expires_at: string | null }
 interface PermRow { permission: string; allowed: boolean; reason: string; sources: Source[] }
@@ -91,7 +92,7 @@ export default function MemberPage() {
   return (
     <>
       <PageHeader title={m.name || m.email} eyebrow={<Link href={th("/team")} className="inline-flex items-center gap-1 hover:text-fg"><ArrowLeft aria-hidden className="size-3" /> Team</Link>}
-        meta={<StatusBadge status={m.status} />}
+        meta={<span className="flex items-center gap-2"><StatusBadge status={m.status} /><HelpLink slug="effective-access-and-overlapping-roles" iconOnly label="About effective access" /></span>}
         actions={manage ? (
           <>
             {m.status === 'active'

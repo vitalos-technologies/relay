@@ -12,6 +12,7 @@ import {
   Badge, Banner, Button, Card, EmptyState, ErrorState, Input, LinkButton, PageHeader, Select, SkeletonRows, Table, Td, Th, THead, Tooltip, Tr, useToast,
 } from '@/components/ui';
 import { Avatar, GrantChip, StatusBadge, TeamNav, V2_ROLE_LABEL, type MemberView, useTeamHref } from '@/components/team/shared';
+import { HelpLink } from '@/components/help/help-link';
 
 export default function MembersPage() {
   const th = useTeamHref();
@@ -53,7 +54,10 @@ export default function MembersPage() {
   return (
     <>
       <PageHeader title="Team"
-        actions={canV2('members.invite') ? <LinkButton href={th("/team/invitations?new=1")} variant="primary" icon={<UserPlus aria-hidden className="size-4" />}>Invite</LinkButton> : null} />
+        actions={<>
+          <HelpLink slug="roles-and-permissions" label="About roles and permissions" />
+          {canV2('members.invite') ? <LinkButton href={th("/team/invitations?new=1")} variant="primary" icon={<UserPlus aria-hidden className="size-4" />}>Invite</LinkButton> : null}
+        </>} />
       <TeamNav />
       {transfer ? (
         <Banner tone="warn" className="mb-6" title={`${transfer.from_email} wants you to become the owner`}

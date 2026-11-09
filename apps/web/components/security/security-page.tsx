@@ -13,6 +13,7 @@ import { useBrowserTimeZone } from '@/lib/client/hooks';
 import {
   Badge, Banner, Button, Card, CardHeader, ConfirmDialog, ErrorState, InfoTip, PageHeader, SkeletonRows, TimeWithZone, useToast,
 } from '@/components/ui';
+import { HelpLink } from '@/components/help/help-link';
 
 interface Credential { id: string; type: string; label: string | null; created_at: string | null }
 interface SessionView { id: string; current: boolean; created_at: string; last_seen_at: string; expires_at: string; user_agent: string | null; mfa_verified: boolean; acr: string | null; amr: string[]; auth_time: string | null }
@@ -101,7 +102,7 @@ export function SecurityPage() {
       <PageHeader
         title="Security"
         meta={a.mfa_verified ? <><ShieldCheck aria-hidden className="size-3.5 text-success" />Two-step verified</> : <><ShieldAlert aria-hidden className="size-3.5" />Password only</>}
-        actions={<a className="touch-target inline-flex h-9 items-center gap-2 rounded-lg border border-border px-3.5 text-sm font-medium hover:bg-raised" href={stepUpHref('/security')} data-testid="verify-now"><KeyRound aria-hidden className="size-4" />Verify now</a>}
+        actions={<><HelpLink slug="set-up-two-step-verification" label="About two-step verification" /><a className="touch-target inline-flex h-9 items-center gap-2 rounded-lg border border-border px-3.5 text-sm font-medium hover:bg-raised" href={stepUpHref('/security')} data-testid="verify-now"><KeyRound aria-hidden className="size-4" />Verify now</a></>}
       />
       <div className="flex flex-col gap-6">
         {verified === '0' ? <Banner tone="warn" title="Not changed">Verification was cancelled.</Banner> : null}

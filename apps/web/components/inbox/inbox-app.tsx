@@ -16,6 +16,7 @@ import { InboxContextPanel } from './context-panel';
 import { CHANNEL_LABEL, CHANNEL_PROVIDER, KIND_LABEL, PRIORITY_LABEL, QUEUES, QUEUE_LABEL, shortAgo } from './labels';
 import { SavedViewsPanel, SavedViewsSelect, VIEW_KEYS } from './saved-views-panel';   // stream B
 import { useInboxStream } from './realtime-stream';                                     // stream B
+import { HelpLink } from '@/components/help/help-link';
 
 type Counts = Record<InboxQueue, number>;
 interface ListResp { items: ConversationListItem[]; next_cursor: string | null }
@@ -133,6 +134,7 @@ export function InboxApp() {
         <aside aria-label="Queues and filters" className="hidden min-h-0 flex-col gap-4 overflow-y-auto border-r border-border p-3 xl:flex">
           <div className="flex items-center justify-between px-1">
             <h1 className="text-[17px] font-semibold">Inbox</h1>
+            <HelpLink slug="work-in-the-inbox" iconOnly label="About the inbox" className="ml-auto" />
             {canV2('inbox.manage') ? <Link href="/settings/inbox/channels" aria-label="Inbox settings" className="rounded-md p-1 text-muted hover:bg-raised hover:text-fg"><Settings2 aria-hidden className="size-4" /></Link> : null}
           </div>
           {queueNav}

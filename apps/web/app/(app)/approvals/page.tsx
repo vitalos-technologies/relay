@@ -13,6 +13,7 @@ import {
 } from '@/components/ui';
 import { VariantPreview } from '@/components/composer/preview';
 import type { InboxItem } from '@/components/collab/types';
+import { HelpLink } from '@/components/help/help-link';
 
 const DECISION: Record<string, { label: string; tone: 'info' | 'success' | 'danger' | 'neutral' }> = {
   pending: { label: 'Waiting', tone: 'info' },
@@ -66,6 +67,7 @@ export default function ApprovalsPage() {
         meta={status === 'pending' && myTurn ? <span>{myTurn} waiting for you</span> : undefined}
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <HelpLink slug="approve-or-request-changes" label="About reviewing posts" />
             <Segmented label="Approval status" size="sm" value={status} onChange={(v) => setParams({ status: v === 'pending' ? null : v })}
               options={[{ value: 'pending', label: 'Waiting' }, { value: 'decided', label: 'Decided' }]} />
             <Segmented label="Group by" size="sm" value={group} onChange={(v) => setParams({ group: v === 'due' ? null : v })}

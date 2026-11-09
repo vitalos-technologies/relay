@@ -12,6 +12,7 @@ import { fmtRelative } from '@/lib/client/format';
 import { Badge, Button, Card, ConfirmDialog, EmptyState, ErrorState, PageHeader, Segmented, SkeletonRows, Tooltip } from '@/components/ui';
 import { useTrashActions } from '@/components/trash/trash-actions';
 import { BulkBar, useSelection } from '@/components/bulk/bulk';
+import { HelpLink } from '@/components/help/help-link';
 
 interface TrashPage { items: TrashItemView[]; next_cursor: string | null; retention_days: Record<TrashKind, number> }
 
@@ -39,7 +40,7 @@ export default function TrashPage() {
 
   return (
     <>
-      <PageHeader title="Trash" meta={`Kept ${TRASH_RETENTION_DAYS.post} days`} />
+      <PageHeader title="Trash" meta={`Kept ${TRASH_RETENTION_DAYS.post} days`} actions={<HelpLink slug="archive-trash-and-delete" label="About archive, trash and delete" />} />
       <div className="mb-6 flex flex-wrap items-center gap-2">
         <Segmented
           label="Show"

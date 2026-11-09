@@ -4,6 +4,7 @@ import { OctagonPause, Play } from 'lucide-react';
 import { api } from '@/lib/client/api';
 import { useSession } from '@/lib/client/session';
 import { Button, ConfirmDialog, Field, IconButton, Textarea, useToast } from '@/components/ui';
+import { HelpLink } from '@/components/help/help-link';
 
 /** Workspace-wide emergency pause (pause.emergency). Checked at dispatch time by the worker (SC-05). */
 export function EmergencyPause({ variant = 'sidebar' }: { variant?: 'sidebar' | 'banner' | 'rail' }) {
@@ -63,6 +64,7 @@ export function EmergencyPause({ variant = 'sidebar' }: { variant?: 'sidebar' | 
             <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} maxLength={500} className="min-h-16" />
           </Field>
         )}
+        <HelpLink slug="pause-publishing-in-an-emergency" label="About pausing publishing" />
       </ConfirmDialog>
     </>
   );

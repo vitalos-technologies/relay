@@ -13,6 +13,7 @@ import { Badge, Banner, BarList, Button, Card, CardHeader, EmptyState, ErrorStat
 import { CoverageNote, Definition, ROLE_LABEL, fmtDay, fmtWhen, pct } from './shared';
 import { SearchForm } from './search-form';
 import type { ShareOfVoiceResponse } from './types';
+import { HelpLink } from '@/components/help/help-link';
 
 export function ListeningOverview() {
   const router = useRouter();
@@ -42,6 +43,7 @@ export function ListeningOverview() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="Listening" actions={<>
+        <HelpLink slug="read-listening-results" label="About listening results" />
         <LinkButton href="/settings/listening/sources" variant="ghost" icon={<Settings2 aria-hidden />}>Sources</LinkButton>
         {canCreate ? <Button variant="primary" icon={<Plus aria-hidden />} onClick={() => setCreating(true)}>New search</Button> : null}
       </>} />

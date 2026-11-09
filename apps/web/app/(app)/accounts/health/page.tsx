@@ -11,6 +11,7 @@ import { useSession } from '@/lib/client/session';
 import {
   Badge, Button, Card, EmptyState, ErrorState, LinkButton, MetaChip, PageHeader, PlatformIcon, SimulatedBadge, SkeletonRows, TimeWithZone, ToneIcon, cn, useToast,
 } from '@/components/ui';
+import { HelpLink } from '@/components/help/help-link';
 
 interface Fix { action: 'reconnect' | 'check' | 'resume' | 'wait' | 'budgets' | 'bot_admin'; label: string; how: string; allowed: boolean; who: string | null }
 interface Issue { code: string; severity: 'critical' | 'warning' | 'info'; title: string; detail: string; fix: Fix; at_risk_from: string | null }
@@ -40,7 +41,7 @@ export default function AccountHealthPage() {
             {data.summary.affected_schedules ? <Badge tone="info" icon={<CalendarClock aria-hidden className="size-3.5" />}>{data.summary.affected_schedules} upcoming affected</Badge> : null}
           </span>
         ) : null}
-        actions={<Button variant="secondary" icon={<RefreshCw aria-hidden className="size-4" />} onClick={() => void refetch()} loading={loading && !!data}>Refresh</Button>}
+        actions={<><HelpLink slug="connection-status-and-fixes" anchor="states-and-fixes" label="About connection statuses and fixes" /><Button variant="secondary" icon={<RefreshCw aria-hidden className="size-4" />} onClick={() => void refetch()} loading={loading && !!data}>Refresh</Button></>}
       />
       {error && !data ? <ErrorState error={error} onRetry={refetch} /> : !data ? <SkeletonRows rows={4} /> : !data.items.length ? (
         <EmptyState icon={<HeartPulse aria-hidden />} title="No connections" />
