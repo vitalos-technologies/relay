@@ -1,6 +1,6 @@
 # Relay — handoff (read this first)
 
-Last updated: 2026-11-09 13:05 UTC
+Last updated: 2026-11-09 18:40 UTC
 
 ## Resume in a new session / another Claude account
 1. Clone `https://github.com/vitalos-technologies/relay` (branch `main`; the lead pushes after each milestone). Working dir used here: `/home/user/social-lite`.
@@ -70,7 +70,7 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
 6b. (Support inbox proposal → superseded by V4.) Platform host restriction (ops.<domain>, office/VPN IPs) is an activation item.
 7. **V3.5** (`docs/queue/03f_V3_5_PROMPT.md`) **done** — foundation (102498a), streams B–E (33f3e12), stream F (admin + MCP + wiring + final docs; `docs/v3-5/*`). Open for user: Inbox in phone bottom bar; main nav grouping (copy-cleanup pass). → 7b. **V4 done** commercial + customer support (`docs/queue/03g_V4_PROMPT.md`: Relay support tickets, Platform → Support, plans/trials/subscriptions/billing via Stripe test mode behind a billing service, entitlements, tenant lifecycle; no Stripe keys in this environment → build against a provider interface with a test double + locally signed webhook fixtures; never request keys in chat) → 7c. **V5 done** (`docs/queue/03h_V5_PROMPT.md`, queued by the user 2026-11-08: one-page marketing site, Standard £10 / Professional £25 per user per month + 14-day trial on V4's billing, marketing support widget → Platform → Support, AI workspace with real workflows) → 8. **Copy cleanup done** (03e) → 9. **Docs + Help Centre done** (04) → 10. **Consolidated activation checklist + user reminder done** (`docs/FINAL_ACTIVATION_CHECKLIST.md`).
 
-## Current state (keep updated) — 2026-11-09 13:05 UTC
+## Current state (keep updated) — 2026-11-09 18:40 UTC
 - Working branch for this session: **`claude/dazzling-pasteur-8yny50`** (pushed after each milestone; merge to `main` via PR
   when the user asks). Working dir `/home/user/relay`.
 - **V3.5 complete** (stream F committed: 8eb8d35): tsc clean, unit 564, integration 489/489,
@@ -92,10 +92,14 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
   Centre at `/help` (164 articles from `content/help/**`, audience-filtered, 44 contextual links, offline bundle), developer/
   API/MCP reference, 19 runbooks (`docs/runbooks/`, repo only), CI docs checks. Final tree: unit 644, integration 594/594,
   full E2E 119 passed / 0 failed / 9 skipped. Report `docs/help/VERIFICATION_REPORT.md`.
-- **QUEUE COMPLETE.** Deliverables for the user: `docs/FINAL_ACTIVATION_CHECKLIST.md` (consolidated; the four user
-  reminders first), `docs/help/DISCREPANCIES.md` (45 defects, recommended fix pass at the top),
-  `docs/help/COVERAGE_MATRIX.md`. Proposed next (awaiting the user): the High-severity fix pass, and moving model ids /
-  prices out of code into deployment settings.
+- **QUEUE COMPLETE**, then (user-approved 2026-11-09): **fix pass** f06eac1 (13 defects: H1–H8, M1 model ids → settings
+  per D32, M18, M19, M23, L9), **brand logo** 6884b14 (traced master set `docs/brand/logo/`, live in the app), **showcase
+  refresh + hero** 3e58b1d, **Oracle VM deploy kit** 53c2c0b (`infra/oracle/`, runbook `docs/runbooks/oracle-vm-deployment.md`;
+  tested amd64 + arm64-under-QEMU 43/43 each, never on the VM). Final tree: unit 677, integration 608/608, full E2E
+  125 passed / 0 failed / 9 skipped. Decisions D30–D32 recorded.
+- **Waiting on the user:** run the VM kit (commands in the runbook), push version tags (checklist §0.2), SMTP provider
+  (production refuses to start without `SMTP_URL`; kit has `--allow-no-smtp` placeholder), DNS for relay/auth/media
+  subdomains, the rest of `docs/FINAL_ACTIVATION_CHECKLIST.md`. Remaining Medium/Low items in `docs/help/DISCREPANCIES.md`.
 - **If this session is gone:** everything through V5 is committed on `claude/dazzling-pasteur-8yny50`; `wip/streams` holds
   only snapshots of in-flight stream work (stale once a phase is committed). Restore with `git cherry-pick --no-commit origin/wip/streams` on a clean tree, then relaunch each stream with
   its progress note + the briefing.
