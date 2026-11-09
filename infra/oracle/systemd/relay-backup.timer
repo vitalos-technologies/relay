@@ -1,0 +1,11 @@
+# Installed by infra/oracle/bootstrap.sh. Runs relay-backup.service every night (VM local time).
+[Unit]
+Description=Nightly Relay backup
+
+[Timer]
+OnCalendar=*-*-* 03:17:00
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

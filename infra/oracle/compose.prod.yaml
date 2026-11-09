@@ -1,0 +1,259 @@
+# Relay production stack for one shared VM (Oracle Ampere arm64 primary; amd64 works the same).
+#
+# Run it only through the kit scripts (bootstrap.sh, update.sh, status.sh, backup.sh), which call:
+#   docker compose -p relay --env-file /opt/relay/.env.infra -f infra/oracle/compose.prod.yaml ...
+#
+# - Own project name ("relay") and its own private bridge network; nothing is shared with other workloads.
+# - Every app port is published on 127.0.0.1 only (the host reverse proxy reaches them there). PostgreSQL is not
+#   published at all. Only the optional bundled Caddy (profile "caddy", used when ports 80/443 are free) binds 80/443.
+# - All data stays on the VM in named volumes: relay_pgdata (Relay + Keycloak databases), relay_media (SeaweedFS).
+# - Secrets: /opt/relay/.env.infra (infrastructure, used for interpolation here) and /opt/relay/.env.production
+#   (application settings, given to web and worker only). Both are generated on the VM, root-only, never printed.
+name: relay
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "5" }
+
+x-hardening: &hardening
+  restart: unless-stopped
+  logging: *logging
+  security_opt: ["no-new-privileges:true"]
+
+# Public names resolve to the host's reverse proxy from inside the containers too (no reliance on hairpin NAT).
+x-public-hosts: &public-hosts
+  - "${RELAY_DOMAIN:?}:${RELAY_PROXY_TARGET:-host-gateway}"
+  - "${RELAY_AUTH_HOST:?}:${RELAY_PROXY_TARGET:-host-gateway}"
+  - "${RELAY_MEDIA_HOST:?}:${RELAY_PROXY_TARGET:-host-gateway}"
+
+x-app-env: &app-env
+  APP_ENV: production
+  APP_BASE_URL: ${RELAY_APP_URL:?}
+  APP_VERSION: ${RELAY_IMAGE_TAG:?}
+  OIDC_ISSUER: ${RELAY_AUTH_URL:?}/realms/relay
+  OIDC_CLIENT_ID: relay-web
+  OIDC_CLIENT_SECRET: ${RELAY_OIDC_CLIENT_SECRET:?}
+  OIDC_ALLOW_INSECURE_HTTP: "false"
+  S3_ENDPOINT: http://storage:8333
+  S3_PUBLIC_ENDPOINT: ${RELAY_MEDIA_URL:?}
+  S3_REGION: us-east-1
+  S3_BUCKET: relay-media
+  S3_FORCE_PATH_STYLE: "true"
+  S3_ACCESS_KEY_ID: ${RELAY_S3_ACCESS_KEY_ID:?}
+  S3_SECRET_ACCESS_KEY: ${RELAY_S3_SECRET_ACCESS_KEY:?}
+  ENABLE_MOCK_PROVIDERS: "false"
+  AI_FIXTURE: "false"
+
+services:
+  postgres:
+    <<: *hardening
+    image: ${RELAY_POSTGRES_IMAGE:-postgres:16-alpine}
+    environment:
+      POSTGRES_USER: relay_admin
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?}
+      POSTGRES_DB: relay
+      POSTGRES_INITDB_ARGS: --data-checksums
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?}
+    # Tuned for a small shared VM (about 1 GB for PostgreSQL). Connections: web 10 + worker ~20 + Keycloak 10 +
+    # release job + backups + headroom (docs/FINAL_ACTIVATION_CHECKLIST.md 1.5).
+    command:
+      - postgres
+      - -c
+      - shared_buffers=${RELAY_PG_SHARED_BUFFERS:-256MB}
+      - -c
+      - effective_cache_size=${RELAY_PG_EFFECTIVE_CACHE_SIZE:-768MB}
+      - -c
+      - work_mem=8MB
+      - -c
+      - maintenance_work_mem=128MB
+      - -c
+      - max_connections=80
+      - -c
+      - max_wal_size=1GB
+      - -c
+      - wal_compression=on
+      - -c
+      - checkpoint_completion_target=0.9
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - log_min_duration_statement=2000
+      - -c
+      - log_lock_waits=on
+    shm_size: 256m
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/10-keycloak.sh:/docker-entrypoint-initdb.d/10-keycloak.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U relay_admin -d relay"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    stop_grace_period: 60s
+    cpus: ${RELAY_PG_CPUS:-1.0}
+    mem_limit: ${RELAY_PG_MEM:-1g}
+
+  # S3-compatible media storage (D10). Private bucket; browsers and networks use short-lived signed URLs only.
+  storage:
+    <<: *hardening
+    image: ${RELAY_SEAWEEDFS_IMAGE:-chrislusf/seaweedfs:3.80}
+    command:
+      - server
+      - -dir=/data
+      - -s3
+      - -s3.port=8333
+      - -s3.config=/etc/seaweedfs/s3.json
+      - -s3.allowedOrigins=${RELAY_APP_URL:?}
+      # SeaweedFS reserves disk per volume file (size limit x volumes grown at once): 256 MB x 2 = ~0.5 GB at first,
+      # growing in 0.5 GB steps, instead of 7 GB with the defaults. Large uploads are chunked, so the limit is not a
+      # maximum file size.
+      - -master.volumeSizeLimitMB=256
+      - -volume.max=0
+    environment:
+      WEED_MASTER_VOLUME_GROWTH_COPY_1: "2"
+    ports: ["${RELAY_BIND_ADDR:-127.0.0.1}:${RELAY_MEDIA_PORT:-3333}:8333"]
+    volumes:
+      - media:/data
+      - ${RELAY_HOME:?}/secrets/s3.json:/etc/seaweedfs/s3.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8333/healthz || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+    cpus: ${RELAY_STORAGE_CPUS:-0.5}
+    mem_limit: ${RELAY_STORAGE_MEM:-512m}
+
+  # Keycloak in production mode (D20): HTTPS terminates at the reverse proxy, which forwards X-Forwarded-*.
+  # The admin console is NOT published on the public hostname; reach it through an SSH tunnel to
+  # 127.0.0.1:${RELAY_AUTH_PORT} (see docs/runbooks/oracle-vm-deployment.md).
+  keycloak:
+    <<: *hardening
+    image: ${RELAY_KEYCLOAK_IMAGE:-quay.io/keycloak/keycloak:26.4}
+    command: ["start", "--import-realm"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?}
+      KC_DB_POOL_MAX_SIZE: "10"
+      KC_HOSTNAME: ${RELAY_AUTH_URL:?}
+      KC_HOSTNAME_ADMIN: http://localhost:${RELAY_AUTH_PORT:-3380}
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: xforwarded
+      KC_HEALTH_ENABLED: "true"
+      KC_CACHE: local
+      KC_BOOTSTRAP_ADMIN_USERNAME: bootstrap-admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?}
+      JAVA_OPTS_KC_HEAP: -XX:MaxRAMPercentage=60 -XX:InitialRAMPercentage=20
+      # Placeholders in the realm template, resolved on the first import only.
+      RELAY_APP_URL: ${RELAY_APP_URL:?}
+      RELAY_DOMAIN: ${RELAY_DOMAIN:?}
+      RELAY_OIDC_CLIENT_SECRET: ${RELAY_OIDC_CLIENT_SECRET:?}
+      RELAY_SELF_REGISTRATION: ${RELAY_SELF_REGISTRATION:-false}
+    ports: ["${RELAY_BIND_ADDR:-127.0.0.1}:${RELAY_AUTH_PORT:-3380}:8080"]
+    volumes:
+      - ./keycloak/relay-realm.json:/opt/keycloak/data/import/relay-realm.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    cpus: ${RELAY_KEYCLOAK_CPUS:-1.0}
+    mem_limit: ${RELAY_KEYCLOAK_MEM:-1200m}
+
+  web:
+    <<: *hardening
+    image: relay-web:${RELAY_IMAGE_TAG:?}
+    init: true
+    cap_drop: [ALL]
+    depends_on:
+      postgres: { condition: service_healthy }
+      storage: { condition: service_healthy }
+    env_file: [{ path: "${RELAY_HOME:?}/.env.production", required: true }]
+    environment:
+      <<: *app-env
+      DATABASE_URL: postgres://socialite_app:${RELAY_DB_APP_PASSWORD:?}@postgres:5432/relay
+      SERVICE_NAME: relay-web
+      NODE_OPTIONS: --max-old-space-size=${RELAY_WEB_HEAP_MB:-640}
+    extra_hosts: *public-hosts
+    ports: ["${RELAY_BIND_ADDR:-127.0.0.1}:${RELAY_WEB_PORT:-3300}:3000"]
+    stop_grace_period: 20s
+    cpus: ${RELAY_WEB_CPUS:-1.5}
+    mem_limit: ${RELAY_WEB_MEM:-1g}
+
+  worker:
+    <<: *hardening
+    image: relay-worker:${RELAY_IMAGE_TAG:?}
+    init: true
+    cap_drop: [ALL]
+    depends_on:
+      postgres: { condition: service_healthy }
+      storage: { condition: service_healthy }
+    env_file: [{ path: "${RELAY_HOME:?}/.env.production", required: true }]
+    environment:
+      <<: *app-env
+      DATABASE_URL: postgres://socialite_worker:${RELAY_DB_WORKER_PASSWORD:?}@postgres:5432/relay
+      SERVICE_NAME: relay-worker
+      WORKER_ID: relay-worker-1
+      NODE_OPTIONS: --max-old-space-size=${RELAY_WORKER_HEAP_MB:-768}
+    extra_hosts: *public-hosts
+    # SIGTERM: stops claiming and drains for up to 30 s; anything mid-send becomes Unknown (never resent).
+    stop_grace_period: 45s
+    cpus: ${RELAY_WORKER_CPUS:-1.5}
+    mem_limit: ${RELAY_WORKER_MEM:-1536m}
+
+  # One-shot release job: roles -> migrations (migrator role) -> grants -> media bucket. Never started by `up`;
+  # the scripts run it with `docker compose run --rm migrate`. Also hosts the operator CLI (ops/platform-operator.mjs).
+  migrate:
+    image: relay-migrate:${RELAY_IMAGE_TAG:?}
+    profiles: ["jobs"]
+    restart: "no"
+    logging: *logging
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    depends_on:
+      postgres: { condition: service_healthy }
+      storage: { condition: service_healthy }
+    environment:
+      APP_ENV: production
+      APP_BASE_URL: ${RELAY_APP_URL:?}
+      DATABASE_ADMIN_URL: postgres://relay_admin:${POSTGRES_ADMIN_PASSWORD:?}@postgres:5432/relay
+      MIGRATOR_DATABASE_URL: postgres://socialite_migrator:${RELAY_DB_MIGRATOR_PASSWORD:?}@postgres:5432/relay
+      DATABASE_URL: postgres://socialite_app:${RELAY_DB_APP_PASSWORD:?}@postgres:5432/relay
+      WORKER_DATABASE_URL: postgres://socialite_worker:${RELAY_DB_WORKER_PASSWORD:?}@postgres:5432/relay
+      S3_ENDPOINT: http://storage:8333
+      S3_BUCKET: relay-media
+      S3_ACCESS_KEY_ID: ${RELAY_S3_ACCESS_KEY_ID:?}
+      S3_SECRET_ACCESS_KEY: ${RELAY_S3_SECRET_ACCESS_KEY:?}
+    cpus: 1.0
+    mem_limit: 768m
+
+  # Bundled reverse proxy with automatic HTTPS, used ONLY when nothing else serves ports 80/443 on the VM
+  # (bootstrap.sh decides; profile "caddy"). Serves the three Relay hostnames and nothing else.
+  caddy:
+    <<: *hardening
+    image: ${RELAY_CADDY_IMAGE:-caddy:2.10-alpine}
+    profiles: ["caddy"]
+    environment:
+      RELAY_DOMAIN: ${RELAY_DOMAIN:?}
+      RELAY_AUTH_HOST: ${RELAY_AUTH_HOST:?}
+      RELAY_MEDIA_HOST: ${RELAY_MEDIA_HOST:?}
+    ports:
+      - "${RELAY_CADDY_HTTP_PORT:-80}:80"
+      - "${RELAY_CADDY_HTTPS_PORT:-443}:443"
+      - "${RELAY_CADDY_HTTPS_PORT:-443}:443/udp"
+    volumes:
+      - ${RELAY_CADDYFILE:-./proxy/Caddyfile.bundled}:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    cpus: 0.5
+    mem_limit: 256m
+
+volumes:
+  pgdata:
+  media:
+  caddy_data:
+  caddy_config:

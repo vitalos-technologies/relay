@@ -1,0 +1,13 @@
+# Installed by infra/oracle/bootstrap.sh. Nightly encrypted Relay backup (database, Keycloak, media, config).
+[Unit]
+Description=Relay encrypted backup
+Wants=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+Environment=RELAY_HOME=@RELAY_HOME@
+ExecStart=@KIT_DIR@/backup.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

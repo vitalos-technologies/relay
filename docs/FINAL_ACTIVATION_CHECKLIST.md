@@ -21,8 +21,8 @@ One list of everything that must happen **outside the code** before Relay runs f
 |---|---|---|---|
 | 0.1 | **Network approvals:** Meta (including insights), TikTok, YouTube/Google, LinkedIn, Threads, Pinterest, and X credits ✱ | Required before real customers connect accounts. The detail for each network is in §4 | B |
 | 0.2 | **Publish the version tags from your own machine** (table below). This environment can't push tags | Gives each release a fixed reference on GitHub | O |
-| 0.3 | **Choose hosting.** Offer: an ARM build plus setup on your shared Oracle VM | Everything in §1 depends on the host and on `<APP_BASE_URL>` | B |
-| 0.4 | **Supply the master SVG logo** from your designer | Replaces the redrawn mark (D19) in `apps/web/components/brand/relay-mark.tsx` and `apps/web/public/`. To verify: the mark renders crisply at 16–512 px | B |
+| 0.3 | **Choose hosting.** Offer accepted (2026-11-09): your shared Oracle Ampere VM, domain `relay.vitalos.co.uk` (configurable), all data on the VM. The deployment kit `infra/oracle/`, runbook `docs/runbooks/oracle-vm-deployment.md` is ready: run `sudo infra/oracle/bootstrap.sh` (dry run) then `--apply`. Still yours: DNS A records for `relay`, `auth.relay`, `media.relay`; OCI security list allows 80/443; storing the backup key shown once | Everything in §1 depends on the host and on `<APP_BASE_URL>` | B |
+| 0.4 | ~~Supply the master SVG logo~~ **Done 2026-11-09:** traced from your brand board into `docs/brand/logo/` and live in the app (`relay-mark.tsx`, favicon, Apple icon). Optional: if your designer's original vector file exists, drop it in with the same names for a slightly more exact outline | Final brand assets | O |
 
 **Version tags (0.2)**
 
@@ -33,6 +33,10 @@ One list of everything that must happen **outside the code** before Relay runs f
 | v2.0.0 | 4815af8 |
 | v3.0.0 | 95f8e34 |
 | v3.1.0 | 78bd026 |
+| v3.1.1 | 020af44 |
+| v4.0.0 | 6b1ef4b |
+| v5.0.0 | c53e0c4 |
+| v5.1.0 | d4f3676 |
 
 ```sh
 git fetch --unshallow 2>/dev/null; git fetch origin   # the V1 commits are missing from shallow clones
@@ -41,6 +45,10 @@ git tag v1.1.0-local e2bc6ec && git push origin v1.1.0-local
 git tag v2.0.0 4815af8 && git push origin v2.0.0
 git tag v3.0.0 95f8e34 && git push origin v3.0.0
 git tag v3.1.0 78bd026 && git push origin v3.1.0
+git tag v3.1.1 020af44 && git push origin v3.1.1
+git tag v4.0.0 6b1ef4b && git push origin v4.0.0
+git tag v5.0.0 c53e0c4 && git push origin v5.0.0
+git tag v5.1.0 d4f3676 && git push origin v5.1.0
 ```
 
 HANDOFF.md also suggests an optional `v3.1.1` tag on the V3.1 Admin commit (`020af44`).
@@ -49,19 +57,19 @@ HANDOFF.md also suggests an optional `v3.1.1` tag on the V3.1 Admin commit (`020
 
 | # | What | Why / unlocks | Where | Verify | Launch |
 |---|---|---|---|---|---|
-| 1.1 | Hosting target, domain, monthly spend cap, deploy access | Production at all | Cloud account / VM (0.3) | Images deployed by digest; `/api/ready` → 200 | B |
-| 1.2 | TLS at the reverse proxy; `APP_BASE_URL=https://…`; the proxy must not strip app headers | OAuth redirects, webhooks, MCP, `__Host-` cookies, HSTS | DNS, proxy, env | `curl -sI https://<domain>/login` shows a CSP with `nonce-`, HSTS and `X-Frame-Options: DENY` | B |
-| 1.3 | Managed PostgreSQL 16 with PITR | System of record and job queue | `DATABASE_URL` | The migration job prints `applied` | B |
-| 1.4 | Login roles `socialite_migrator`, `socialite_app`, `socialite_worker` (no superuser, createdb, createrole or bypassrls). Per-container URLs: web → app, worker → worker, `MIGRATOR_DATABASE_URL`. `DATABASE_ADMIN_URL` goes only in the release job that applies `infra/postgres/roles.sql` | Least privilege; append-only audit | Secret manager → per-container env | `SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolbypassrls FROM pg_roles WHERE rolname LIKE 'socialite_%'` returns false for all of them. As the app role, `UPDATE audit_events …` is denied | B |
-| 1.5 | Connection capacity: `workers × 20 + web × 10 + migrator + monitoring + headroom` (the default of 100 covers about 3 + 3), or a **session-mode** pooler. Transaction mode is unsafe (advisory locks). Size memory for the 020/021/025 indexes | No connection exhaustion | DB parameters; `DATABASE_POOL_MAX`, `WORKER_BULK_POOL_MAX` | Peak `pg_stat_activity` stays below `max_connections`; no `too many clients` errors in the logs | B |
-| 1.6 | Private S3-compatible bucket and HMAC keys. CORS allows `POST` from `<APP_BASE_URL>`. The public endpoint is reachable | Media uploads; providers fetch signed URLs | `S3_ENDPOINT`, `S3_PUBLIC_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | `/api/diagnostics` shows storage ok. An image upload in the Library works with no CSP violations | B |
-| 1.7 | Key custody. Preferred: Cloud KMS key plus wrapped KEKs (AAD `social-lite-kek:<kid>`); web and worker get only `cloudkms.cryptoKeyDecrypter`. Alternative: `KEY_ENCRYPTION_KEYS` from the secret manager. Keep old key ids configured: there is no re-wrap tool | Encrypted provider tokens | `KMS_KEY_NAME`, `KMS_WRAPPED_KEKS` | The worker logs `kms_keys_loaded`; production boot succeeds | B |
-| 1.8 | `SESSION_SECRET` | Sessions; signs the widget's time-trap token | Secret manager | Boot succeeds | B |
+| 1.1 | Host: shared Oracle VM via the kit `infra/oracle/`, runbook `docs/runbooks/oracle-vm-deployment.md`. Docker project `relay`, app ports on 127.0.0.1 only, CPU/memory limits, log rotation. Images are tagged per build (`<date>-<sha>`) and released with `update.sh` (automatic rollback). Images are multi-arch (`linux/arm64` primary, `linux/amd64`): both were built and the whole kit tested end to end in the sandbox (arm64 under QEMU emulation, not yet on Ampere hardware). | Production at all | VM (0.3) | `sudo infra/oracle/status.sh` → `web /api/ready 200`, worker and Keycloak ready | B |
+| 1.2 | TLS at the reverse proxy; `APP_BASE_URL=https://…`; the proxy must not strip app headers. `bootstrap.sh` detects nginx / Caddy / Traefik / Apache / free ports and adds a Relay-only site (diff + backup first) or runs a bundled Caddy; certbot command printed for nginx/Apache | OAuth redirects, webhooks, MCP, `__Host-` cookies, HSTS | DNS, proxy (kit) | `curl -sI https://<domain>/login` shows a CSP with `nonce-`, HSTS and `X-Frame-Options: DENY` (verified through the kit's Caddy in the sandbox) | B |
+| 1.3 | PostgreSQL 16 in a container on the VM (volume `relay_pgdata`, tuned for ~1 GB). No PITR: nightly encrypted `pg_dump` (`backup.sh`, RPO ≈ 24 h; `update.sh` also backs up before each release). Accept this RPO or add more frequent dumps / an off-VM copy (`RELAY_BACKUP_RSYNC_TARGET`) | System of record and job queue | Kit | The release job prints `migrations … applied`; `/opt/relay/backups/LAST_SUCCESS` is recent | B |
+| 1.4 | Login roles `socialite_migrator`, `socialite_app`, `socialite_worker` (no superuser, createdb, createrole or bypassrls). The kit's release job creates them with generated passwords and applies `infra/postgres/roles.sql`; web → app, worker → worker, migrations → migrator; the owner URL exists only in the release job | Least privilege; append-only audit | Kit (`.env.infra`, generated on the VM) | `SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolbypassrls FROM pg_roles WHERE rolname LIKE 'socialite_%'` returns false for all of them (verified in the sandbox). As the app role, `UPDATE audit_events …` is denied | B |
+| 1.5 | Connection capacity: `workers × 20 + web × 10 + migrator + monitoring + headroom`. Kit: `max_connections=80` for 1 web + 1 worker + Keycloak (pool 10) + jobs. Transaction-mode poolers are unsafe (advisory locks). Size memory for the 020/021/025 indexes | No connection exhaustion | `compose.prod.yaml`; `DATABASE_POOL_MAX`, `WORKER_BULK_POOL_MAX` | Peak `pg_stat_activity` stays below `max_connections`; no `too many clients` errors in the logs | B |
+| 1.6 | SeaweedFS on the VM (volume `relay_media`), private bucket `relay-media` created by the release job, generated keys, CORS limited to `<APP_BASE_URL>` (server flag; SeaweedFS does not implement bucket CORS). Public endpoint `https://media.<domain>` via the proxy | Media uploads; providers fetch signed URLs | Kit | `/api/diagnostics` shows storage ok. An image upload in the Library works with no CSP violations | B |
+| 1.7 | Key custody on the VM: `KEY_ENCRYPTION_KEYS` generated by `bootstrap.sh` into root-only `/opt/relay/.env.production` (no Cloud KMS on this host). Included, encrypted, in every backup. Keep old key ids when rotating: there is no re-wrap tool | Encrypted provider tokens | `/opt/relay/.env.production` | Production boot succeeds; a restored copy reads a stored credential (13.3) | B |
+| 1.8 | `SESSION_SECRET` (generated on the VM by `bootstrap.sh`) | Sessions; signs the widget's time-trap token | `/opt/relay/.env.production` | Boot succeeds | B |
 | 1.9 | Review the **92 env vars that code reads but `.env.example` doesn't list** (many are tuning or Setup keys by design). Ones production likely needs: `META_WEBHOOK_VERIFY_TOKEN`, `RELAY_STRIPE_*`, `BILLING_LIVE_MODE`, `KMS_*`, `MCP_*`, `ALLOW_SELF_SERVE_WORKSPACES`, `S3_PUBLIC_ENDPOINT`, `APP_VERSION`, `WORKER_CONCURRENCY`, `WORKER_HEALTH_PORT`, `ANALYTICS_*_RETENTION_DAYS` | No missing config at boot | Secret manager; full list in `content/help/developers/environment-variables.md` | Production boot passes `assertProductionSafe`; `node scripts/docs-api-check.mjs` passes | B |
-| 1.10 | Apply migrations 001–038 with the migrator role, then `pnpm db:roles`. Plan a maintenance window: 020–025 build indexes without `CONCURRENTLY`. First rehearse on a backup copy with `./scripts/migration-rehearsal.sh` | Schema for all features | Release job | All rehearsal checks PASS; `/api/ready` reports migrations applied | B |
-| 1.11 | Deploy web plus a worker that includes every stream. Run the worker with the **worker** DB role, then restart it (billing, support, entitlement, widget, AI, inbox, integrations and listening loops) | Background work | Host | Worker `/health` and `/ready` ok; `lastRun` advances | B |
-| 1.12 | A distinct `APP_VERSION` per image; adopt the dispatch-version pin (`system_flags.dispatch_version`) in the deploy runbook | Two schedulers never dispatch at once | Build pipeline; `docs/runbooks/deployment-and-configuration.md` | `worker_heartbeats.version` shows the tag, not `dev` | B |
-| 1.13 | Web image contains `apps/web/public` and `content/help` (the Dockerfile was fixed by HC, but no image has been built yet) | Brand and marketing files, the Help Centre | `infra/docker/Dockerfile` | `/help` and `/marketing/overview-light.webp` load from the image | B |
+| 1.10 | Apply migrations 001–038 with the migrator role, then the grants: the kit's release job (`docker compose run --rm migrate`, run by `bootstrap.sh` / `update.sh`). Plan a maintenance window for 020–025 (indexes without `CONCURRENTLY`) once data exists | Schema for all features | Kit release job | `/api/ready` reports migrations applied (34 files, last 038, in the sandbox) | B |
+| 1.11 | Deploy web plus a worker that includes every stream, the worker on the **worker** DB role (kit default; `update.sh` restarts worker then web) | Background work | Kit | Worker `/health` and `/ready` ok; `lastRun` advances | B |
+| 1.12 | A distinct `APP_VERSION` per image: the kit sets it to the image tag. Optional: the dispatch-version pin (`system_flags.dispatch_version`) for overlapping workers (the kit runs one worker and stops the old one first) | Two schedulers never dispatch at once | `infra/oracle/build.sh`; `docs/runbooks/deployment-and-configuration.md` | `worker_heartbeats.version` shows the tag, not `dev` (verified in the sandbox) | B |
+| 1.13 | Web image contains `apps/web/public` and `content/help`: the kit's `infra/oracle/Dockerfile` includes both | Brand and marketing files, the Help Centre | `infra/oracle/Dockerfile` | `/help` and `/marketing/overview-light.webp` load from the image (verified in the sandbox) | B |
 | 1.14 | Never run seeds or demo scripts in production (`db:seed`, `db:seed:e2e`, `scripts/analytics-demo.ts`, `scripts/seed-marketing-showcase.ts`). Never set `NOTION_INTERNAL_TOKEN` | Clean live data | Release process | No demo workspace exists; Setup shows the token unset | B |
 | 1.15 | PDF reports need Chromium in the worker image. Without it they fall back to HTML (`ANALYTICS_PDF=off` forces HTML) | PDF exports | Worker image | An exported PDF starts with `%PDF` | O |
 | 1.16 | Tracked-link host `<APP_BASE_URL>/api/l/<code>` reachable and on the brand's approved link domains | Campaign links (flag `v31.tracked_links`) | Proxy; Brand rules | A short link returns 302; an unknown code returns 404 | O |

@@ -1,0 +1,24 @@
+# Bundled Caddy for Relay only (compose profile "caddy"), used when nothing else serves ports 80/443.
+# Automatic HTTPS (Let's Encrypt / ZeroSSL) for the three Relay hostnames once their DNS A records point here.
+# Relay sets its own security headers (CSP with nonces, HSTS, X-Frame-Options); Caddy passes them through untouched
+# and forwards X-Forwarded-For/-Proto/-Host by default.
+{$RELAY_DOMAIN} {
+	encode zstd gzip
+	# MCP uses streamed responses: flush immediately.
+	reverse_proxy /mcp* web:3000 {
+		flush_interval -1
+	}
+	reverse_proxy web:3000
+}
+
+{$RELAY_AUTH_HOST} {
+	# The Keycloak admin console and the master realm stay private (SSH tunnel to 127.0.0.1:RELAY_AUTH_PORT).
+	@private path /admin /admin/* /realms/master /realms/master/*
+	respond @private 404
+	reverse_proxy keycloak:8080
+}
+
+{$RELAY_MEDIA_HOST} {
+	# Host header is preserved (S3 signatures include it). Size limits come from the signed upload policy.
+	reverse_proxy storage:8333
+}

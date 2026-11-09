@@ -14,6 +14,7 @@ never served by the Help Centre or included in the downloadable bundle. Member-f
 | Runbook | Use when |
 |---|---|
 | [deployment-and-configuration.md](deployment-and-configuration.md) | Releasing, configuring or rolling back a deployment |
+| [oracle-vm-deployment.md](oracle-vm-deployment.md) | First install, updates, backups and restore drills on the shared Oracle Ampere VM (`infra/oracle/`) |
 | [health-and-monitoring.md](health-and-monitoring.md) | Daily checks; any alert; "is Relay healthy?" |
 | [worker-and-queue-failures.md](worker-and-queue-failures.md) | Posts not going out, overdue work, backlog, dead letters, stuck jobs |
 | [expired-provider-auth.md](expired-provider-auth.md) | Accounts needing reconnection, missing permissions, blocked deliveries |
