@@ -1,9 +1,10 @@
-// Model clients. The real client calls the Claude API through the official SDK with structured
-// output; the model gets no tools and no credentials. Tests inject a fake (no network). The fixture
+// Model clients. The real client calls the configured provider through its official SDK with structured
+// output; the model id comes from the AI_MODEL setting (ai/models.ts); the model gets no tools and no credentials. Tests inject a fake (no network). The fixture
 // client (AI_FIXTURE=true, never in production) returns deterministic, clearly labelled suggestions.
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { AppError, measure } from '@social-lite/core';
+import { FIXTURE_MODEL, usesServerFallback } from './models.js';
 import { modelOutputSchema, type ModelOutput, type PromptInput, type PromptTarget } from './prompt.js';
 
 export interface ModelCallRequest {
@@ -29,9 +30,6 @@ export interface AiModelClient {
   generate(req: ModelCallRequest): Promise<ModelCallResult>;
 }
 
-/** Models that accept server-side refusal fallbacks (`fallbacks: "default"`). */
-const FALLBACK_MODELS = new Set(['claude-opus-5-5', 'claude-opus-5', 'claude-sonnet-5-5', 'claude-fable-5-1']);
-
 export class AnthropicModelClient implements AiModelClient {
   readonly fixture = false;
   private readonly sdk: Anthropic;
@@ -43,7 +41,7 @@ export class AnthropicModelClient implements AiModelClient {
   }
 
   async generate(req: ModelCallRequest): Promise<ModelCallResult> {
-    const fallback = FALLBACK_MODELS.has(req.model);
+    const fallback = usesServerFallback(req.model); // AI_FALLBACK_MODELS (deployment setting)
     try {
       const res = await this.sdk.beta.messages.parse({
         model: req.model,
@@ -118,6 +116,6 @@ export class FixtureModelClient implements AiModelClient {
       }
       return { scope: t.key, text, hashtags, note: 'Test fixture — deterministic suggestion, no model was called.' };
     });
-    return { output: { suggestions }, stopReason: 'end_turn', model: 'test-fixture', inputTokens: 0, outputTokens: 0 };
+    return { output: { suggestions }, stopReason: 'end_turn', model: FIXTURE_MODEL, inputTokens: 0, outputTokens: 0 };
   }
 }

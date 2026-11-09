@@ -131,7 +131,8 @@ export async function updateBrand(ctx: Ctx, brandId: string, patch: BrandPatch):
 
 /** Emergency pause/resume for one brand (SC-05). Engine hooks run in the same transaction. */
 export async function setBrandPaused(ctx: Ctx, brandId: string, input: { paused: boolean; reason?: string | null }): Promise<BrandDto & { affected: Record<string, number> }> {
-  requireAction(ctx, 'pause.emergency');
+  // Pausing and resuming are separate permissions: a pause-only role (Approver) must not restart publishing.
+  requireAction(ctx, input.paused ? 'publishing.pause' : 'publishing.resume');
   const reason = input.reason?.trim().slice(0, 500) || null;
   const affected = await withTx(async (tx) => {
     await assertBrand(ctx, brandId, tx);

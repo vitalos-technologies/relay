@@ -172,7 +172,7 @@ export interface AssistantRunDto {
   output: AssistantOutputDto | null;
   sources: SourceRefDto[];
   actions: ProposedActionDto[];
-  usage: { input_tokens: number; output_tokens: number; cost_estimate_usd: number } | null;
+  usage: { input_tokens: number; output_tokens: number; cost_estimate_usd: number | null } | null;
   provider: string | null;
   model: string | null;
   latency_ms: number | null;

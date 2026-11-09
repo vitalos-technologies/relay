@@ -6,7 +6,7 @@
 //  reconcile: the container status is definitive (PUBLISHED / FINISHED / EXPIRED / ERROR); the media id is
 //             found in the user's recent threads.
 import {
-  composeTextWithLink, validateVariant,
+  altTextFor, composeTextWithLink, validateVariant,
   type AdapterContext, type AttemptReference, type ChannelCapabilities, type ChannelConstraints, type Checkpoint,
   type ConnectionHealth, type PrepareOutcome, type ProviderCredentials, type PublishConnection, type PublishInput,
   type PublishOutcome, type PublishingAdapter, type ReconcileOutcome, type ValidationIssue, type ValidationResult,
@@ -84,6 +84,9 @@ const stateOf = (cp: Checkpoint | null): State | null => {
 const CONTAINER_TTL_MS = 23 * 3600_000; // containers expire after 24 h (H4)
 const cpOf = (s: State, step: string): Checkpoint => ({ step, data: { ...s }, expiresAt: new Date(Date.parse(s.createdAt) + CONTAINER_TTL_MS).toISOString() });
 
+/** Library alt text for an image or video container (`alt_text`, ≤ 1,000; fix H3). */
+const alt = (m: PublishInput['media'][number]): string | undefined => altTextFor('threads', m) ?? undefined;
+
 async function createContainer(ctx: AdapterContext, userId: string, token: string, params: Record<string, string | undefined>): Promise<string> {
   const r = await threadsCall<{ id?: string }>(ctx, { method: 'POST', path: `/${THREADS_VERSION}/${encodeURIComponent(userId)}/threads`, token, params, op: 'threads.container.create' });
   if (!r.data.id) throw new ProviderHttpError('Threads', 502, 'no_container_id', 'Threads did not return a container id', null);
@@ -124,12 +127,12 @@ async function prepare(ctx: AdapterContext, input: PublishInput, checkpoint: Che
     } else if (!carousel) {
       const m = input.media[0]!;
       if (!s.parentId) {
-        s = { ...s, parentId: await createContainer(ctx, userId, token, isVideoMedia(m) ? { media_type: 'VIDEO', video_url: m.url, text } : { media_type: 'IMAGE', image_url: m.url, text }), parentStatus: 'IN_PROGRESS' };
+        s = { ...s, parentId: await createContainer(ctx, userId, token, isVideoMedia(m) ? { media_type: 'VIDEO', video_url: m.url, text, alt_text: alt(m) } : { media_type: 'IMAGE', image_url: m.url, text, alt_text: alt(m) }), parentStatus: 'IN_PROGRESS' };
       }
     } else {
       for (let i = s.items.length; i < input.media.length; i++) {
         const m = input.media[i]!;
-        const id = await createContainer(ctx, userId, token, isVideoMedia(m) ? { media_type: 'VIDEO', video_url: m.url, is_carousel_item: 'true' } : { media_type: 'IMAGE', image_url: m.url, is_carousel_item: 'true' });
+        const id = await createContainer(ctx, userId, token, isVideoMedia(m) ? { media_type: 'VIDEO', video_url: m.url, is_carousel_item: 'true', alt_text: alt(m) } : { media_type: 'IMAGE', image_url: m.url, is_carousel_item: 'true', alt_text: alt(m) });
         s = { ...s, items: [...s.items, { assetId: m.assetId, containerId: id, status: 'IN_PROGRESS' }] };
       }
       const items: Item[] = [];

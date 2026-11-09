@@ -21,7 +21,7 @@ import { log } from '../log.js';
 import { loadUserAuthz } from '../authz.js';
 import { staffAllowed } from '../collab/access.js';
 import { ChannelUnavailableError, channelRuntime } from './channels-runtime.js';
-import { prepareTemplateSend } from './channels-whatsapp.js';
+import { prepareTemplateSend, whatsAppServiceAllowance, whatsAppServiceCharge } from './channels-whatsapp.js';
 import { recordActivity } from '../connectors/store.js';
 import { getSetting } from '../settings.js';
 import { isAutomated } from '../automation/origin.js';
@@ -90,10 +90,23 @@ export async function requestReply(ctx: Ctx, conversationId: string, input: Repl
     if (ch.status !== 'active') throw new AppError('invalid_state', ch.status === 'paused' ? 'This channel is paused.' : (ch.status_detail ?? 'This channel needs attention.'), undefined, { reason: 'channel_unavailable' });
     if (conv.status === 'spam') throw new AppError('invalid_state', 'Marked as spam. Move it out of spam to reply.', undefined, { reason: 'conversation_closed' });
     const rules = adapter.replyRules({ kind: conv.kind, mode: input.mode, now: new Date(), lastInboundAt: conv.last_inbound_at, firstInboundAt: conv.first_inbound_at, privateReplyUsed: conv.private_reply_used, features: await features() });
-    // Stream B: a WhatsApp template is the documented way to write outside the 24 h window; the charge must be acknowledged.
-    const tpl = input.template ? prepareTemplateSend(ch, input.template, rules.allowed) : null;
+    // Stream B: a WhatsApp template is the documented way to write outside the 24 h window. H2: every WhatsApp send gets
+    // the charge Meta will apply (utility templates in the window and service replies past the monthly free tier are
+    // charged since 2026-10-01); anything billable must be acknowledged. Sends on one number are serialised so two
+    // agents can't both take the last free service message.
+    let charge: ReturnType<typeof prepareTemplateSend>['charge'] | null = null;
+    let tpl: ReturnType<typeof prepareTemplateSend> | null = null;
+    if (ch.kind === 'whatsapp' && (input.template || rules.allowed)) {
+      await tx.query(`SELECT pg_advisory_xact_lock(hashtext('relay:whatsapp-service:' || $1))`, [ch.external_account_id]);
+      const now = new Date();
+      const service = await whatsAppServiceAllowance(tx, ch, now);
+      tpl = input.template ? prepareTemplateSend(ch, input.template, rules.allowed, { now, service }) : null;
+      charge = tpl ? tpl.charge : whatsAppServiceCharge(ch, now, service);
+    } else if (input.template) {
+      tpl = prepareTemplateSend(ch, input.template, rules.allowed);
+    }
     if (!rules.allowed && !tpl) throw new AppError('invalid_state', rules.message, undefined, { reason: rules.code });
-    if (tpl?.charge.billable && !input.acknowledge_charge) throw new AppError('invalid_state', `${tpl.charge.note} Confirm the charge to send.`, undefined, { reason: 'charge_ack_required', charge: tpl.charge });
+    if (charge?.billable && !input.acknowledge_charge) throw new AppError('invalid_state', `${charge.note} Confirm the charge to send.`, undefined, { reason: 'charge_ack_required', charge });
     // Collision / thread-changed check on the locked row.
     if (input.base_version !== conv.version && input.acknowledge_version !== conv.version) {
       const details: ThreadChangedDetails = { current_version: conv.version, changes: await changesSince(tx, conv, input.base_version, ctx.actor.userId) };
@@ -111,7 +124,7 @@ export async function requestReply(ctx: Ctx, conversationId: string, input: Repl
       `INSERT INTO inbox_reply_attempts(workspace_id, brand_id, conversation_id, channel_id, mode, body, body_sha256, base_version, idempotency_key, reply_to_external_id, is_simulated, created_by, automated, template, charge, target_meta)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
       [ctx.access.workspaceId, conv.brand_id, conversationId, ch.id, input.mode, tpl ? tpl.rendered : input.body, sha(input.body), conv.version, input.idempotency_key, replyTo, ch.is_simulated, ctx.actor.userId, isAutomated(),
-        tpl ? JSON.stringify(tpl.template) : null, tpl ? JSON.stringify(tpl.charge) : null, last ? JSON.stringify(last.meta ?? {}) : null]);
+        tpl ? JSON.stringify(tpl.template) : null, charge ? JSON.stringify(charge) : null, last ? JSON.stringify(last.meta ?? {}) : null]);
     await tx.query(`UPDATE inbox_conversations SET version=version+1, updated_at=now(), private_reply_used = private_reply_used OR ($2 = 'private_message' AND kind='comment') WHERE id=$1`, [conversationId, input.mode]);
     await tx.query(`DELETE FROM inbox_drafts WHERE conversation_id=$1 AND user_id=$2`, [conversationId, ctx.actor.userId]);
     await inboxEvent(tx, { workspaceId: conv.workspace_id, conversationId, brandId: conv.brand_id, kind: 'reply.queued', actorId: ctx.actor.userId, data: { attempt_id: a.id, mode: input.mode } });

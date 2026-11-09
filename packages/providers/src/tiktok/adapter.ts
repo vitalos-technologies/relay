@@ -17,7 +17,7 @@ import { prepareFromClass, prepareTransport, publishFromClass, publishTransport 
 import { factsOf, isVideoMedia, loadBytes, providerOptions } from '../shared/media.js';
 import { grantedScopes } from '../shared/oauth.js';
 import { TIKTOK_JSON, chunkPlan, chunkRange, classifyTikTok, tiktokCall } from './api.js';
-import { fetchUserInfo, publishModeFor, queryCreatorInfo, refreshTikTokCredentials, type TikTokPublishMode } from './oauth.js';
+import { fetchUserInfo, publishModeFor, queryCreatorInfo, refreshTikTokCredentials, type CreatorInfo, type TikTokPublishMode } from './oauth.js';
 
 export const TIKTOK_CONSTRAINTS_VERSION = 'tiktok-content-posting@2026-11-07';
 
@@ -55,6 +55,11 @@ export interface TikTokOptions {
   mode: 'direct' | 'inbox';
   /** Required for Direct Post; chosen by the user from creator_info privacy_level_options, no default. */
   privacyLevel: TikTokPrivacy;
+  /**
+   * Interaction settings. TikTok's content sharing guidelines: none is on by default — the user turns each on; unset
+   * (or anything but `true`) is sent as disabled. An interaction the creator turned off in TikTok (creator_info
+   * comment_disabled / duet_disabled / stitch_disabled) is always sent as disabled. Photo posts: Comment only.
+   */
   allowComment: boolean;
   allowDuet: boolean;
   allowStitch: boolean;
@@ -152,13 +157,28 @@ const uploadState = (cp: Checkpoint | null): UploadState | null => {
 const cpOf = (s: UploadState, step: string): Checkpoint => ({ step, data: { ...s }, expiresAt: s.uploadExpiresAt });
 const UPLOAD_URL_TTL_MS = 55 * 60_000; // "valid for one hour after issuance" — keep a 5 min margin
 
-function postInfo(input: PublishInput, o: Partial<TikTokOptions>): Record<string, unknown> {
+/** Creator-side interaction locks from creator_info (true = the creator turned it off in TikTok). */
+export interface InteractionLocks { comment: boolean; duet: boolean; stitch: boolean }
+export const NO_LOCKS: InteractionLocks = { comment: false, duet: false, stitch: false };
+export const locksFrom = (ci: CreatorInfo): InteractionLocks => ({ comment: ci.comment_disabled === true, duet: ci.duet_disabled === true, stitch: ci.stitch_disabled === true });
+
+/**
+ * disable_* flags actually sent. An interaction is enabled only when the user switched it on (=== true) AND the creator
+ * has not turned it off in TikTok. Exported for tests.
+ */
+export function interactionFlags(o: Partial<TikTokOptions>, locks: InteractionLocks = NO_LOCKS): { disable_comment: boolean; disable_duet: boolean; disable_stitch: boolean } {
+  return {
+    disable_comment: o.allowComment !== true || locks.comment,
+    disable_duet: o.allowDuet !== true || locks.duet,
+    disable_stitch: o.allowStitch !== true || locks.stitch,
+  };
+}
+
+function postInfo(input: PublishInput, o: Partial<TikTokOptions>, locks: InteractionLocks): Record<string, unknown> {
   return {
     title: input.variant.text,
     privacy_level: o.privacyLevel,
-    disable_comment: o.allowComment !== true,
-    disable_duet: o.allowDuet !== true,
-    disable_stitch: o.allowStitch !== true,
+    ...interactionFlags(o, locks),
     ...(typeof o.coverTimestampMs === 'number' ? { video_cover_timestamp_ms: o.coverTimestampMs } : {}),
     brand_content_toggle: o.brandContent === true,
     brand_organic_toggle: o.brandOrganic === true,
@@ -185,10 +205,12 @@ async function prepare(ctx: AdapterContext, input: PublishInput, checkpoint: Che
   const o = optsOf(input);
   const video = input.media.find(isVideoMedia);
   let state = uploadState(checkpoint);
+  let locks = NO_LOCKS;
   try {
     // Fresh creator settings at post time (T7): privacy options, interaction settings, max duration.
     if (mode === 'direct' && !(state && state.mode === 'direct')) {
       const ci = await queryCreatorInfo(ctx, token);
+      locks = locksFrom(ci);
       if (Array.isArray(ci.privacy_level_options) && o.privacyLevel && !ci.privacy_level_options.includes(o.privacyLevel)) {
         return { kind: 'permanent', code: 'tiktok_privacy_mismatch', message: `TikTok: privacy "${o.privacyLevel}" is no longer available for this creator (options: ${ci.privacy_level_options.join(', ')}). Edit the post.` };
       }
@@ -196,7 +218,8 @@ async function prepare(ctx: AdapterContext, input: PublishInput, checkpoint: Che
         return { kind: 'permanent', code: 'tiktok_video_too_long', message: `TikTok: this creator can post videos up to ${ci.max_video_post_duration_sec} s. Trim the video.` };
       }
     }
-    if (!video) return { kind: 'ready', checkpoint: { step: 'photo_ready', data: { mode } } };
+    // Photo posts: Duet/Stitch don't apply; the creator's comment setting is carried to publish().
+    if (!video) return { kind: 'ready', checkpoint: { step: 'photo_ready', data: { mode, commentLocked: locks.comment } } };
 
     const usable = state && state.assetId === video.assetId && state.mode === mode && Date.parse(state.uploadExpiresAt) - nowMs > 0 && state.nextChunk < state.totalChunks;
     if (!usable) state = null;
@@ -207,7 +230,7 @@ async function prepare(ctx: AdapterContext, input: PublishInput, checkpoint: Che
       const source_info = { source: 'FILE_UPLOAD', video_size: bytes.byteLength, chunk_size: plan.chunkSize, total_chunk_count: plan.totalChunks };
       const r = await tiktokCall<{ data?: { publish_id?: string; upload_url?: string } }>(ctx, {
         method: 'POST', path: mode === 'direct' ? '/v2/post/publish/video/init/' : '/v2/post/publish/inbox/video/init/', bearer: token,
-        headers: { 'content-type': TIKTOK_JSON }, json: mode === 'direct' ? { post_info: postInfo(input, o), source_info } : { source_info },
+        headers: { 'content-type': TIKTOK_JSON }, json: mode === 'direct' ? { post_info: postInfo(input, o, locks), source_info } : { source_info },
         op: mode === 'direct' ? 'tiktok.video.init' : 'tiktok.inbox.init',
       });
       const pid = r.data.data?.publish_id;
@@ -249,7 +272,8 @@ async function publish(ctx: AdapterContext, input: PublishInput, checkpoint: Che
         method: 'POST', path: '/v2/post/publish/content/init/', bearer: token, headers: { 'content-type': TIKTOK_JSON }, publishes: true, op: 'tiktok.photo.init',
         json: {
           post_info: mode === 'direct'
-            ? { ...(o.title ? { title: o.title } : {}), description: input.variant.text, privacy_level: o.privacyLevel, disable_comment: o.allowComment !== true,
+            ? { ...(o.title ? { title: o.title } : {}), description: input.variant.text, privacy_level: o.privacyLevel,
+                disable_comment: interactionFlags(o, { ...NO_LOCKS, comment: (checkpoint?.data as { commentLocked?: unknown } | undefined)?.commentLocked === true }).disable_comment,
                 auto_add_music: o.autoAddMusic === true, brand_content_toggle: o.brandContent === true, brand_organic_toggle: o.brandOrganic === true }
             : { ...(o.title ? { title: o.title } : {}), description: input.variant.text },
           source_info: { source: 'PULL_FROM_URL', photo_cover_index: 0, photo_images: input.media.map((m) => m.url) },
@@ -352,6 +376,32 @@ async function health(ctx: AdapterContext, connection: PublishConnection, creden
   }
   if (mode === 'manual') return { status: 'missing_permission', checkedAt, metadata, missingPermissions: ['video.publish', 'video.upload'], message: 'TikTok posting permission was not granted: only manual handoff is possible. Reconnect and approve posting.' };
   return { status: 'ready', checkedAt, metadata, message: mode === 'inbox' ? 'Connected for draft upload (manual handoff in the TikTok app).' : `Connected as ${me.display_name ?? connection.displayName}.` };
+}
+
+/** What the composer shows for a Direct Post (TikTok guidelines: query creator_info when rendering the post page). */
+export interface TikTokCreatorSettings {
+  nickname: string | null;
+  username: string | null;
+  privacyLevelOptions: TikTokPrivacy[];
+  commentDisabled: boolean;
+  duetDisabled: boolean;
+  stitchDisabled: boolean;
+  maxVideoPostDurationSec: number | null;
+}
+
+/** Live creator_info for the composer. Throws ProviderHttpError / TransportError like any TikTok call. */
+export async function tiktokCreatorSettings(ctx: AdapterContext, credentials: ProviderCredentials): Promise<TikTokCreatorSettings> {
+  const ci = await queryCreatorInfo(ctx, oauthAccessToken(credentials, 'TikTok'));
+  return {
+    nickname: ci.creator_nickname ?? null,
+    username: ci.creator_username ?? null,
+    privacyLevelOptions: (Array.isArray(ci.privacy_level_options) ? ci.privacy_level_options : [])
+      .filter((x): x is TikTokPrivacy => (TIKTOK_PRIVACY_LEVELS as readonly string[]).includes(x)),
+    commentDisabled: ci.comment_disabled === true,
+    duetDisabled: ci.duet_disabled === true,
+    stitchDisabled: ci.stitch_disabled === true,
+    maxVideoPostDurationSec: typeof ci.max_video_post_duration_sec === 'number' ? ci.max_video_post_duration_sec : null,
+  };
 }
 
 /** Manual handoff package (no API call): caption + media for download, then post in the TikTok app. */

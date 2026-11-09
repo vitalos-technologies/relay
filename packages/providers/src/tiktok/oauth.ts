@@ -61,7 +61,8 @@ async function exchangeCode(ctx: AdapterContext, p: { code: string; redirectUri:
 }
 
 interface UserInfo { open_id?: string; union_id?: string; avatar_url?: string; display_name?: string }
-interface CreatorInfo { creator_username?: string; creator_nickname?: string; privacy_level_options?: string[]; comment_disabled?: boolean; duet_disabled?: boolean; stitch_disabled?: boolean; max_video_post_duration_sec?: number }
+/** POST /v2/post/publish/creator_info/query/ data (TikTok: call it when rendering the post page; 20 req/min per token). */
+export interface CreatorInfo { creator_username?: string; creator_nickname?: string; privacy_level_options?: string[]; comment_disabled?: boolean; duet_disabled?: boolean; stitch_disabled?: boolean; max_video_post_duration_sec?: number }
 
 export async function fetchUserInfo(ctx: AdapterContext, token: string): Promise<UserInfo> {
   const r = await tiktokCall<{ data?: { user?: UserInfo } }>(ctx, { method: 'GET', path: '/v2/user/info/', query: { fields: 'open_id,union_id,avatar_url,display_name' }, bearer: token, op: 'tiktok.user.info' });

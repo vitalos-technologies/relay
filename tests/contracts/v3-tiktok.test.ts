@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import { TransportError, type PublishConnection } from '@social-lite/core';
 import { MemoryMockStore } from '@social-lite/providers';
-import { CHUNK_BYTES, TIKTOK_INBOX_HANDOFF, chunkPlan, tiktokAdapter, tiktokConnector, tiktokFake, tiktokManualHandoff, tiktokMetricsFetcher } from '../../packages/providers/src/tiktok/index.js';
+import { CHUNK_BYTES, TIKTOK_INBOX_HANDOFF, chunkPlan, interactionFlags, tiktokAdapter, tiktokConnector, tiktokCreatorSettings, tiktokFake, tiktokManualHandoff, tiktokMetricsFetcher } from '../../packages/providers/src/tiktok/index.js';
 import { NOW, RecordingTransport, SCENARIOS, SECRET_ACCESS, SECRET_REFRESH, ctxWith, expectNoSecrets, image, inputOf, prepareUntilReady, res, simulated, video } from './v3-helpers.js';
 
 const conn = (over: Partial<PublishConnection> = {}): PublishConnection => ({ id: 'c1', provider: 'tiktok', providerAccountId: 'open-id-1', displayName: 'Creator', username: 'creator', isMock: false,
@@ -157,6 +157,56 @@ describe('tiktok Direct Post video upload', () => {
     expect(await tiktokAdapter.prepare(ctxWith(t), inputOf(conn(), creds, { options: direct, format: 'video' }, [video(1000)]), null)).toMatchObject({ kind: 'permanent', code: 'tiktok_privacy_mismatch' });
     const t2 = new RecordingTransport(() => ok({ privacy_level_options: ['SELF_ONLY'], max_video_post_duration_sec: 10 }));
     expect(await tiktokAdapter.prepare(ctxWith(t2), inputOf(conn(), creds, { options: direct, format: 'video' }, [video(1000)]), null)).toMatchObject({ kind: 'permanent', code: 'tiktok_video_too_long' });
+  });
+});
+
+// Fix H1 (2026-11-09). TikTok content sharing guidelines: interactions are off until the user turns them on; an
+// interaction the creator disabled (creator_info) is greyed out and never sent as allowed; photo posts: Comment only.
+describe('tiktok interaction settings (H1)', () => {
+  const vidInit = (t: RecordingTransport) => JSON.parse(t.requests.find((r) => r.url.endsWith('/video/init/'))!.body as string).post_info;
+  const transport = (ci: Record<string, unknown>) => new RecordingTransport((r) => {
+    if (r.url.endsWith('/creator_info/query/')) return ok({ privacy_level_options: ['SELF_ONLY'], max_video_post_duration_sec: 600, ...ci });
+    if (r.url.endsWith('/video/init/')) return ok({ publish_id: 'v_pub_file~v2.1', upload_url: 'https://open-upload.tiktokapis.com/video/?upload_id=1' });
+    if (r.url.endsWith('/content/init/')) return ok({ publish_id: 'p_pub_url~v2.1' });
+    return { status: 201, headers: {}, body: '' };
+  });
+
+  it('unset interactions are sent as disabled (the composer shows them off); only an explicit true allows', () => {
+    expect(interactionFlags({})).toEqual({ disable_comment: true, disable_duet: true, disable_stitch: true });
+    expect(interactionFlags({ allowComment: true, allowDuet: true, allowStitch: true })).toEqual({ disable_comment: false, disable_duet: false, disable_stitch: false });
+    expect(interactionFlags({ allowComment: false })).toMatchObject({ disable_comment: true });
+  });
+
+  it('video: an interaction the creator disabled in TikTok is sent as disabled even when the user allowed it', async () => {
+    const t = transport({ comment_disabled: true, duet_disabled: false, stitch_disabled: true });
+    const inp = inputOf(conn(), creds, { options: { tiktok: { ...direct.tiktok, allowComment: true, allowDuet: true, allowStitch: true } }, format: 'video' }, [video(1000)]);
+    expect((await tiktokAdapter.prepare(ctxWith(t), inp, null)).kind).toBe('ready');
+    expect(vidInit(t)).toMatchObject({ disable_comment: true, disable_duet: false, disable_stitch: true });
+  });
+
+  it('video: nothing locked and the user allowed comments only ⇒ comments on, duet/stitch off', async () => {
+    const t = transport({ comment_disabled: false, duet_disabled: false, stitch_disabled: false });
+    const inp = inputOf(conn(), creds, { options: { tiktok: { privacyLevel: 'SELF_ONLY', consent: true, allowComment: true } }, format: 'video' }, [video(1000)]);
+    await tiktokAdapter.prepare(ctxWith(t), inp, null);
+    expect(vidInit(t)).toMatchObject({ disable_comment: false, disable_duet: true, disable_stitch: true });
+  });
+
+  it('photo: Comment only (no duet/stitch fields); a creator comment lock carried from prepare disables comments', async () => {
+    const t = transport({ comment_disabled: true });
+    const inp = inputOf(conn(), creds, { text: 'p', options: { tiktok: { ...direct.tiktok, allowComment: true, allowDuet: true, allowStitch: true } } }, [image(1)]);
+    const p = await tiktokAdapter.prepare(ctxWith(t), inp, null);
+    expect(p).toMatchObject({ kind: 'ready', checkpoint: { step: 'photo_ready', data: { commentLocked: true } } });
+    await tiktokAdapter.publish(ctxWith(t), inp, (p as { checkpoint: import('@social-lite/core').Checkpoint }).checkpoint);
+    const info = JSON.parse(t.requests.at(-1)!.body as string).post_info;
+    expect(info.disable_comment).toBe(true);
+    expect(info).not.toHaveProperty('disable_duet');
+    expect(info).not.toHaveProperty('disable_stitch');
+  });
+
+  it('tiktokCreatorSettings: normalises creator_info for the composer (unknown privacy values dropped)', async () => {
+    const t = new RecordingTransport(() => ok({ creator_nickname: 'Nick', creator_username: 'nick', privacy_level_options: ['SELF_ONLY', 'BOGUS'], comment_disabled: true, stitch_disabled: true, max_video_post_duration_sec: 300 }));
+    expect(await tiktokCreatorSettings(ctxWith(t), creds)).toEqual({ nickname: 'Nick', username: 'nick', privacyLevelOptions: ['SELF_ONLY'], commentDisabled: true, duetDisabled: false, stitchDisabled: true, maxVideoPostDurationSec: 300 });
+    expect(t.requests[0]!.url).toBe('https://open.tiktokapis.com/v2/post/publish/creator_info/query/');
   });
 });
 

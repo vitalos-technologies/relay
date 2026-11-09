@@ -95,6 +95,18 @@ export const INSTAGRAM_CONSTRAINTS: ChannelConstraints = {
   maxFrameRate: 60,
 };
 
+/**
+ * Fix H7: Relay reads Page post / IG media insights (meta/metrics.ts) when the insights permissions were granted.
+ * granted_scopes is recorded at connect and refreshed by every health check; unknown (older connections) ⇒ true, like
+ * the other networks — the sync then reports "permission missing" if Meta refuses.
+ */
+export function metaCanReadMetrics(provider: 'facebook' | 'instagram', connection: Pick<PublishConnection, 'metadata' | 'isMock'>): boolean {
+  if (connection.isMock) return true; // simulated destinations get labelled simulated metrics (providers/metrics.ts)
+  const scopes = Array.isArray(connection.metadata?.granted_scopes) ? (connection.metadata.granted_scopes as unknown[]).filter((x): x is string => typeof x === 'string') : [];
+  const needed: readonly string[] = provider === 'facebook' ? FACEBOOK_INSIGHTS_SCOPES : INSTAGRAM_INSIGHTS_SCOPES;
+  return !scopes.length || needed.every((s) => scopes.includes(s));
+}
+
 export function capabilitiesFor(provider: 'facebook' | 'instagram', connection: PublishConnection): ChannelCapabilities {
   const version = typeof connection.metadata?.graph_version === 'string' ? connection.metadata.graph_version : DEFAULT_GRAPH_VERSION;
   return {
@@ -104,7 +116,7 @@ export function capabilitiesFor(provider: 'facebook' | 'instagram', connection: 
     canPublish: true,
     canEditPublished: false,
     canDeletePublished: false,
-    canReadMetrics: false,
+    canReadMetrics: metaCanReadMetrics(provider, connection),
     canReconcile: true,
     constraints: provider === 'facebook' ? FACEBOOK_CONSTRAINTS : INSTAGRAM_CONSTRAINTS,
     constraintsVersion: `meta-${provider}-${MEDIA_RESEARCHED_ON}-${version}`,
@@ -115,7 +127,7 @@ export function capabilitiesFor(provider: 'facebook' | 'instagram', connection: 
 export function toMediaFacts(media: PublishInput['media']): MediaFacts[] {
   return media.map((m) => ({
     assetId: m.assetId, status: 'ready', mime: m.mime, bytes: m.bytes, width: m.width, height: m.height,
-    kind: m.kind, durationMs: m.durationMs, videoCodec: m.videoCodec, audioCodec: m.audioCodec, frameRate: m.frameRate,
+    kind: m.kind, durationMs: m.durationMs, videoCodec: m.videoCodec, audioCodec: m.audioCodec, frameRate: m.frameRate, altText: m.altText,
   }));
 }
 

@@ -25,7 +25,7 @@ export function mediaFacts(ids: string[], assets: Map<string, Asset>): MediaFact
   return ids.map((id) => {
     const a = assets.get(id);
     if (!a) return { assetId: id, status: 'missing', mime: null, bytes: null, width: null, height: null };
-    return { assetId: id, status: a.status, mime: a.mime, bytes: a.bytes, width: a.width, height: a.height };
+    return { assetId: id, status: a.status, mime: a.mime, bytes: a.bytes, width: a.width, height: a.height, altText: a.alt_text };
   });
 }
 
@@ -53,7 +53,7 @@ export function localChecks(draft: DraftContent, connections: Connection[], asse
     const media = mediaFacts(v.assetIds, assets);
     const r = validateVariant({
       provider: c.provider, connectionId: c.id, constraints: k, text: v.text, link: v.link, buttons: v.buttons, media,
-      linkIsSeparateField: linkIsSeparate(c, media.length),
+      linkIsSeparateField: linkIsSeparate(c, media.length), options: v.options,
     });
     const text = outgoingText(v, c);
     out.set(c.id, {

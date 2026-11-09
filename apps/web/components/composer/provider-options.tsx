@@ -5,6 +5,7 @@
 import type { ReactNode } from 'react';
 import { PROVIDER_LABEL, type ChannelCapabilities, type VariantDraft } from '@social-lite/core';
 import type { Connection } from '@/lib/client/types';
+import { useApi } from '@/lib/client/use-api';
 import { Banner, Checkbox, Field, Input, RadioGroup, Select, Switch, cn } from '@/components/ui';
 
 type Opts = Record<string, unknown>;
@@ -26,9 +27,20 @@ export function hasProviderOptions(c: Connection): boolean {
   return ['tiktok', 'youtube', 'pinterest', 'linkedin', 'bluesky'].includes(c.provider);
 }
 
+/** GET /api/connections/:id/tiktok-creator-info (live creator_info). */
+interface TikTokCreatorInfo {
+  privacy_level_options: string[];
+  interactions: { comment_disabled: boolean; duet_disabled: boolean; stitch_disabled: boolean };
+  creator: { nickname: string | null; username: string | null };
+}
+
 export function ProviderOptions({
-  connection, variant, onChange, readOnly, issues,
-}: { connection: Connection; variant: VariantDraft; onChange: (v: VariantDraft) => void; readOnly: boolean; issues: string[] }) {
+  connection, variant, onChange, readOnly, issues, photoOnly = false,
+}: {
+  connection: Connection; variant: VariantDraft; onChange: (v: VariantDraft) => void; readOnly: boolean; issues: string[];
+  /** Every attached item is an image (TikTok photo post: only Comment applies). */
+  photoOnly?: boolean;
+}) {
   const caps = connection.capabilities as Partial<ChannelCapabilities>;
   const required = new Set(caps.requiredOptions ?? REQUIRED_FALLBACK[connection.provider] ?? []);
   const p = connection.provider;
@@ -44,23 +56,39 @@ export function ProviderOptions({
   const str = (k: string) => (typeof o[k] === 'string' ? (o[k] as string) : '');
   const bool = (k: string) => o[k] === true;
 
+  // TikTok Direct Post: the creator's current settings (TikTok requires creator_info when rendering the post page).
+  const direct = p === 'tiktok' && (caps.publishMode ?? 'direct') === 'direct';
+  const creator = useApi<TikTokCreatorInfo>(direct ? `/api/connections/${connection.id}/tiktok-creator-info` : null);
+
   let body: ReactNode = null;
   if (p === 'tiktok') {
     const mode = caps.publishMode;
+    const ci = creator.data;
+    const privacy = ci && ci.privacy_level_options.length ? TIKTOK_PRIVACY.filter((x) => ci.privacy_level_options.includes(x.value)) : TIKTOK_PRIVACY;
+    const chosen = str('privacyLevel');
+    const stale = !!chosen && !privacy.some((x) => x.value === chosen);
+    const locked = { comment: !!ci?.interactions.comment_disabled, duet: !!ci?.interactions.duet_disabled, stitch: !!ci?.interactions.stitch_disabled };
+    const offInTikTok = 'Turned off in the creator’s TikTok settings';
+    // TikTok guidelines: every interaction starts off and is only on when the user turns it on (unset = off, which is what is sent).
+    const interaction = (key: 'allowComment' | 'allowDuet' | 'allowStitch', label: string, isLocked: boolean) => (
+      <Switch checked={!isLocked && bool(key)} onCheckedChange={(v) => set({ [key]: v })} disabled={readOnly || isLocked} label={label} description={isLocked ? offInTikTok : undefined} />
+    );
     body = (
       <>
         {mode === 'draft_handoff' ? <Banner tone="info" title="Sent to the creator’s TikTok inbox to finish in the app" /> : null}
         {mode === 'manual' ? <Banner tone="info" title="Manual handoff: download and post in TikTok" /> : null}
+        {direct && creator.error ? <Banner tone="warn" title="Couldn’t load the creator’s TikTok settings">Relay checks them again before posting.</Banner> : null}
         <Field label="Who can view" optional={!req('privacyLevel')}>
-          <Select value={str('privacyLevel')} onChange={(e) => set({ privacyLevel: e.target.value || undefined })} disabled={readOnly}>
+          <Select value={chosen} onChange={(e) => set({ privacyLevel: e.target.value || undefined })} disabled={readOnly}>
             <option value="">Choose…</option>
-            {TIKTOK_PRIVACY.map((x) => <option key={x.value} value={x.value}>{x.label}</option>)}
+            {privacy.map((x) => <option key={x.value} value={x.value}>{x.label}</option>)}
+            {stale ? <option value={chosen}>{TIKTOK_PRIVACY.find((x) => x.value === chosen)?.label ?? chosen} (not available)</option> : null}
           </Select>
         </Field>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Switch checked={o.allowComment !== false} onCheckedChange={(v) => set({ allowComment: v })} disabled={readOnly} label="Comments" />
-          <Switch checked={bool('allowDuet')} onCheckedChange={(v) => set({ allowDuet: v })} disabled={readOnly} label="Duet" />
-          <Switch checked={bool('allowStitch')} onCheckedChange={(v) => set({ allowStitch: v })} disabled={readOnly} label="Stitch" />
+        <div className={cn('grid grid-cols-1 gap-3', !photoOnly && 'sm:grid-cols-3')} role="group" aria-label="Interactions">
+          {interaction('allowComment', 'Allow comments', locked.comment)}
+          {photoOnly ? null : interaction('allowDuet', 'Allow Duet', locked.duet)}
+          {photoOnly ? null : interaction('allowStitch', 'Allow Stitch', locked.stitch)}
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Switch checked={bool('brandOrganic')} onCheckedChange={(v) => set({ brandOrganic: v })} disabled={readOnly} label="Your brand" description="Labelled “Promotional content”" />
@@ -130,7 +158,7 @@ export function ProviderOptions({
         <Field label="Pin title" optional hint="Up to 100 characters.">
           <Input value={str('title')} maxLength={100} readOnly={readOnly} onChange={(e) => set({ title: e.target.value })} />
         </Field>
-        <Field label="Alt text" optional hint="Up to 500 characters.">
+        <Field label="Alt text" optional hint="Up to 500 characters. Empty: the image’s library alt text.">
           <Input value={str('altText')} maxLength={500} readOnly={readOnly} onChange={(e) => set({ altText: e.target.value })} />
         </Field>
       </>

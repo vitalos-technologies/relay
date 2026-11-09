@@ -81,7 +81,7 @@ function AssistantDrawer({ open, onOpenChange, surface, context, brandId, onUseT
       </> : undefined}>
       {!s ? <p className="text-[13px] text-muted">Loading…</p> : !s.configured ? (
         <Banner tone="info" title="AI is not set up">
-          No AI provider is configured, so the assistant is off. An owner can add a provider key in Setup.
+          No AI provider and model are configured, so the assistant is off. An owner can set them in Setup.
           {can('setup.manage') ? <div className="mt-2"><LinkButton href="/setup" size="sm" variant="secondary">Open Setup</LinkButton></div> : null}
         </Banner>
       ) : (

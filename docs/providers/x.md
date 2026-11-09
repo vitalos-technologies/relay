@@ -152,6 +152,11 @@ Published URL: `https://x.com/<username>/status/<id>` (or `https://x.com/i/web/s
 | Transport, pre-connect | retryable | `rejected_safe_to_retry` | – |
 | Transport, after send | retryable | `unknown` | – |
 
+Alt text (fix H3, 2026-11-09): after an image is uploaded and ready, `POST /2/media/metadata`
+`{id, metadata:{alt_text:{text}}}` (≤ 1,000, `media.write`; listed price $0.005/request) for each image with library
+alt text; `altSet` in the checkpoint prevents a repeat. `capabilities.canReadMetrics` is true (public metrics; billable
+reads metered on `x.read`; fix H7).
+
 Health (`/2/users/me`):
 - A 401, or a user id that differs from the connection's account, means **Reconnect required**.
 - Missing granted scopes, or `client-forbidden`, means **Missing permission**.

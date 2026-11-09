@@ -2,17 +2,19 @@
 // Analytics → Channels (GET /api/analytics/channels): one row per account with posts, followers (latest + observed
 // change) and native metric totals; comparison only inside comparable groups.
 import { PROVIDER_LABEL } from '@social-lite/core';
-import type { ChannelsResponse } from '@social-lite/core/contracts/analytics';
+import { CHANNEL_TABLE_MEASURES, type ChannelsResponse, type ChannelTableMeasure } from '@social-lite/core/contracts/analytics';
 import { useApi } from '@/lib/client/use-api';
 import { BarList, Card, CardHeader, EmptyState, ErrorState, fmtMetric, PlatformIcon, SkeletonRows, Table, Td, Th, THead, Tr } from '@/components/ui';
 import { AnalyticsFilters, DatasetNotice, HealthFooter, useAnalyticsQuery } from '@/components/analytics/v3/shared';
 
-const KEY_METRICS = ['engagements', 'views', 'impressions', 'reach'];
+// Fix H6: the columns are measures from the API (engagements is a measure, not a metric family) — same totals as the
+// comparison cards below.
+const COLUMN_LABEL: Record<ChannelTableMeasure, string> = { engagements: 'Engagements', views: 'Views', impressions: 'Impressions', reach: 'Reach' };
 
 export default function AnalyticsChannelsPage() {
   const { qs } = useAnalyticsQuery(['measure']);
   const { data, error, loading, refetch, refreshing } = useApi<ChannelsResponse>(`/api/analytics/channels?${qs}`, { keepPrevious: true });
-  const metric = (r: ChannelsResponse['rows'][number], fam: string) => r.metrics.find((m) => m.family === fam || m.native_metric === fam);
+  const measure = (r: ChannelsResponse['rows'][number], k: ChannelTableMeasure) => r.measures?.find((m) => m.measure === k);
   return (
     <div aria-busy={refreshing || undefined}>
       <AnalyticsFilters meta={data?.meta} showFormat={false} />
@@ -29,7 +31,7 @@ export default function AnalyticsChannelsPage() {
                 <Th className="text-right">Posts</Th>
                 <Th className="text-right">Followers</Th>
                 <Th className="hidden text-right sm:table-cell">Change</Th>
-                {KEY_METRICS.map((k) => <Th key={k} className="hidden text-right capitalize lg:table-cell">{k}</Th>)}
+                {CHANNEL_TABLE_MEASURES.map((k) => <Th key={k} className="hidden text-right lg:table-cell">{COLUMN_LABEL[k]}</Th>)}
               </tr>
             </THead>
             <tbody>
@@ -44,7 +46,7 @@ export default function AnalyticsChannelsPage() {
                   <Td className="text-right tabular">{r.posts_published.toLocaleString('en-GB')}</Td>
                   <Td className="text-right tabular">{r.followers.latest === null ? <span className="text-muted">—</span> : fmtMetric(r.followers.latest)}</Td>
                   <Td className="hidden text-right tabular sm:table-cell">{r.followers.observed_change === null ? <span className="text-muted">—</span> : <span className={r.followers.observed_change > 0 ? 'text-success' : r.followers.observed_change < 0 ? 'text-danger' : 'text-muted'}>{r.followers.observed_change > 0 ? '+' : ''}{fmtMetric(r.followers.observed_change)}</span>}</Td>
-                  {KEY_METRICS.map((k) => { const m = metric(r, k); return <Td key={k} className="hidden text-right tabular lg:table-cell">{m && m.value !== null ? fmtMetric(m.value) : <span className="text-muted">—</span>}</Td>; })}
+                  {CHANNEL_TABLE_MEASURES.map((k) => { const m = measure(r, k); return <Td key={k} className="hidden text-right tabular lg:table-cell" data-measure={k}>{m && m.value !== null ? fmtMetric(m.value) : <span className="text-muted">—</span>}</Td>; })}
                 </Tr>
               ))}
             </tbody>
@@ -62,7 +64,7 @@ export default function AnalyticsChannelsPage() {
             </div>
           ) : null}
           {data.comparison.excluded.length ? <p className="mt-3 text-xs text-muted">Not comparable: {data.comparison.excluded.map((e) => `${e.display_name} (${PROVIDER_LABEL[e.provider]})`).join(', ')}</p> : null}
-          <p className="mt-6 text-xs text-muted">— = not provided by that network, not fetched, or no data in the period.</p>
+          <p className="mt-6 text-xs text-muted">— = not provided by that network, not fetched, or no data in the period. Reach adds up per-post unique counts.</p>
         </>
       )}
     </div>

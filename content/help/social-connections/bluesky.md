@@ -55,7 +55,8 @@ Mentions (`@handle`) and links become rich-text facets automatically.
 
 ## Scheduling and publishing
 
-Relay uploads the images and fixes the post's record key before the due time, then creates the post. Because the key
+Relay uploads the images and fixes the post's record key before the due time, then creates the post. Each image
+carries its library alt text. Because the key
 is fixed, a repeated attempt cannot create a second post, and a lost answer is resolved by looking the record up —
 Relay always knows for certain whether it was published.
 

@@ -278,6 +278,8 @@ export interface ConversationDetail extends ConversationListItem {
   /** Older entries exist (paginate with ?before=). */
   has_more: boolean;
   reply: {
+    /** WhatsApp: the charge Meta applies to a free-form (service) reply sent now; the send re-checks it (H2). */
+    service_charge?: { billable: boolean; category: string; estimate: { amount: number; currency: string } | null; note: string } | null;
     modes: Array<{ mode: ReplyMode; allowed: boolean; reason: string | null; window_ends_at: string | null }>;
     can_reply: boolean;
     can_note: boolean;

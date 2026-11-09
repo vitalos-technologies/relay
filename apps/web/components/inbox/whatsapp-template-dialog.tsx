@@ -1,24 +1,25 @@
 'use client';
 // WhatsApp approved-template send (stream B). Outside the 24-hour customer service window only templates can be sent;
-// the charge is shown BEFORE sending (Meta per-message pricing: marketing/authentication always, utility outside the
-// window). The exact text that will be sent is previewed; a charged send needs an explicit acknowledgement, which the
-// server re-checks. Send-once rules apply as for any reply (idempotency key, thread version).
+// the charge is shown BEFORE sending with the same rules the server applies (core whatsAppChargeFor: marketing and
+// authentication always; utility templates too, inside the window as well, since Meta's 2026-10-01 change). The exact
+// text that will be sent is previewed; a charged send needs an explicit acknowledgement, which the server re-checks.
+// Send-once rules apply as for any reply (idempotency key, thread version).
 import { useRef, useState } from 'react';
 import { FileText } from 'lucide-react';
 import type { ReplyAttemptDto, TemplateInfo } from '@social-lite/core/contracts/v35-inbox';
+import { whatsAppChargeFor, type WhatsAppRates, type WhatsAppServiceAllowance } from '@social-lite/core/contracts/whatsapp-charges';
 import { api } from '@/lib/client/api';
 import { useApi } from '@/lib/client/use-api';
 import { Badge, Banner, Button, Checkbox, Dialog, EmptyState, Field, Input, Select, SkeletonRows, useToast } from '@/components/ui';
 import { newKey } from './labels';
 
-interface Resp { items: TemplateInfo[]; refreshed_at: string | null; rates: Record<string, { amount: number; currency: string }> | null }
+interface Resp { items: TemplateInfo[]; refreshed_at: string | null; rates: WhatsAppRates | null; service_allowance?: WhatsAppServiceAllowance }
 
-export function chargeFor(t: TemplateInfo | null, windowOpen: boolean, rates: Resp['rates']): { billable: boolean; text: string } {
+export function chargeFor(t: TemplateInfo | null, windowOpen: boolean, rates: Resp['rates'], now = new Date()): { billable: boolean; text: string } {
   if (!t) return { billable: false, text: '' };
-  const cat = t.category ?? 'marketing';
-  if (cat === 'utility' && windowOpen) return { billable: false, text: 'Free: utility template inside the 24-hour window.' };
-  const r = rates?.[cat];
-  return { billable: true, text: `Charged by Meta per delivered message (${cat})${r ? ` · about ${new Intl.NumberFormat(undefined, { style: 'currency', currency: r.currency }).format(r.amount)}` : ''}. The exact rate depends on the recipient’s country.` };
+  const c = whatsAppChargeFor({ template: { category: t.category }, windowOpen, now, rates });
+  const r = c.estimate;
+  return { billable: c.billable, text: c.billable ? `${c.note.replace(/\.$/, '')}${r ? ` · about ${new Intl.NumberFormat(undefined, { style: 'currency', currency: r.currency }).format(r.amount)}` : ''}.` : c.note };
 }
 
 export function WhatsAppTemplateButton({ channelId, conversationId, baseVersion, windowOpen, disabled, onSent }: { channelId: string; conversationId: string; baseVersion: number; windowOpen: boolean; disabled?: boolean; onSent: () => void }) {

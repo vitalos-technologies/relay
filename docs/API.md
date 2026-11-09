@@ -103,6 +103,7 @@ type Brand = { id; name; timezone; approval_required; editors_can_publish; defau
 | POST | `/api/connections/:id/disconnect` | – | `{ connection, blocked_deliveries: number }` (AC-05) |
 | POST | `/api/connections/:id/reconnect` | `{}` OAuth ⇒ `{ authorization_url }`; Telegram ⇒ `{ bot_token }` | `Connection` |
 | PATCH | `/api/connections/:id/mock-scenario` | `{ scenario: MockScenario }` | `Connection` (mock only) |
+| GET | `/api/connections/:id/tiktok-creator-info` | – (TikTok only; `drafts.edit` on the brand) | `{ connection_id, simulated, checked_at, creator, privacy_level_options, interactions: { comment_disabled, duet_disabled, stitch_disabled }, max_video_post_duration_sec }` (live creator_info; `409 invalid_state` for other networks, `502 provider_error` when TikTok fails) |
 
 ```ts
 type ProviderStatus = { provider: Provider; configured: boolean; missing: string[]; callback_url: string | null;

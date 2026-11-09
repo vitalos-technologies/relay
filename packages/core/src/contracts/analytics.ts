@@ -366,6 +366,11 @@ export interface ChannelRow {
   posts_published: number;
   /** Native metric totals over posts published in the period (lifetime of those posts). */
   metrics: Array<MetricValue & { posts_with_data: number; label_note: string | null }>;
+  /**
+   * Fix H6: the table's measure columns (CHANNEL_TABLE_MEASURES), computed exactly like the comparison card
+   * (engagements = the network's engagement families added up; views/impressions/reach = that family's total).
+   */
+  measures: Array<{ measure: ChannelTableMeasure; value: number | null; status: SeriesStatus; posts_with_data: number }>;
   followers: {
     latest: number | null;
     as_of_date: string | null;
@@ -377,6 +382,10 @@ export interface ChannelRow {
   };
   health: SeriesHealth;
 }
+
+/** Measure columns of the Analytics → Channels table, in order. */
+export const CHANNEL_TABLE_MEASURES = ['engagements', 'views', 'impressions', 'reach'] as const satisfies readonly MeasureKey[];
+export type ChannelTableMeasure = (typeof CHANNEL_TABLE_MEASURES)[number];
 
 export interface ChannelsResponse {
   meta: ResponseMeta;

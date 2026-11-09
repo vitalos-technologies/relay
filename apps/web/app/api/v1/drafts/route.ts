@@ -1,8 +1,9 @@
 // POST /api/v1/drafts { brand_id, title?, text } — create a DRAFT as the calling service account.
-// Requires content.create_draft on that brand (integration preset). Never schedules or publishes.
+// Requires content.create_draft on that brand (integration preset). Never schedules or publishes. Optional
+// Idempotency-Key: a retry with the same key and body returns the original draft instead of creating another.
 import { z } from 'zod';
 import { createIntegrationDraft } from '@social-lite/services/integrations/drafts';
-import { parseJson } from '@/lib/api';
+import { idempotencyKey, parseJson } from '@/lib/api';
 import { machineRoute } from '@/lib/machine';
 
 export const dynamic = 'force-dynamic';
@@ -12,6 +13,7 @@ const body = z.object({ brand_id: z.string().uuid(), title: z.string().trim().ma
 
 export const POST = machineRoute(async ({ req, ctx, principal }) => {
   const input = await parseJson(req, body);
-  const post = await createIntegrationDraft(ctx, principal.serviceAccountId, input.brand_id, { title: input.title || 'API draft', text: input.text, source: { kind: 'api' }, tags: ['api'] });
+  const post = await createIntegrationDraft(ctx, principal.serviceAccountId, input.brand_id, { title: input.title || 'API draft', text: input.text, source: { kind: 'api' }, tags: ['api'] },
+    { idempotencyKey: idempotencyKey(req) });
   return { id: post.id, status: 'draft' };
 });

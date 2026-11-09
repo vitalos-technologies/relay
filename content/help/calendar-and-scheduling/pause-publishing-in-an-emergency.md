@@ -37,6 +37,11 @@ permission for the whole workspace (a workspace-wide role); a brand-level role c
 - You can keep writing, scheduling and approving. New schedules wait.
 - Anything already being sent may still complete.
 
+## Who can resume
+
+`publishing.resume`: Owner, Admin, Brand manager and Publisher. **Approvers can pause but not resume**: they see the
+**Publishing paused** banner without a **Resume** button, and the server refuses a resume from them.
+
 ## Resume
 
 1. Select **Resume publishing** (or **Resume** on the brand banner) and confirm.
@@ -46,4 +51,3 @@ permission for the whole workspace (a workspace-wide role); a brand-level role c
 ## Limitations
 
 - A pause doesn't remove anything already published. Delete those on the network itself.
-- Today the same permission resumes as pauses (`publishing.pause`): an Approver who can pause can also resume.

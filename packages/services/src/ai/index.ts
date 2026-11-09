@@ -5,4 +5,5 @@ export { checkSuggestion, extractFacts, extractUrls, findProhibited, findPromise
 export { AnthropicModelClient, FixtureModelClient, type AiModelClient, type ModelCallRequest, type ModelCallResult } from './client.js';
 export { buildUserPrompt, quote, SYSTEM_PROMPT, modelOutputSchema, type ModelOutput, type PromptInput, type PromptTarget } from './prompt.js';
 export { fetchSourceUrl, htmlToText, sanitizeText, SOURCE_MAX_CHARS } from './source.js';
-export { AI_METER, DEFAULT_AI_MONTHLY_TOKENS, capFromLimits, costEstimateUsd, readUsage, reserveTokens, settleTokens } from './usage.js';
+export { AI_METER, DEFAULT_AI_MONTHLY_TOKENS, capFromLimits, readUsage, reserveTokens, settleTokens } from './usage.js';
+export { aiModelSetupState, configuredModel, costEstimateForTotals, costEstimateUsd, FIXTURE_MODEL, modelPrice, requireModel, usesServerFallback, type AiModelSetupState } from './models.js';

@@ -76,8 +76,8 @@ Open the TikTok variant of the post:
 
 | Field | Rules |
 |---|---|
-| **Who can view** | Required for direct posts; options come from the creator's own TikTok settings; there is no default |
-| Comments / Duet / Stitch | Duet and Stitch start off. **Comments:** the switch starts in the *on* position, but Relay only allows comments when you have actually switched it (known issue) — toggle it off and on again if you want comments. Relay does not yet grey out interactions the creator has disabled in TikTok; TikTok then disables them itself. |
+| **Who can view** | Required for direct posts; Relay lists only the options the creator's TikTok account currently allows (read from TikTok when you open the TikTok settings); there is no default |
+| **Allow comments** / **Allow Duet** / **Allow Stitch** | All start off, as TikTok requires; turn on the ones you want. An interaction the creator has turned off in their TikTok settings is greyed out with *Turned off in the creator's TikTok settings*. Photo posts show **Allow comments** only (Duet and Stitch don't apply to photos). |
 | Disclose commercial content → **Your brand** | Labelled "Promotional content" by TikTok |
 | Disclose commercial content → **Branded content** | Labelled "Paid partnership"; cannot be *Only me* |
 | AI-generated | Adds TikTok's "Creator labeled as AI-generated" tag |
@@ -96,7 +96,8 @@ Open the TikTok variant of the post:
 
 ## Scheduling and publishing
 
-At the due time Relay asks TikTok for the creator's current settings, uploads the video in chunks (the last chunk
+At the due time Relay asks TikTok for the creator's current settings (if the creator has since turned an interaction
+off in TikTok, it is sent as off), uploads the video in chunks (the last chunk
 completes the post) or asks TikTok to fetch the photos, and then follows TikTok's processing status. TikTok says
 processing can take a few minutes before the post appears.
 
@@ -123,6 +124,7 @@ posts report nothing — shown as *not provided*, never 0. Needs `video.list`. S
 | TikTok: choose who can view this post (there is no default). | Pick an option under **Who can view**. |
 | TikTok: confirm that you agree to TikTok's Music Usage Confirmation … | Tick the agreement. |
 | TikTok: privacy "…" is not available for this creator | The creator's settings changed; pick one of the listed options. |
+| Couldn't load the creator's TikTok settings | TikTok didn't answer when the composer asked. All options are shown; Relay checks the creator's settings again before posting. |
 | TikTok: branded content visibility cannot be set to private. | Choose a public option or untick *Branded content*. |
 | TikTok: video is …; TikTok needs at least 360 px on each side. | Use a larger video. |
 | This account has no posting permission | Reconnect and approve posting, or post manually in TikTok. |

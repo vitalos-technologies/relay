@@ -205,7 +205,8 @@ function makeConnector(provider: 'facebook' | 'instagram'): OAuthConnector {
         grantedScopes: tokens.scopes,
         // Page tokens derived from a long-lived user token have no expiry date.
         expiresAt: null,
-        metadata: { ...metadata, ...(health.metadata ?? {}) },
+        // granted_scopes drives capabilities.canReadMetrics (insights permissions; fix H7).
+        metadata: { ...metadata, granted_scopes: tokens.scopes, ...(health.metadata ?? {}) },
         health,
       };
     },

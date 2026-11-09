@@ -6,7 +6,10 @@
 import { AppError } from '@social-lite/core';
 import type { TemplateInfo, TemplateSend } from '@social-lite/core/contracts/v35-inbox';
 import { parseWhatsAppWebhook, verifyWhatsAppNumber, whatsAppCharge, whatsAppStatuses } from '@social-lite/providers/whatsapp/inbox';
-import { getPool, many, maybeOne, withTx } from '@social-lite/db';
+import {
+  WHATSAPP_FREE_SERVICE_MESSAGES_PER_MONTH, whatsAppServiceMonthStart, type WhatsAppChargeNotice, type WhatsAppRates, type WhatsAppServiceAllowance,
+} from '@social-lite/core/contracts/whatsapp-charges';
+import { getPool, many, maybeOne, one, withTx, type Queryable } from '@social-lite/db';
 import { z } from 'zod';
 import type { Ctx } from '../context.js';
 import { audit } from '../audit.js';
@@ -21,7 +24,7 @@ import { ingestItems } from './ingest.js';
 import { confirmAttemptFromProvider } from './replies.js';
 import { inboxEvent, type ChannelRow } from './shared.js';
 
-type Rates = Partial<Record<'marketing' | 'utility' | 'authentication', { amount: number; currency: string }>>;
+type Rates = WhatsAppRates;
 
 // ------------------------------------------------------------------ templates + charges
 export function cachedTemplates(ch: Pick<ChannelRow, 'settings'>): TemplateInfo[] {
@@ -29,8 +32,31 @@ export function cachedTemplates(ch: Pick<ChannelRow, 'settings'>): TemplateInfo[
   return Array.isArray(t) ? t : [];
 }
 
+/**
+ * Free service messages used this month on this channel's phone number (H2). Counts Relay's own free-form sends (and
+ * service-category templates) that are queued, sending, sent or unknown, from the earliest possible start of Meta's
+ * month, across every channel on the same number; and whether Meta already billed a service message this month.
+ */
+export async function whatsAppServiceAllowance(db: Queryable, ch: Pick<ChannelRow, 'external_account_id' | 'is_simulated'>, now = new Date()): Promise<WhatsAppServiceAllowance> {
+  const since = whatsAppServiceMonthStart(now);
+  const r = await one<{ used: number; billed: boolean }>(db,
+    `WITH chans AS (SELECT id FROM inbox_channels WHERE kind='whatsapp' AND external_account_id=$1 AND is_simulated=$2)
+     SELECT (SELECT count(*)::int FROM inbox_reply_attempts a WHERE a.channel_id IN (SELECT id FROM chans) AND a.created_at >= $3
+               AND a.state IN ('queued','sending','sent','unknown') AND (a.template IS NULL OR a.template->>'category' = 'service')) AS used,
+            EXISTS (SELECT 1 FROM inbox_messages m WHERE m.channel_id IN (SELECT id FROM chans) AND m.direction='outbound' AND m.provider_created_at >= $3
+               AND m.meta->'pricing'->>'category' = 'service' AND m.meta->'pricing'->>'billable' = 'true') AS billed`,
+    [ch.external_account_id, ch.is_simulated, since]);
+  return { used: r.used, limit: WHATSAPP_FREE_SERVICE_MESSAGES_PER_MONTH, billed_this_month: r.billed };
+}
+
+/** The charge for a free-form (service) reply on WhatsApp (shown before sending; acknowledged when billable). */
+export function whatsAppServiceCharge(ch: Pick<ChannelRow, 'settings'>, now: Date, service: WhatsAppServiceAllowance): WhatsAppChargeNotice {
+  return whatsAppCharge({ template: null, windowOpen: true, now, service, rates: (ch.settings?.rates as Rates | undefined) ?? null });
+}
+
 /** Validate a template against the cached approved list and render the exact text that will be sent. */
-export function prepareTemplateSend(ch: ChannelRow, input: { name: string; language: string; params: string[] }, windowOpen: boolean): { template: TemplateSend; rendered: string; charge: ReturnType<typeof whatsAppCharge> } {
+export function prepareTemplateSend(ch: ChannelRow, input: { name: string; language: string; params: string[] }, windowOpen: boolean,
+  opts: { now?: Date; service?: WhatsAppServiceAllowance | null } = {}): { template: TemplateSend; rendered: string; charge: WhatsAppChargeNotice } {
   if (ch.kind !== 'whatsapp') throw new AppError('validation_failed', 'Templates are only available on WhatsApp.');
   const t = cachedTemplates(ch).find((x) => x.name === input.name && x.language === input.language);
   if (!t) throw new AppError('validation_failed', 'Unknown template. Refresh the template list.', { template: 'Not found' });
@@ -38,10 +64,10 @@ export function prepareTemplateSend(ch: ChannelRow, input: { name: string; langu
   if (input.params.length !== t.param_count) throw new AppError('validation_failed', `This template needs ${t.param_count} value${t.param_count === 1 ? '' : 's'}.`, { params: 'Wrong number of values' });
   const rendered = t.body.replace(/\{\{(\d+)\}\}/g, (_m, n: string) => input.params[Number(n) - 1] ?? '');
   const template: TemplateSend = { name: t.name, language: t.language, category: t.category, params: input.params };
-  return { template, rendered: rendered.slice(0, 2000), charge: whatsAppCharge({ template, windowOpen, rates: (ch.settings?.rates as Rates | undefined) ?? null }) };
+  return { template, rendered: rendered.slice(0, 2000), charge: whatsAppCharge({ template, windowOpen, now: opts.now, service: opts.service ?? null, rates: (ch.settings?.rates as Rates | undefined) ?? null }) };
 }
 
-export async function listTemplates(ctx: Ctx, channelId: string, refresh = false): Promise<{ items: TemplateInfo[]; refreshed_at: string | null; rates: Rates | null }> {
+export async function listTemplates(ctx: Ctx, channelId: string, refresh = false): Promise<{ items: TemplateInfo[]; refreshed_at: string | null; rates: Rates | null; service_allowance: WhatsAppServiceAllowance }> {
   const ch = await loadChannelFor(ctx, channelId, refresh ? 'inbox.manage' : 'inbox.read');
   if (ch.kind !== 'whatsapp') throw new AppError('validation_failed', 'Templates are only available on WhatsApp.');
   if (refresh) {
@@ -50,13 +76,14 @@ export async function listTemplates(ctx: Ctx, channelId: string, refresh = false
     if (!r.ok) throw new AppError('provider_error', r.message);
     const at = new Date().toISOString();
     await getPool().query(`UPDATE inbox_channels SET settings = settings || jsonb_build_object('templates', $2::jsonb), updated_at=now() WHERE id=$1`, [ch.id, JSON.stringify({ items: r.items.slice(0, 200), refreshed_at: at })]);
-    return { items: r.items, refreshed_at: at, rates: (ch.settings?.rates as Rates | undefined) ?? null };
+    return { items: r.items, refreshed_at: at, rates: (ch.settings?.rates as Rates | undefined) ?? null, service_allowance: await whatsAppServiceAllowance(getPool(), ch) };
   }
-  return { items: cachedTemplates(ch), refreshed_at: ((ch.settings?.templates as { refreshed_at?: string } | undefined)?.refreshed_at) ?? null, rates: (ch.settings?.rates as Rates | undefined) ?? null };
+  return { items: cachedTemplates(ch), refreshed_at: ((ch.settings?.templates as { refreshed_at?: string } | undefined)?.refreshed_at) ?? null, rates: (ch.settings?.rates as Rates | undefined) ?? null,
+    service_allowance: await whatsAppServiceAllowance(getPool(), ch) };
 }
 
 export const ratesSchema = z.object({
-  rates: z.record(z.enum(['marketing', 'utility', 'authentication']), z.object({ amount: z.number().min(0).max(10), currency: z.string().regex(/^[A-Z]{3}$/) }).strict()).nullable(),
+  rates: z.record(z.enum(['marketing', 'utility', 'authentication', 'service']), z.object({ amount: z.number().min(0).max(10), currency: z.string().regex(/^[A-Z]{3}$/) }).strict()).nullable(),
 }).strict();
 
 /** Operator-entered rate card (Meta's rates vary by recipient country; Relay only shows what the operator entered). */

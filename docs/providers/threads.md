@@ -53,7 +53,7 @@ Research date: **2026-11-07**. **Live-test status: not tested.** Threads uses it
 
 - Graph-style errors `{error:{message,type,code,error_subcode}}`: code 190 → reconnect; 10/200–299 → permission;
   4/17/32/613 → rate limited (no reset header documented; 15 min); publishing-limit exhaustion → budget.
-- Topic tags, reply control and alt text are not sent (alt text not covered by H3).
+- Topic tags and reply control are not sent. Alt text: the library alt text goes in `alt_text` on image/video containers (≤ 1,000; fix H3, 2026-11-09).
 
 ## Required provider fields
 

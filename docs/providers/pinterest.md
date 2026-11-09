@@ -57,7 +57,8 @@ developers.pinterest.com). **Live-test status: not tested.**
 
 ## Required provider fields
 
-Board = the connection (required, chosen explicitly). Optional `variant.options.pinterest`: `title`, `altText`.
+Board = the connection (required, chosen explicitly). Optional `variant.options.pinterest`: `title`, `altText` (empty ⇒ the
+first image's library alt text, `PublishMedia.altText`; > 500 is a validation issue — fix H3).
 `variant.link` is the destination link (separate field, not appended to the description).
 
 ## Checkpoints

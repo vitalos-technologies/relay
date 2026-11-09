@@ -43,12 +43,12 @@ async function history(tx: Queryable, ctx: Ctx, userId: string, from: string | n
     [ctx.access.workspaceId, userId, from, to, ctx.actor.userId, reason?.slice(0, 300) ?? null]);
 }
 
-async function notifyUsers(tx: Queryable, workspaceId: string, userIds: string[], n: { kind: string; title: string; body?: string; severity?: 'info' | 'warning' | 'critical'; ref?: string; dedupe: string }) {
+async function notifyUsers(tx: Queryable, workspaceId: string, userIds: string[], n: { kind: string; title: string; body?: string; severity?: 'info' | 'warning' | 'critical'; ref?: string; link?: string; dedupe: string }) {
   for (const u of [...new Set(userIds)]) {
     await tx.query(
-      `INSERT INTO notifications(workspace_id, user_id, severity, kind, title, body, reference_type, reference_id, dedupe_key)
-       VALUES ($1,$2,$3,$4,$5,$6,'workspace',$7,$8) ON CONFLICT (user_id, dedupe_key) DO NOTHING`,
-      [workspaceId, u, n.severity ?? 'info', n.kind, n.title, n.body ?? null, n.ref ?? workspaceId, n.dedupe]);
+      `INSERT INTO notifications(workspace_id, user_id, severity, kind, title, body, reference_type, reference_id, dedupe_key, link_path)
+       VALUES ($1,$2,$3,$4,$5,$6,'workspace',$7,$8,$9) ON CONFLICT (user_id, dedupe_key) DO NOTHING`,
+      [workspaceId, u, n.severity ?? 'info', n.kind, n.title, n.body ?? null, n.ref ?? workspaceId, n.dedupe, n.link ?? null]);
   }
 }
 
@@ -339,7 +339,8 @@ export async function proposeOwnershipTransfer(ctx: Ctx, input: { to_user_id: st
       throw err;
     }
     await notifyUsers(tx, ctx.access.workspaceId, [input.to_user_id], { kind: 'ownership.transfer_requested', severity: 'warning',
-      title: 'You have been asked to become the workspace owner', body: `${ctx.actor.email} wants to transfer ownership to you. Accept it in Team.`, dedupe: `ownership:${id}:requested` });
+      title: 'You have been asked to become the workspace owner', body: `${ctx.actor.email} wants to transfer ownership to you. Accept or decline from the banner at the top of Relay.`,
+      link: '/overview', dedupe: `ownership:${id}:requested` });
     await audit(tx, { workspaceId: ctx.access.workspaceId, actorUserId: ctx.actor.userId, action: 'ownership.transfer_proposed', resourceType: 'workspace', resourceId: ctx.access.workspaceId,
       diff: { transfer_id: id, to_user_id: input.to_user_id, keep_previous_owner_as: keep }, correlationId: ctx.correlationId });
     return transferDto((await maybeOne<TransferRow>(tx, `${TRANSFER_SQL} WHERE t.id=$1`, [id]))!);
@@ -405,6 +406,12 @@ export async function cancelOwnershipTransfer(ctx: Ctx, transferId: string): Pro
     if (t.status !== 'pending') throw new AppError('invalid_state', `This transfer was already ${t.status}.`);
     const status = t.to_user_id === ctx.actor.userId ? 'declined' : 'cancelled';
     await tx.query(`UPDATE ownership_transfers SET status=$2, decided_at=now(), decided_by=$3 WHERE id=$1`, [t.id, status, ctx.actor.userId]);
+    // Tell the other party (and the proposer when a co-owner cancelled) so nobody waits on a transfer that is over.
+    const others = [t.from_user_id, t.to_user_id].filter((u) => u !== ctx.actor.userId);
+    await notifyUsers(tx, ctx.access.workspaceId, others, { kind: `ownership.transfer_${status}`, severity: 'info',
+      title: status === 'declined' ? 'Ownership transfer declined' : 'Ownership transfer cancelled',
+      body: status === 'declined' ? `${t.to_email} declined to become the owner. You are still the owner.` : `The request to make ${t.to_email} the owner was cancelled.`,
+      link: '/team', dedupe: `ownership:${t.id}:${status}` });
     await audit(tx, { workspaceId: ctx.access.workspaceId, actorUserId: ctx.actor.userId, action: `ownership.transfer_${status}`, resourceType: 'workspace', resourceId: ctx.access.workspaceId,
       diff: { transfer_id: t.id }, correlationId: ctx.correlationId });
     return transferDto((await maybeOne<TransferRow>(tx, `${TRANSFER_SQL} WHERE t.id=$1`, [t.id]))!);

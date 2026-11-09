@@ -5,7 +5,7 @@
 //  publish: POST /rest/posts (publishes:true) → 201, id in x-restli-id.
 //  reconcile: organizations — posts by author since the send time; members — manual (r_member_social is restricted).
 import {
-  composeTextWithLink, validateVariant,
+  altTextFor, composeTextWithLink, validateVariant,
   type AdapterContext, type AttemptReference, type ChannelCapabilities, type ChannelConstraints, type Checkpoint,
   type ConnectionHealth, type PrepareOutcome, type ProviderCredentials, type PublishConnection, type PublishInput, type PublishMedia,
   type PublishOutcome, type PublishingAdapter, type ReconcileOutcome, type ValidationIssue, type ValidationResult,
@@ -186,7 +186,12 @@ export function postBody(input: PublishInput, checkpoint: Checkpoint | null): Re
   const o = optsOf(input);
   const items = itemsOf(checkpoint);
   if (input.media.length && (items.length !== input.media.length || items.some((i) => i.state !== 'ready'))) return null;
-  const alt = (i: number) => (Array.isArray(o.altTexts) && typeof o.altTexts[i] === 'string' && o.altTexts[i] ? { altText: o.altTexts[i] } : {});
+  // Image altText (≤ 4,086): a per-post override (options.altTexts[i]) or the library alt text (fix H3).
+  const alt = (i: number) => {
+    const m = input.media[i];
+    const t = m ? altTextFor('linkedin', m, Array.isArray(o.altTexts) ? o.altTexts[i] : undefined) : null;
+    return t ? { altText: t } : {};
+  };
   let content: Record<string, unknown> | undefined;
   if (items.length === 1) content = { media: { id: items[0]!.urn, ...(items[0]!.video ? (o.videoTitle ? { title: o.videoTitle } : {}) : alt(0)) } };
   else if (items.length > 1) content = { multiImage: { images: items.map((it, i) => ({ id: it.urn, ...alt(i) })) } };
@@ -238,12 +243,22 @@ async function reconcile(ctx: AdapterContext, ref: AttemptReference): Promise<Re
   }
 }
 
+/**
+ * The token's member (userinfo `sub`) is the connected member. A live member connection's id is `urn:li:person:<sub>`
+ * (strict). A simulated (mock_) member connection's id is the simulator's `sub` itself (ids of simulated connections
+ * must start with `mock_`, so they carry no URN prefix): compared as-is, and only for simulated connections.
+ */
+export function sameMember(connection: Pick<PublishConnection, 'providerAccountId' | 'isMock'>, sub: string): boolean {
+  if (connection.providerAccountId === `urn:li:person:${sub}`) return true;
+  return connection.isMock && connection.providerAccountId.startsWith('mock_') && connection.providerAccountId === sub;
+}
+
 async function health(ctx: AdapterContext, connection: PublishConnection, credentials: ProviderCredentials): Promise<ConnectionHealth> {
   const checkedAt = ctx.now().toISOString();
   const token = oauthAccessToken(credentials, 'LinkedIn');
   try {
     const me = await userInfo(ctx, token);
-    if (!isOrg(connection) && me.sub && `urn:li:person:${me.sub}` !== connection.providerAccountId) {
+    if (!isOrg(connection) && me.sub && !sameMember(connection, me.sub)) {
       return { status: 'reconnect_required', checkedAt, message: 'This LinkedIn token belongs to a different member. Reconnect the original account.' };
     }
     if (isOrg(connection)) {

@@ -7,6 +7,7 @@ import { AppError, notFound } from '@social-lite/core';
 import { getPool, maybeOne, withTx, type Queryable } from '@social-lite/db';
 import { audit } from './audit.js';
 import { config } from './config.js';
+import { aiModelSetupState } from './ai/models.js';
 import type { Ctx } from './context.js';
 import { envSetting, isSettingKey, setSetting, SETTING_DEFS, settingSource, type SettingKey } from './settings.js';
 import { authorizeCtx, requireAction } from './tenancy.js';
@@ -147,15 +148,37 @@ export async function getSetup(ctx: Ctx, db: Queryable = getPool()): Promise<{ g
   for (const g of PROVIDER_GROUPS) {
     const keys = (Object.keys(SETTING_DEFS) as SettingKey[]).filter((k) => SETTING_DEFS[k].group === g.group);
     const items = await Promise.all(keys.map((k) => settingItem(k, db)));
-    groups.push({ id: g.id, title: g.title, required: false, ready: items.every((i, n) => i.is_set || SETTING_DEFS[keys[n]!].optional === true), items });
+    let ready = items.every((i, n) => i.is_set || SETTING_DEFS[keys[n]!].optional === true);
+    if (g.group === 'ai') {
+      const extra = aiModelItems();
+      items.push(...extra);
+      ready = ready && extra[0]!.is_set;
+    }
+    groups.push({ id: g.id, title: g.title, required: false, ready, items });
   }
   return { groups };
+}
+
+const AI_ENV_KEYS: readonly string[] = ['AI_MODEL', 'AI_MODEL_PRICES', 'AI_FALLBACK_MODELS'];
+
+/** D32: AI model settings are environment-only; the page shows set / not set, never the values. */
+function aiModelItems(): SetupItem[] {
+  const a = aiModelSetupState();
+  const env = (on: boolean) => (on ? 'env' as const : null);
+  const model: SetupItem = { key: 'AI_MODEL', label: 'Model', secret: false, is_set: a.model, source: env(a.model), editable: false,
+    hint: 'Model id from your AI provider. Required with the provider key; without it AI stays off.' };
+  const prices: SetupItem = { key: 'AI_MODEL_PRICES', label: 'Model prices', secret: false, is_set: a.priced_models > 0, source: env(a.priced_models > 0), editable: false,
+    hint: 'Optional JSON: {"<model id>": [input, output]} in USD per million tokens. Without a price, cost estimates show as unknown.' };
+  if (a.model && !a.price) prices.warning = 'No price for the configured model: cost estimates show as unknown. Token budgets still apply.';
+  const fallbacks: SetupItem = { key: 'AI_FALLBACK_MODELS', label: 'Fallback-enabled models', secret: false, is_set: a.fallback_models > 0, source: env(a.fallback_models > 0), editable: false,
+    hint: 'Optional comma-separated model ids for which Relay asks the provider for its server-side refusal fallback.' };
+  return [model, prices, fallbacks];
 }
 
 export async function putSetup(ctx: Ctx, key: string, value: string): Promise<SetupItem> {
   if (!isSettingKey(key)) {
     requireAction(ctx, 'setup.manage');
-    if (ENV_GROUPS.some((g) => g.items.some((i) => i.key === key))) {
+    if (ENV_GROUPS.some((g) => g.items.some((i) => i.key === key)) || AI_ENV_KEYS.includes(key)) {
       throw new AppError('invalid_state', 'This setting can only be changed in the server environment.');
     }
     throw notFound('Setting');

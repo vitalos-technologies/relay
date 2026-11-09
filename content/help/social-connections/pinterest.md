@@ -50,7 +50,7 @@ of the app's OAuth flow and use) makes them public and raises limits. Relay show
 |---|---|
 | Description | Post text, up to 800 characters |
 | **Pin title** | Optional, up to 100 characters (Relay limit; Pinterest's limit **not verified**) |
-| **Alt text** | Optional, up to 500 characters |
+| **Alt text** | Optional, up to 500 characters. Empty: the first image's library alt text is sent (it must also fit in 500 characters) |
 | Link | The Pin's destination link, up to 2,048 characters (Relay limit; **not verified**) |
 | Media | Required |
 
@@ -86,4 +86,5 @@ treated as about 2 days late. (Pinterest's analytics documentation could not be 
 |---|---|
 | Pinterest: choose a board. | Connect a board. |
 | Pinterest: title is … of 100 characters. / alt text is … of 500 | Shorten the field. |
+| Pinterest: alt text of the image is … of 500 characters. | The image's library alt text is too long for Pinterest: shorten it in the library or type a Pinterest **Alt text**. |
 | Pins not visible to others | Relay's app is still on Trial access (Limited access badge). |

@@ -22,7 +22,7 @@ chat; use the deployment secret manager.
 7. Production `SESSION_SECRET` (already required; also signs the widget's form time-trap token).
 
 ## AI workspace
-8. AI provider key in Setup → protected settings, then per-workspace AI budgets (Usage and limits) or platform
+8. AI provider key in Setup → protected settings and `AI_MODEL` in the server environment (D32; optional `AI_MODEL_PRICES`), then per-workspace AI budgets (Usage and limits) or platform
    entitlement overrides. Multi-step workflows are a Professional feature (`ai_workflows`).
 
 ## Deploy

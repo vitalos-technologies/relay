@@ -18,6 +18,7 @@ import { authorizeCtx, brandAllowed, requireAction } from '../tenancy.js';
 import { getSetting } from '../settings.js';
 import { iso, inboxEvent, loadChannelRow, loadConversation, people, type ConversationRow } from './shared.js';
 import { moderationFor } from './moderation.js';
+import { whatsAppServiceAllowance, whatsAppServiceCharge } from './channels-whatsapp.js';
 
 type ListRow = ConversationRow & { ch_kind: ConversationListItem['channel']['kind']; ch_name: string; ch_sim: boolean; c_name: string | null; c_handle: string | null; case_number: string | null; case_state: string | null };
 
@@ -179,9 +180,13 @@ export async function getConversation(ctx: Ctx, id: string, q: { before?: string
     ...events.map((e): TimelineEntry => ({ type: 'event', at: e.at.toISOString(), event: { kind: e.kind, actor: e.actor_id ? ppl.get(e.actor_id) ?? null : null, data: e.data } })),
   ].sort((a, b) => a.at.localeCompare(b.at));
   const [item] = await toListItems(db, [listRow]);
+  // H2: what a free-form WhatsApp reply would cost right now (the send itself re-checks and needs an acknowledgement).
+  const waChannel = chKind === 'whatsapp' ? await loadChannelRow(db, conv.channel_id) : null;
+  const serviceCharge = waChannel ? whatsAppServiceCharge(waChannel, new Date(), await whatsAppServiceAllowance(db, waChannel)) : null;
   return {
     ...item!, timeline, has_more: msgs.length > 50,
     reply: {
+      service_charge: serviceCharge,
       modes: await replyAvailability(conv, db),
       can_reply: authorizeCtx(ctx, 'inbox.reply', { brandId: conv.brand_id }).allowed,
       can_note: authorizeCtx(ctx, 'inbox.read', { brandId: conv.brand_id }).allowed,

@@ -29,9 +29,15 @@ Until claimed, the channel shows *Not receiving yet*. Updates are verified by th
 (`inbox_inbound_events`, unique per update id) before the 200, then processed by the worker (`inbox.inbound_received`).
 
 ## WhatsApp charges
-Shown before sending, re-checked by the server: free-form replies inside the window are free; utility templates inside
-an open window are free; other templates are charged by Meta per delivered message (category + recipient country). An
-optional operator rate card per channel turns this into an estimate. A charged send needs `acknowledge_charge`. The
+Shown before sending, re-checked by the server (rules in `packages/core/src/contracts/whatsapp-charges.ts`, Meta
+pricing re-checked 2026-11-09). Since Meta's 2026-10-01 change: every template is charged per delivered message
+(category + recipient country), including utility templates inside an open window; free-form (service) replies inside
+the window are free only while the number has used fewer than 1,000 service messages this month. Relay counts its own
+service sends on the number from the earliest possible month start in any time zone (queued/in-flight included) and
+treats the tier as used once Meta prices a service message as billable this month; sends on one number are serialised
+by an advisory lock. Free entry point windows aren't detectable and are shown as charged. An optional operator rate
+card per channel (marketing, utility, authentication, service) turns this into an estimate. Any billable send needs
+`acknowledge_charge`; automated sends can't give it and are blocked. The
 actual pricing Meta reports per message (status webhook `pricing`) is stored on the message and shown. Failures after
 acceptance (`status=failed`) are shown on the message. A send whose response was lost is confirmed only by the status
 webhook carrying `relay-attempt:<attempt id>` in `biz_opaque_callback_data` (WhatsApp has no lookup API).

@@ -14,7 +14,7 @@ exports or changes CRM/external records. Proposed actions (put a reply draft in 
 add an internal note, use copy, create a task) are previews the requester applies through the normal service with their
 own permissions.
 
-**Off when not configured:** with no provider key (Setup) the assistant says "AI is not set up"; no run is created and no
+**Off when not configured:** with no provider key (Setup) or no `AI_MODEL` (environment, D32) the assistant says "AI is not set up"; no run is created and no
 output is shown. There is no fixture/demo output in the app (tests use an injected fake provider).
 
 **Run lifecycle:** request (ai.use + the context's read permission, rate limit 20/10 min per person, monthly budget) →

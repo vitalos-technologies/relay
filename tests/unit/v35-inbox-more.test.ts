@@ -66,10 +66,33 @@ describe('stream B reply rules + charges', () => {
     expect(whatsAppReplyRules(rules('dm', 'private_message', 23 * H))).toMatchObject({ allowed: true });
     expect(whatsAppReplyRules(rules('dm', 'private_message', 25 * H))).toMatchObject({ allowed: false, code: 'reply_window_closed' });
     expect(whatsAppReplyRules(rules('dm', 'private_message', null))).toMatchObject({ allowed: false });
-    expect(whatsAppCharge({ template: null, windowOpen: true })).toMatchObject({ billable: false, category: 'service' });
-    expect(whatsAppCharge({ template: { name: 'x', language: 'en', category: 'utility', params: [] }, windowOpen: true })).toMatchObject({ billable: false });
-    expect(whatsAppCharge({ template: { name: 'x', language: 'en', category: 'utility', params: [] }, windowOpen: false })).toMatchObject({ billable: true, estimate: null });
+    const before = new Date('2026-09-30T23:59:59Z');
+    const after = new Date('2026-10-01T00:00:00Z');
+    const utility = { name: 'x', language: 'en', category: 'utility' as const, params: [] };
+    const allowance = (used: number, billed = false) => ({ used, limit: 1000, billed_this_month: billed });
+    // Before Meta's 2026-10-01 change: service replies and utility templates inside the window were free.
+    expect(whatsAppCharge({ template: null, windowOpen: true, now: before })).toMatchObject({ billable: false, category: 'service' });
+    expect(whatsAppCharge({ template: utility, windowOpen: true, now: before })).toMatchObject({ billable: false });
+    // H2: from 2026-10-01 a utility template inside the window is charged.
+    expect(whatsAppCharge({ template: utility, windowOpen: true, now: after })).toMatchObject({ billable: true, category: 'utility' });
+    expect(whatsAppCharge({ template: utility, windowOpen: true })).toMatchObject({ billable: true });
+    expect(whatsAppCharge({ template: utility, windowOpen: false, now: before })).toMatchObject({ billable: true, estimate: null });
     expect(whatsAppCharge({ template: { name: 'x', language: 'en', category: 'marketing', params: [] }, windowOpen: true, rates: { marketing: { amount: 0.05, currency: 'GBP' } } })).toMatchObject({ billable: true, estimate: { amount: 0.05, currency: 'GBP' } });
+    expect(whatsAppCharge({ template: { name: 'x', language: 'en', category: null, params: [] }, windowOpen: true })).toMatchObject({ billable: true, category: 'marketing' });
+    // Service replies: 1,000 free per month per number; unknown usage is never assumed free; Meta's own billing wins.
+    expect(whatsAppCharge({ template: null, windowOpen: true, now: after, service: allowance(999) })).toMatchObject({ billable: false, category: 'service' });
+    expect(whatsAppCharge({ template: null, windowOpen: true, now: after, service: allowance(1000), rates: { service: { amount: 0.01, currency: 'GBP' } } }))
+      .toMatchObject({ billable: true, category: 'service', estimate: { amount: 0.01, currency: 'GBP' } });
+    expect(whatsAppCharge({ template: null, windowOpen: true, now: after, service: allowance(3, true) })).toMatchObject({ billable: true });
+    expect(whatsAppCharge({ template: null, windowOpen: true, now: after })).toMatchObject({ billable: true });
+  });
+
+  it('WhatsApp free-tier month starts at the earliest possible midnight in any time zone (never understates usage)', async () => {
+    const { whatsAppServiceMonthStart } = await import('@social-lite/core/contracts/whatsapp-charges');
+    // Mid-month: the UTC+14 midnight on the 1st is earliest.
+    expect(whatsAppServiceMonthStart(new Date('2026-11-15T12:00:00Z')).toISOString()).toBe('2026-10-31T10:00:00.000Z');
+    // First hours of a UTC month: a UTC−12 account is still in the previous month, which started on the 1st at 12:00 UTC.
+    expect(whatsAppServiceMonthStart(new Date('2026-11-01T05:00:00Z')).toISOString()).toBe('2026-10-01T12:00:00.000Z');
   });
 
   it('Instagram, reviews, YouTube, Threads, Bluesky, Telegram modes', () => {

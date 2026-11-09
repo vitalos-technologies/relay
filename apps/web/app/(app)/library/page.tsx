@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { ALT_TEXT_SUPPORT, PROVIDERS, PROVIDER_LABEL } from '@social-lite/core';
 import { Archive, CircleCheck, FileText, FolderInput, Hourglass, ImageOff, Images, OctagonX, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { api, isApiError } from '@/lib/client/api';
 import { useSession } from '@/lib/client/session';
@@ -19,6 +20,13 @@ const ContentHubPanel = dynamic(() => import('@/components/content-hub/content-h
 import { TrashConfirmDialog, useTrashActions } from '@/components/trash/trash-actions';
 import { AssetGovernancePanel } from '@/components/brand-rules/asset-governance';
 import { BulkBar, SelectAll, useSelection } from '@/components/bulk/bulk';
+
+// Fix H3: say exactly where library alt text goes (core ALT_TEXT_SUPPORT drives the adapters too).
+const list = (ps: string[]) => (ps.length > 1 ? `${ps.slice(0, -1).join(', ')} and ${ps.at(-1)}` : ps.join(''));
+const ALT_SENT = PROVIDERS.filter((p) => ALT_TEXT_SUPPORT[p].images).map((p) => PROVIDER_LABEL[p]);
+const ALT_NOT_SENT = PROVIDERS.filter((p) => !ALT_TEXT_SUPPORT[p].images).map((p) => PROVIDER_LABEL[p]);
+const ALT_TEXT_INFO = `Describes the image for screen readers. ${list(ALT_NOT_SENT)} have no alt-text field. Pinterest takes up to 500 characters.`;
+const ALT_TEXT_HINT = `Sent to ${list(ALT_SENT)}.`;
 
 export default function LibraryPage() {
   const { session } = useSession();
@@ -252,7 +260,7 @@ function AssetDrawer({ asset, onClose, onChanged, canEdit, onTrashed, onRestored
             ['Used in', `${asset.usage_count} post${asset.usage_count === 1 ? '' : 's'}`],
           ]}
         />
-        <Field label="Alt text" info="Describes the image for screen readers. Sent where the network supports it.">
+        <Field label="Alt text" info={ALT_TEXT_INFO} hint={ALT_TEXT_HINT}>
           <Textarea value={alt} onChange={(e) => setAlt(e.target.value)} rows={3} maxLength={1000} readOnly={!canEdit} />
         </Field>
         <Field label="Tags">

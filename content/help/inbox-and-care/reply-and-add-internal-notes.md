@@ -28,7 +28,8 @@ even by mistake. Not every channel supports every mode; unavailable modes are hi
 ## Send
 
 1. Type the reply (or insert a saved reply).
-2. Watch the **reply window** hint, for example *Reply window closes in 5h* (WhatsApp adds *replies inside it are free*).
+2. Watch the **reply window** hint, for example *Reply window closes in 5h*. On WhatsApp a charged reply also shows
+   **This reply is charged** (see [WhatsApp in the inbox](/help/inbox-and-care/whatsapp-in-the-inbox)).
    After a network's window closes, private replies are refused by the network.
 3. Select send.
 

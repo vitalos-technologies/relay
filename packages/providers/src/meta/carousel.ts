@@ -8,7 +8,7 @@
 //   { step, data: { kind:'carousel', children:[{assetId, containerId, finished, video}], containerId?, createdAt, expiresAt, polls } }
 // Children already created are never re-created on resume; an expired set (24 h) is rebuilt from scratch,
 // after checking that the parent was not already published.
-import type { AdapterContext, Checkpoint, PrepareOutcome, PublishInput } from '@social-lite/core';
+import { altTextFor, type AdapterContext, type Checkpoint, type PrepareOutcome, type PublishInput } from '@social-lite/core';
 import { igUserIdOf, isVideoMedia } from './common.js';
 import { isTransportError, normalizeGraphError, prepareOutcomeFromGraphError, prepareOutcomeFromTransportError } from './errors.js';
 import { graph, str } from './graph.js';
@@ -88,7 +88,7 @@ export async function prepareCarousel(ctx: AdapterContext, input: PublishInput, 
     try {
       res = await graph<{ id?: string }>(ctx, {
         method: 'POST', path: `${igUserId}/media`, token, op: 'meta.instagram.carousel_item_create', timeoutMs: 60_000,
-        params: video ? { media_type: 'VIDEO', video_url: m.url, is_carousel_item: true } : { image_url: m.url, is_carousel_item: true },
+        params: video ? { media_type: 'VIDEO', video_url: m.url, is_carousel_item: true } : { image_url: m.url, is_carousel_item: true, alt_text: altTextFor('instagram', m) ?? undefined },
       });
     } catch (err) {
       if (isTransportError(err)) return prepareOutcomeFromTransportError(err, cp('carousel_children', s));

@@ -7,7 +7,7 @@
 //    `published` (default true). Error 389 "Unable to fetch video file from URL", 382 "file too small".
 //  - Video Status reference: status.video_status ∈ ready | processing | error, processing_progress 0..100.
 // Assumed: the video post's `description` is what /published_posts reports as `message` (reconcile search).
-import type { AdapterContext, AttemptReference, Checkpoint, PrepareOutcome, PublishInput, PublishOutcome, ReconcileOutcome } from '@social-lite/core';
+import { altTextFor, type AdapterContext, type AttemptReference, type Checkpoint, type PrepareOutcome, type PublishInput, type PublishOutcome, type ReconcileOutcome } from '@social-lite/core';
 import { facebookPhotoCaption, pageIdOf } from './common.js';
 import {
   isTransportError, normalizeGraphError, prepareOutcomeFromGraphError, prepareOutcomeFromTransportError,
@@ -47,7 +47,7 @@ export async function prepareAlbum(ctx: AdapterContext, input: PublishInput, tok
     try {
       res = await graph<{ id?: string }>(ctx, {
         method: 'POST', path: `${pageId}/photos`, token, op: 'meta.facebook.photo_stage', timeoutMs: 60_000,
-        params: { url: m.url, published: false },
+        params: { url: m.url, alt_text_custom: altTextFor('facebook', m) ?? undefined, published: false },
       });
     } catch (err) {
       if (isTransportError(err)) return prepareOutcomeFromTransportError(err, albumCp(a)); // unpublished photos are invisible

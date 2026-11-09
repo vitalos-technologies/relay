@@ -4,7 +4,7 @@
 > Repository-only reference: includes platform-operator routes. The Help Centre article
 > `content/help/developers/api-route-reference.md` is the member-facing subset. OpenAPI: `docs/api/openapi.json`.
 
-Route files: 541 · handlers: 671 · Public: 26 · Session: 555 · Session (no workspace): 13 · Platform operator: 61 · API key: 2 · Widget: 10 · MCP bearer: 4
+Route files: 542 · handlers: 672 · Public: 26 · Session: 556 · Session (no workspace): 13 · Platform operator: 61 · API key: 2 · Widget: 10 · MCP bearer: 4
 
 ## Access models
 
@@ -1692,6 +1692,16 @@ Source: `apps/web/app/api/connections/[id]/reconnect/route.ts`
 | Method | Access | Body | Query | Idempotency-Key |
 |---|---|---|---|---|
 | POST | Session | `reconnectSchema` (`packages/services/src/connections/index.ts`) |  |  |
+
+### `/api/connections/{id}/tiktok-creator-info`
+
+GET /api/connections/:id/tiktok-creator-info — the TikTok creator's current posting settings (creator_info): privacy options and interactions turned off in TikTok. Read-only; the composer calls it when it shows TikTok settings.
+
+Source: `apps/web/app/api/connections/[id]/tiktok-creator-info/route.ts`
+
+| Method | Access | Body | Query | Idempotency-Key |
+|---|---|---|---|---|
+| GET | Session |  |  |  |
 
 ## connectors
 
@@ -5460,13 +5470,13 @@ Source: `apps/web/app/api/trash/restore/route.ts`
 
 ### `/api/v1/drafts`
 
-POST /api/v1/drafts { brand_id, title?, text } — create a DRAFT as the calling service account. Requires content.create_draft on that brand (integration preset). Never schedules or publishes.
+POST /api/v1/drafts { brand_id, title?, text } — create a DRAFT as the calling service account. Requires content.create_draft on that brand (integration preset). Never schedules or publishes. Optional Idempotency-Key: a retry with the same key and body returns the original draft instead of creating another.
 
 Source: `apps/web/app/api/v1/drafts/route.ts`
 
 | Method | Access | Body | Query | Idempotency-Key |
 |---|---|---|---|---|
-| POST | API key | `body` `z.object({ brand_id: z.string().uuid(), title: z.string().trim().max(200).nullish(), text: z.string().min(1).max(10_000) }).strict()` |  |  |
+| POST | API key | `body` `z.object({ brand_id: z.string().uuid(), title: z.string().trim().max(200).nullish(), text: z.string().min(1).max(10_000) }).strict()` |  | accepted |
 
 ### `/api/v1/me`
 

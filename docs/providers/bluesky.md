@@ -67,7 +67,7 @@ atproto OAuth is the documented next step (see Gaps).
   deterministic TID `rkey` and `createdAt`; checkpoint `{rkey, createdAt, facets, blobs[], expiresAt: +5 min}`.
 - `publish`: `createRecord` with that `rkey` (`publishes:true`). Lost response/5xx/conflict ⇒ **unknown**;
   `reconcile` = `getRecord(rkey)` → exists ⇒ published; `RecordNotFound` ⇒ **not published** (definitive).
-- Alt text: `variant.options.bluesky.altTexts[i]` (empty string when not provided).
+- Alt text: `variant.options.bluesky.altTexts[i]` when set, else the library alt text (`PublishMedia.altText`, fix H3), else an empty string.
 
 ## Connection service
 

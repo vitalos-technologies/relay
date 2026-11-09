@@ -31,7 +31,7 @@ export function AiWorkflowsAdmin() {
                 <div className={`h-full rounded-full ${pct >= 90 ? 'bg-danger' : pct >= 70 ? 'bg-warn' : 'bg-accent'}`} style={{ width: `${pct}%` }} />
               </div>
             </div>
-            <p className="text-xs text-muted">30 days: {data.usage_30d.model_calls.toLocaleString()} model calls · {data.usage_30d.tokens.toLocaleString()} tokens · est. ${data.usage_30d.cost_estimate_usd.toFixed(2)}. Active now: {data.active}.</p>
+            <p className="text-xs text-muted">30 days: {data.usage_30d.model_calls.toLocaleString()} model calls · {data.usage_30d.tokens.toLocaleString()} tokens · {data.usage_30d.cost_estimate_usd === null ? 'cost unknown (prices not set)' : `est. $${data.usage_30d.cost_estimate_usd.toFixed(2)}`}. Active now: {data.active}.</p>
           </div>
         </Card>
         <Card aria-labelledby="h-aw-runs">

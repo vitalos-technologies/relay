@@ -63,6 +63,19 @@ export function effectiveStatus(r: Pick<ConnectionRow, 'status' | 'paused' | 'di
   return r.status;
 }
 
+/**
+ * The adapter's current capabilities for this connection (same source as MCP list_destinations and diagnostics, via
+ * posts/shared capabilitiesFor), so a capability fix shows on connection cards without waiting for the next health
+ * check (fix H7). Falls back to the stored record.
+ */
+function liveCapabilities(r: ConnectionRow): ConnectionJson['capabilities'] {
+  try {
+    return getAdapter(r.provider).capabilities(toPublishConnection(r)) as unknown as ConnectionJson['capabilities'];
+  } catch {
+    return r.capabilities ?? {};
+  }
+}
+
 export function toConnectionJson(r: ConnectionRow): ConnectionJson {
   const status = effectiveStatus(r);
   const hd = r.health_detail ?? {};
@@ -76,7 +89,7 @@ export function toConnectionJson(r: ConnectionRow): ConnectionJson {
     status,
     status_label: CONNECTION_STATUS_LABEL[status],
     is_mock: r.is_mock,
-    capabilities: r.capabilities ?? {},
+    capabilities: liveCapabilities(r),
     health: {
       message: hd.message ?? '',
       checked_at: r.health_checked_at ? r.health_checked_at.toISOString() : null,

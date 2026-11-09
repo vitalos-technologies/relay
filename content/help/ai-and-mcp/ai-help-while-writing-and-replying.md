@@ -35,7 +35,7 @@ keywords: [ai writing, suggest, rewrite, translate, summarise, draft reply, copy
 
 | Message | Meaning |
 |---|---|
-| AI is not set up | No AI provider configured. Ask an Owner. |
+| AI is not set up | No AI provider key or model configured. Ask an Owner. |
 | AI budget used up / Budget used up | The workspace's AI budget for the month is spent (see [AI limits](/help/ai-and-mcp/ai-limits-privacy-and-usage)). |
 | Paid actions are paused | Billing restriction; AI requests are refused. |
 | A rate-limit message | 20 requests per 10 minutes per person; wait a moment. |

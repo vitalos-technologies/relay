@@ -130,6 +130,17 @@ export const xFake: FakeHandler = async (req: HttpRequest, env: FakeEnv): Promis
     });
   }
 
+  // ---- media alt text (fix H3): POST /2/media/metadata {id, metadata:{alt_text:{text ≤ 1000}}}
+  if (req.method === 'POST' && path === '/2/media/metadata') {
+    const body = JSON.parse(typeof req.body === 'string' ? req.body : '{}') as { id?: string; metadata?: { alt_text?: { text?: string } } };
+    const text = body.metadata?.alt_text?.text;
+    if (!body.id || typeof text !== 'string' || [...text].length > 1000) return problem(400, 'Invalid Request', 'id and metadata.alt_text.text (≤ 1000) are required', 'https://api.x.com/2/problems/invalid-request');
+    const obj = await env.store.get('x', body.id);
+    if (!obj || obj.kind !== 'media') return problem(400, 'Invalid Request', 'media_id not found', 'https://api.x.com/2/problems/invalid-request');
+    await env.store.put({ ...obj, data: { ...obj.data, alt_text: text } });
+    return json(200, { data: { id: body.id, associated_metadata: true, alt_text: { text } } });
+  }
+
   // ---- create post
   if (req.method === 'POST' && path === '/2/tweets') {
     const body = JSON.parse(typeof req.body === 'string' ? req.body : '{}') as { text?: string; media?: { media_ids?: string[] } };

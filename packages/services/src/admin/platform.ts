@@ -492,6 +492,7 @@ export async function platformIntegrations(p: PlatformCtx, db: Queryable = getPo
   const { mcpConfig } = await import('../mcp/config.js');
   const { getSetting } = await import('../settings.js');
   const { config } = await import('../config.js');
+  const { aiModelSetupState } = await import('../ai/models.js');
   const providers = (await listProviderStatus({} as never)).items;
   const counts = await many<{ provider: string; live: number; sim: number }>(db,
     `SELECT provider::text, count(*) FILTER (WHERE NOT is_mock AND NOT is_synthetic)::int live, count(*) FILTER (WHERE is_mock OR is_synthetic)::int sim
@@ -518,8 +519,12 @@ export async function platformIntegrations(p: PlatformCtx, db: Queryable = getPo
   const smtp = process.env.SMTP_URL ?? '';
   items.push({ key: 'email', label: 'Email (SMTP)', kind: 'email', status: smtp && !/localhost:1025|127\.0\.0\.1:1025/.test(smtp) ? 'configured' : 'not_configured',
     missing: smtp ? (/:1025/.test(smtp) ? ['production SMTP (local capture in use)'] : []) : ['SMTP_URL'], live_accounts: null, simulated_accounts: null, note: null });
+  // D32: AI needs the provider key AND AI_MODEL; prices are optional (unknown cost otherwise). Names only, never values.
   const ai = await getSetting('ANTHROPIC_API_KEY').catch(() => undefined);
-  items.push({ key: 'ai', label: 'AI assistance', kind: 'ai', status: ai ? 'configured' : 'not_configured', missing: ai ? [] : ['ANTHROPIC_API_KEY'], live_accounts: null, simulated_accounts: null,
-    note: config().APP_ENV === 'production' ? null : 'Development installation' });
+  const aiModel = aiModelSetupState();
+  const aiNotes = [config().APP_ENV === 'production' ? null : 'Development installation', aiModel.model && !aiModel.price ? 'No model price set: cost estimates unknown' : null].filter(Boolean);
+  items.push({ key: 'ai', label: 'AI assistance', kind: 'ai', status: ai && aiModel.model ? 'configured' : 'not_configured',
+    missing: [!ai && 'ANTHROPIC_API_KEY', !aiModel.model && 'AI_MODEL'].filter(Boolean) as string[], live_accounts: null, simulated_accounts: null,
+    note: aiNotes.length ? aiNotes.join(' · ') : null });
   return { items };
 }

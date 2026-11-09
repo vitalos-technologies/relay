@@ -17,7 +17,7 @@ keywords: [api, endpoints, routes, openapi, rest]
 
 Only two interfaces are meant for integrations: the machine API under `/api/v1` (service-account API keys) and the MCP endpoint `/mcp`. Every other route is the web app's own API: it needs a browser session cookie plus CSRF protection and can change between releases. Conventions shared by all routes (error envelope, pagination, idempotency, rate limits) are in [API conventions](/help/developers/api-conventions).
 
-This page lists 489 route files with 610 handlers (Public: 26, Session: 555, Session (no workspace): 13, API key: 2, Widget: 10, MCP bearer: 4). 61 handlers used only by Relay staff in the admin console are not listed here.
+This page lists 490 route files with 611 handlers (Public: 26, Session: 556, Session (no workspace): 13, API key: 2, Widget: 10, MCP bearer: 4). 61 handlers used only by Relay staff in the admin console are not listed here.
 
 ## Access models
 
@@ -300,6 +300,7 @@ This page lists 489 route files with 610 handlers (Public: 26, Session: 555, Ses
 | PATCH | `/api/connections/{id}/mock-scenario` | Session |  | PATCH /api/connections/:id/mock-scenario { scenario } — simulated destinations only. |
 | POST | `/api/connections/{id}/pause` | Session |  | POST /api/connections/:id/pause { paused } |
 | POST | `/api/connections/{id}/reconnect` | Session |  | POST /api/connections/:id/reconnect — OAuth: {} => { authorization_url }; Telegram: { bot_token }; Bluesky: { app_password } => Connection. |
+| GET | `/api/connections/{id}/tiktok-creator-info` | Session |  | GET /api/connections/:id/tiktok-creator-info — the TikTok creator's current posting settings (creator_info): privacy options and interactions turned off in TikTok. Read-only; the composer calls it when it shows TikTok s… |
 
 ### connectors
 
@@ -861,7 +862,7 @@ This page lists 489 route files with 610 handlers (Public: 26, Session: 555, Ses
 
 | Methods | Path | Access | Idempotency-Key | Purpose |
 |---|---|---|---|---|
-| POST | `/api/v1/drafts` | API key |  | POST /api/v1/drafts { brand_id, title?, text } — create a DRAFT as the calling service account. Requires content.create_draft on that brand (integration preset). Never schedules or publishes. |
+| POST | `/api/v1/drafts` | API key | POST | POST /api/v1/drafts { brand_id, title?, text } — create a DRAFT as the calling service account. Requires content.create_draft on that brand (integration preset). Never schedules or publishes. Optional Idempotency-Key: a… |
 | GET | `/api/v1/me` | API key |  | GET /api/v1/me — the calling service account (API key auth): name, workspace, brand-scoped grants. |
 
 ### webhooks

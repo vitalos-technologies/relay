@@ -6,20 +6,14 @@
 import { getPool, maybeOne, type Queryable } from '@social-lite/db';
 import { readMeterUsage, reserveUsage, settleUsage } from '../product/budgets.js';
 import type { AiTask } from './types.js';
+import { costEstimateUsd } from './models.js';
 
 export const AI_METER = 'ai.tokens' as const;
 export const DEFAULT_AI_MONTHLY_TOKENS = 200_000;
 
-/** USD per million tokens [input, output]; unknown models are priced like the default model. */
-const PRICES: Record<string, [number, number]> = {
-  'claude-opus-5-5': [4, 20], 'claude-opus-5': [5, 25], 'claude-opus-4-8': [5, 25], 'claude-sonnet-5-5': [2, 10],
-  'claude-sonnet-5': [2, 10], 'claude-haiku-5-5': [0.1, 0.5], 'claude-fable-5-1': [10, 50], 'test-fixture': [0, 0],
-};
-
-export function costEstimateUsd(model: string, input: number, output: number): number {
-  const [i, o] = PRICES[model] ?? PRICES['claude-opus-5-5']!;
-  return Math.round(((input * i + output * o) / 1_000_000) * 1e6) / 1e6;
-}
+// Prices are deployment settings (AI_MODEL_PRICES, D32): see ai/models.ts. Without a configured price the stored
+// cost_estimate_usd is 0 and readers compute the estimate from token totals at read time (unknown ⇒ null).
+export { costEstimateUsd, costEstimateForTotals } from './models.js';
 
 export function capFromLimits(limits: Record<string, unknown> | null | undefined): number {
   const v = Number(limits?.ai_monthly_tokens);
@@ -61,7 +55,7 @@ export async function settleTokens(r: Reservation, rec: UsageRecord): Promise<{ 
     `INSERT INTO ai_usage(workspace_id, brand_id, post_id, user_id, model, task, status, period, reserved_tokens, input_tokens, output_tokens, cost_estimate_usd, correlation_id)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
     [r.workspaceId, rec.brandId, rec.postId, rec.userId, rec.model, rec.task, rec.status, r.period, r.amount,
-      Math.round(rec.inputTokens), Math.round(rec.outputTokens), costEstimateUsd(rec.model, rec.inputTokens, rec.outputTokens), rec.correlationId.slice(0, 64)]);
+      Math.round(rec.inputTokens), Math.round(rec.outputTokens), costEstimateUsd(rec.model, rec.inputTokens, rec.outputTokens) ?? 0, rec.correlationId.slice(0, 64)]);
   const u = await readMeterUsage(r.workspaceId, AI_METER);
   return { used: u.used, remaining: Math.max(0, r.cap - u.used - u.reserved) };
 }

@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { AppError } from '@social-lite/core';
 import { PROPOSED_ACTION_KINDS } from '@social-lite/core/contracts/v35-ai';
 import { getSetting, settingSource } from '../settings.js';
+import { AI_SETUP_HINT, configuredModel, usesServerFallback } from '../ai/models.js';
 import type { Queryable } from '@social-lite/db';
 
 export const assistantOutputSchema = z.object({
@@ -48,9 +49,8 @@ export class AnthropicAssistantClient implements AssistantModelClient {
         system: req.system,
         messages: [{ role: 'user', content: req.prompt }],
         output_config: { effort: 'medium', format: betaZodOutputFormat(assistantOutputSchema) },
-        // Server-side refusal fallback (no model list maintained here).
-        betas: ['server-side-fallback-2026-07-01'],
-        fallbacks: 'default' as const,
+        // Server-side refusal fallback only for models listed in AI_FALLBACK_MODELS (deployment setting, D32).
+        ...(usesServerFallback(req.model) ? { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const } : {}),
       });
       const u = res.usage;
       const inputTokens = (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0);
@@ -70,16 +70,18 @@ let override: AssistantModelClient | null = null;
 /** Tests only: inject a deterministic fake provider. Pass null to restore normal resolution. */
 export function setAssistantModelClient(c: AssistantModelClient | null): void { override = c; }
 
-export const NOT_CONFIGURED_MESSAGE = 'AI is not set up. An owner can add a provider key in Setup.';
+export const NOT_CONFIGURED_MESSAGE = `AI is not set up. ${AI_SETUP_HINT}`;
 
-/** Provider configured? (env or protected Setup). Never returns the key. */
+/** Provider configured? D32: the provider key (env or protected Setup) AND AI_MODEL. Never returns the key. */
 export async function assistantConfigured(db?: Queryable): Promise<boolean> {
+  if (!configuredModel()) return false;
   if (override) return true;
   return (await settingSource('ANTHROPIC_API_KEY', db)) !== null;
 }
 
-/** Resolve the client, or null when no provider is configured (the run is recorded as not_configured). */
+/** Resolve the client, or null when AI is not set up (key or model missing; the run is recorded as not_configured). */
 export async function resolveAssistantClient(): Promise<AssistantModelClient | null> {
+  if (!configuredModel()) return null;
   if (override) return override;
   const key = await getSetting('ANTHROPIC_API_KEY');
   return key ? new AnthropicAssistantClient(key) : null;

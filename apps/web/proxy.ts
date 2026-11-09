@@ -14,6 +14,8 @@ export function proxy(request: NextRequest) {
   });
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-nonce', nonce);
+  // Lets server layouts make routing decisions (e.g. a Help Centre 404) before the response starts streaming.
+  requestHeaders.set('x-relay-pathname', request.nextUrl.pathname);
   requestHeaders.set('Content-Security-Policy', csp);
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set('Content-Security-Policy', csp);

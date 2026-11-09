@@ -7,17 +7,16 @@ import { useSession } from '@/lib/client/session';
 import { useApi } from '@/lib/client/use-api';
 import { useQueryState } from '@/lib/client/hooks';
 import { fmtRelative } from '@/lib/client/format';
-import { api } from '@/lib/client/api';
 import {
-  Badge, Banner, Button, Card, EmptyState, ErrorState, Input, LinkButton, PageHeader, Select, SkeletonRows, Table, Td, Th, THead, Tooltip, Tr, useToast,
+  Badge, Card, EmptyState, ErrorState, Input, LinkButton, PageHeader, Select, SkeletonRows, Table, Td, Th, THead, Tooltip, Tr,
 } from '@/components/ui';
 import { Avatar, GrantChip, StatusBadge, TeamNav, V2_ROLE_LABEL, type MemberView, useTeamHref } from '@/components/team/shared';
 import { HelpLink } from '@/components/help/help-link';
+import { OutgoingTransfers, useOwnershipTransfers } from '@/components/team/outgoing-transfer';
 
 export default function MembersPage() {
   const th = useTeamHref();
-  const { canV2, session, refresh } = useSession();
-  const toast = useToast();
+  const { canV2, session } = useSession();
   const [params, setParams] = useQueryState();
   const [q, setQ] = useState(params.get('q') ?? '');
   const status = params.get('status') ?? '';
@@ -26,27 +25,13 @@ export default function MembersPage() {
   const path = canV2('members.read') ? `/api/members?${new URLSearchParams(Object.entries({ q: params.get('q') ?? '', status, role, team_id: team }).filter(([, v]) => v)).toString()}` : null;
   const { data, error, loading, refetch } = useApi<{ members: MemberView[]; policy_version: number }>(path, { keepPrevious: true });
   const teams = useApi<{ items: Array<{ id: string; name: string }> }>(canV2('teams.read') ? '/api/teams' : null);
-  const transfer = session.v2?.pending_ownership_transfer;
-  const [accepting, setAccepting] = useState(false);
+  // Incoming transfers are accepted / declined from the shell banner (any page, any role); owners see outgoing ones here.
+  const transfers = useOwnershipTransfers(canV2('workspace.transfer_owner'));
 
   const counts = useMemo(() => ({
     active: data?.members.filter((m) => m.status === 'active').length ?? 0,
     suspended: data?.members.filter((m) => m.status === 'suspended').length ?? 0,
   }), [data]);
-
-  const acceptTransfer = async () => {
-    if (!transfer) return;
-    setAccepting(true);
-    try {
-      await api.post(`/api/workspace/ownership-transfers/${transfer.id}/accept`, {});
-      toast.success('You are now the owner');
-      await refresh();
-    } catch (e) {
-      toast.error(e, 'Could not accept');
-    } finally {
-      setAccepting(false);
-    }
-  };
 
   if (!canV2('members.read')) {
     return (<><PageHeader title="Team" /><EmptyState icon={<ShieldAlert aria-hidden />} title="No access" /></>);
@@ -59,10 +44,7 @@ export default function MembersPage() {
           {canV2('members.invite') ? <LinkButton href={th("/team/invitations?new=1")} variant="primary" icon={<UserPlus aria-hidden className="size-4" />}>Invite</LinkButton> : null}
         </>} />
       <TeamNav />
-      {transfer ? (
-        <Banner tone="warn" className="mb-6" title={`${transfer.from_email} wants you to become the owner`}
-          actions={<Button size="sm" variant="primary" loading={accepting} onClick={() => void acceptTransfer()}>Accept ownership</Button>} />
-      ) : null}
+      {transfers.data ? <OutgoingTransfers items={transfers.data.items} onChanged={() => void transfers.refetch()} className="mb-6" /> : null}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <form className="relative min-w-[200px] flex-1" onSubmit={(e) => { e.preventDefault(); setParams({ q: q.trim() || null }); }}>
           <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-subtle" />

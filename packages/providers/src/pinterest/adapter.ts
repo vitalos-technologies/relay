@@ -3,7 +3,7 @@
 //  Video:  prepare = POST /v5/media → multipart POST to upload_url (S3) → GET /v5/media/{id} until succeeded.
 //  publish: POST /v5/pins (publishes:true) → 201 {id}. reconcile: the board's recent Pins.
 import {
-  validateVariant,
+  altOverride, altTextFor, validateVariant,
   type AdapterContext, type AttemptReference, type ChannelCapabilities, type ChannelConstraints, type Checkpoint,
   type ConnectionHealth, type PrepareOutcome, type ProviderCredentials, type PublishConnection, type PublishInput,
   type PublishOutcome, type PublishingAdapter, type ReconcileOutcome, type ValidationIssue, type ValidationResult,
@@ -58,7 +58,7 @@ function capabilities(connection: PublishConnection): ChannelCapabilities {
 function validate(input: Pick<PublishInput, 'variant' | 'media' | 'connection'>): ValidationResult {
   const base = validateVariant({
     provider: 'pinterest', connectionId: input.connection.id, constraints: PINTEREST_CONSTRAINTS,
-    text: input.variant.text, link: input.variant.link, buttons: input.variant.buttons, media: factsOf(input.media), linkIsSeparateField: true,
+    text: input.variant.text, link: input.variant.link, buttons: input.variant.buttons, media: factsOf(input.media), linkIsSeparateField: true, options: input.variant.options,
   });
   const issues: ValidationIssue[] = [...base.issues];
   const add = (field: ValidationIssue['field'], code: string, message: string) => issues.push({ connectionId: input.connection.id, provider: 'pinterest', field, code, message: `Pinterest: ${message}` });
@@ -112,6 +112,9 @@ async function prepare(ctx: AdapterContext, input: PublishInput, checkpoint: Che
 
 export function pinBody(input: PublishInput, checkpoint: Checkpoint | null): Record<string, unknown> | null {
   const o = optsOf(input);
+  // One alt text per Pin (≤ 500, validated): the Pinterest "Alt text" option, else the first image's library alt text (fix H3).
+  const first = input.media[0];
+  const altText = altOverride(o.altText) ?? (first ? altTextFor('pinterest', first) : null);
   const video = input.media.find(isVideoMedia);
   let media_source: Record<string, unknown>;
   if (video) {
@@ -128,7 +131,7 @@ export function pinBody(input: PublishInput, checkpoint: Checkpoint | null): Rec
     ...(o.title ? { title: o.title } : {}),
     ...(input.variant.text ? { description: input.variant.text } : {}),
     ...(input.variant.link ? { link: input.variant.link } : {}),
-    ...(o.altText ? { alt_text: o.altText } : {}),
+    ...(altText ? { alt_text: altText } : {}),
     media_source,
   };
 }

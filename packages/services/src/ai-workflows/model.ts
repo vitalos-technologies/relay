@@ -6,9 +6,9 @@
 import type { AssistantTask, SourceKind, SuggestionItem } from '@social-lite/core/contracts/v35-ai';
 import { AppError } from '@social-lite/core';
 import { getPool } from '@social-lite/db';
-import { config } from '../config.js';
 import { log } from '../log.js';
-import { costEstimateUsd, reserveTokens } from '../ai/usage.js';
+import { reserveTokens } from '../ai/usage.js';
+import { costEstimateUsd, requireModel } from '../ai/models.js';
 import { releaseUsage, settleUsage } from '../product/budgets.js';
 import { resolveAssistantClient, type AssistantModelOutput } from '../assistant/client.js';
 import { checkOutput, countInjections, quoteData, verifyQuote } from '../assistant/guard.js';
@@ -66,7 +66,7 @@ export async function callModel(s: StepCtx, p: { usageTask: AssistantTask; task:
     if (err instanceof AppError && err.code === 'entitlement_required') throw new RunStop('entitlement', err.message);
     throw err;
   }
-  const model = config().AI_MODEL;
+  const model = requireModel(); // the client resolved, so AI_MODEL is set
   const t0 = Date.now();
   let res;
   try {
@@ -76,7 +76,8 @@ export async function callModel(s: StepCtx, p: { usageTask: AssistantTask; task:
     throw err instanceof AppError ? err : new AppError('provider_error', 'The AI provider is unavailable. Try again shortly.');
   }
   const served = res.model || model;
-  const cost = costEstimateUsd(served, res.inputTokens, res.outputTokens);
+  // Stored for reference (0 when no price is configured); readers compute estimates from tokens × configured prices.
+  const cost = costEstimateUsd(served, res.inputTokens, res.outputTokens) ?? 0;
   await settleUsage(reservation.id, res.inputTokens + res.outputTokens).catch(() => undefined);
   const db = getPool();
   await db.query(

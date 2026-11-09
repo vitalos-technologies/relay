@@ -5,13 +5,13 @@
 //  publish: POST /2/tweets {text (link appended), media:{media_ids}}.
 //  reconcile: GET /2/users/:id/tweets around the send time (each call is a BILLABLE read).
 import {
-  TransportError, composeTextWithLink, validateVariant,
+  TransportError, altTextFor, composeTextWithLink, validateVariant,
   type AdapterContext, type AttemptReference, type ChannelCapabilities, type ChannelConstraints, type Checkpoint,
   type ConnectionHealth, type PrepareOutcome, type ProviderCredentials, type PublishConnection, type PublishInput,
   type PublishOutcome, type PublishingAdapter, type ReconcileOutcome, type ValidationResult,
 } from '@social-lite/core';
 import { XApiError, accessTokenFrom, classifyXError, xCall } from './api.js';
-import { mediaIdsFrom, needsMediaFlow, prepareMedia } from './media.js';
+import { mediaIdsFrom, needsMediaFlow, prepareMedia, setAltText } from './media.js';
 import { X_REQUIRED_SCOPES, refreshXCredentials } from './oauth.js';
 
 export const X_CONSTRAINTS_VERSION = 'x-api-v2@2026-11-06';
@@ -64,7 +64,9 @@ export function xPostUrl(connection: PublishConnection, id: string): string | nu
 function capabilities(): ChannelCapabilities {
   return {
     provider: 'x', formats: ['text', 'image', 'album', 'video'], canPublish: true, canEditPublished: false, canDeletePublished: false,
-    canReadMetrics: false, canReconcile: true, constraints: X_CONSTRAINTS, constraintsVersion: X_MEDIA_CONSTRAINTS_VERSION,
+    // Fix H7: public post metrics are read (x/metrics.ts, tweet.read — always granted); each read is billable and
+    // metered on the workspace x.read budget, so collection stops while that budget is exhausted.
+    canReadMetrics: true, canReconcile: true, constraints: X_CONSTRAINTS, constraintsVersion: X_MEDIA_CONSTRAINTS_VERSION,
     checkedAt: new Date().toISOString(),
   };
 }
@@ -75,7 +77,7 @@ function validate(input: Pick<PublishInput, 'variant' | 'media' | 'connection'>)
     text: input.variant.text, link: input.variant.link, buttons: input.variant.buttons,
     media: input.media.map((m) => ({
       assetId: m.assetId, status: 'ready', mime: m.mime, bytes: m.bytes, width: m.width, height: m.height,
-      kind: m.kind, durationMs: m.durationMs, videoCodec: m.videoCodec, audioCodec: m.audioCodec, frameRate: m.frameRate,
+      kind: m.kind, durationMs: m.durationMs, videoCodec: m.videoCodec, audioCodec: m.audioCodec, frameRate: m.frameRate, altText: m.altText,
     })),
   });
 }
@@ -122,14 +124,21 @@ async function prepare(ctx: AdapterContext, input: PublishInput, checkpoint: Che
   const mediaId = typeof checkpoint?.data.mediaId === 'string' ? checkpoint.data.mediaId : null;
   const expiresAt = checkpoint?.expiresAt ?? (typeof checkpoint?.data.expiresAt === 'string' ? checkpoint.data.expiresAt : null);
   const stillValid = !!mediaId && (!expiresAt || Date.parse(expiresAt) - nowMs > 5 * 60_000);
+  // Library alt text (fix H3): POST /2/media/metadata once the image is ready; `altSet` in the checkpoint avoids repeats.
+  const alt = altTextFor('x', image);
+  const withAlt = async (o: PrepareOutcome): Promise<PrepareOutcome> => {
+    if (o.kind !== 'ready' || !alt || o.checkpoint.data.altSet === true || typeof o.checkpoint.data.mediaId !== 'string') return o;
+    await setAltText(ctx, token, o.checkpoint.data.mediaId, alt);
+    return { kind: 'ready', checkpoint: { ...o.checkpoint, data: { ...o.checkpoint.data, altSet: true } } };
+  };
 
   try {
-    if (stillValid && checkpoint?.step === 'media_ready') return { kind: 'ready', checkpoint };
+    if (stillValid && checkpoint?.step === 'media_ready') return await withAlt({ kind: 'ready', checkpoint });
     if (stillValid && checkpoint?.step === 'media_processing') {
       const r = await xCall<{ data: MediaUploadData }>(ctx, {
         method: 'GET', path: '/2/media/upload', query: { command: 'STATUS', media_id: mediaId! }, bearer: token, op: 'x.media.status',
       });
-      return mediaOutcome(ctx, { ...r.data.data, id: r.data.data?.id ?? mediaId! }, expiresAt);
+      return await withAlt(mediaOutcome(ctx, { ...r.data.data, id: r.data.data?.id ?? mediaId! }, expiresAt));
     }
     let bytes: Uint8Array;
     try {
@@ -144,7 +153,14 @@ async function prepare(ctx: AdapterContext, input: PublishInput, checkpoint: Che
       method: 'POST', path: '/2/media/upload', formData: form, bearer: token, op: 'x.media.upload', timeoutMs: 60_000,
     });
     if (!r.data?.data?.id) return { kind: 'retryable', code: 'x_media_no_id', message: 'X did not return a media id; the upload will be retried.' };
-    return mediaOutcome(ctx, r.data.data, null);
+    const uploaded = mediaOutcome(ctx, r.data.data, null);
+    try {
+      return await withAlt(uploaded);
+    } catch (err) {
+      // Keep the uploaded media id so a retry only repeats the alt-text call.
+      const o = prepareError(err, nowMs);
+      return o.kind === 'retryable' && uploaded.kind === 'ready' ? { ...o, checkpoint: uploaded.checkpoint } : o;
+    }
   } catch (err) {
     return prepareError(err, nowMs);
   }

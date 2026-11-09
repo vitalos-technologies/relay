@@ -11,11 +11,12 @@ import { useSession } from '@/lib/client/session';
 import { useApi } from '@/lib/client/use-api';
 import { fmtRelative } from '@/lib/client/format';
 import {
-  Badge, Banner, Button, Card, CardHeader, ConfirmDialog, Dialog, ErrorNotice, ErrorState, Facts, Field, IconButton, Input, PageHeader, Select,
+  Badge, Banner, Button, Card, CardHeader, ConfirmDialog, Dialog, ErrorNotice, ErrorState, Facts, Field, IconButton, Input, PageHeader, RadioGroup, Select,
   SkeletonRows, Tooltip, useToast,
 } from '@/components/ui';
 import { GRANT_ROLES, GrantChip, ROLE_HINT, StatusBadge, TeamNav, V2_ROLE_LABEL, type MemberView, useTeamHref } from '@/components/team/shared';
 import { HelpLink } from '@/components/help/help-link';
+import { OutgoingTransfers, useOwnershipTransfers } from '@/components/team/outgoing-transfer';
 
 interface Source { grant_id: string; role: string; via: 'direct' | 'team'; team_name: string | null; expires_at: string | null }
 interface PermRow { permission: string; allowed: boolean; reason: string; sources: Source[] }
@@ -54,7 +55,9 @@ export default function MemberPage() {
   const [reason, setReason] = useState('');
   const [reassignTo, setReassignTo] = useState('');
   const isOwnerMe = session.v2?.permissions?.['workspace.transfer_owner'] === true;
-  const reload = () => { void member.refetch(); void access.refetch(); if (manage) void handover.refetch(); };
+  const [keepPrevious, setKeepPrevious] = useState<'admin' | 'none'>('admin');
+  const transfers = useOwnershipTransfers(isOwnerMe);
+  const reload = () => { void member.refetch(); void access.refetch(); if (manage) void handover.refetch(); if (isOwnerMe) void transfers.refetch(); };
 
   if (member.error && !member.data) return <ErrorState error={member.error} onRetry={member.refetch} />;
   if (!member.data) return <SkeletonRows rows={6} />;
@@ -74,7 +77,7 @@ export default function MemberPage() {
   const lifecycle = async () => {
     if (confirm === 'suspend') await api.post(`/api/members/${userId}/suspend`, { reason: reason || null });
     if (confirm === 'reactivate') await api.post(`/api/members/${userId}/reactivate`, {});
-    if (confirm === 'transfer') await api.post('/api/workspace/ownership-transfers', { to_user_id: userId, keep_previous_owner_as: 'admin' });
+    if (confirm === 'transfer') await api.post('/api/workspace/ownership-transfers', { to_user_id: userId, keep_previous_owner_as: keepPrevious });
     if (confirm === 'remove') {
       await apiFetch(`/api/members/${userId}`, { method: 'DELETE', body: { reassign_to: reassignTo || null, reason: reason || null } });
       toast.success('Removed');
@@ -86,6 +89,7 @@ export default function MemberPage() {
     reload();
   };
 
+  const pendingToThem = (transfers.data?.items ?? []).filter((t) => t.to_user_id === userId);
   const direct = m.grants.filter((g) => g.via === 'direct');
   const viaTeams = m.grants.filter((g) => g.via === 'team');
 
@@ -99,11 +103,12 @@ export default function MemberPage() {
               ? <Button icon={<Ban aria-hidden className="size-4" />} onClick={() => setConfirm('suspend')} disabledReason={m.is_owner && !isOwnerMe ? 'Owners only' : undefined}>Suspend</Button>
               : <Button onClick={() => setConfirm('reactivate')}>Reactivate</Button>}
             <Button variant="danger" icon={<UserMinus aria-hidden className="size-4" />} onClick={() => setConfirm('remove')} disabledReason={m.is_owner && !isOwnerMe ? 'Owners only' : undefined}>Remove</Button>
-            {isOwnerMe && !m.is_owner && m.status === 'active' ? <Button icon={<Crown aria-hidden className="size-4" />} onClick={() => setConfirm('transfer')}>Make owner</Button> : null}
+            {isOwnerMe && !m.is_owner && m.status === 'active' && !pendingToThem.length ? <Button icon={<Crown aria-hidden className="size-4" />} onClick={() => { setKeepPrevious('admin'); setConfirm('transfer'); }}>Make owner</Button> : null}
           </>
         ) : null} />
       <TeamNav />
       {m.status === 'suspended' ? <Banner tone="warn" className="mb-6" title="Suspended">{m.status_reason}</Banner> : null}
+      <OutgoingTransfers items={pendingToThem} onChanged={reload} className="mb-6" />
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-6">
@@ -193,7 +198,16 @@ export default function MemberPage() {
             ) : null}
             <Field label="Reason" optional><Input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} /></Field>
           </div>
-        ) : confirm === 'transfer' ? <p className="text-[13px] text-muted">Requires fresh sign-in. They must accept; you stay as admin.</p> : null}
+        ) : confirm === 'transfer' ? (
+          <div className="flex flex-col gap-3 text-[13px]">
+            <p className="text-muted">Requires fresh sign-in. They must accept within 7 days.</p>
+            <RadioGroup name="keep-previous" legend="After they accept, you" value={keepPrevious} onChange={setKeepPrevious}
+              options={[
+                { value: 'admin', label: 'Stay as Admin' },
+                { value: 'none', label: 'Give up your access', description: 'You keep only other roles you already hold, if any.' },
+              ]} />
+          </div>
+        ) : null}
       </ConfirmDialog>
     </>
   );

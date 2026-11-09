@@ -7,6 +7,7 @@ import { getPool, many, one } from '@social-lite/db';
 import type { Ctx } from '../context.js';
 import { requireAction } from '../tenancy.js';
 import { readUsage } from '../ai/usage.js';
+import { costEstimateForTotals } from '../ai/models.js';
 import { assistantConfigured } from '../assistant/client.js';
 import { checkFeature, entitlementsCore } from '../entitlements/resolve.js';
 import { requirePlatform, type PlatformCtx } from '../admin/platform.js';
@@ -19,7 +20,8 @@ export interface AiWorkflowAdminDto {
   features: { ai_drafting: boolean; ai_workflows: boolean; plan: string };
   budget: { period: string; used: number; cap: number; remaining: number };
   runs_7d: { by_status: Record<string, number>; by_workflow: WorkflowAdminRow[] };
-  usage_30d: { tokens: number; cost_estimate_usd: number; model_calls: number };
+  /** cost_estimate_usd at the configured prices (AI_MODEL_PRICES); null when a model used has no configured price. */
+  usage_30d: { tokens: number; cost_estimate_usd: number | null; model_calls: number };
   failures: Array<{ id: string; workflow: AiWorkflow; label: string; status: string; outcome_code: string | null; failed_step: string | null; detail: string | null; requested_by: string | null; created_at: string }>;
   active: number;
 }
@@ -39,7 +41,7 @@ export async function aiWorkflowAdmin(ctx: Ctx): Promise<AiWorkflowAdminDto> {
     assistantConfigured(db), readUsage(ws, db), entitlementsCore(db, ws),
     many<{ status: string; n: number }>(db, `SELECT status, count(*)::int n FROM ai_runs WHERE workspace_id=$1 AND kind='workflow' AND created_at > now() - interval '7 days' GROUP BY status`, [ws]),
     many<Omit<WorkflowAdminRow, 'label'>>(db, byWorkflowSql('AND workspace_id=$1'), [ws]),
-    one<{ tokens: number; cost: number; calls: number }>(db, `SELECT coalesce(sum(input_tokens + output_tokens), 0)::int tokens, coalesce(sum(cost_estimate_usd), 0)::float8 cost, count(*)::int calls FROM ai_usage WHERE workspace_id=$1 AND created_at > now() - interval '30 days'`, [ws]),
+    many<{ model: string | null; input_tokens: number; output_tokens: number; calls: number }>(db, `SELECT model, coalesce(sum(input_tokens), 0)::int input_tokens, coalesce(sum(output_tokens), 0)::int output_tokens, count(*)::int calls FROM ai_usage WHERE workspace_id=$1 AND created_at > now() - interval '30 days' GROUP BY model`, [ws]),
     many<{ id: string; task: AiWorkflow; status: string; outcome_code: string | null; status_detail: string | null; step: string | null; who: string | null; created_at: Date }>(db,
       `SELECT r.id, r.task, r.status, r.outcome_code, r.status_detail, r.created_at, coalesce(u.name, u.email) AS who,
               (SELECT s.label FROM ai_run_steps s WHERE s.run_id=r.id AND s.status IN ('failed','not_configured') ORDER BY s.seq LIMIT 1) AS step
@@ -52,7 +54,7 @@ export async function aiWorkflowAdmin(ctx: Ctx): Promise<AiWorkflowAdminDto> {
     features: { ai_drafting: checkFeature(core, 'ai_drafting', { paid: true }).ok, ai_workflows: checkFeature(core, 'ai_workflows', { paid: true }).ok, plan: core.plan?.name ?? 'No plan' },
     budget,
     runs_7d: { by_status: Object.fromEntries(status.map((s) => [s.status, s.n])), by_workflow: wf.map((w) => ({ ...w, label: WORKFLOW_LABEL[w.workflow] ?? w.workflow })) },
-    usage_30d: { tokens: usage.tokens, cost_estimate_usd: usage.cost, model_calls: usage.calls },
+    usage_30d: { tokens: usage.reduce((n, r) => n + r.input_tokens + r.output_tokens, 0), cost_estimate_usd: costEstimateForTotals(usage), model_calls: usage.reduce((n, r) => n + r.calls, 0) },
     failures: failures.map((f) => ({ id: f.id, workflow: f.task, label: WORKFLOW_LABEL[f.task] ?? f.task, status: f.status, outcome_code: f.outcome_code, failed_step: f.step, detail: f.status_detail, requested_by: f.who, created_at: f.created_at.toISOString() })),
     active: active.n,
   };

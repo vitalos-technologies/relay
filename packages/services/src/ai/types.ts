@@ -57,7 +57,8 @@ export interface AiStatus {
   configured: boolean;
   reason: string | null;
   fixture: boolean;
-  model: string;
+  /** Configured model id (AI_MODEL), or null when AI is not set up. */
+  model: string | null;
   can_use: boolean;
   period: string;
   used: number;

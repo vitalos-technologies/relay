@@ -3,17 +3,38 @@
 // contract, diagnose; create an external task from a case with the outbound preview (no customer messages leave Relay);
 // translation off until enabled with the billing acknowledgement, then a labelled machine translation with the original
 // kept; the Slack link page refuses an invalid token; the phone hub (@mobile).
+// L9: the spec owns its state. Before and after the file it disconnects every live simulated Asana installation in the
+// E2E workspace (other specs or earlier runs can leave one revoked or with a failure scenario) and switches translation
+// off, so it passes alone, after the specs that precede it, and run after run.
 import { randomUUID } from 'node:crypto';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Browser, type Page } from '@playwright/test';
 import { api, demoBrand, signIn, type Api } from './helpers';
 
 const OWNER = 'owner@demo.social-lite.test';
 const PAGE_NAME = 'E2E Integrations Page (simulated)';
 
+/** Reset what this spec depends on (as the owner, through the real API). */
+async function resetIntegrationState(browser: Browser) {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  try {
+    await signIn(page, OWNER);
+    const a = await api(page);
+    const hub = (await a.get('/api/connectors/hub')).body as { connectors: Array<{ connector: string; installations: Array<{ id: string; is_simulated: boolean; disconnected_at: string | null }> }> };
+    for (const c of hub.connectors.filter((x) => x.connector === 'asana')) {
+      for (const i of c.installations.filter((x) => x.is_simulated && !x.disconnected_at)) expect((await a.send('DELETE', `/api/connectors/hub/${i.id}`)).status).toBeLessThan(300);
+    }
+    const tr = hub.connectors.find((x) => x.connector === 'google_translate')?.installations.some((x) => !x.disconnected_at);
+    if (tr) await a.send('PUT', '/api/connectors/translate/settings', { enabled: false, allow_customer_content: false, monthly_char_cap: 100000, glossary_id: null });
+  } finally {
+    await ctx.close();
+  }
+}
+
 async function caseConversation(a: Api): Promise<{ name: string; id: string }> {
   const brand = await demoBrand(a, /Vitalos/);
-  const existing = (await a.get('/api/inbox/channels')).body.items as Array<{ id: string; display_name: string }>;
-  let ch = existing.find((c) => c.display_name === PAGE_NAME)?.id;
+  const existing = (await a.get('/api/inbox/channels')).body.items as Array<{ id: string; display_name: string; status: string }>;
+  let ch = existing.find((c) => c.display_name === PAGE_NAME && c.status === 'active')?.id;
   if (!ch) {
     const conn = await a.send('POST', `/api/brands/${brand.id}/connections/mock`, { provider: 'facebook', display_name: PAGE_NAME });
     ch = (await a.send('POST', '/api/inbox/channels', { connection_id: conn.body.id })).body.id;
@@ -33,6 +54,8 @@ async function ensureSimulated(page: Page, a: Api, connector: string, brandId: s
 
 test.describe('Integrations', () => {
   test.describe.configure({ timeout: 240_000 });
+  test.beforeAll(async ({ browser }) => { await resetIntegrationState(browser); });
+  test.afterAll(async ({ browser }) => { await resetIntegrationState(browser); });
 
   test('hub honesty, simulated Asana install, explicit project choice, sync contract, diagnose', async ({ page }) => {
     await signIn(page, OWNER);

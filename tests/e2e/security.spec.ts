@@ -325,6 +325,14 @@ test.describe('identity & security (Keycloak)', () => {
     expect((await me.json()).grants).toEqual([{ role: 'integration', scope: 'brand', brand_id: vitalos.id }]);
     const draft = await call('POST', '/api/v1/drafts', { brand_id: vitalos.id, text: 'Drafted by an API key' });
     expect(draft.status()).toBe(200);
+    // M23: an Idempotency-Key makes a retried request return the same draft; a different body with that key is refused.
+    const idem = (body: unknown, k: string) => page.request.fetch('/api/v1/drafts', { method: 'POST', headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json', 'idempotency-key': k }, data: JSON.stringify(body) });
+    const k = `e2e-retry-${Date.now()}`;
+    const d1 = await idem({ brand_id: vitalos.id, text: 'Retried once' }, k);
+    const d2 = await idem({ brand_id: vitalos.id, text: 'Retried once' }, k);
+    expect([d1.status(), d2.status()]).toEqual([200, 200]);
+    expect((await d2.json()).id).toBe((await d1.json()).id);
+    expect((await idem({ brand_id: vitalos.id, text: 'Something else' }, k)).status()).toBe(409);
     expect((await call('POST', '/api/v1/drafts', { brand_id: other.id, text: 'x' })).status()).toBe(403);
     // Session-cookie routes ignore API keys entirely (no cookie ⇒ 401), so a key can never reach publish.
     const anon = await page.context().browser()!.newContext();

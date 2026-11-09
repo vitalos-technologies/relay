@@ -245,7 +245,7 @@ export async function executeWorkflowRun(runId: string, workerId: string): Promi
       await setStep(step.id, { status: 'succeeded', detail: out.detail ?? null, result, finish: true });
     } catch (err) {
       if (err instanceof NotConfigured) {
-        await setStep(step.id, { status: 'not_configured', detail: 'AI is not set up. An owner can add a provider key in Setup.', finish: true });
+        await setStep(step.id, { status: 'not_configured', detail: 'AI is not set up. An owner can set the provider key and model in Setup.', finish: true });
         await emit(`${d.label}: AI is not set up, so this step was skipped.`, 'warn', step.key);
         state.__not_configured = true;
         continue;
@@ -325,7 +325,7 @@ export async function finalize(r: Pick<WfRunRow, 'id' | 'workspace_id' | 'brand_
   } else if (o.notConfigured) {
     code = 'not_configured';
     status = c.results > 0 ? 'partially_completed' : 'failed';
-    detail = status === 'partially_completed' ? 'AI is not set up: Relay completed the data steps; AI-written parts were skipped.' : 'AI is not set up. An owner can add a provider key in Setup.';
+    detail = status === 'partially_completed' ? 'AI is not set up: Relay completed the data steps; AI-written parts were skipped.' : 'AI is not set up. An owner can set the provider key and model in Setup.';
   } else if (o.partial) {
     status = 'partially_completed'; code = 'step_failed';
     detail = 'Some items could not be completed. See the results.';

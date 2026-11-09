@@ -4,7 +4,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { renderHelpMarkdown, type RenderedHelp, type RenderOptions } from './markdown.js';
 import {
-  HELP_SECTIONS, SLUG_RE, canRead, parseFrontMatter, type HelpAudience, type HelpFrontMatter, type HelpSectionId,
+  HELP_SECTIONS, SLUG_RE, canRead, isHelpSection, parseFrontMatter, type HelpAudience, type HelpFrontMatter, type HelpSectionId,
 } from './schema.js';
 
 export interface HelpArticle extends HelpFrontMatter {
@@ -111,6 +111,33 @@ export function articleFor(lib: HelpLibrary, slug: string, audiences: readonly H
   const a = lib.bySlug.get(slug);
   if (!a) return { article: null, hidden: false };
   return canRead(audiences, a.audience) ? { article: a, hidden: false } : { article: null, hidden: true };
+}
+
+/**
+ * Server-side routing decision for a Help Centre path, made BEFORE anything streams so the HTTP status is real (M18:
+ * signed-in readers' pages render inside a client shell, where a page-level notFound() arrived after a 200 had been
+ * sent). Mirrors the article and section pages: unknown or out-of-audience articles and unknown sections are a 404 —
+ * except a member-only article for a signed-out reader, which renders the sign-in prompt — and non-canonical article
+ * URLs redirect. Returns null for paths it doesn't own.
+ */
+export type HelpPathDecision = { kind: 'ok' } | { kind: 'not_found' } | { kind: 'redirect'; href: string; permanent: boolean };
+export function helpPathDecision(lib: HelpLibrary, pathname: string, viewer: { signedIn: boolean; audiences: readonly HelpAudience[] }): HelpPathDecision | null {
+  const m = /^\/help\/([^/]+)(?:\/([^/]+))?\/?$/.exec(pathname);
+  if (!m) return null;
+  let section: string; let slug: string | undefined;
+  try { section = decodeURIComponent(m[1]!); slug = m[2] === undefined ? undefined : decodeURIComponent(m[2]); } catch { return { kind: 'not_found' }; }
+  if (slug === undefined) {
+    // /help/contact and /help/requests live in the (app) group; they aren't Help Centre sections.
+    if (section === 'contact' || section === 'requests') return null;
+    return isHelpSection(section) ? { kind: 'ok' } : { kind: 'not_found' };
+  }
+  if (section === 'requests') return null; // /help/requests/<ref> (support requests, app group)
+  const { article, hidden } = articleFor(lib, slug, viewer.audiences);
+  if (!article) return hidden && !viewer.signedIn ? { kind: 'ok' } : { kind: 'not_found' };
+  if (section === article.section) return { kind: 'ok' };
+  if (section === 'article') return { kind: 'redirect', href: article.href, permanent: false };
+  if (!isHelpSection(section)) return { kind: 'not_found' };
+  return { kind: 'redirect', href: article.href, permanent: true };
 }
 
 export interface HelpSectionView { id: HelpSectionId; title: string; description: string; icon: string; articles: HelpArticle[] }

@@ -6,14 +6,16 @@ import { useSession } from '@/lib/client/session';
 import { Button, ConfirmDialog, Field, IconButton, Textarea, useToast } from '@/components/ui';
 import { HelpLink } from '@/components/help/help-link';
 
-/** Workspace-wide emergency pause (pause.emergency). Checked at dispatch time by the worker (SC-05). */
+/** Workspace-wide emergency pause (publishing.pause) and resume (publishing.resume). Checked at dispatch time by the worker (SC-05). */
 export function EmergencyPause({ variant = 'sidebar' }: { variant?: 'sidebar' | 'banner' | 'rail' }) {
-  const { session, can, refresh } = useSession();
+  const { session, canV2, refresh } = useSession();
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState('');
-  if (!session.workspace || !can('pause.emergency')) return null;
+  if (!session.workspace) return null;
   const paused = session.workspace.publishing_paused;
+  // Separate permissions: a pause-only role (Approver) sees no Resume control (the server enforces it too).
+  if (!canV2(paused ? 'publishing.resume' : 'publishing.pause')) return null;
 
   const submit = async () => {
     await api.post('/api/workspace/pause', paused ? { paused: false } : { paused: true, reason: reason.trim() || undefined });

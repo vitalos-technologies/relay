@@ -151,6 +151,25 @@ test.describe('Inbox — remaining networks', () => {
     await expect(d.getByRole('button', { name: 'Send (charged)' })).not.toHaveAttribute('aria-disabled', 'true');
   });
 
+  test('WhatsApp: a utility template inside the 24 h window is charged (Meta, since 2026-10-01) and needs the acknowledgement (H2)', async ({ page }) => {
+    await signIn(page, OWNER);
+    const a = await api(page);
+    const ch = await integrationChannel(a, 'whatsapp');
+    const name = `Uma ${tag()}`;
+    expect((await a.send('POST', `/api/inbox/channels/${ch}/simulate`, { kind: 'dm', name, text: 'Order status?' })).status).toBe(200);
+    await open(page, name);
+    await page.getByRole('button', { name: 'Template', exact: true }).click();
+    const d = page.getByRole('dialog', { name: 'Send a WhatsApp template' });
+    await d.getByLabel('Template').selectOption({ label: 'order_update · en · utility' });
+    await d.getByLabel(/^Value 1/).fill('Uma');
+    await d.getByLabel(/^Value 2/).fill('#7');
+    await expect(d.getByText('This message is charged', { exact: true })).toBeVisible();
+    await expect(d.getByText(/utility rate/)).toBeVisible();
+    await expect(d.getByRole('button', { name: 'Send (charged)' })).toHaveAttribute('aria-disabled', 'true');
+    await d.getByLabel('I understand this message is charged').check();
+    await expect(d.getByRole('button', { name: 'Send (charged)' })).not.toHaveAttribute('aria-disabled', 'true');
+  });
+
   test('phone: Google review, internal note with mention and Add channel dialog fit 390 px @mobile', async ({ page }, info) => {
     test.skip(info.project.name !== 'mobile', 'phone layout only');
     await signIn(page, OWNER);

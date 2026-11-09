@@ -44,7 +44,7 @@ export default function AdminAiPage() {
                 </div>
                 <dl className="grid grid-cols-2 gap-3">
                   <div><dt className="text-muted">Tokens (30 days)</dt><dd className="tabular">{data.ai.tokens_30d.toLocaleString()}</dd></div>
-                  <div><dt className="text-muted">Estimated cost (30 days)</dt><dd className="tabular">${data.ai.cost_estimate_usd_30d.toFixed(2)}</dd></div>
+                  <div><dt className="text-muted">Estimated cost (30 days)</dt><dd className="tabular">{data.ai.cost_estimate_usd_30d === null ? <span className="text-muted">Unknown · prices not set</span> : `$${data.ai.cost_estimate_usd_30d.toFixed(2)}`}</dd></div>
                   <div><dt className="text-muted">Median time (7 days)</dt><dd className="tabular">{data.ai.median_latency_ms_7d === null ? '—' : `${(data.ai.median_latency_ms_7d / 1000).toFixed(1)} s`}</dd></div>
                   <div><dt className="text-muted">Approved knowledge</dt><dd className="tabular">{data.ai.knowledge_sources.approved}{data.ai.knowledge_sources.stale ? ` · ${data.ai.knowledge_sources.stale} past review` : ''}</dd></div>
                 </dl>

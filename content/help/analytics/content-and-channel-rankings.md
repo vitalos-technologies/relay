@@ -49,14 +49,14 @@ higher; use the network filter for like-for-like rankings.
 
 **Analytics → Channels** ([/analytics/channels](/analytics/channels)) shows one row per account:
 
-![Channels view with demo data: four accounts with posts, followers, change, views, impressions and reach, and an engagements comparison with each account's share](/help/img/analytics/analytics-channels.png)
+![Channels view with demo data: four accounts with posts, followers, change, engagements, views, impressions and reach, and an engagements comparison with the same totals and each account's share](/help/img/analytics/analytics-channels.png)
 
 | Column | Meaning |
 |---|---|
 | Posts | Posts published to this account in the period |
 | Followers | Latest follower snapshot (— in live data: not read from networks yet) |
 | Change | Latest minus earliest snapshot in the period (needs at least two snapshots) |
-| Engagements, Views, Impressions, Reach | Lifetime totals of posts published in the period; — when the network doesn't report it. **Known issue:** the Engagements column currently always shows —; use the engagements comparison below the table |
+| Engagements, Views, Impressions, Reach | Lifetime totals of posts published in the period, the same totals as the comparison below the table (Engagements adds up the network's engagement metrics; Reach adds up per-post unique counts); — when the network doesn't report it, nothing was fetched, or no post has data. Shown on wide screens. |
 
 ### Comparison groups
 

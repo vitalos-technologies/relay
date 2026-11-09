@@ -26,13 +26,13 @@ import { runSupportAssist } from '@social-lite/services/support/ai';
 import { autoArchiveResolved, sweepSupportAccessExpiry } from '@social-lite/services/support/sweeps';
 import { setBillingStateSourceForTests, stubBillingState } from '@social-lite/services/entitlements/source';
 import { entitlementsCore, invalidateEntitlements, requireEntitlement } from '@social-lite/services/entitlements/resolve';
-import { addMember, closeTestPool, createUser, createWorkspace, testPool, v2Ctx } from './helpers.js';
+import { addMember, closeTestPool, createUser, createWorkspace, testPool, v2Ctx, useTestModel, clearTestModel } from './helpers.js';
 
 const db = () => testPool();
 const key = () => randomUUID();
 
-beforeAll(async () => { testPool(); await ensureBucket(); });
-afterAll(async () => { setAssistantModelClient(null); setBillingStateSourceForTests(null); await closeTestPool(); });
+beforeAll(async () => { testPool(); useTestModel(); await ensureBucket(); });
+afterAll(async () => { setAssistantModelClient(null); setBillingStateSourceForTests(null); clearTestModel(); await closeTestPool(); });
 
 async function staff(role: 'operator' | 'support' | 'billing' = 'support'): Promise<PlatformCtx> {
   const u = await createUser(`staff-${randomUUID().slice(0, 8)}@relay.test`, `Sam ${role}`);
@@ -457,6 +457,10 @@ describe('staff AI assistance (§16)', () => {
         proposed: [{ kind: 'set_status', value: 'resolved' }] as never, answerable: true, uncertainty: '' }, stopReason: 'end_turn', model: 'fake', inputTokens: 10, outputTokens: 5 };
     } };
     setAssistantModelClient(fake);
+    clearTestModel(); // D32: provider without AI_MODEL ⇒ still not configured, nothing sent to a model
+    expect((await runSupportAssist(s, t.reference, { task: 'draft_reply' })).state).toBe('not_configured');
+    expect(seen).toHaveLength(0);
+    useTestModel();
     const draft = await runSupportAssist(s, t.reference, { task: 'draft_reply' });
     expect(draft).toMatchObject({ state: 'succeeded', draft: 'Your refund has been issued.', draft_only: true });
     expect(draft.message).toMatch(/Check before sending/);

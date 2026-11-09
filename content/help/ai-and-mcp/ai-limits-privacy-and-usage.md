@@ -34,5 +34,5 @@ keywords: [ai budget, tokens, privacy, data retention, ai usage, limits]
 | Steps, progress lines, IDs, counts, usage and audit entries | Kept |
 | Your assistant conversations | Private to you |
 
-Prompts aren't written to logs. Admins see usage, costs and failures (**Admin console → AI and automation**), never
+Prompts aren't written to logs. Admins see usage, cost estimates (shown as unknown until the installation sets model prices) and failures (**Admin console → AI and automation**), never
 prompts or content.

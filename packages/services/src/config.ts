@@ -4,6 +4,37 @@ import { z } from 'zod';
 
 const bool = z.enum(['true', 'false', '1', '0']).transform((v) => v === 'true' || v === '1');
 
+// AI model settings (D32): model ids and prices are deployment settings, never values in code. Messages never echo values.
+const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}$/;
+const blankToUndefined = (v: unknown) => (typeof v === 'string' && v.trim() === '' ? undefined : typeof v === 'string' ? v.trim() : v);
+const MODEL_ID_HINT = 'must be a single model id (letters, digits, . _ : @ / -; no spaces)';
+function parseModelList(v: string | undefined, ctx: z.RefinementCtx): string[] {
+  const ids = (v ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+  if (ids.some((id) => !MODEL_ID.test(id))) ctx.addIssue({ code: 'custom', message: 'must be a comma-separated list of model ids (no spaces inside an id)' });
+  return [...new Set(ids)];
+}
+/** USD per million tokens [input, output] by model id. */
+export type AiModelPrices = Record<string, [number, number]>;
+function parseModelPrices(v: string | undefined, ctx: z.RefinementCtx): AiModelPrices {
+  if (v === undefined) return {};
+  let parsed: unknown;
+  try { parsed = JSON.parse(v); } catch {
+    ctx.addIssue({ code: 'custom', message: 'must be JSON like {"<model id>": [input USD per million tokens, output USD per million tokens]}' });
+    return {};
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    ctx.addIssue({ code: 'custom', message: 'must be a JSON object keyed by model id' });
+    return {};
+  }
+  const out: AiModelPrices = {};
+  for (const [id, price] of Object.entries(parsed as Record<string, unknown>)) {
+    const ok = MODEL_ID.test(id) && Array.isArray(price) && price.length === 2 && price.every((n) => typeof n === 'number' && Number.isFinite(n) && n >= 0);
+    if (!ok) { ctx.addIssue({ code: 'custom', message: 'each entry must be "<model id>": [input, output] with two non-negative numbers (USD per million tokens)' }); return {}; }
+    out[id] = [price[0] as number, price[1] as number];
+  }
+  return out;
+}
+
 const schema = z.object({
   APP_ENV: z.enum(['development', 'test', 'production']).default('development'),
   APP_BASE_URL: z.string().url().default('http://localhost:3000'),
@@ -38,7 +69,12 @@ const schema = z.object({
   TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
   TIPSIGNAL_SIGNING_SECRET: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
-  AI_MODEL: z.string().default('claude-opus-5-5'),
+  // No default: AI is enabled only when the provider key AND AI_MODEL are set (otherwise "AI is not set up").
+  AI_MODEL: z.preprocess(blankToUndefined, z.string().regex(MODEL_ID, MODEL_ID_HINT).optional()),
+  // Optional: model ids for which Relay asks the provider for its server-side refusal fallback.
+  AI_FALLBACK_MODELS: z.preprocess(blankToUndefined, z.string().optional()).transform(parseModelList),
+  // Optional: JSON price table; without a price for a model its cost estimate is shown as unknown (never guessed).
+  AI_MODEL_PRICES: z.preprocess(blankToUndefined, z.string().optional()).transform(parseModelPrices),
   // Deterministic, clearly labelled AI suggestions for demos/tests. Forbidden in production.
   AI_FIXTURE: bool.default(false),
   WORKER_ID: z.string().optional(),
@@ -54,7 +90,8 @@ export class ConfigError extends Error {}
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsed = schema.safeParse(env);
   if (!parsed.success) {
-    const fields = parsed.error.issues.map((i) => i.path.join('.')).join(', ');
+    // Field names plus Relay-written reasons only; values are never echoed (they may be secrets).
+    const fields = parsed.error.issues.map((i) => (i.code === 'custom' || i.code === 'invalid_format' ? `${i.path.join('.')} ${i.message}` : i.path.join('.'))).join(', ');
     throw new ConfigError(`Invalid configuration: ${fields}`);
   }
   const c = parsed.data;

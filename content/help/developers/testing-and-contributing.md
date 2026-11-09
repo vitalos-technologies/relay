@@ -33,6 +33,9 @@ keywords: [tests, testing, vitest, playwright, ci, contributing, pull request, c
 - Global setup seeds an isolated "E2E Workspace" (`scripts/seed-e2e.ts`) so test data never lands in the demo workspace; `E2E_SKIP_SEED=1` skips seeding.
 - `tests/e2e/helpers.ts` signs in through the real Keycloak flow (`signIn`) and calls the API from inside the signed-in page with the session's CSRF token (`api`).
 - Point the suite at another server with `E2E_BASE_URL`. One worker at a time (`workers: 1`) because the tests share seeded data.
+- Each spec sets up, and afterwards removes, the state it depends on (for example `integrations.spec.ts` disconnects
+  leftover simulated installations and switches translation off before and after it runs), so it passes alone, in the
+  full suite and on repeated runs.
 
 ## Continuous integration
 

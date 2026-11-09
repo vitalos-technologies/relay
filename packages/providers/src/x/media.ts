@@ -10,14 +10,22 @@
 //   { step: 'media_uploading' | 'media_processing' | 'media_ready',
 //     data: { items: [{ assetId, mediaId, state: 'uploading'|'finalizing'|'processing'|'ready', nextSegment?, expiresAt }], mediaIds } }
 // Resume continues a video upload from its next segment and never re-uploads a ready item.
-import { TransportError, type AdapterContext, type Checkpoint, type PrepareOutcome, type PublishInput } from '@social-lite/core';
+import { TransportError, altTextFor, type AdapterContext, type Checkpoint, type PrepareOutcome, type PublishInput } from '@social-lite/core';
 import { XApiError, xCall } from './api.js';
 
 export const VIDEO_SEGMENT_BYTES = 4 * 1024 * 1024;
 const EXPIRY_MARGIN_MS = 5 * 60_000;
 
 type ItemState = 'uploading' | 'finalizing' | 'processing' | 'ready';
-export interface XMediaItem { assetId: string; mediaId: string; state: ItemState; nextSegment?: number; expiresAt: string | null; video: boolean }
+export interface XMediaItem { assetId: string; mediaId: string; state: ItemState; nextSegment?: number; expiresAt: string | null; video: boolean; altSet?: boolean }
+
+/**
+ * Library alt text → POST /2/media/metadata (fix H3; docs.x.com "Create Media metadata", ≤ 1,000 chars, media.write).
+ * Invisible (no post exists yet), so retrying is safe. Listed price: $0.005 per request (images with alt text only).
+ */
+export async function setAltText(ctx: AdapterContext, token: string, mediaId: string, text: string): Promise<void> {
+  await xCall(ctx, { method: 'POST', path: '/2/media/metadata', json: { id: mediaId, metadata: { alt_text: { text } } }, bearer: token, op: 'x.media.metadata', timeoutMs: 30_000 });
+}
 
 interface UploadData {
   id?: string;
@@ -171,5 +179,18 @@ export async function prepareMedia(ctx: AdapterContext, input: PublishInput, tok
     }
   }
   if (checkAfter !== null) return { kind: 'pending', checkpoint: checkpoint(items), checkAfterMs: checkAfter };
+  // Alt text once every item is ready; progress is checkpointed per item (altSet) so a retry never repeats a call.
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i]!;
+    const text = it.video || it.altSet ? null : altTextFor('x', input.media[i]!);
+    if (!text) continue;
+    try {
+      await setAltText(ctx, token, it.mediaId, text);
+    } catch (err) {
+      if (err instanceof TransportError || err instanceof XApiError) return withCp(onError(err));
+      return { kind: 'retryable', code: 'unexpected', message: 'Unexpected error while adding alt text on X; it will be retried.', checkpoint: checkpoint(items) };
+    }
+    items[i] = { ...it, altSet: true };
+  }
   return { kind: 'ready', checkpoint: checkpoint(items) };
 }

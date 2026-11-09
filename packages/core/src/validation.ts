@@ -2,6 +2,7 @@
 import { countHashtags, countMentions, measure, composeTextWithLink } from './text.js';
 import type { ChannelConstraints, MediaFormat, MediaKind, Provider, ResolvedVariant, ValidationIssue, ValidationResult, DraftContent, UrlButton } from './types.js';
 import { PROVIDER_LABEL } from './types.js';
+import { altTextTooLong } from './alt-text.js';
 
 export interface MediaFacts {
   assetId: string;
@@ -17,6 +18,8 @@ export interface MediaFacts {
   videoCodec?: string | null;
   audioCodec?: string | null;
   frameRate?: number | null;
+  /** Library alt text (fix H3): checked against the network's alt-text limit. */
+  altText?: string | null;
 }
 
 /** Media kind from an explicit kind or the MIME type. */
@@ -47,6 +50,8 @@ export interface ValidateVariantInput {
   media: MediaFacts[];
   /** true when the link is sent as a separate field (Facebook feed link); otherwise appended to text. */
   linkIsSeparateField?: boolean;
+  /** variant.options (fix H3: a Pinterest "Alt text" option replaces the library alt text). */
+  options?: Record<string, unknown>;
 }
 
 const URL_RE = /^https:\/\/[^\s/$.?#].[^\s]*$/i;
@@ -157,6 +162,9 @@ export function validateVariant(v: ValidateVariantInput): ValidationResult {
       if (c.minAspectRatio && ar < c.minAspectRatio - 0.005) add('media', 'aspect', `image aspect ratio ${ar.toFixed(2)} is too tall (minimum ${c.minAspectRatio.toFixed(2)}, e.g. 4:5). Crop it.`);
       if (c.maxAspectRatio && ar > c.maxAspectRatio + 0.005) add('media', 'aspect', `image aspect ratio ${ar.toFixed(2)} is too wide (maximum ${c.maxAspectRatio.toFixed(2)}, e.g. 1.91:1). Crop it.`);
     }
+  }
+  for (const t of altTextTooLong(v.provider, v.media, v.options)) {
+    add('media', 'alt_text_too_long', `alt text of ${v.media.length > 1 ? `item ${t.index + 1}` : 'the image'} is ${t.length} of ${t.max} characters. Shorten it in the library${v.provider === 'pinterest' ? ' or type a Pinterest alt text' : ''}.`);
   }
   return { ok: issues.length === 0, issues };
 }

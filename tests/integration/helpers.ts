@@ -17,6 +17,20 @@ export function testEnv(): void {
   process.env.S3_BUCKET = 'social-lite-test';
   process.env.SMTP_URL ??= 'smtp://localhost:1025';
   process.env.LOG_LEVEL ??= 'warn';
+  // AI model settings come only from the tests that need them (useTestModel), never from a developer's .env.
+  for (const k of ['AI_MODEL', 'AI_FALLBACK_MODELS', 'AI_MODEL_PRICES']) delete process.env[k];
+  resetConfigCache();
+}
+
+/** D32: AI needs a model setting. Tests that inject a fake client use a placeholder id (never a real model id). */
+export const TEST_MODEL = 'test-model';
+export function useTestModel(): void {
+  process.env.AI_MODEL = TEST_MODEL;
+  resetConfigCache();
+}
+/** Undo useTestModel (the integration project shares one process, so env must not leak into later files). */
+export function clearTestModel(): void {
+  delete process.env.AI_MODEL;
   resetConfigCache();
 }
 

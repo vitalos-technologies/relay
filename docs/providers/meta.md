@@ -174,7 +174,10 @@ with) the variant text. A match gives `published`. Otherwise the result is **`st
   - Anything else gives `still_unknown`.
 
 **Health** (both). The Page or IG lookup uses the Page token and decides `reconnect_required`, because Page tokens outlive the 60-day user
-token. `/me/permissions` uses the user token and lists `missingPermissions`. Transient failures throw `MetaHealthUnavailableError`, so the caller
+token. `/me/permissions` uses the user token and lists `missingPermissions`; the granted list is stored as
+`metadata.granted_scopes` (also at connect), which drives `capabilities.canReadMetrics` (insights permissions granted, or
+unknown; fix H7, 2026-11-09). Alt text (fix H3): library alt text → `alt_text_custom` on Facebook `/photos` (single and
+staged multi-photo) and `alt_text` on Instagram image / carousel-image containers (≤ 1,000; never Reels). Transient failures throw `MetaHealthUnavailableError`, so the caller
 keeps the previous status.
 
 **Connectors.**

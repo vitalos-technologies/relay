@@ -53,7 +53,7 @@ listed but not selectable ("needs Content admin or Administrator role").
 - **Commentary (L6)**: `little` text; reserved `| { } @ [ ] ( ) < > # \ * _ ~` must be backslash-escaped. We escape
   everything except `#word` hashtags.
 - **Images (L3, L5)**: `POST /rest/images?action=initializeUpload {initializeUploadRequest:{owner}}` → `uploadUrl,
-  image`; upload the bytes to `uploadUrl`; < 36,152,320 pixels; JPG/GIF/PNG; multi-image 2–20; `altText` ≤ 4086.
+  image`; upload the bytes to `uploadUrl`; < 36,152,320 pixels; JPG/GIF/PNG; multi-image 2–20; `altText` ≤ 4086 (sent from `options.linkedin.altTexts[i]`, else the library alt text; fix H3).
   Tokens with only `w_member_social` cannot GET `/rest/images` → member images are not polled.
 - **Videos (L4)**: MP4, 3 s – 30 min, 75 KB – 500 MB (5 GB API max). `initializeUpload {owner, fileSizeBytes,
   uploadCaptions:false, uploadThumbnail:false}` → `video, uploadInstructions[{uploadUrl, firstByte, lastByte}],
@@ -85,3 +85,7 @@ send time and matching commentary; members ⇒ manual resolution.
 
 Callback: `<APP_BASE_URL>/api/oauth/linkedin/callback`. Settings: `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`,
 `LINKEDIN_API_VERSION` (default 202610), `LINKEDIN_ORGANIZATIONS`.
+
+**Health (member identity, fix 2026-11-09).** `health()` compares `/v2/userinfo` `sub` with the connection: a live member
+connection must equal `urn:li:person:<sub>`; a simulated (`mock_`) member connection's id is the simulator's `sub`
+itself and is compared as-is (`sameMember()`), so simulated members no longer flip to `reconnect_required`.

@@ -14,7 +14,7 @@ import {
   canCreateWorkspace, createWorkspace as createWorkspaceSvc, sessionInfo, setWorkspacePaused, switchWorkspace, updateWorkspace,
 } from '../../packages/services/src/workspaces.js';
 import { createSession } from '../../packages/services/src/auth/session.js';
-import { addMember, closeTestPool, createBrand, createUser, ctxFor, tenant, testPool, v2Ctx } from './helpers.js';
+import { addMember, closeTestPool, createBrand, createUser, ctxFor, grant, tenant, testPool, v2Ctx } from './helpers.js';
 
 const NF = { code: 'not_found' };
 const FORBIDDEN = { code: 'forbidden' };
@@ -143,26 +143,37 @@ describe('roles', () => {
     expect(await loadAccess(t.owner.id, t.workspaceId, testPool())).toMatchObject({ role: 'admin' });
   });
 
-  it('emergency pause by an approver pauses waiting deliveries in the same transaction and resumes them', async () => {
+  it('emergency pause by an approver pauses waiting deliveries in the same transaction; only publishing.resume resumes them', async () => {
     const db = testPool();
     const t = await tenant();
     const approver = await createUser();
+    const publisher = await createUser();
     await addMember(t.workspaceId, approver.id, 'approver');
+    await addMember(t.workspaceId, publisher.id, 'viewer');
+    await grant(t.workspaceId, publisher.id, 'publisher');
     const ctx = ctxFor(approver.id, t.workspaceId, 'approver');
+    const pubCtx = await v2Ctx(publisher.id, t.workspaceId);
     const deliveryId = await seedDelivery(t.workspaceId, t.brandId);
 
     const paused = await setWorkspacePaused(ctx, { paused: true, reason: 'Incident' });
     expect(paused).toMatchObject({ publishing_paused: true, paused_reason: 'Incident', affected: { paused: 1 } });
     expect((await db.query(`SELECT state FROM deliveries WHERE id=$1`, [deliveryId])).rows[0].state).toBe('paused');
 
-    const resumed = await setWorkspacePaused(ctx, { paused: false });
+    // H5: the Approver preset holds publishing.pause but not publishing.resume (legacy and V2 contexts).
+    await expect(setWorkspacePaused(ctx, { paused: false })).rejects.toMatchObject(FORBIDDEN);
+    await expect(setWorkspacePaused(await v2Ctx(approver.id, t.workspaceId), { paused: false })).rejects.toMatchObject(FORBIDDEN);
+    expect((await db.query(`SELECT publishing_paused FROM workspaces WHERE id=$1`, [t.workspaceId])).rows[0].publishing_paused).toBe(true);
+
+    const resumed = await setWorkspacePaused(pubCtx, { paused: false });
     expect(resumed).toMatchObject({ publishing_paused: false, paused_reason: null, affected: { resumed: 1, expired: 0 } });
     expect((await db.query(`SELECT state FROM deliveries WHERE id=$1`, [deliveryId])).rows[0].state).toBe('scheduled');
 
-    // Brand pause uses the same hooks.
+    // Brand pause uses the same hooks and the same split.
     const b = await setBrandPaused(ctx, t.brandId, { paused: true });
     expect(b.affected).toEqual({ paused: 1 });
-    await setBrandPaused(ctx, t.brandId, { paused: false });
+    await expect(setBrandPaused(ctx, t.brandId, { paused: false })).rejects.toMatchObject(FORBIDDEN);
+    await expect(setBrandPaused(await v2Ctx(approver.id, t.workspaceId), t.brandId, { paused: false })).rejects.toMatchObject(FORBIDDEN);
+    await setBrandPaused(await v2Ctx(publisher.id, t.workspaceId), t.brandId, { paused: false });
     expect((await db.query(`SELECT state FROM deliveries WHERE id=$1`, [deliveryId])).rows[0].state).toBe('scheduled');
     const actions = (await listAudit(t.ownerCtx, { resource_type: 'workspace' })).items.map((e) => e.action);
     expect(actions).toEqual(expect.arrayContaining(['workspace.paused', 'workspace.resumed']));

@@ -180,7 +180,7 @@ export function DataExportSection() {
 const list = (s: string) => s.split(',').map((x) => x.trim()).filter(Boolean);
 
 function BrandForm({ brandId, section }: { brandId: string; section: 'details' | 'publishing' | 'voice' }) {
-  const { can, refresh, session } = useSession();
+  const { can, canOn, refresh, session } = useSession();
   const toast = useToast();
   const zones = useZones();
   const { data, error, loading, refetch, setData } = useApi<Brand>(`/api/brands/${brandId}`);
@@ -234,7 +234,7 @@ function BrandForm({ brandId, section }: { brandId: string; section: 'details' |
   return (
     <>
       {data.publishing_paused && section !== 'voice' ? (
-        <Banner tone="warn" title="Brand paused" actions={can('pause.emergency') ? <Button size="sm" icon={<Play aria-hidden className="size-4" />} onClick={() => setPauseOpen(true)}>Resume</Button> : null}>
+        <Banner tone="warn" title="Brand paused" actions={canOn(brandId, 'publishing.resume') ? <Button size="sm" icon={<Play aria-hidden className="size-4" />} onClick={() => setPauseOpen(true)}>Resume</Button> : null}>
           {data.paused_reason ? `“${data.paused_reason}”` : null}
           {data.paused_at ? <span className="block text-xs text-muted">Since <TimeWithZone instant={data.paused_at} tz={data.timezone} /></span> : null}
         </Banner>
@@ -281,7 +281,7 @@ function BrandForm({ brandId, section }: { brandId: string; section: 'details' |
       {saveErr && !fe ? <ErrorNotice error={saveErr} /> : null}
       <div className="flex flex-wrap items-center gap-2">
         {editable ? <Button variant="primary" onClick={save} loading={busy} disabledReason={!f.name.trim() ? 'Name can’t be empty.' : dlBad ? 'Fix the deadline.' : null}>Save</Button> : null}
-        {section === 'publishing' && can('pause.emergency') && !data.publishing_paused ? (
+        {section === 'publishing' && canOn(brandId, 'publishing.pause') && !data.publishing_paused ? (
           <Button variant="quiet" className="text-danger!" icon={<OctagonPause aria-hidden className="size-4" />} onClick={() => setPauseOpen(true)}>Pause brand</Button>
         ) : null}
       </div>

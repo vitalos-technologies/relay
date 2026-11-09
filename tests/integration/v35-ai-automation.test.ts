@@ -15,9 +15,9 @@ import {
 import {
   aiAutomationAdminOverview, sweepSlaNearing, createPolicy, createRule, installAutomation, listAutomationRuns, resetAutomationInstallForTests, setEmergencyStop, setPolicyStatus, testRule, updatePolicy, automationCatalog,
 } from '@social-lite/services/automation/index';
-import type { Ctx } from '@social-lite/services';
+import { resetConfigCache, type Ctx } from '@social-lite/services';
 import { registerAiAutomationWorkers } from '@social-lite/services/automation/worker';
-import { addMember, closeTestPool, createBrand, createUser, createWorkspace, grant, testPool, v2Ctx } from './helpers.js';
+import { addMember, closeTestPool, createBrand, createUser, createWorkspace, grant, testPool, v2Ctx, useTestModel, clearTestModel } from './helpers.js';
 
 const key = () => randomUUID().replace(/-/g, '');
 
@@ -77,9 +77,9 @@ async function knowledgeReply(w: World, brand: string, title: string, body: stri
   return approveKnowledge(w.owner, { brand_id: brand, kind: 'saved_reply', ref_id: sr.id, topics: ['shipping'] });
 }
 
-beforeAll(() => { testPool(); });
+beforeAll(() => { testPool(); useTestModel(); });
 afterEach(() => { setAssistantModelClient(null); });
-afterAll(async () => { setAssistantModelClient(null); await closeTestPool(); });
+afterAll(async () => { setAssistantModelClient(null); clearTestModel(); await closeTestPool(); });
 
 describe('V3.5 assistant — provider configuration', () => {
   it('without a provider the assistant says so and stays off (no fixture output)', async () => {
@@ -93,6 +93,24 @@ describe('V3.5 assistant — provider configuration', () => {
     expect(err).toBeInstanceOf(AppError);
     expect(err.code).toBe('provider_not_configured');
     expect((await testPool().query(`SELECT count(*)::int AS n FROM ai_runs WHERE workspace_id=$1`, [w.ws])).rows[0].n).toBe(0);
+  });
+
+  it('D32: a provider without AI_MODEL is still "not set up" (no model id in code)', async () => {
+    const w = await world();
+    const fake = new FakeProvider(() => out({ suggestions: [{ kind: 'summary', text: 'x', language: 'en', based_on: [] }] }));
+    setAssistantModelClient(fake);
+    clearTestModel();
+    try {
+      expect(await assistantStatus(w.ann)).toMatchObject({ configured: false, can_use: false });
+      await simulateInbound(w.owner, w.channelId, { kind: 'dm', text: 'Hello?' });
+      const c = await latestConversation(w.ann);
+      const err = await createRun(w.ann, { surface: 'inbox', task: 'summarize_conversation', context: { type: 'conversation', id: c.id }, idempotency_key: key() }).catch((e) => e);
+      expect(err.code).toBe('provider_not_configured');
+      expect(fake.calls).toHaveLength(0);
+    } finally {
+      useTestModel();
+    }
+    expect(await assistantStatus(w.ann)).toMatchObject({ configured: true });
   });
 });
 
@@ -462,6 +480,19 @@ describe('V3.5 automation — classification, routing, bounded replies', () => {
     expect(adm.automation).toMatchObject({ automated_replies_24h: 1, rules: { enabled: 1, total: 1 }, policies: { active: 1 } });
     expect(adm.automation.runs_24h).toMatchObject({ succeeded: 1, escalated: 1 });
     expect(JSON.stringify(adm)).not.toMatch(/ship|voucher|parcel/i);
+    // D32: no price configured for the model used ⇒ cost unknown (never guessed); tokens are still counted and budgeted.
+    expect(adm.ai.tokens_30d).toBeGreaterThan(0);
+    expect(adm.ai.cost_estimate_usd_30d).toBeNull();
+    process.env.AI_MODEL_PRICES = JSON.stringify({ 'fake-model': [1, 2] });
+    resetConfigCache();
+    try {
+      const priced = await aiAutomationAdminOverview(w.owner);
+      const tok = (await testPool().query(`SELECT sum(input_tokens)::int i, sum(output_tokens)::int o FROM ai_runs WHERE workspace_id=$1`, [w.ws])).rows[0];
+      expect(priced.ai.cost_estimate_usd_30d).toBeCloseTo((tok.i * 1 + tok.o * 2) / 1e6, 4);
+    } finally {
+      delete process.env.AI_MODEL_PRICES;
+      resetConfigCache();
+    }
     await expect(aiAutomationAdminOverview(w.ann)).rejects.toMatchObject({ code: 'forbidden' });
   });
 

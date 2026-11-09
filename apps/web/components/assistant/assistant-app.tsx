@@ -32,7 +32,7 @@ export function AssistantApp() {
       <PageHeader title="Assistant" meta={s ? (s.configured ? `${s.remaining.toLocaleString()} tokens left` : 'Off') : undefined}
         actions={canV2('automation.manage') ? <LinkButton href="/automation" variant="secondary" icon={<Workflow aria-hidden className="size-4" />}>Automation</LinkButton> : null} />
       {s && !s.configured ? (
-        <Banner tone="info" title="AI is not set up" className="mb-6">No AI provider is configured, so the assistant is off. An owner can add a provider key in Setup.</Banner>
+        <Banner tone="info" title="AI is not set up" className="mb-6">No AI provider and model are configured, so the assistant is off. An owner can set them in Setup.</Banner>
       ) : null}
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList label="Assistant sections">

@@ -113,10 +113,11 @@ Returns the service account, its workspace and its brand-scoped grants.
 curl -s https://relay.example.com/api/v1/drafts \
   -H "Authorization: Bearer $RELAY_API_KEY" \
   -H "Content-Type: application/json" \
+  -H "Idempotency-Key: weekly-tip-2026-11-09" \
   -d '{"brand_id":"<brand uuid>","title":"Weekly tip","text":"Synthetic example text"}'
 ```
 
-Creates a draft on that brand (needs `content.create_draft`, the `integration` role). It never schedules or publishes; a person reviews the draft in Relay. This endpoint does not take an `Idempotency-Key`: if a request times out, check the brand's drafts before retrying, or a second draft may be created. (MCP `create_draft` with an `idempotency_key` is retry-safe.) An invalid, expired or revoked key returns `401` with `WWW-Authenticate: Bearer`.
+Creates a draft on that brand (needs `content.create_draft`, the `integration` role). It never schedules or publishes; a person reviews the draft in Relay. Send an `Idempotency-Key` header (8–200 characters) to make retries safe: the same key and body within 24 hours return the original draft's `id` instead of creating another, and the same key with a different body returns `409 idempotency_conflict`. Keys are scoped to the API key's service account. Without the header, each request creates a draft. An invalid, expired or revoked key returns `401` with `WWW-Authenticate: Bearer`.
 
 ## Health endpoints
 

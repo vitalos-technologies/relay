@@ -13,7 +13,7 @@ keywords: [ai, assistant, workflow, generate, campaign brief, weekly plan, summa
 ---
 
 > **Note:** AI-written parts need an AI provider to be set up for your Relay installation (an Owner adds the key in
-> **Setup**). Until then the page says **AI is not set up**: *Data steps (reading, checks, plans, reports) still run;
+> **Setup**, and the server administrator sets the model). Until then the page says **AI is not set up**: *Data steps (reading, checks, plans, reports) still run;
 > AI-written parts are skipped.* Relay never shows placeholder or invented text.
 
 ## Before you start

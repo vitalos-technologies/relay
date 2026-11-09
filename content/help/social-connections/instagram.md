@@ -109,7 +109,8 @@ comment within 7 days. See [Inbox channels by network](/help/inbox-and-care/inbo
 ## Limitations
 
 - No Stories, no editing or deleting published posts, no shopping tags, no collaborator invites, no first comment.
-- Alt text and user tags are not sent to Instagram.
+- User tags are not sent to Instagram. Library alt text is sent for single images and carousel images (up to 1,000
+  characters), not for Reels — see [Add alt text](/help/publishing/alt-text-and-accessible-media).
 - Facebook Login for Business configurations are not supported (classic Facebook Login only).
 
 ## Reconnect, revoke, disconnect
@@ -127,6 +128,7 @@ comment within 7 days. See [Inbox channels by network](/help/inbox-and-care/inbo
 |---|---|---|
 | No pages or profiles to publish to | The Facebook account has no Page with a linked Instagram professional account, or no content role on it | Link the Instagram account to a Page in Instagram's settings, check your Page role, reconnect |
 | Image aspect ratio / width message | Image outside 4:5–1.91:1 or narrower than 320 px | Crop in Relay's media editor and reschedule |
+| Instagram: alt text of the image is … of 1000 characters | The image's library alt text is longer than Instagram accepts | Shorten it in **Content library** |
 | Publishing blocked: Page Publishing Authorization | The Page needs PPA | Complete PPA in Facebook, then retry |
 | Rate limited until … | Daily publishing quota or Meta API limits reached | Relay retries automatically after the time shown |
 | Not confirmed — check before retrying | The answer from Instagram was lost | Relay checks automatically; if it stays *Unknown*, look on Instagram and resolve it in Relay |

@@ -122,6 +122,6 @@ events, ids, counts, usage and audit are kept. Threads are private to their owne
 while they can still see the brand. Prompts are not logged; the person's request text is purged with run output.
 
 ## 11. Gaps / activation
-- Activation: an AI provider key (Setup) turns on model steps; budgets per workspace in Usage and limits.
+- Activation: an AI provider key (Setup) plus `AI_MODEL` (server environment; no default, D32) turns on model steps; budgets per workspace in Usage and limits.
 - Progress uses polling with an event cursor (no server push); attachments are text formats only (larger documents via
   the Content library); a model call in flight cannot be aborted mid-request (cancellation applies at the next checkpoint).

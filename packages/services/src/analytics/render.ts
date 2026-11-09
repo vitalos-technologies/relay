@@ -8,7 +8,10 @@ import type {
   AnalyticsView, AudienceResponse, ChannelsResponse, ContentRow, ContentTableResponse, Coverage, MeasureDefinition, OverviewResponse, ReportManifest, ResponseMeta,
   VideoResponse, WorkflowResponse,
 } from '@social-lite/core/contracts/analytics';
+import type { ChannelTableMeasure } from '@social-lite/core/contracts/analytics';
 import { csvLine } from './semantics.js';
+
+const CHANNEL_MEASURE_LABEL: Record<ChannelTableMeasure, string> = { engagements: 'Engagements', views: 'Views', impressions: 'Impressions', reach: 'Reach' };
 
 export type ViewData =
   | { view: 'overview'; data: OverviewResponse }
@@ -115,6 +118,8 @@ export function reportTables(v: ViewData): Array<{ title: string; header: string
       for (const r of v.data.rows) {
         for (const m of r.metrics) body.push([r.display_name, r.provider, r.posts_published, m.metric_id, m.native_metric, m.name, m.dimension ?? '', m.value, m.status, m.posts_with_data, m.label_note ?? '', m.observed_at ?? '', m.through ?? '']);
         body.push([r.display_name, r.provider, r.posts_published, 'followers.latest', '', 'Followers (latest snapshot)', '', r.followers.latest, r.followers.status, '', r.followers.message ?? '', r.followers.as_of_date ?? '', '']);
+        // Fix H6: the table's measure columns (engagements added up across the network's engagement metrics).
+        for (const m of r.measures ?? []) body.push([r.display_name, r.provider, r.posts_published, `measure.${m.measure}`, '', CHANNEL_MEASURE_LABEL[m.measure], '', m.value, m.status, m.posts_with_data, m.measure === 'reach' ? 'Sum of per-post unique counts' : '', '', '']);
       }
       return [{ title: 'Channels — native metrics (lifetime of posts published in this period)', header: ['account', 'network', 'posts_published', 'metric_id', 'native_metric', 'name', 'dimension', 'value', 'status', 'posts_with_data', 'note', 'observed_at_utc', 'through_utc'], body }];
     }

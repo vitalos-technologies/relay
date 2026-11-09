@@ -53,7 +53,7 @@ Every provider, Google, Notion and MCP-client path runs against labelled fakes o
 | P2 | LinkedIn analytics tied to the organisations flag | `r_member_postAnalytics` and `rw_organization_admin` are only requested with `LINKEDIN_ORGANIZATIONS=true` | 8.4 |
 | P3 | No account-level fetchers | No adapter fetches followers or audience (`not_fetched`); Channels/Audience show explanatory states | 8.4–8.6 |
 | P4 | TikTok manual handoff action | The composer shows a "Manual handoff" banner, but `tiktokManualHandoff()` (caption + media download, open the app) still has no caller | 6.14 |
-| P5 | Capability model incomplete | No `comments` capability. Meta and X still report `canReadMetrics:false`, so MCP `get_capabilities` shows `can_read_metrics:false` for them | 6.13 |
+| P5 | Capability model incomplete | No `comments` capability. (`canReadMetrics` for Meta and X fixed 2026-11-09, fix H7: Meta follows the granted insights permissions, X is true.) | 6.13 |
 | P6 | Bluesky limits | App password only (no atproto OAuth); no video; no link cards | 6.7, 6.8 |
 | P7 | Browser upload not resumable | Single presigned POST ≤ 300 MB; no processing-time budget | 7.1, 7.6 |
 | P8 | Unmapped native posts | Only Relay-published posts are synced | 9.8 |

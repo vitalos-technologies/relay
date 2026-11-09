@@ -5,8 +5,9 @@ import { useSession } from '@/lib/client/session';
 import { useOnline } from '@/lib/client/hooks';
 import { EmergencyPause } from './emergency-pause';
 import { EntitlementStrip } from '@/components/entitlements/shell-strip';
+import { OwnershipTransferBanner } from '@/components/team/ownership-transfer-banner';
 
-/** Persistent shell-level status: offline, workspace paused, demo workspace. */
+/** Persistent shell-level status: offline, workspace paused, ownership transfer to you, demo workspace. */
 export function ShellBanners() {
   const { session } = useSession();
   const online = useOnline();
@@ -26,6 +27,8 @@ export function ShellBanners() {
           <EmergencyPause variant="banner" />
         </div>
       ) : null}
+      {/* H4: the proposed new owner can accept or decline from any page, whatever their role. */}
+      <OwnershipTransferBanner />
       {/* V4 entitlements: paid actions paused (trial ended / payment problem) — billing + support links always shown */}
       <EntitlementStrip />
       {session.support_access?.active ? (

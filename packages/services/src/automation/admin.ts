@@ -5,6 +5,7 @@ import { getPool, many, one } from '@social-lite/db';
 import type { Ctx } from '../context.js';
 import { requireAction } from '../tenancy.js';
 import { readUsage } from '../ai/usage.js';
+import { costEstimateForTotals } from '../ai/models.js';
 import { assistantConfigured } from '../assistant/client.js';
 import { emergencyStopState } from './policies.js';
 
@@ -14,7 +15,9 @@ export interface AiAutomationAdminOverview {
     configured: boolean;
     budget: { period: string; used: number; cap: number; remaining: number };
     runs_24h: Record<string, number>;          // by status
-    tokens_30d: number; cost_estimate_usd_30d: number; median_latency_ms_7d: number | null;
+    tokens_30d: number;
+    /** At the configured prices (AI_MODEL_PRICES); null when a model used has no configured price. */
+    cost_estimate_usd_30d: number | null; median_latency_ms_7d: number | null;
     knowledge_sources: { approved: number; stale: number };
   };
   automation: {
@@ -33,7 +36,7 @@ export async function aiAutomationAdminOverview(ctx: Ctx): Promise<AiAutomationA
   const ws = ctx.access.workspaceId;
   const [runs, usage30, lat, know, pol, rules, aruns, replies, expiring] = await Promise.all([
     many<{ status: string; n: number }>(db, `SELECT status, count(*)::int n FROM ai_runs WHERE workspace_id=$1 AND created_at > now() - interval '24 hours' GROUP BY status`, [ws]),
-    one<{ tokens: number; cost: number }>(db, `SELECT coalesce(sum(input_tokens + output_tokens), 0)::int tokens, coalesce(sum(cost_estimate_usd), 0)::float8 cost FROM ai_runs WHERE workspace_id=$1 AND created_at > now() - interval '30 days'`, [ws]),
+    many<{ model: string | null; input_tokens: number; output_tokens: number }>(db, `SELECT model, coalesce(sum(input_tokens), 0)::int input_tokens, coalesce(sum(output_tokens), 0)::int output_tokens FROM ai_runs WHERE workspace_id=$1 AND created_at > now() - interval '30 days' GROUP BY model`, [ws]),
     one<{ p50: number | null }>(db, `SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY latency_ms)::float8 p50 FROM ai_runs WHERE workspace_id=$1 AND latency_ms IS NOT NULL AND created_at > now() - interval '7 days'`, [ws]),
     one<{ approved: number; stale: number }>(db, `SELECT count(*)::int approved, count(*) FILTER (WHERE review_by < current_date)::int stale FROM ai_knowledge_sources WHERE workspace_id=$1 AND revoked_at IS NULL`, [ws]),
     many<{ status: string; n: number }>(db, `SELECT CASE WHEN status='active' AND expires_at <= now() THEN 'expired' ELSE status END status, count(*)::int n FROM automation_policies WHERE workspace_id=$1 GROUP BY 1`, [ws]),
@@ -47,7 +50,7 @@ export async function aiAutomationAdminOverview(ctx: Ctx): Promise<AiAutomationA
   return {
     generated_at: new Date().toISOString(),
     ai: {
-      configured: await assistantConfigured(db), budget: u, runs_24h: by(runs, 'status'), tokens_30d: usage30.tokens, cost_estimate_usd_30d: Math.round(usage30.cost * 1e4) / 1e4,
+      configured: await assistantConfigured(db), budget: u, runs_24h: by(runs, 'status'), tokens_30d: usage30.reduce((n, r) => n + r.input_tokens + r.output_tokens, 0), cost_estimate_usd_30d: costEstimateForTotals(usage30),
       median_latency_ms_7d: lat.p50 === null ? null : Math.round(lat.p50), knowledge_sources: know,
     },
     automation: {

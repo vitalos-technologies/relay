@@ -3,11 +3,12 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { resetConfigCache } from '@social-lite/services';
 import { diagnostics, readiness } from '../../packages/services/src/diagnostics.js';
 import { getSetup, putSetup } from '../../packages/services/src/setup.js';
+import { platformIntegrations, type PlatformCtx } from '../../packages/services/src/admin/platform.js';
 import { getSetting } from '../../packages/services/src/settings.js';
 import { ensureBucket } from '../../packages/services/src/storage.js';
 import { addMember, closeTestPool, createUser, ctxFor, tenant, testPool } from './helpers.js';
 
-const KEYS = ['META_APP_ID', 'META_APP_SECRET', 'ANTHROPIC_API_KEY', 'OIDC_ISSUER', 'TELEGRAM_WEBHOOK_SECRET', 'GOOGLE_CONTENT_CLIENT_SECRET', 'NOTION_CLIENT_SECRET', 'NOTION_INTERNAL_TOKEN'];
+const KEYS = ['META_APP_ID', 'META_APP_SECRET', 'ANTHROPIC_API_KEY', 'AI_MODEL', 'AI_MODEL_PRICES', 'AI_FALLBACK_MODELS', 'OIDC_ISSUER', 'TELEGRAM_WEBHOOK_SECRET', 'GOOGLE_CONTENT_CLIENT_SECRET', 'NOTION_CLIENT_SECRET', 'NOTION_INTERNAL_TOKEN'];
 const saved = Object.fromEntries(KEYS.map((k) => [k, process.env[k]]));
 let t: Awaited<ReturnType<typeof tenant>>;
 
@@ -75,6 +76,46 @@ describe('setup', () => {
     await expect(putSetup(t.ownerCtx, 'TELEGRAM_WEBHOOK_SECRET', 'another-secret-value-xyz')).rejects.toMatchObject({ code: 'conflict' });
     await expect(putSetup(t.ownerCtx, 'SESSION_SECRET', 'x')).rejects.toMatchObject({ code: 'invalid_state' });
     await expect(putSetup(t.ownerCtx, 'NOPE', 'x')).rejects.toMatchObject({ code: 'not_found' });
+  });
+
+  it('AI setup (D32): key, model and prices show as set / not set, never their values; model settings are environment-only', async () => {
+    const aiGroup = async () => (await getSetup(t.ownerCtx)).groups.find((g) => g.id === 'ai')!;
+    const op: PlatformCtx = { actor: { userId: t.owner.id, email: 'op@relay.test', name: 'Op', sessionId: 'sess' }, role: 'operator', assurance: { mfaVerified: true, authTime: new Date() }, correlationId: 'c' } as PlatformCtx;
+    const diag = async () => (await platformIntegrations(op)).items.find((i) => i.key === 'ai')!;
+    delete process.env.ANTHROPIC_API_KEY; delete process.env.AI_MODEL; delete process.env.AI_MODEL_PRICES; delete process.env.AI_FALLBACK_MODELS;
+    resetConfigCache();
+    let g = await aiGroup();
+    expect(g.items.map((i) => i.key)).toEqual(['ANTHROPIC_API_KEY', 'AI_MODEL', 'AI_MODEL_PRICES', 'AI_FALLBACK_MODELS']);
+    expect(g.items.map((i) => i.is_set)).toEqual([false, false, false, false]);
+    expect(g.ready).toBe(false);
+    expect(await diag()).toMatchObject({ status: 'not_configured', missing: ['ANTHROPIC_API_KEY', 'AI_MODEL'] });
+
+    // Key only ⇒ still not set up (no default model).
+    process.env.ANTHROPIC_API_KEY = 'sk-ant-test-key-000000';
+    resetConfigCache();
+    expect((await aiGroup()).ready).toBe(false);
+    expect(await diag()).toMatchObject({ status: 'not_configured', missing: ['AI_MODEL'] });
+
+    // Key + model (placeholder id) ⇒ ready; prices optional, flagged when missing for the model.
+    process.env.AI_MODEL = 'test-model';
+    process.env.AI_FALLBACK_MODELS = 'test-model';
+    resetConfigCache();
+    g = await aiGroup();
+    expect(g.ready).toBe(true);
+    const item = (k: string) => g.items.find((i) => i.key === k)!;
+    expect(item('AI_MODEL')).toMatchObject({ is_set: true, source: 'env', editable: false });
+    expect(item('AI_MODEL_PRICES')).toMatchObject({ is_set: false, warning: expect.stringMatching(/unknown/) });
+    expect(item('AI_FALLBACK_MODELS')).toMatchObject({ is_set: true });
+    expect(await diag()).toMatchObject({ status: 'configured', missing: [], note: expect.stringMatching(/cost estimates unknown/) });
+    process.env.AI_MODEL_PRICES = JSON.stringify({ 'test-model': [1.25, 5] });
+    resetConfigCache();
+    g = await aiGroup();
+    expect(g.items.find((i) => i.key === 'AI_MODEL_PRICES')).toMatchObject({ is_set: true, source: 'env' });
+    expect(g.items.find((i) => i.key === 'AI_MODEL_PRICES')!.warning).toBeUndefined();
+    // Values never leave the server.
+    const json = JSON.stringify([g, await diag()]);
+    for (const v of ['test-model', '1.25', 'sk-ant-test-key-000000']) expect(json).not.toContain(v);
+    for (const k of ['AI_MODEL', 'AI_MODEL_PRICES', 'AI_FALLBACK_MODELS']) await expect(putSetup(t.ownerCtx, k, 'x')).rejects.toMatchObject({ code: 'invalid_state' });
   });
 
   it('is owner-only', async () => {

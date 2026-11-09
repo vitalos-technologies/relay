@@ -23,3 +23,5 @@ export {
 } from './store.js';
 // V3: Bluesky (AT Protocol app password).
 export { connectBluesky, blueskyConnectSchema } from './bluesky.js';
+// Fix H1: live TikTok creator_info for the composer.
+export { getTikTokCreatorInfo, type TikTokCreatorInfoJson } from './tiktok.js';

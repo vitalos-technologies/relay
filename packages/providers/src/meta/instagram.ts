@@ -6,7 +6,8 @@
 //  carousel → children POST /{ig-user-id}/media { is_carousel_item=true, image_url | media_type=VIDEO+video_url }
 //             then POST /{ig-user-id}/media { media_type=CAROUSEL, children=<ids>, caption }  (parent = containerId)
 //
-//  prepare  → POST /{ig-user-id}/media { image_url, caption }  → container id (checkpoint, expires +24h)
+//  prepare  → POST /{ig-user-id}/media { image_url, caption, alt_text? }  → container id (checkpoint, expires +24h)
+//             (alt_text = library alt text on images and carousel images, never Reels; fix H3)
 //             GET  /{container-id}?fields=status_code,status    → IN_PROGRESS | FINISHED | ERROR | EXPIRED | PUBLISHED
 //  publish  → GET  /{ig-user-id}/content_publishing_limit       (quota guard; failures are non-fatal)
 //             POST /{ig-user-id}/media_publish { creation_id }  → media id   (publishes: true)
@@ -15,9 +16,10 @@
 //
 // Links: Instagram captions do not make links clickable. supportsLink=false, so a variant with a
 // link fails validation with an exact fix ("link_unsupported"); we never silently drop it.
-import type {
-  AdapterContext, AttemptReference, Checkpoint, ConnectionHealth, PrepareOutcome, ProviderCredentials,
-  PublishConnection, PublishInput, PublishOutcome, PublishingAdapter, ReconcileOutcome,
+import {
+  altTextFor,
+  type AdapterContext, type AttemptReference, type Checkpoint, type ConnectionHealth, type PrepareOutcome, type ProviderCredentials,
+  type PublishConnection, type PublishInput, type PublishOutcome, type PublishingAdapter, type ReconcileOutcome,
 } from '@social-lite/core';
 import { capabilitiesFor, igUserIdOf, metaShape, textMatches, validateMeta, validationFailureMessage } from './common.js';
 import { prepareCarousel } from './carousel.js';
@@ -118,7 +120,7 @@ export async function createContainer(ctx: AdapterContext, input: PublishInput, 
       method: 'POST', path: `${igUserId}/media`, token, op: 'meta.instagram.media_create', timeoutMs: 60_000,
       params: reel
         ? { media_type: 'REELS', video_url: item.url, caption: input.variant.text || undefined, share_to_feed: true, cover_url: item.posterUrl || undefined }
-        : { image_url: item.url, caption: input.variant.text || undefined },
+        : { image_url: item.url, caption: input.variant.text || undefined, alt_text: altTextFor('instagram', item) ?? undefined }, // alt_text: images only (not Reels)
     });
   } catch (err) {
     if (isTransportError(err)) return prepareOutcomeFromTransportError(err); // containers are invisible; safe to recreate

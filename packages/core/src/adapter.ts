@@ -98,6 +98,8 @@ export interface PublishMedia {
   frameRate?: number | null;
   /** Signed URL of a JPEG poster frame (Reel cover etc.), when available. */
   posterUrl?: string | null;
+  /** Library alt text (assets.alt_text). Adapters send it via altTextFor() where the network supports it (fix H3). */
+  altText?: string | null;
 }
 
 export interface PublishConnection {

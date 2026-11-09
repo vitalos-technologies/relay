@@ -42,6 +42,7 @@ down. Prices on 2026-11-09 (X says they can change; the console is authoritative
 | Create a post **containing a URL** | $0.200 |
 | Read a post (per post returned) | $0.005 (reads of the same post within a UTC day are not charged again) |
 | Read your own data with your own app | $0.001 per resource |
+| Add alt text to an uploaded image (media metadata) | $0.005 per request |
 
 Pay-per-usage is capped at 3 million post reads per monthly billing cycle. Because Relay appends a post's link to the
 text, **every X post with a link is billed at the URL rate**.
@@ -77,7 +78,9 @@ less often than other networks to save reads.
 
 ## Scheduling and publishing
 
-Images and videos are uploaded first (videos in chunks, then X processes them); the post is created at the due time.
+Images and videos are uploaded first (videos in chunks, then X processes them); each image with library alt text then
+gets it attached (one billed media-metadata request per described image; images without alt text cost nothing extra);
+the post is created at the due time.
 If X's answer is lost, Relay looks at the account's recent posts around the send time (a billed read) before
 deciding; it never posts again blindly.
 
@@ -101,4 +104,5 @@ for 30 days after publication (other networks: 90) and consumes the X read budge
 | Budget exhausted | The workspace X budget, or the app's X credits, ran out | Raise the budget or add credits; reads resume automatically |
 | Duplicate content rejected | X refuses identical text posted recently | Change the text |
 | Media processing failed | X could not process the image or video | Replace it with a JPEG/PNG ≤ 5 MB or an H.264/AAC MP4 |
+| X: alt text of the image is … of 1000 characters | The image's library alt text is longer than X accepts | Shorten it in **Content library** |
 | Missing permission | A scope was not granted | Reconnect and approve all |

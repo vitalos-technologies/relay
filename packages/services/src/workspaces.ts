@@ -93,7 +93,8 @@ export interface SessionInfo {
   permissions: Record<Action, boolean>;
   /** V2 permission flags (held on some scope) + per-brand permissions; policy version they were computed at. */
   v2: { permissions: Record<Permission, boolean>; brands: Record<string, Permission[]>; policy_version: number; mfa_verified: boolean;
-    pending_ownership_transfer: { id: string; from_email: string } | null };
+    /** Pending transfer TO the signed-in user in the active workspace (shell banner: accept / decline). */
+    pending_ownership_transfer: { id: string; from_email: string; expires_at: string; keep_previous_owner_as: 'admin' | 'none' } | null };
   mock_providers_enabled: boolean;
   app_env: 'development' | 'test' | 'production';
   /** First-run: true when this user may create a workspace (POST /api/workspaces). */
@@ -146,9 +147,9 @@ export async function sessionInfo(session: SessionRecord, actor: Actor, db: Quer
     brands: brands.map((b) => ({ id: b.id, name: b.name, timezone: b.timezone, publishing_paused: b.publishing_paused, approval_required: b.approval_required, is_demo: b.is_demo })),
     permissions: permissionsForAccess(access),
     v2: { ...v2PermissionsForAccess(access, brands.map((b) => b.id)), policy_version: access?.authz?.policyVersion ?? 0, mfa_verified: !!session.mfaVerified,
-      pending_ownership_transfer: access ? await maybeOne<{ id: string; from_email: string }>(db,
-        `SELECT t.id, u.email AS from_email FROM ownership_transfers t JOIN users u ON u.id=t.from_user_id
-          WHERE t.workspace_id=$1 AND t.to_user_id=$2 AND t.status='pending' AND t.expires_at > now() LIMIT 1`, [active!.id, actor.userId]) : null },
+      pending_ownership_transfer: access ? await maybeOne<{ id: string; from_email: string; expires_at: Date; keep_previous_owner_as: 'admin' | 'none' }>(db,
+        `SELECT t.id, u.email AS from_email, t.expires_at, t.keep_previous_owner_as FROM ownership_transfers t JOIN users u ON u.id=t.from_user_id
+          WHERE t.workspace_id=$1 AND t.to_user_id=$2 AND t.status='pending' AND t.expires_at > now() LIMIT 1`, [active!.id, actor.userId]).then((t) => t && { ...t, expires_at: t.expires_at.toISOString() }) : null },
     mock_providers_enabled: mockProvidersEnabled(),
     app_env: config().APP_ENV,
     can_create_workspace: workspaces.length === 0 ? await canCreateWorkspace(actor.userId, db) : false,
@@ -208,7 +209,8 @@ export async function updateWorkspace(ctx: Ctx, patch: { name?: string; timezone
 
 /** Emergency pause/resume of the whole workspace (SC-05). Engine hooks run in the same transaction. */
 export async function setWorkspacePaused(ctx: Ctx, input: { paused: boolean; reason?: string | null }): Promise<WorkspaceDto & { affected: Record<string, number> }> {
-  requireAction(ctx, 'pause.emergency');
+  // Pausing and resuming are separate permissions: a pause-only role (Approver) must not restart publishing.
+  requireAction(ctx, input.paused ? 'publishing.pause' : 'publishing.resume');
   const reason = input.reason?.trim().slice(0, 500) || null;
   return withTx(async (tx) => {
     const before = await loadWorkspace(tx, ctx.access.workspaceId, true);

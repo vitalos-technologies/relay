@@ -339,7 +339,8 @@ export async function archiveAsset(ctx: Ctx, assetId: string): Promise<AssetDto>
 
 /**
  * Publish-ready media for the given assets, in order. URL = signed GET of the jpeg_publish derivative
- * (TTL covers provider fetch/processing/retries); load() streams the same bytes from storage.
+ * (TTL covers provider fetch/processing/retries); load() streams the same bytes from storage. altText = the library
+ * alt text at send time (covered by the approval binding, posts/approval-policy computeBinding).
  * Throws invalid_state when any asset is missing, not validated, or lacks its publish derivative.
  * Archived assets remain publishable (archive is refused while referenced by active deliveries;
  * physical deletion only happens after retention).
@@ -364,6 +365,7 @@ export async function loadPublishMedia(db: Queryable, workspaceId: string, asset
         durationMs: r.duration_ms, videoCodec: r.video_codec, audioCodec: r.audio_codec, frameRate: r.frame_rate !== null ? Number(r.frame_rate) : null,
         url: await signedGetUrl(vkey, ttlSeconds, { contentType: r.mime }),
         posterUrl: r.poster_key ? await signedGetUrl(r.poster_key, ttlSeconds, { contentType: 'image/jpeg' }) : null,
+        altText: r.alt_text,
         load: async () => new Uint8Array(await getObjectBytes(vkey, Math.max(vbytes, 1) + 1024)),
       });
       continue;
@@ -377,6 +379,7 @@ export async function loadPublishMedia(db: Queryable, workspaceId: string, asset
     out.push({
       assetId: id, mime, width: c ? c.width : r.width, height: c ? c.height : r.height, bytes,
       url: await signedGetUrl(key, ttlSeconds, { contentType: mime }),
+      altText: r.alt_text,
       load: async () => new Uint8Array(await getObjectBytes(key, Math.max(bytes, 1) + 1024)),
     });
   }
@@ -391,21 +394,21 @@ export async function assetFacts(db: Queryable, workspaceId: string, assetIds: s
   return assetIds.map((id) => {
     const r = byId.get(id);
     if (!r) return { assetId: id, status: 'missing', mime: null, bytes: null, width: null, height: null };
-    return { assetId: id, status: r.status, mime: r.mime, bytes: r.bytes !== null ? Number(r.bytes) : null, width: r.width, height: r.height, ...videoFacts(r) };
+    return { assetId: id, status: r.status, mime: r.mime, bytes: r.bytes !== null ? Number(r.bytes) : null, width: r.width, height: r.height, altText: r.alt_text, ...videoFacts(r) };
   });
 }
 
 // ------------------------------------------------------------------ V1.1 video helpers
 
 interface PublishRow {
-  id: string; status: AssetStatus; media_kind: 'image' | 'video'; object_key: string | null; mime: string | null; bytes: string | null;
+  id: string; status: AssetStatus; media_kind: 'image' | 'video'; alt_text: string | null; object_key: string | null; mime: string | null; bytes: string | null;
   width: number | null; height: number | null; duration_ms: number | null; video_codec: string | null; audio_codec: string | null;
   frame_rate: string | null; poster_key: string | null; a_mime: string | null; a_bytes: string | null; a_width: number | null; a_height: number | null;
 }
 
 /** Publish derivative per asset: jpeg_publish for images, video_publish (+ poster) for videos. */
 const PUBLISH_ROWS_SQL = `
-  SELECT a.id, a.status, a.media_kind, d.object_key, d.mime, d.bytes, d.width, d.height, d.duration_ms, d.video_codec, d.audio_codec, d.frame_rate,
+  SELECT a.id, a.status, a.media_kind, a.alt_text, d.object_key, d.mime, d.bytes, d.width, d.height, d.duration_ms, d.video_codec, d.audio_codec, d.frame_rate,
          a.mime AS a_mime, a.bytes AS a_bytes, a.width AS a_width, a.height AS a_height,
          (SELECT p.object_key FROM asset_derivatives p WHERE p.asset_id = a.id AND p.workspace_id = a.workspace_id
              AND p.variant = 'poster' AND p.transform_version = $3) AS poster_key
@@ -439,6 +442,7 @@ export async function publishFacts(db: Queryable, workspaceId: string, assetIds:
       bytes: Number(has ? r.bytes : r.a_bytes) || null,
       width: has ? r.width : r.a_width,
       height: has ? r.height : r.a_height,
+      altText: r.alt_text,
       ...videoFacts(r),
     };
   });

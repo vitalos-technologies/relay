@@ -23,7 +23,7 @@ approval no longer describes what would be sent.
 | Edit text, link or media for a submitted destination | Review **reset** ("Reset — the post changed"); author and reviewers notified | The scheduled version doesn't change. Your edits stay in the draft and are **not sent** unless you submit again. |
 | Change destinations | Reset | Not sent unless resubmitted |
 | Reschedule | Approval re-requested (the dialog warns *Approved posts need re-approval*) | Same |
-| Media or link changed underneath (for example a replaced file) | Refused at decision time ("Media, destinations or links changed after submission") | Held before sending ("…changed after approval. Resubmit it for review.") |
+| Media or link changed underneath (for example a replaced file, or an image's alt text edited in the library) | Refused at decision time ("Media, destinations or links changed after submission") | Held before sending ("…changed after approval. Resubmit it for review.") |
 | Approval policy saved | Request invalidated ("The approval policy changed…") | Held ("The approval policy changed after this was approved.") |
 | An approver loses access | — | Held ("…no longer has enough eligible approvals") |
 

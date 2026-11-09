@@ -19,7 +19,7 @@ import {
 import { setBillingStateSourceForTests, stubBillingState } from '@social-lite/services/entitlements/source';
 import { invalidateEntitlements } from '@social-lite/services/entitlements/resolve';
 import type { PlatformCtx } from '@social-lite/services/admin/platform';
-import { addMember, closeTestPool, createBrand, createUser, createWorkspace, grant, testPool, v2Ctx } from './helpers.js';
+import { addMember, closeTestPool, createBrand, createUser, createWorkspace, grant, testPool, v2Ctx, useTestModel, clearTestModel } from './helpers.js';
 
 const db = () => testPool();
 const key = () => randomUUID().replace(/-/g, '');
@@ -41,10 +41,11 @@ const copy = (text: string) => ({ suggestions: [{ kind: 'copy' as const, text, l
 const states = new Map<string, Partial<BillingState>>();
 beforeAll(() => {
   testPool();
+  useTestModel();
   setBillingStateSourceForTests(async (q, ws) => ({ ...(await stubBillingState(q, ws)), ...(states.get(ws) ?? {}) }));
 });
 afterEach(() => { setAssistantModelClient(null); invalidateEntitlements(); });
-afterAll(async () => { setAssistantModelClient(null); setBillingStateSourceForTests(null); await closeTestPool(); });
+afterAll(async () => { setAssistantModelClient(null); setBillingStateSourceForTests(null); clearTestModel(); await closeTestPool(); });
 
 interface World { ws: string; brand: string; owner: Ctx; ownerId: string; fb: string; x: string }
 

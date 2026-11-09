@@ -706,6 +706,7 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
                   variant={activeVariant}
                   onChange={updateVariant}
                   readOnly={readOnly}
+                  photoOnly={isPhotoOnly(activeVariant.inheritMedia ? draft.baseAssetIds : (activeVariant.assetIds ?? []), assets)}
                   issues={issuesFor(activeConn.id).filter((i) => i.field === 'options').map((i) => i.message)}
                 />
                 <VariantCrops draft={draft} variant={activeVariant} assets={assets} onChange={updateVariant} readOnly={readOnly} />
@@ -956,6 +957,11 @@ function scrollToPanel() {
   const panel = document.querySelector<HTMLElement>('[data-testid="collab-panel"]');
   if (!side || !panel) return;
   side.scrollTo({ top: side.scrollTop + panel.getBoundingClientRect().top - side.getBoundingClientRect().top - 4, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+}
+
+/** Every attached item is a known image (TikTok photo post: only Comment applies). */
+function isPhotoOnly(ids: string[], assets: Map<string, Asset>): boolean {
+  return ids.length > 0 && ids.every((id) => { const m = assets.get(id)?.mime; return !!m && m.startsWith('image/'); });
 }
 
 function allMockOf(ds: Array<{ is_mock: boolean }>) {

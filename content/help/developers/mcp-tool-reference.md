@@ -49,7 +49,7 @@ A tool call is admitted when the token carries any one of the tool's scopes **an
 
 Tool failures return `isError: true` with a JSON text body `{ "error": { "code", "message", "details"? } }`. Stable codes:
 
-`not_found`, `forbidden`, `insufficient_scope`, `consent_required`, `client_revoked`, `mfa_required`, `validation_failed`, `version_conflict`, `conflict`, `invalid_state`, `idempotency_conflict`, `in_progress`, `rate_limited`, `budget_exhausted`, `approval_required`, `needs_choice`, `intent_stale`, `intent_expired`, `confirmation_required`, `unsupported_principal`, `source_connections_unavailable`, `result_too_large`, `cancelled`, `not_configured`, `internal`
+`not_found`, `forbidden`, `insufficient_scope`, `consent_required`, `client_revoked`, `mfa_required`, `validation_failed`, `version_conflict`, `conflict`, `invalid_state`, `idempotency_conflict`, `in_progress`, `rate_limited`, `budget_exhausted`, `approval_required`, `needs_choice`, `intent_stale`, `intent_expired`, `confirmation_required`, `unsupported_principal`, `source_connections_unavailable`, `result_too_large`, `cancelled`, `not_configured`, `entitlement_required`, `internal`
 
 Protocol-level problems use JSON-RPC errors instead: unknown tool or invalid arguments `-32602`, resource not found (also for resources you may not read) `-32002`. HTTP-level failures (`401` with `WWW-Authenticate`, `403 insufficient_scope`, `404` unknown session, `413`, `429` with `Retry-After`) are described in [Connect an MCP client](/help/developers/mcp-server#errors-and-limits).
 

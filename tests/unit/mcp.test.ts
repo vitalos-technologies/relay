@@ -94,3 +94,18 @@ describe('MCP automation policy coverage', () => {
     expect(grantGap(grant, intent('2026-11-08T09:00:00Z'), post('Hello'), new Date('2026-11-21T00:00:00Z'))).toBe('outside validity window');
   });
 });
+
+describe('MCP error codes (M19)', () => {
+  it('every code toToolError can return is in the published MCP_ERROR_CODES list', async () => {
+    const { MCP_ERROR_CODES } = await import('@social-lite/core/contracts/mcp');
+    const { AppError } = await import('@social-lite/core');
+    const { toToolError } = await import('@social-lite/services/mcp/principal');
+    const appCodes = ['unauthenticated', 'forbidden', 'not_found', 'validation_failed', 'conflict', 'version_conflict', 'idempotency_conflict',
+      'rate_limited', 'csrf_failed', 'provider_not_configured', 'provider_error', 'invalid_state', 'payload_too_large', 'unsupported_media',
+      'budget_exhausted', 'dispatch_disabled', 'mfa_required', 'step_up_required', 'entitlement_required', 'internal'] as const;
+    for (const c of appCodes) expect(MCP_ERROR_CODES).toContain(toToolError(new AppError(c, 'x')).code);
+    expect(toToolError(new AppError('entitlement_required', 'Upgrade', undefined, { feature: 'mcp' }))).toMatchObject({ code: 'entitlement_required', details: { feature: 'mcp' } });
+    expect(MCP_ERROR_CODES).toContain(toToolError(new AppError('validation_failed', 'x', undefined, { reason: 'ambiguous_time' })).code);
+    expect(MCP_ERROR_CODES).toContain(toToolError(new AppError('forbidden', 'x', undefined, { reason: 'approval_required' })).code);
+  });
+});

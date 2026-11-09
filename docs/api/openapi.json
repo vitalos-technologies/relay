@@ -8494,6 +8494,48 @@
     "x-relay-source": "apps/web/app/api/connections/[id]/reconnect/route.ts"
    }
   },
+  "/api/connections/{id}/tiktok-creator-info": {
+   "get": {
+    "operationId": "get_api_connections_id_tiktok_creator_info",
+    "tags": [
+     "connections"
+    ],
+    "summary": "GET /api/connections/:id/tiktok-creator-info — the TikTok creator's current posting settings (creator_info): privacy op…",
+    "description": "GET /api/connections/:id/tiktok-creator-info — the TikTok creator's current posting settings (creator_info): privacy options and interactions turned off in TikTok. Read-only; the composer calls it when it shows TikTok settings.\n\nAccess: Session. Signed-in session cookie and an active workspace membership; mutations also need a same-origin `Origin` and the `X-CSRF-Token` from `GET /api/session`.",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "security": [
+     {
+      "session": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Success. JSON body returned by the service (or a redirect/stream where the description says so)."
+     },
+     "default": {
+      "description": "Error envelope",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorEnvelope"
+        }
+       }
+      }
+     }
+    },
+    "x-relay-access": "session",
+    "x-relay-source": "apps/web/app/api/connections/[id]/tiktok-creator-info/route.ts"
+   }
+  },
   "/api/connectors": {
    "get": {
     "operationId": "get_api_connectors",
@@ -27703,7 +27745,20 @@
      "v1"
     ],
     "summary": "POST /api/v1/drafts { brand_id, title?, text } — create a DRAFT as the calling service account.",
-    "description": "POST /api/v1/drafts { brand_id, title?, text } — create a DRAFT as the calling service account. Requires content.create_draft on that brand (integration preset). Never schedules or publishes.\n\nAccess: API key. `Authorization: Bearer sl_live_…` service-account key; no cookies, no CSRF.",
+    "description": "POST /api/v1/drafts { brand_id, title?, text } — create a DRAFT as the calling service account. Requires content.create_draft on that brand (integration preset). Never schedules or publishes. Optional Idempotency-Key: a retry with the same key and body returns the original draft instead of creating another.\n\nAccess: API key. `Authorization: Bearer sl_live_…` service-account key; no cookies, no CSRF.",
+    "parameters": [
+     {
+      "name": "Idempotency-Key",
+      "in": "header",
+      "required": false,
+      "description": "Unique key per intended action (8-200 characters). Same key + same body returns the stored response for 24 h; same key + different body returns 409 idempotency_conflict. Endpoints whose service reserves the key reject a missing key with 422.",
+      "schema": {
+       "type": "string",
+       "minLength": 8,
+       "maxLength": 200
+      }
+     }
+    ],
     "security": [
      {
       "apiKey": []

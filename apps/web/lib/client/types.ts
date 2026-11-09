@@ -15,7 +15,7 @@ export interface SessionInfo {
   permissions: Record<Action, boolean>;
   /** V2 flags (stream B): permission held anywhere, per-brand permissions, policy version. */
   v2?: { permissions: Partial<Record<Permission, boolean>>; brands: Record<string, Permission[]>; policy_version: number; mfa_verified: boolean;
-    pending_ownership_transfer: { id: string; from_email: string } | null };
+    pending_ownership_transfer: { id: string; from_email: string; expires_at: string; keep_previous_owner_as: 'admin' | 'none' } | null };
   mock_providers_enabled: boolean;
   app_env: 'development' | 'test' | 'production';
   /** Present in the implementation: whether this user may create a workspace (POST /api/workspaces). */

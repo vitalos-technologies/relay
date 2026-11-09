@@ -83,11 +83,21 @@ test.describe('signed in', () => {
     await page.getByRole('navigation', { name: 'Breadcrumb' }).getByRole('link', { name: 'Help' }).click();
     await page.waitForURL(/\/help$/);
 
-    // Audience filtering on the server: a member gets the not-found page (no content), and search/bundle leave it out.
-    // (Inside the signed-in app shell the response is streamed, so the HTTP status stays 200; signed out it is 404.)
-    await page.goto(ADMIN_ARTICLE);
+    // Audience filtering on the server: a member gets the not-found page (no content) with a real 404 status (M18: the
+    // decision is made before the app shell streams), and search/bundle leave it out.
+    const res = await page.goto(ADMIN_ARTICLE);
+    expect(res?.status()).toBe(404);
     await expect(page.getByRole('heading', { name: 'Article not available' })).toBeVisible();
     await expect(page.locator('.help-prose')).toHaveCount(0);
+    const raw = await page.request.get(ADMIN_ARTICLE);
+    expect(raw.status()).toBe(404);
+    expect(await raw.text()).not.toContain('help-prose');
+    expect((await page.request.get('/help/getting-started/no-such-article')).status()).toBe(404);
+    expect((await page.request.get('/help/not-a-section')).status()).toBe(404);
+    // Readable articles stay 200; the old /help/article/<slug> links still redirect.
+    expect((await page.request.get(MEMBER_ARTICLE)).status()).toBe(200);
+    const moved = await page.request.get(`/help/article/${MEMBER_ARTICLE.split('/').pop()}`, { maxRedirects: 0 });
+    expect([307, 308]).toContain(moved.status());
     const s = await (await page.request.get('/api/help/search?q=set+up+a+workspace+for+your+team')).json() as { results: Array<{ slug: string }> };
     expect(s.results.map((r) => r.slug)).not.toContain('first-steps-for-workspace-admins');
     const zip = await page.request.get('/api/help/bundle');

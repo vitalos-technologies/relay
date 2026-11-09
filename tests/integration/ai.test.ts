@@ -6,6 +6,10 @@ import { aiStatus, setAiModelClient, suggestForPost, type AiModelClient, type Mo
 import { addMember, closeTestPool, createBrand, createUser, ctxFor, tenant, testPool } from './helpers.js';
 import { seedConnections, seedReadyImage } from './engine-helpers.js';
 
+// Placeholder model ids only (D32: model ids and prices are deployment settings, never values in the repository).
+const MODEL = 'test-model';
+const AI_ENV = ['AI_MODEL', 'AI_MODEL_PRICES', 'AI_FALLBACK_MODELS'] as const;
+
 type Gen = (req: ModelCallRequest) => Promise<ModelCallResult> | ModelCallResult;
 class FakeModel implements AiModelClient {
   readonly fixture = false;
@@ -18,7 +22,7 @@ class FakeModel implements AiModelClient {
 }
 const echo = (map: (t: string, key: string) => string, usage = { inputTokens: 900, outputTokens: 300 }): Gen => (req) => ({
   output: { suggestions: req.input.targets.map((t) => ({ scope: t.key, text: map(t.text, t.key), hashtags: [], note: '' })) },
-  stopReason: 'end_turn', model: 'claude-opus-5-5', ...usage,
+  stopReason: 'end_turn', model: MODEL, ...usage,
 });
 
 const TIP_TEXT = 'League One: Northfield v Southport\nKick-off Sat 7 Nov, 19:45 GMT\n\nPick: Northfield (Match result)\nModel probability: 62.3%. Probabilities are estimates, not promises.\n\nhttps://tipsignal.example/r/1';
@@ -38,6 +42,8 @@ beforeAll(async () => {
   testPool();
   delete process.env.ANTHROPIC_API_KEY;
   delete process.env.AI_FIXTURE;
+  process.env.AI_MODEL = MODEL;
+  process.env.AI_MODEL_PRICES = JSON.stringify({ [MODEL]: [4, 20] });
   resetConfigCache();
   await testPool().query(`DELETE FROM app_settings WHERE key='ANTHROPIC_API_KEY'`);
   t = await tenant();
@@ -47,9 +53,15 @@ beforeAll(async () => {
 afterEach(() => {
   setAiModelClient(null);
   delete process.env.AI_FIXTURE;
+  delete process.env.ANTHROPIC_API_KEY;
+  process.env.AI_MODEL = MODEL;
   resetConfigCache();
 });
-afterAll(closeTestPool);
+afterAll(async () => {
+  for (const k of AI_ENV) delete process.env[k];
+  resetConfigCache();
+  await closeTestPool();
+});
 
 describe('AI suggestions', () => {
   it('is visibly disabled without a key or fixture', async () => {
@@ -57,6 +69,24 @@ describe('AI suggestions', () => {
     expect(s).toMatchObject({ configured: false, reason: 'AI not configured', can_use: false, cap: 200_000 });
     const postId = await makePost({ baseText: 'Hello' });
     await expect(suggestForPost(t.ownerCtx, postId, { task: 'shorten' })).rejects.toMatchObject({ code: 'provider_not_configured', message: expect.stringContaining('AI not configured') });
+  });
+
+  it('stays off without AI_MODEL even when a key (or test client) is present (D32)', async () => {
+    delete process.env.AI_MODEL;
+    process.env.ANTHROPIC_API_KEY = 'sk-ant-test-key-000000';
+    resetConfigCache();
+    expect(await aiStatus(t.ownerCtx)).toMatchObject({ configured: false, model: null, can_use: false });
+    const fake = new FakeModel(echo((x) => x));
+    setAiModelClient(fake);
+    expect(await aiStatus(t.ownerCtx)).toMatchObject({ configured: false, model: null });
+    const postId = await makePost({ baseText: 'Hello' });
+    await expect(suggestForPost(t.ownerCtx, postId, { task: 'shorten' })).rejects.toMatchObject({ code: 'provider_not_configured' });
+    expect(fake.calls).toHaveLength(0);
+    expect((await testPool().query(`SELECT count(*)::int n FROM ai_usage WHERE post_id=$1`, [postId])).rows[0].n).toBe(0);
+    // key + model ⇒ on
+    process.env.AI_MODEL = MODEL;
+    resetConfigCache();
+    expect(await aiStatus(t.ownerCtx)).toMatchObject({ configured: true, model: MODEL });
   });
 
   it('returns checked suggestions without touching the draft, and records usage (IDs + counts only)', async () => {
@@ -74,14 +104,14 @@ describe('AI suggestions', () => {
     expect(after).toEqual(before);
     // prompt contains only post text + voice + limits; no credentials, no asset bytes
     const req = fake.calls[0]!;
-    expect(req.model).toBe('claude-opus-5-5');
+    expect(req.model).toBe(MODEL);
     expect(req.prompt).toContain('A really very good launch');
     expect(req.prompt).toContain('Base copy, shared by X · Demo x, Telegram · Demo telegram');
     expect(req.prompt).not.toMatch(/sk-ant|mock_x_|object_key/);
     const row = (await testPool().query(`SELECT * FROM ai_usage WHERE post_id=$1`, [postId])).rows[0];
-    expect(row).toMatchObject({ task: 'shorten', status: 'ok', input_tokens: 900, output_tokens: 300, user_id: t.owner.id, brand_id: t.brandId, model: 'claude-opus-5-5' });
+    expect(row).toMatchObject({ task: 'shorten', status: 'ok', input_tokens: 900, output_tokens: 300, user_id: t.owner.id, brand_id: t.brandId, model: MODEL });
     expect(Number(row.reserved_tokens)).toBeGreaterThan(16_000);
-    expect(Number(row.cost_estimate_usd)).toBeCloseTo((900 * 4 + 300 * 20) / 1e6, 6);
+    expect(Number(row.cost_estimate_usd)).toBeCloseTo((900 * 4 + 300 * 20) / 1e6, 6); // AI_MODEL_PRICES for the placeholder model
     expect(await used()).toBe(1200);
   });
 

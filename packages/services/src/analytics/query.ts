@@ -13,7 +13,7 @@ import type {
   MetricValue, OverviewResponse, Period, PostFormat, ResponseMeta, SeriesHealth, SeriesStatus, StatusReason, Thumbnail, Trend, TrendPoint, TrendSeries,
   VideoResponse, WorkflowResponse,
 } from '@social-lite/core/contracts/analytics';
-import { CONTENT_SORTS, MEASURE_KEYS } from '@social-lite/core/contracts/analytics';
+import { CHANNEL_TABLE_MEASURES, CONTENT_SORTS, MEASURE_KEYS } from '@social-lite/core/contracts/analytics';
 import { getPool, many, maybeOne } from '@social-lite/db';
 import type { Ctx } from '../context.js';
 import { signedGetUrl } from '../storage.js';
@@ -984,10 +984,17 @@ export async function channels(ctx: Ctx, filters: AnalyticsFilters, opts: { meas
     const latest = follow.latestBefore.get(c.id);
     const sumry = snapshotSummary(snaps.map((s) => ({ date: s.local_date, value: s.value })));
     const supportsF = providerSupports(c.provider, 'followers');
-    const engV = measureFromAggs('engagements', b.aggs.filter((a) => a.connection_id === c.id), posts.length);
+    const connAggs = b.aggs.filter((a) => a.connection_id === c.id);
+    const engV = measureFromAggs('engagements', connAggs, posts.length);
+    // Fix H6: the table's columns are measures (engagements is not a metric family), same computation as the comparison.
+    const measures: ChannelRow['measures'] = CHANNEL_TABLE_MEASURES.map((m) => {
+      const v = m === 'engagements' ? engV : measureFromAggs(m, connAggs, posts.length);
+      const status: SeriesStatus = !providerSupports(c.provider, m) ? 'unsupported' : v.value === null ? (posts.length ? 'not_fetched' : 'ok') : v.value === 0 ? 'zero' : 'ok';
+      return { measure: m, value: providerSupports(c.provider, m) ? v.value : null, status, posts_with_data: v.resources };
+    });
     return {
       connection_id: c.id, brand_id: c.brand_id, provider: c.provider, display_name: c.display_name, connection_status: c.disconnected_at ? 'disconnected' : c.status, is_mock: c.is_mock,
-      posts_published: posts.length, metrics,
+      posts_published: posts.length, metrics, measures,
       followers: { latest: latest?.value ?? null, as_of_date: latest?.local_date ?? null, observed_change: sumry.observed_change,
         snapshots: snaps.map((s) => ({ as_of_date: s.local_date, value: s.value })),
         status: latest ? (latest.value === 0 ? 'zero' : 'ok') : supportsF ? 'not_fetched' : 'unsupported',

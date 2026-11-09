@@ -75,6 +75,32 @@ describe('service accounts', () => {
     expect(sched.rows[0].n).toBe(0);
   });
 
+  it('machine-API drafts honour an Idempotency-Key per service account (M23)', async () => {
+    const { t, owner } = await setup();
+    const a = await createServiceAccount(owner, { name: 'Retry bot', brand_id: t.brandId });
+    const b = await createServiceAccount(owner, { name: 'Other bot', brand_id: t.brandId });
+    const pa = (await authenticateApiKey(bearer(a.key.secret)))!;
+    const pb = (await authenticateApiKey(bearer(b.key.secret)))!;
+    const ctxA = await serviceAccountCtx(pa);
+    const input = { title: 'API draft', text: 'Retry me', tags: ['api'] };
+    const count = async () => (await testPool().query(`SELECT count(*)::int n FROM posts WHERE brand_id=$1 AND source->>'service_account_id'=$2`, [t.brandId, pa.serviceAccountId])).rows[0].n;
+    const first = await createIntegrationDraft(ctxA, pa.serviceAccountId, t.brandId, input, { idempotencyKey: 'retry-key-0001' });
+    const again = await createIntegrationDraft(await serviceAccountCtx(pa), pa.serviceAccountId, t.brandId, input, { idempotencyKey: 'retry-key-0001' });
+    expect(again).toMatchObject({ id: first.id, replayed: true });
+    expect(await count()).toBe(1);
+    // Same key, different body: conflict, nothing created.
+    await expect(createIntegrationDraft(ctxA, pa.serviceAccountId, t.brandId, { ...input, text: 'Different' }, { idempotencyKey: 'retry-key-0001' }))
+      .rejects.toMatchObject({ code: 'idempotency_conflict' });
+    // Keys are per service account: another account reusing the string gets its own draft.
+    const otherSa = await createIntegrationDraft(await serviceAccountCtx(pb), pb.serviceAccountId, t.brandId, input, { idempotencyKey: 'retry-key-0001' });
+    expect(otherSa.id).not.toBe(first.id);
+    // Too-short key: rejected; no key: not deduplicated (backward compatible).
+    await expect(createIntegrationDraft(ctxA, pa.serviceAccountId, t.brandId, input, { idempotencyKey: 'short' })).rejects.toMatchObject({ code: 'validation_failed' });
+    await createIntegrationDraft(ctxA, pa.serviceAccountId, t.brandId, input);
+    expect(await count()).toBe(2);
+    expect((await testPool().query(`SELECT count(*)::int n FROM audit_events WHERE action='post.created' AND resource_id=$1`, [first.id])).rows[0].n).toBe(1);
+  });
+
   it('revoked, expired and rotated-out keys and disabled/expired accounts fail immediately', async () => {
     const { t, owner } = await setup();
     const out = await createServiceAccount(owner, { name: 'Lifecycle', brand_id: t.brandId });

@@ -8,6 +8,7 @@ import {
   acceptInvitation, acceptInvitationForUser, bulkInvite, createInvitation, listInvitations, previewInvitation, resendInvitation, revokeInvitation,
 } from '../../packages/services/src/auth/invitations.js';
 import { sha256, createSession } from '../../packages/services/src/auth/session.js';
+import { sessionInfo } from '../../packages/services/src/workspaces.js';
 import { LoginError } from '../../packages/services/src/auth/users.js';
 import { addMemberGrant, listMembers, revokeGrant } from '../../packages/services/src/members.js';
 import {
@@ -301,5 +302,45 @@ describe('last owner and ownership transfer (§12.8)', () => {
     expect(await loadAccess(t.admin.id, t.ws, testPool())).toMatchObject({ role: 'admin' });
     // Granting owner through the grants API is impossible.
     await expect(addMemberGrant(await v2Ctx(target.id, t.ws), t.admin.id, { role: 'owner' })).rejects.toMatchObject({ code: 'validation_failed' });
+  });
+
+  it('a recipient without members.read sees the transfer in their session and can accept or decline; the proposer can cancel; both sides are told (H4)', async () => {
+    const t = await agency();
+    const editor = await member(t.ws, 'editor', t.brandA);
+    expect(authorize((await v2Ctx(editor.id, t.ws)).access.authz!, 'members.read').allowed).toBe(false);
+    const sessionOf = async (u: { id: string; email: string }) => {
+      const { session } = await createSession(testPool(), u.id, { workspaceId: t.ws });
+      return sessionInfo(session, { userId: u.id, email: u.email, name: null, sessionId: session.id });
+    };
+
+    // Decline: the shell banner's data comes from the session (no members.read needed); DELETE by the recipient = declined.
+    const tr = await proposeOwnershipTransfer(await t.own(), { to_user_id: editor.id, keep_previous_owner_as: 'none' });
+    expect((await sessionOf(editor)).v2.pending_ownership_transfer).toMatchObject({ id: tr.id, from_email: t.owner.email, keep_previous_owner_as: 'none',
+      expires_at: expect.stringMatching(/^\d{4}-/) });
+    expect((await sessionOf(t.admin)).v2.pending_ownership_transfer).toBeNull();
+    const requested = (await testPool().query(`SELECT link_path FROM notifications WHERE user_id=$1 AND kind='ownership.transfer_requested'`, [editor.id])).rows;
+    expect(requested).toEqual([{ link_path: '/overview' }]);
+    expect((await cancelOwnershipTransfer(await v2Ctx(editor.id, t.ws), tr.id)).status).toBe('declined');
+    expect((await sessionOf(editor)).v2.pending_ownership_transfer).toBeNull();
+    const declinedNote = (await testPool().query(`SELECT user_id, link_path FROM notifications WHERE workspace_id=$1 AND kind='ownership.transfer_declined'`, [t.ws])).rows;
+    expect(declinedNote).toEqual([{ user_id: t.owner.id, link_path: '/team' }]);
+    // Someone uninvolved who isn't an owner can't cancel (not found, nothing revealed).
+    const tr2 = await proposeOwnershipTransfer(await t.own(), { to_user_id: editor.id });
+    await expect(cancelOwnershipTransfer(await t.adm(), tr2.id)).rejects.toMatchObject({ code: 'not_found' });
+    // Cancel by the proposer: the recipient is told and the banner goes away.
+    expect((await cancelOwnershipTransfer(await t.own(), tr2.id)).status).toBe('cancelled');
+    expect((await testPool().query(`SELECT user_id FROM notifications WHERE workspace_id=$1 AND kind='ownership.transfer_cancelled'`, [t.ws])).rows)
+      .toEqual([{ user_id: editor.id }]);
+    expect((await sessionOf(editor)).v2.pending_ownership_transfer).toBeNull();
+    const audits = (await testPool().query(`SELECT action FROM audit_events WHERE workspace_id=$1 AND action LIKE 'ownership.%' ORDER BY created_at`, [t.ws])).rows.map((r) => r.action);
+    expect(audits).toEqual(['ownership.transfer_proposed', 'ownership.transfer_declined', 'ownership.transfer_proposed', 'ownership.transfer_cancelled']);
+
+    // Accept with keep_previous_owner_as 'none': the Editor becomes owner and the previous owner keeps no admin role.
+    const tr3 = await proposeOwnershipTransfer(await t.own(), { to_user_id: editor.id, keep_previous_owner_as: 'none' });
+    expect((await acceptOwnershipTransfer(await v2Ctx(editor.id, t.ws), tr3.id)).status).toBe('accepted');
+    expect(await loadAccess(editor.id, t.ws, testPool())).toMatchObject({ role: 'owner' });
+    const prev = (await testPool().query(`SELECT role FROM scoped_role_grants WHERE workspace_id=$1 AND user_id=$2 AND revoked_at IS NULL`, [t.ws, t.owner.id])).rows;
+    expect(prev.map((r) => r.role)).not.toContain('admin');
+    expect(prev.map((r) => r.role)).not.toContain('owner');
   });
 });

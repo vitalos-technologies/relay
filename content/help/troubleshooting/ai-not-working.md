@@ -13,7 +13,7 @@ keywords: [ai error, assistant not working, ai not set up, budget used up]
 
 | You see | Cause | Fix |
 |---|---|---|
-| **AI is not set up** | No AI provider key for your Relay installation. Data steps still run; AI-written parts are skipped. | An Owner adds the key in **Setup**. |
+| **AI is not set up** | Your Relay installation has no AI provider key or no AI model configured (both are needed). Data steps still run; AI-written parts are skipped. | An Owner adds the key in **Setup** and the server administrator sets the model (`AI_MODEL`); **Setup → AI assistance** shows which one is missing. |
 | **Multi-step tasks are on the Professional plan** | Standard includes AI drafting only. | Upgrade, or use **Ask** and composer help. |
 | **AI budget used up** / **Budget used up** | The month's AI tokens are spent. | Wait for the next period or ask an admin to raise the workspace budget within the plan. |
 | **Stopped** / Access revoked | Your access changed during the task. | Check your role; start again. |

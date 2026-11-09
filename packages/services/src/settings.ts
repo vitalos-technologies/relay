@@ -70,7 +70,7 @@ export const SETTING_DEFS: Record<SettingKey, SettingDef> = {
   TIPSIGNAL_SIGNING_SECRET: { key: 'TIPSIGNAL_SIGNING_SECRET', label: 'TipSignal signing secret', secret: true, group: 'tipsignal',
     hint: 'Shared HMAC secret used to verify TipSignal event signatures.', validate: (v) => (v.length >= 16 ? null : 'Use at least 16 characters') },
   ANTHROPIC_API_KEY: { key: 'ANTHROPIC_API_KEY', label: 'Anthropic API key', secret: true, group: 'ai',
-    hint: 'Enables AI-assisted drafting. Stored encrypted; never shown again.', validate: (v) => (/^sk-ant-[A-Za-z0-9_-]{10,}$/.test(v) ? null : 'Anthropic API keys start with sk-ant-'),
+    hint: 'Provider key for AI features (also needs AI_MODEL in the server environment). Stored encrypted; never shown again.', validate: (v) => (/^sk-ant-[A-Za-z0-9_-]{10,}$/.test(v) ? null : 'Anthropic API keys start with sk-ant-'),
     docsUrl: 'https://console.anthropic.com/settings/keys' },
   // ---- V3 social providers
   TIKTOK_CLIENT_KEY: { key: 'TIKTOK_CLIENT_KEY', label: 'TikTok client key', secret: false, group: 'tiktok', hint: `TikTok for Developers → your app → Credentials (Login Kit + Content Posting API). ${cb('tiktok')}`, validate: noWhitespace, docsUrl: 'https://developers.tiktok.com/apps/' },

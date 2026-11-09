@@ -15,6 +15,7 @@ import { processImage, TRANSFORM_VERSION } from '../media/process.js';
 import { deleteObject, ensureBucket, putObject } from '../storage.js';
 import { config } from '../config.js';
 import { serviceActor } from '../service-accounts.js';
+import { beginIdempotent, completeIdempotent } from '../idempotency.js';
 
 export interface IntegrationDraftInput {
   title: string;
@@ -65,25 +66,40 @@ async function storeImage(ctx: Ctx, brandId: string, actorService: string, img: 
   }
 }
 
-/** Create a draft (never scheduled/published) on `brandId` as the service account `serviceAccountId`. */
-export async function createIntegrationDraft(ctx: Ctx, serviceAccountId: string, brandId: string, input: IntegrationDraftInput): Promise<{ id: string }> {
+/**
+ * Create a draft (never scheduled/published) on `brandId` as the service account `serviceAccountId`.
+ * `opts.idempotencyKey` (the machine API's optional `Idempotency-Key`): same key + same request within 24 h returns the
+ * original draft id without creating another; same key + different request is `idempotency_conflict`. Keys are scoped
+ * per service account. Not combined with `image` (only internal integrations send images, without a key).
+ */
+export async function createIntegrationDraft(ctx: Ctx, serviceAccountId: string, brandId: string, input: IntegrationDraftInput,
+  opts: { idempotencyKey?: string | null } = {}): Promise<{ id: string; replayed?: boolean }> {
   requireAction(ctx, 'content.create_draft', { brandId });
   const ws = ctx.access.workspaceId;
   const brand = await one<{ n: number }>(getPool(), `SELECT count(*)::int n FROM brands WHERE id=$1 AND workspace_id=$2 AND archived_at IS NULL`, [brandId, ws]);
   if (!brand.n) throw notFound('Brand');
   const text = input.text.slice(0, 10_000);
   if (!text.trim()) throw new AppError('validation_failed', 'Text is required', { text: 'Required' });
+  const idemKey = opts.idempotencyKey ?? null;
+  if (idemKey !== null && input.image) throw new AppError('internal', 'Idempotent integration drafts cannot carry an image');
+  const idemAction = `api.drafts.create:${serviceAccountId}`;
   const actorService = serviceActor(serviceAccountId);
   const assetId = input.image ? await storeImage(ctx, brandId, actorService, input.image) : null;
   const conns = (await brandConnections(getPool(), ws, brandId)).filter((c) => ['ready', 'expiring'].includes(c.status));
   const draft = { baseText: text, baseLink: null, baseAssetIds: assetId ? [assetId] : [],
     variants: conns.map((c) => ({ connectionId: c.id, inheritText: true, inheritMedia: true })) };
   return withTx(async (tx) => {
+    if (idemKey !== null) {
+      const replay = await beginIdempotent(tx, { workspaceId: ws, userId: serviceAccountId, action: idemAction, key: idemKey,
+        body: { brandId, title: input.title, text: input.text, tags: input.tags ?? [] } });
+      if (replay) return { ...(replay.body as { id: string }), replayed: true };
+    }
     const post = await one<{ id: string }>(tx,
       `INSERT INTO posts(workspace_id, brand_id, created_by, updated_by, title, draft, source, tags) VALUES ($1,$2,NULL,NULL,$3,$4,$5,$6) RETURNING id`,
       [ws, brandId, input.title.slice(0, 200), JSON.stringify(draft), JSON.stringify({ ...(input.source ?? {}), service_account_id: serviceAccountId }), input.tags ?? []]);
     await audit(tx, { workspaceId: ws, brandId, actorService, action: 'post.created', resourceType: 'post', resourceId: post.id,
       diff: { via: 'service_account', key: ctx.actor.sessionId.startsWith('api-key:') ? ctx.actor.sessionId.slice(8) : null }, correlationId: ctx.correlationId });
+    if (idemKey !== null) await completeIdempotent(tx, { workspaceId: ws, action: idemAction, key: idemKey, status: 200, body: { id: post.id } });
     return post;
   });
 }

@@ -1,12 +1,14 @@
 // Facebook Page publishing adapter (Graph API, Page access token).
 //  text/link  → POST /{page-id}/feed   { message, link }
-//  image      → POST /{page-id}/photos { url, caption, published=true }   (caption verified; `message` is deprecated)
-//  album      → prepare: POST /{page-id}/photos { url, published=false } per photo (checkpointed)
+//  image      → POST /{page-id}/photos { url, caption, alt_text_custom?, published=true }   (caption verified; `message` is deprecated)
+//  album      → prepare: POST /{page-id}/photos { url, alt_text_custom?, published=false } per photo (checkpointed)
+//  alt_text_custom = the library alt text (fix H3; core altTextFor).
 //               publish: POST /{page-id}/feed { message, attached_media[n]={"media_fbid":…} }        (V1.1)
 //  video      → POST /{page-id}/videos { file_url, description } ⇒ processing; reconcile polls status  (V1.1)
-import type {
-  AdapterContext, AttemptReference, ConnectionHealth, Checkpoint, PrepareOutcome, ProviderCredentials,
-  PublishConnection, PublishInput, PublishOutcome, PublishingAdapter, ReconcileOutcome,
+import {
+  altTextFor,
+  type AdapterContext, type AttemptReference, type ConnectionHealth, type Checkpoint, type PrepareOutcome, type ProviderCredentials,
+  type PublishConnection, type PublishInput, type PublishOutcome, type PublishingAdapter, type ReconcileOutcome,
 } from '@social-lite/core';
 import {
   capabilitiesFor, facebookPhotoCaption, metaShape, pageIdOf, textMatches, unixSeconds, validateMeta, validationFailureMessage,
@@ -66,7 +68,7 @@ export const facebookAdapter: PublishingAdapter = {
       res = image
         ? await graph<{ id?: string; post_id?: string }>(ctx, {
           method: 'POST', path: `${pageId}/photos`, token, op: 'meta.facebook.photos', publishes: true,
-          params: { url: image.url, caption: facebookPhotoCaption(input.variant.text, input.variant.link) || undefined, published: true },
+          params: { url: image.url, caption: facebookPhotoCaption(input.variant.text, input.variant.link) || undefined, alt_text_custom: altTextFor('facebook', image) ?? undefined, published: true },
         })
         : await graph<{ id?: string }>(ctx, {
           method: 'POST', path: `${pageId}/feed`, token, op: 'meta.facebook.feed', publishes: true,

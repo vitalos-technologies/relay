@@ -26,11 +26,13 @@ each destination.
    - **Media** — a different set or order of media; **Image required** marks networks that need one.
 3. Network-specific fields appear below when the network supports them, for example:
    - **Telegram:** **URL buttons** (label + `https://` link).
-   - **TikTok:** *Who can view*, **Comments**, **Duet**, **Stitch**, disclosure (**Your brand** → *Promotional content*;
+   - **TikTok:** *Who can view*, **Allow comments**, **Allow Duet**, **Allow Stitch** (all off until you turn them on;
+     photo posts show comments only), disclosure (**Your brand** → *Promotional content*;
      **Branded content** → *Paid partnership*), **AI-generated**, **Photo title** (photo posts, up to 90 characters).
    - **YouTube:** **Title**, **Tags**, **Altered or synthetic content**, and whether *Relay uploads at the scheduled time*
      or you *Let YouTube release it* (uploaded early as private; YouTube publishes at the scheduled time).
-   - **Pinterest:** **Board**, **Pin title** (up to 100 characters), **Alt text** (up to 500 characters).
+   - **Pinterest:** **Board**, **Pin title** (up to 100 characters), **Alt text** (up to 500 characters; empty uses the
+     first image's library alt text).
    - **LinkedIn:** **Posting as** (person or organisation), **Visibility** (Anyone / Connections only), **Video title**.
    - Some networks: **Languages** (comma-separated codes, for example `en, de`).
 4. Optional: **Crop** images for this destination only (see [Crop images for each channel](/help/publishing/crop-images-for-each-channel)).

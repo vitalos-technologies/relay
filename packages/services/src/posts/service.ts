@@ -165,7 +165,7 @@ export async function validateDraft(db: Queryable, ctx: Ctx, post: PostRow, conn
     const { facts: media, issues: cropIssues } = await cropAwareMediaFacts(db, ctx.access.workspaceId, v.assetIds, v.options, { connectionId: id, provider: conn.provider });
     issues.push(...cropIssues);
     const linkSeparate = conn.provider === 'facebook' && media.length === 0;
-    const r = validateVariant({ provider: conn.provider, connectionId: id, constraints: caps.constraints, text: v.text, link: v.link, buttons: v.buttons, media, linkIsSeparateField: linkSeparate });
+    const r = validateVariant({ provider: conn.provider, connectionId: id, constraints: caps.constraints, text: v.text, link: v.link, buttons: v.buttons, media, linkIsSeparateField: linkSeparate, options: v.options });
     const outgoing = linkSeparate ? v.text : composeTextWithLink(v.text, v.link);
     per[id] = { ok: r.ok && issues.length === 0, measured_length: measure(outgoing, caps.constraints.textCounting), limit: media.length ? caps.constraints.maxCaptionLength : caps.constraints.maxTextLength, provider: conn.provider };
     results.push({ ok: r.ok && !issues.length, issues: [...issues, ...r.issues] });

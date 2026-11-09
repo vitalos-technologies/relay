@@ -14,6 +14,7 @@ import { loadPost, type PostRow } from '../posts/service.js';
 import { brandConnections, capabilitiesFor, type ConnectionRow } from '../posts/shared.js';
 import type { BrandVoice } from '../brands.js';
 import { AnthropicModelClient, FixtureModelClient, type AiModelClient } from './client.js';
+import { AI_SETUP_HINT, FIXTURE_MODEL, configuredModel, requireModel } from './models.js';
 import { checkSuggestion, type LimitTarget } from './fidelity.js';
 import { SYSTEM_PROMPT, buildUserPrompt, type PromptInput, type PromptTarget } from './prompt.js';
 import { SOURCE_MAX_CHARS, fetchSourceUrl, sanitizeText } from './source.js';
@@ -40,21 +41,23 @@ export function aiFixtureEnabled(): boolean {
   return c.APP_ENV !== 'production' && c.AI_FIXTURE;
 }
 
+/** D32: a real (or test-injected) client needs the provider key AND AI_MODEL; the fixture needs neither. */
 async function resolveClient(): Promise<AiModelClient> {
+  if (!clientOverride && aiFixtureEnabled()) return new FixtureModelClient();
+  if (!configuredModel()) throw new AppError('provider_not_configured', `${NOT_CONFIGURED}. ${AI_SETUP_HINT}`);
   if (clientOverride) return clientOverride;
-  if (aiFixtureEnabled()) return new FixtureModelClient();
   const key = await getSetting('ANTHROPIC_API_KEY');
-  if (!key) throw new AppError('provider_not_configured', `${NOT_CONFIGURED}. An owner can add an Anthropic API key in Setup.`);
+  if (!key) throw new AppError('provider_not_configured', `${NOT_CONFIGURED}. ${AI_SETUP_HINT}`);
   return new AnthropicModelClient(key);
 }
 
 export async function aiStatus(ctx: Ctx, db: Queryable = getPool()): Promise<AiStatus> {
   const fixture = !clientOverride && aiFixtureEnabled();
-  const configured = !!clientOverride || fixture || (await settingSource('ANTHROPIC_API_KEY', db)) !== null;
+  const configured = fixture || (!!configuredModel() && (!!clientOverride || (await settingSource('ANTHROPIC_API_KEY', db)) !== null));
   const u = await readUsage(ctx.access.workspaceId, db);
   return {
     configured, reason: configured ? null : NOT_CONFIGURED, fixture,
-    model: fixture ? 'test-fixture' : config().AI_MODEL,
+    model: fixture ? FIXTURE_MODEL : configured ? configuredModel() : null,
     can_use: configured && canAnywhere(ctx, 'content.edit'),
     period: u.period, used: u.used, cap: u.cap, remaining: u.remaining,
   };
@@ -193,7 +196,7 @@ export async function suggestForPost(ctx: Ctx, postId: string, rawInput: unknown
   // Prompt + atomic reservation BEFORE the call.
   const promptInput: PromptInput = { task: input.task, voice, tone: input.tone, targets, source };
   const prompt = buildUserPrompt(promptInput);
-  const model = config().AI_MODEL;
+  const model = client.fixture ? FIXTURE_MODEL : requireModel();
   const reservation = await reserveTokens(ctx.access.workspaceId, AI_MAX_OUTPUT_TOKENS + estimateInputTokens(SYSTEM_PROMPT, prompt), { userId: ctx.actor.userId, ref: `ai:${ctx.correlationId.slice(0, 64)}` });
   const base = { brandId: post.brand_id, postId: post.id, userId: ctx.actor.userId, task: input.task, correlationId: ctx.correlationId };
 

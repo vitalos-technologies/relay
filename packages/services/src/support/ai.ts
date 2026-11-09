@@ -12,11 +12,11 @@ import { z } from 'zod';
 import { AppError, notFound } from '@social-lite/core';
 import { SUPPORT_AI_TASKS, type SupportAiDraftDto, type SupportAiTask, type SupportTicketCategory, type SupportTicketStatus } from '@social-lite/core/contracts/v4-support';
 import { getPool, many, maybeOne, one, type Queryable } from '@social-lite/db';
-import { config } from '../config.js';
 import { enforceRateLimit } from '../ratelimit.js';
 import { isUuid } from '../tenancy.js';
 import { platformAudit, type PlatformCtx } from '../admin/platform.js';
 import { NOT_CONFIGURED_MESSAGE, resolveAssistantClient } from '../assistant/client.js';
+import { requireModel } from '../ai/models.js';
 import { quoteData } from '../assistant/guard.js';
 import { requireSupportStaff } from './access.js';
 
@@ -118,7 +118,7 @@ export async function runSupportAssist(p: PlatformCtx, ref: string, raw: unknown
     } else {
       provider = client.provider;
       try {
-        const res = await client.generate({ model: config().AI_MODEL, maxTokens: MAX_OUTPUT_TOKENS, system: SYSTEM, prompt: buildPrompt(t, task) });
+        const res = await client.generate({ model: requireModel(), maxTokens: MAX_OUTPUT_TOKENS, system: SYSTEM, prompt: buildPrompt(t, task) });
         tokens = { in: res.inputTokens, out: res.outputTokens };
         if (!res.output) { state = 'failed'; error = 'The AI provider returned no usable answer.'; }
         else {

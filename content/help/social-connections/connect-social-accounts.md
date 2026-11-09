@@ -66,13 +66,21 @@ can publish (for example *Image · Album · Reel*), and whether analytics are av
 |---|---|
 | State badge | One honest label: Connected, Missing permission, Awaiting platform approval, Unsupported for this account, Reconnect required, Manual handoff, Limited access, Expires soon, Paused, Verifying, Disconnected. See [Connection states and fixes](/help/social-connections/connection-status-and-fixes). |
 | **Publishes** | The post formats this destination accepts in Relay (Text, Image, Album, Video, Reel). |
-| **Analytics** | Whether Relay expects to read post statistics for this destination. See the note below. |
+| **Analytics** | Whether Relay reads post statistics for this destination: **Available** or **Not available**. See below. |
 | **Expires** | When the network's sign-in expires (reconnect before then). |
 | **Rate limited until** | The network asked Relay to slow down; publishing to this destination resumes after this time. |
 
-> **Note:** For Facebook, Instagram, X and Telegram the card currently shows **Analytics: Not available** even when
-> Relay does read post statistics for Facebook, Instagram and X (Telegram genuinely provides none). Use the
-> **Analytics** pages to see what was actually collected. This is a known display issue.
+**Analytics** is **Available** when Relay reads post statistics for the account:
+
+- **Facebook** and **Instagram:** when the account allowed Meta's insights permission (`read_insights` /
+  `instagram_manage_insights`). Relay records what was allowed when you connect and at every connection check; without
+  it the card shows **Not available** — reconnect and allow insights once the workspace requests them.
+- **X:** always (public metrics). Each read is billed by X and counts against the workspace's X reads cap.
+- **TikTok, YouTube, LinkedIn:** when the analytics permission was granted. **Threads, Pinterest, Bluesky:** always.
+- **Telegram:** never — Telegram provides no post statistics.
+
+The same answer appears in [Connection health](/help/social-connections/connection-status-and-fixes) and to AI tools
+through MCP. Use the **Analytics** pages to see what was actually collected.
 
 ## Manage a connection
 

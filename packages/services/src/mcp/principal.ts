@@ -7,7 +7,7 @@
 // (requireAction / authorizeCtx / assertBrand / brandFilter) enforces them without MCP-specific code paths.
 import { randomUUID } from 'node:crypto';
 import { AppError, PERMISSIONS, type Permission } from '@social-lite/core';
-import { MCP_SCOPE_PERMISSIONS, isMcpScope, type McpScope } from '@social-lite/core/contracts/mcp';
+import { MCP_SCOPE_PERMISSIONS, isMcpScope, type McpErrorCode, type McpScope } from '@social-lite/core/contracts/mcp';
 import { getPool, many, maybeOne, type Queryable } from '@social-lite/db';
 import type { Ctx } from '../context.js';
 import { loadAccess } from '../tenancy.js';
@@ -16,7 +16,8 @@ import { config } from '../config.js';
 import type { ClientRow, McpPrincipal } from './auth.js';
 
 export class McpToolError extends Error {
-  constructor(readonly code: string, message: string, readonly details?: Record<string, unknown>) {
+  /** `code` is typed against MCP_ERROR_CODES so every code a tool can return is in the published list. */
+  constructor(readonly code: McpErrorCode, message: string, readonly details?: Record<string, unknown>) {
     super(message);
     this.name = 'McpToolError';
   }
@@ -111,13 +112,13 @@ export function requireHuman(s: CallScope, what = 'This action'): void {
 export function toToolError(err: unknown): McpToolError {
   if (err instanceof McpToolError) return err;
   if (err instanceof AppError) {
-    const map: Record<string, string> = {
+    const map: Record<string, McpErrorCode> = {
       not_found: 'not_found', forbidden: 'forbidden', validation_failed: 'validation_failed', version_conflict: 'version_conflict',
       conflict: 'conflict', invalid_state: 'invalid_state', idempotency_conflict: 'idempotency_conflict', rate_limited: 'rate_limited',
       budget_exhausted: 'budget_exhausted', mfa_required: 'mfa_required', step_up_required: 'mfa_required', unauthenticated: 'forbidden',
       provider_not_configured: 'not_configured', entitlement_required: 'entitlement_required',
     };
-    const code = err.details?.reason === 'ambiguous_time' ? 'needs_choice' : err.details?.reason === 'approval_required' ? 'approval_required' : (map[err.code] ?? 'internal');
+    const code: McpErrorCode = err.details?.reason === 'ambiguous_time' ? 'needs_choice' : err.details?.reason === 'approval_required' ? 'approval_required' : (map[err.code] ?? 'internal');
     // Details are already user-safe in services (no secrets); pass through a small allow-list only.
     const details: Record<string, unknown> = {};
     for (const k of ['issues', 'per_destination', 'options', 'current', 'reason', 'retry_after_seconds', 'conflict_copy_id', 'feature', 'allowance', 'upgrade_to', 'access']) if (err.details?.[k] !== undefined) details[k] = err.details[k];

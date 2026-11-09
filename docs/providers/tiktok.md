@@ -98,7 +98,10 @@ Video endpoint accepts up to 10 min (creator limit from creator_info). Images: W
 **Required Direct Post UX (T7)** — enforced as required provider fields in `variant.options.tiktok`:
 - creator nickname shown; latest creator_info fetched at post time (prepare re-queries it);
 - `privacyLevel` chosen manually from `privacy_level_options` (**no default**; validated against creator_info);
-- `allowComment/allowDuet/allowStitch` off by default; ignored (and greyed out) when the creator disabled them;
+- `allowComment/allowDuet/allowStitch` off by default (unset ⇒ sent as `disable_*: true`); the composer reads live
+  creator_info (`GET /api/connections/:id/tiktok-creator-info`) and greys out an interaction the creator disabled, and
+  prepare re-reads creator_info and always sends a creator-disabled interaction as disabled; photo posts show and send
+  Comment only (fix H1, 2026-11-09);
 - commercial disclosure: `brandOrganic` ("Your brand" → "Promotional content"), `brandContent` ("Branded
   content" → "Paid partnership"); branded content **cannot be `SELF_ONLY`**;
 - `consent: true` — content is sent only after express consent (Music Usage Confirmation / Branded Content

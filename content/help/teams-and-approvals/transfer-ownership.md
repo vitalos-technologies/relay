@@ -9,7 +9,7 @@ related: [suspend-or-remove-a-member, roles-and-permissions, step-up-verificatio
 product_version: "2026-11"
 reviewed: 2026-11-09
 order: 51
-keywords: [owner, change owner, ownership, last owner]
+keywords: [owner, change owner, ownership, last owner, accept ownership, decline, cancel transfer]
 ---
 
 Ownership never changes through the role picker. It moves only through a transfer that the new owner accepts.
@@ -24,15 +24,29 @@ Ownership never changes through the role picker. It moves only through a transfe
 ## Propose the transfer
 
 1. Go to **Team** ([/team](/team)) and open the member.
-2. Select **Make owner**, read *Requires fresh sign-in. They must accept; you stay as admin.*, and select
-   **Send transfer**.
-3. **Result:** "Transfer sent — they must accept". The person is notified in the app. The proposal **expires after 7 days**.
+2. Select **Make owner**. Read *Requires fresh sign-in. They must accept within 7 days.*
+3. Choose what happens to you after they accept: **Stay as Admin** (default) or **Give up your access** (you keep only
+   other roles you already hold, if any). Select **Send transfer**.
+4. **Result:** "Transfer sent — they must accept". The person is notified in the app. The proposal **expires after 7 days**.
 
-## Accept (new owner)
+While it's pending, **Team** and the member's page show *Ownership transfer to <email> pending*, with who sent it and
+when it expires.
 
-1. Open **Team**. A banner says *<email> wants you to become the owner*.
-2. Select **Accept ownership**. You need a fresh, two-step-verified sign-in.
-3. **Result:** in one step you become Owner and the previous owner becomes **Admin**. Owners and admins are notified.
+## Accept or decline (new owner)
+
+The new owner doesn't need any Team permissions: a banner at the top of **every page** says
+*<email> wants you to become the owner of <workspace>*, with the expiry. The notification leads there too.
+
+- **Accept ownership:** confirm, then complete a fresh, two-step-verified sign-in if Relay asks. **Result:** in one step
+  you become Owner and the previous owner becomes **Admin** (or keeps no admin role, if they chose that). Owners and
+  admins are notified.
+- **Decline:** confirm. The current owner stays the owner and is notified that you declined.
+
+## Cancel a pending transfer
+
+On **Team** or the member's page, select **Cancel transfer** and confirm. The proposed owner is notified. The person
+who proposed it, the proposed owner (by declining) and any owner can end a pending transfer. Every step is recorded in the
+audit log: proposed, accepted, declined, cancelled.
 
 ## What can stop a transfer
 
@@ -47,9 +61,5 @@ Removing either person cancels a pending transfer automatically.
 
 ## Limitations
 
-- The app always keeps the previous owner as **Admin**; to remove them afterwards, the new owner removes or changes them
-  like any member.
-- The **Accept ownership** banner is shown on the Team page, which needs `members.read`. A recipient whose roles don't
-  include it (for example an Editor) can't see the banner; give them Admin first, or ask Relay support.
-- There is no button to cancel or decline a pending transfer in the app today; it lapses after 7 days, or ends when
-  either person is removed. (Reported as a gap.)
+- The banner shows the transfer for the workspace you have open. If you belong to several workspaces, switch to the one
+  named in the notification.

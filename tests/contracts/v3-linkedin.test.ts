@@ -169,6 +169,25 @@ describe('linkedin reconcile and health', () => {
     expect((await linkedinAdapter.health(ctxWith(t('abc123', [])), member(), { ...creds, expiresAt: '2026-11-10T00:00:00Z' })).status).toBe('expiring');
     expect((await linkedinAdapter.health(ctxWith(t('abc123', [])), member(), creds)).status).toBe('ready');
   });
+
+  // Fix (F1, lead follow-up 2026-11-09): simulated member connections flipped to reconnect_required at the first health
+  // sweep because their id (`mock_linkedin_…`, no URN prefix) never equalled `urn:li:person:<sub>`.
+  it('health: a simulated member connection (id = the simulator\'s sub) stays ready through the real simulator', async () => {
+    const id = 'mock_linkedin_0a1b2c3d4e5f';
+    const s = simulated(linkedinFake, 'linkedin', id);
+    const h = await linkedinAdapter.health(s.ctx, { id: 'c-sim', provider: 'linkedin', providerAccountId: id, displayName: 'Sim', username: null, isMock: true, metadata: {} }, { kind: 'mock', token: 'tok' });
+    expect(h.status).toBe('ready');
+    expect(s.state.calls.some((r) => r.url.endsWith('/v2/userinfo'))).toBe(true);
+  });
+
+  it('health: a real member is still strict — a bare sub equal to the id, or another member, flips to reconnect', async () => {
+    const t = (sub: string) => new RecordingTransport(() => res(200, { sub }));
+    // Live connection whose id is not a URN must not pass the simulated-only comparison.
+    expect((await linkedinAdapter.health(ctxWith(t('mock_linkedin_x')), member({ providerAccountId: 'mock_linkedin_x' }), creds)).status).toBe('reconnect_required');
+    expect((await linkedinAdapter.health(ctxWith(t('someone-else')), member(), creds)).status).toBe('reconnect_required');
+    // A simulated connection answered by a different simulated member also flips.
+    expect((await linkedinAdapter.health(ctxWith(t('mock_linkedin_other')), member({ providerAccountId: 'mock_linkedin_x', isMock: true, metadata: {} }), { kind: 'mock', token: 'tok' })).status).toBe('reconnect_required');
+  });
 });
 
 describe('linkedin simulator scenarios', () => {

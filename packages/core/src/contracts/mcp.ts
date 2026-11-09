@@ -130,7 +130,7 @@ export const MCP_ERROR_CODES = [
   'not_found', 'forbidden', 'insufficient_scope', 'consent_required', 'client_revoked', 'mfa_required', 'validation_failed',
   'version_conflict', 'conflict', 'invalid_state', 'idempotency_conflict', 'in_progress', 'rate_limited', 'budget_exhausted',
   'approval_required', 'needs_choice', 'intent_stale', 'intent_expired', 'confirmation_required', 'unsupported_principal',
-  'source_connections_unavailable', 'result_too_large', 'cancelled', 'not_configured', 'internal',
+  'source_connections_unavailable', 'result_too_large', 'cancelled', 'not_configured', 'entitlement_required', 'internal',
 ] as const;
 export type McpErrorCode = (typeof MCP_ERROR_CODES)[number];
 

@@ -4,7 +4,7 @@
 //  publish: com.atproto.repo.createRecord with that rkey (publishes:true). A repeated create of the same rkey
 //           cannot make a second post; a lost response is reconciled with getRecord (absent ⇒ not published).
 import {
-  composeTextWithLink, utf8Length, validateVariant,
+  altTextFor, composeTextWithLink, utf8Length, validateVariant,
   type AdapterContext, type AttemptReference, type ChannelCapabilities, type ChannelConstraints, type Checkpoint,
   type ConnectionHealth, type PrepareOutcome, type ProviderCredentials, type PublishConnection, type PublishInput,
   type PublishOutcome, type PublishingAdapter, type ReconcileOutcome, type ValidationIssue, type ValidationResult,
@@ -117,13 +117,17 @@ async function prepare(ctx: AdapterContext, input: PublishInput, checkpoint: Che
 
 export function postRecord(input: PublishInput, p: Prepared): Record<string, unknown> {
   const o = optsOf(input);
-  const alt = (i: number) => (Array.isArray(o.altTexts) && typeof o.altTexts[i] === 'string' ? o.altTexts[i]! : '');
+  // `alt` is required by app.bsky.embed.images: a per-post override (options.altTexts[i]) or the library alt text (fix H3), else ''.
+  const alt = (i: number, assetId: string) => {
+    const m = input.media.find((x) => x.assetId === assetId) ?? input.media[i];
+    return (m ? altTextFor('bluesky', m, Array.isArray(o.altTexts) ? o.altTexts[i] : undefined) : null) ?? '';
+  };
   return {
     $type: POST_COLLECTION,
     text: p.text,
     createdAt: p.createdAt,
     ...(p.facets.length ? { facets: p.facets } : {}),
-    ...(p.blobs.length ? { embed: { $type: 'app.bsky.embed.images', images: p.blobs.map((b, i) => ({ alt: alt(i), image: b.blob, ...(b.width && b.height ? { aspectRatio: { width: b.width, height: b.height } } : {}) })) } } : {}),
+    ...(p.blobs.length ? { embed: { $type: 'app.bsky.embed.images', images: p.blobs.map((b, i) => ({ alt: alt(i, b.assetId), image: b.blob, ...(b.width && b.height ? { aspectRatio: { width: b.width, height: b.height } } : {}) })) } } : {}),
     ...(Array.isArray(o.langs) && o.langs.length ? { langs: o.langs.slice(0, 3) } : {}),
   };
 }

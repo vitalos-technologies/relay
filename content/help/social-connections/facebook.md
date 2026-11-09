@@ -62,8 +62,8 @@ The insights permission is requested only when the owner has switched it on in *
 | Format | In Relay | How it is sent |
 |---|---|---|
 | Text / link | Text, optional link | Feed post; the link is sent as Facebook's separate link field so a preview card appears |
-| Photo | One image | Photo post; the link (if any) is appended to the caption |
-| Multi-photo | 2–10 images (Relay limit — Meta documents no maximum) | Photos are uploaded unpublished first, then attached to one post |
+| Photo | One image | Photo post; the link (if any) is appended to the caption; the image's library alt text is sent as its alt text |
+| Multi-photo | 2–10 images (Relay limit — Meta documents no maximum) | Photos are uploaded unpublished first (each with its alt text), then attached to one post |
 | Video | One video | Page video; Facebook processes it before it appears |
 
 ## Limits

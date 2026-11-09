@@ -336,7 +336,7 @@ function WhatsAppDialog({ channel, onClose, onChanged }: { channel: InboxChannel
   const t = useApi<{ items: Array<{ name: string; language: string; category: string | null; status: string; body: string }>; refreshed_at: string | null; rates: Record<string, { amount: number; currency: string }> | null }>(`/api/inbox/channels/${channel.id}/templates`);
   const [busy, setBusy] = useState<string | null>(null);
   const [rates, setRates] = useState<Record<string, string> | null>(null);
-  const r = rates ?? Object.fromEntries(['marketing', 'utility', 'authentication'].map((k) => [k, t.data?.rates?.[k] ? String(t.data.rates[k]!.amount) : '']));
+  const r = rates ?? Object.fromEntries(['marketing', 'utility', 'authentication', 'service'].map((k) => [k, t.data?.rates?.[k] ? String(t.data.rates[k]!.amount) : '']));
   const currency = Object.values(t.data?.rates ?? {})[0]?.currency ?? 'GBP';
   const [cur, setCur] = useState<string | null>(null);
   return (
@@ -358,9 +358,9 @@ function WhatsAppDialog({ channel, onClose, onChanged }: { channel: InboxChannel
         ) : null}
         <fieldset className="flex flex-col gap-2 rounded-lg border border-border p-3">
           <legend className="px-1 text-xs font-medium text-subtle">Rate card for estimates</legend>
-          <p className="text-xs text-muted">Meta charges per delivered template; rates vary by recipient country. Enter typical rates to show an estimate before sending, or leave empty to show “charged” only.</p>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {['marketing', 'utility', 'authentication'].map((k) => <Field key={k} label={k[0]!.toUpperCase() + k.slice(1)}><Input inputMode="decimal" value={r[k] ?? ''} onChange={(e) => setRates({ ...r, [k]: e.target.value })} /></Field>)}
+          <p className="text-xs text-muted">Meta charges per delivered message: templates, and replies once the number’s 1,000 free service messages a month are used. Rates vary by recipient country. Enter typical rates to show an estimate before sending, or leave empty to show “charged” only.</p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+            {['marketing', 'utility', 'authentication', 'service'].map((k) => <Field key={k} label={k[0]!.toUpperCase() + k.slice(1)}><Input inputMode="decimal" value={r[k] ?? ''} onChange={(e) => setRates({ ...r, [k]: e.target.value })} /></Field>)}
             <Field label="Currency"><Input value={cur ?? currency} maxLength={3} onChange={(e) => setCur(e.target.value.toUpperCase())} /></Field>
           </div>
           <div><Button size="sm" variant="primary" loading={busy === 'rates'} onClick={async () => {

@@ -6,7 +6,7 @@ import { inflateRawSync } from 'node:zlib';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { audiencesFor, parseFrontMatter, parseYamlSubset, validateFrontMatter } from '@social-lite/services/help/schema';
 import { renderHelpMarkdown, slugifyHeading } from '@social-lite/services/help/markdown';
-import { articleFor, readHelpLibrary, readableArticles, relatedFor, searchHelp, sectionsFor, stem } from '@social-lite/services/help/library';
+import { articleFor, helpPathDecision, readHelpLibrary, readableArticles, relatedFor, searchHelp, sectionsFor, stem } from '@social-lite/services/help/library';
 import { runDocsCheck, appRoutePatterns } from '@social-lite/services/help/check';
 import { buildHelpBundle, crc32, unzipEntries, zipFiles } from '@social-lite/services/help/bundle';
 
@@ -121,6 +121,31 @@ describe('audiences and filtering (server-side rules)', () => {
     const intro = lib.bySlug.get('what-is-relay')!;
     expect(relatedFor(lib, intro, ['public']).map((a) => a.slug)).toEqual(['glossary']);
     expect(relatedFor(lib, intro, member).map((a) => a.slug)).toEqual(['schedule-a-post', 'glossary']);
+  });
+
+  it('decides 404s and redirects before the shell streams (M18: real status for signed-in readers)', () => {
+    const lib = readHelpLibrary(join(root, 'content/help'));
+    const member = { signedIn: true, audiences: audiencesFor({ signedIn: true }) };
+    const admin = { signedIn: true, audiences: audiencesFor({ signedIn: true, admin: true }) };
+    const out = { signedIn: false, audiences: audiencesFor({ signedIn: false }) };
+    const tour = lib.bySlug.get('admin-console-tour')!;
+    const sched = lib.bySlug.get('schedule-a-post')!;
+    // Out-of-audience = unknown: the same 404, nothing revealed.
+    expect(helpPathDecision(lib, tour.href, member)).toEqual({ kind: 'not_found' });
+    expect(helpPathDecision(lib, `/help/${tour.section}/nope-not-here`, member)).toEqual({ kind: 'not_found' });
+    expect(helpPathDecision(lib, tour.href, admin)).toEqual({ kind: 'ok' });
+    // Signed out, member articles render the sign-in prompt (no content); unknown ones are 404.
+    expect(helpPathDecision(lib, sched.href, out)).toEqual({ kind: 'ok' });
+    expect(helpPathDecision(lib, `/help/${sched.section}/nope-not-here`, out)).toEqual({ kind: 'not_found' });
+    // Sections and redirects.
+    expect(helpPathDecision(lib, `/help/${sched.section}`, member)).toEqual({ kind: 'ok' });
+    expect(helpPathDecision(lib, '/help/not-a-section', member)).toEqual({ kind: 'not_found' });
+    expect(helpPathDecision(lib, `/help/article/${sched.slug}`, member)).toEqual({ kind: 'redirect', href: sched.href, permanent: false });
+    const otherSection = tour.section === sched.section ? 'getting-started' : tour.section;
+    expect(helpPathDecision(lib, `/help/${otherSection}/${sched.slug}`, member)).toEqual({ kind: 'redirect', href: sched.href, permanent: true });
+    expect(helpPathDecision(lib, `/help/article/${tour.slug}`, member)).toEqual({ kind: 'not_found' });
+    // Paths the Help Centre doesn't own.
+    for (const p of ['/help', '/help/contact', '/help/requests', '/help/requests/SR-123', '/overview']) expect(helpPathDecision(lib, p, member)).toBeNull();
   });
 
   it('search covers title, keywords, headings, summary and body — only what the reader may open', () => {

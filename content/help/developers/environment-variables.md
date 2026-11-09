@@ -141,7 +141,7 @@ Each of these can be an environment variable or be entered on the setup page (in
 | Pinterest | `PINTEREST_APP_ID`, `PINTEREST_APP_SECRET` (secret), `PINTEREST_ACCESS_TIER` (`trial` or `standard`) |
 | Google Drive and Docs | `GOOGLE_CONTENT_CLIENT_ID`, `GOOGLE_CONTENT_CLIENT_SECRET` (secret), `GOOGLE_PICKER_API_KEY`, `GOOGLE_PICKER_APP_ID` |
 | Notion | `NOTION_CLIENT_ID`, `NOTION_CLIENT_SECRET` (secret), `NOTION_INTERNAL_TOKEN` (secret; single internal test workspace only, not in production), `NOTION_WEBHOOK_VERIFICATION_TOKEN` (secret) |
-| AI assistance | `ANTHROPIC_API_KEY` (secret), `AI_MODEL` (environment only; defaults to the model id pinned in `config.ts`) |
+| AI assistance | `ANTHROPIC_API_KEY` (secret). Environment only: `AI_MODEL` (required: the provider's model id; no default, so AI stays off until it is set), `AI_FALLBACK_MODELS` (optional comma-separated model ids for which Relay requests the provider's server-side refusal fallback), `AI_MODEL_PRICES` (optional JSON `{"<model id>": [input, output]}` in USD per million tokens; without a price, cost estimates show as unknown). Invalid values stop the server at start-up with the variable name. The setup page shows each as set or not set, never the value |
 | TipSignal | `TIPSIGNAL_SIGNING_SECRET` (secret) |
 | Asana | `ASANA_CLIENT_ID`, `ASANA_CLIENT_SECRET` (secret) |
 | monday.com | `MONDAY_CLIENT_ID`, `MONDAY_CLIENT_SECRET` (secret), `MONDAY_SIGNING_SECRET` (secret), `MONDAY_API_VERSION` (`YYYY-MM`) |

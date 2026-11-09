@@ -21,7 +21,7 @@ export interface AiSuggestResponse {
   suggestions: AiSuggestion[]; usage: { input: number; output: number; remaining: number; cap: number };
   fixture: boolean; model: string; post_version: number; notices: string[];
 }
-export interface AiStatusResponse { configured: boolean; reason: string | null; fixture: boolean; model: string; can_use: boolean; period: string; used: number; cap: number; remaining: number }
+export interface AiStatusResponse { configured: boolean; reason: string | null; fixture: boolean; model: string | null; can_use: boolean; period: string; used: number; cap: number; remaining: number }
 
 const TASKS: Array<{ id: Task; label: string; help: string; Icon: typeof Scissors }> = [
   { id: 'shorten', label: 'Shorten', help: 'Tighter copy. Facts and links are kept.', Icon: Scissors },

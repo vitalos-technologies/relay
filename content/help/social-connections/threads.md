@@ -63,7 +63,8 @@ extended and must be granted again. Each profile can publish **250** posts throu
 | Video | MOV/MP4, H.264/HEVC, AAC, 23–60 fps, ≤ 1920 px wide, aspect 0.01:1–10:1, up to 5 min, ≤ 1 GB | Same |
 | Carousel | 2–20 images/videos | Same |
 
-On text-only posts the link is sent as a link attachment (preview); with media it is appended to the text.
+On text-only posts the link is sent as a link attachment (preview); with media it is appended to the text. Images and
+videos carry their library alt text (up to 1,000 characters).
 
 ## Scheduling and publishing
 
@@ -89,5 +90,6 @@ needed. A lost answer is resolved from the container's status, which tells Relay
 |---|---|
 | Threads: text is … of 500 allowed (emojis count as their UTF-8 bytes). | Remove characters or emoji. |
 | Link limit exceeded | Use 5 links or fewer. |
+| Threads: alt text of the image is … of 1000 characters. | Shorten the image's alt text in **Content library**. |
 | Container expired | Relay rebuilds it automatically; if it keeps failing, re-upload the media. |
 | Rate limited | 250 posts per 24 h reached; Relay retries later. |

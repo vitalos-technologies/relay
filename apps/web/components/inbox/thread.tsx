@@ -9,7 +9,7 @@ import type { ConversationDetail, PersonRef, ReplyAttemptDto, ReplyMode, ThreadC
 import { api, isApiError } from '@/lib/client/api';
 import { useApi } from '@/lib/client/use-api';
 import { useSession } from '@/lib/client/session';
-import { Badge, Banner, Button, IconButton, Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger, SimulatedBadge, useToast } from '@/components/ui';
+import { Badge, Banner, Button, Checkbox, IconButton, Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger, SimulatedBadge, useToast } from '@/components/ui';
 import { ConversationComposer, type ComposerMode } from '@/components/conversation/composer';
 import { ConversationTimeline, type TimelineEntryView } from '@/components/conversation/timeline';
 import { AssistantButton } from '@/components/assistant/assistant-panel'; // V3.5 stream E
@@ -42,6 +42,9 @@ export function InboxThread({ id, onBack, onDetails, onChanged }: { id: string; 
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
   const [conflict, setConflict] = useState<(ThreadChangedDetails & { message: string; reason: string }) | null>(null);
+  // H2: a charged WhatsApp reply needs an explicit acknowledgement (the server refuses it otherwise: charge_ack_required).
+  const [chargeFromServer, setChargeFromServer] = useState<{ note: string } | null>(null);
+  const [ackCharge, setAckCharge] = useState(false);
   const sendKey = useRef<string | null>(null);
   const [noteMentions, setNoteMentions] = useState<string[]>([]);   // stream B: @mentions in internal notes
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
@@ -97,18 +100,27 @@ export function InboxThread({ id, onBack, onDetails, onChanged }: { id: string; 
         toast.success('Note added');
       } else {
         sendKey.current ??= newKey();
-        const r = await api.post<{ attempt: ReplyAttemptDto }>(`/api/inbox/conversations/${id}/replies`, { mode, body, base_version: composeBase ?? c.version, idempotency_key: sendKey.current, acknowledge_version: acknowledge ?? null });
+        const r = await api.post<{ attempt: ReplyAttemptDto }>(`/api/inbox/conversations/${id}/replies`, { mode, body, base_version: composeBase ?? c.version, idempotency_key: sendKey.current, acknowledge_version: acknowledge ?? null, acknowledge_charge: ackCharge });
         toast.info(r.attempt.state === 'queued' ? 'Sending…' : ATTEMPT_LABEL[r.attempt.state]);
       }
       sendKey.current = null;
       setBody('');
       setComposeBase(null);
       setConflict(null);
+      setChargeFromServer(null);
+      setAckCharge(false);
       writeLocalDraft(id, null);
       await refetch();
       onChanged();
     } catch (e) {
-      if (isApiError(e) && e.code === 'conflict' && e.details && typeof e.details.current_version === 'number') {
+      if (isApiError(e) && e.details?.reason === 'charge_ack_required') {
+        // Nothing was queued: show the charge and wait for the acknowledgement.
+        const ch = e.details.charge as { note?: string } | undefined;
+        setChargeFromServer({ note: ch?.note ?? e.message });
+        setAckCharge(false);
+        sendKey.current = null;
+        toast.info('Confirm the charge to send');
+      } else if (isApiError(e) && e.code === 'conflict' && e.details && typeof e.details.current_version === 'number') {
         setConflict({ ...(e.details as unknown as ThreadChangedDetails), message: e.message, reason: String(e.details.reason) });
         sendKey.current = null; // nothing was queued: a new decision gets a new key
         await refetch();
@@ -117,7 +129,7 @@ export function InboxThread({ id, onBack, onDetails, onChanged }: { id: string; 
         toast.error(e, 'Not sent');
       }
     } finally { setBusy(false); }
-  }, [c, body, mode, id, refetch, onChanged, toast, composeBase, noteMentions]);
+  }, [c, body, mode, id, refetch, onChanged, toast, composeBase, noteMentions, ackCharge]);
 
   const entries = useMemo<TimelineEntryView[]>(() => {
     if (!c) return [];
@@ -271,6 +283,11 @@ export function InboxThread({ id, onBack, onDetails, onChanged }: { id: string; 
                 <Button size="sm" variant="secondary" onClick={() => { setConflict(null); setComposeBase(conflict.current_version); }}>Reviewed</Button>
                 {!conflict.changes.some((x) => x.kind === 'pending_reply') ? <Button size="sm" variant="primary" onClick={() => void send(conflict.current_version)}>Send anyway</Button> : null}
               </div>
+            </Banner>
+          ) : mode !== 'note' && c.channel.kind === 'whatsapp' && (chargeFromServer || c.reply.service_charge?.billable) ? (
+            <Banner tone="warn" title="This reply is charged">
+              <p className="text-[13px]">{chargeFromServer?.note ?? c.reply.service_charge?.note}</p>
+              <div className="mt-2"><Checkbox label="I understand this message is charged" checked={ackCharge} onChange={(e) => setAckCharge(e.target.checked)} /></div>
             </Banner>
           ) : composing.length ? (
             <p className="flex items-center gap-1.5 text-xs text-warn"><Users aria-hidden className="size-3.5" />{composing.map((p) => personName(p.user)).join(', ')} {composing.length > 1 ? 'are' : 'is'} writing a reply</p>

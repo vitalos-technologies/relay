@@ -41,16 +41,28 @@ sources:
 ## Replying
 
 1. Open the conversation in **Inbox**. The composer shows whether the 24-hour window is open.
-2. **Inside the window:** type a reply and send.
+2. **Inside the window:** type a reply and send. While the number still has free service messages this month, the
+   reply is free. Once they are used up, the composer shows **This reply is charged** and you tick
+   **I understand this message is charged** before sending.
 3. **Outside the window:** choose an approved **template** and fill in its parameters.
-4. If the message is chargeable, Relay shows the charge first (category and, if the owner entered a rate card for the
-   channel, an estimate) and asks you to **acknowledge the charge** before sending. The server re-checks this.
+4. Every template is charged: marketing, authentication and **utility templates, inside the window too**. Relay shows
+   the charge first (category and, if the owner entered a rate card for the channel, an estimate) and asks you to
+   **acknowledge the charge** before sending. The server re-checks this; nothing is queued without it.
 5. After sending, the price Meta reports for the message is stored and shown on it; failures reported later by Meta
    appear on the message too.
 
-> **Warning:** Relay currently treats a **utility template sent inside an open window as free** and does not ask for
-> charge acknowledgement in that case. Meta resumed charging for these on 1 October 2026. Until Relay is updated,
-> assume utility templates are charged.
+## How Relay counts free service messages
+
+- Relay counts the free-form replies it has sent from the number this month, including ones still sending. It starts
+  counting at the earliest moment Meta's month can begin in any time zone, so it may show a charge slightly early
+  around the start of a month, but never shows a charged reply as free because of its count.
+- As soon as Meta reports a service message as **billable** this month, Relay treats the free messages as used up.
+- Relay can't see messages sent from the same number by other tools. If you use other tools, Meta's count may run out
+  earlier than Relay's; Meta's pricing on each sent message is shown on it.
+- Free entry point conversations (started from a Click-to-WhatsApp ad) are free with Meta, but Relay can't detect
+  them, so it still shows the charge.
+- Automated replies (rules, AI workflows, satisfaction surveys) can't acknowledge a charge, so they aren't sent once a
+  reply would be charged.
 
 ## When a send's result is lost
 

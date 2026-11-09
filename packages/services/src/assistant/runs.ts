@@ -16,13 +16,13 @@ import { PRIORITIES } from '@social-lite/core/contracts/v35-inbox';
 import { getPool, many, maybeOne, one, withTx, type Queryable } from '@social-lite/db';
 import type { Ctx } from '../context.js';
 import { audit } from '../audit.js';
-import { config } from '../config.js';
 import { log } from '../log.js';
 import { writeOutbox } from '../outbox.js';
 import { canAnywhere } from '../access.js';
 import { enforceRateLimit } from '../ratelimit.js';
 import { assertUuid, authorizeCtx, loadAccess, requireAction } from '../tenancy.js';
-import { AI_METER, costEstimateUsd, readUsage, reserveTokens } from '../ai/usage.js';
+import { AI_METER, readUsage, reserveTokens } from '../ai/usage.js';
+import { costEstimateUsd, requireModel } from '../ai/models.js';
 import { readMeterUsage, releaseUsage, settleUsage } from '../product/budgets.js';
 import { NOT_CONFIGURED_MESSAGE, assistantConfigured, resolveAssistantClient, type AssistantModelOutput } from './client.js';
 import { checkOutput, countInjections, verifyQuote } from './guard.js';
@@ -102,7 +102,7 @@ async function runDto(db: Queryable, r: RunRow): Promise<AssistantRunDto> {
   return {
     id: r.id, surface: r.surface as AssistantRunDto['surface'], task: (r.task === 'auto_reply' ? 'suggest_reply' : r.task), context: r.context, brand_id: r.brand_id,
     status: r.status, status_detail: r.status_detail, output: r.output, sources: r.sources, actions: actions.map(actionDto),
-    usage: r.status === 'succeeded' || r.input_tokens ? { input_tokens: r.input_tokens, output_tokens: r.output_tokens, cost_estimate_usd: Number(r.cost_estimate_usd) } : null,
+    usage: r.status === 'succeeded' || r.input_tokens ? { input_tokens: r.input_tokens, output_tokens: r.output_tokens, cost_estimate_usd: r.model ? costEstimateUsd(r.model, r.input_tokens, r.output_tokens) : null } : null,
     provider: r.provider, model: r.model, latency_ms: r.latency_ms, requested_by: who ? { id: who.id, name: who.name ?? who.email } : null, automated: !!r.automation_run_id,
     created_at: r.created_at.toISOString(), finished_at: r.finished_at?.toISOString() ?? null,
   };
@@ -278,7 +278,7 @@ export async function executeRun(runId: string, workerId: string): Promise<Assis
     ? `If <person_request> contains text, translate exactly that text (for example a reply draft). Otherwise translate ${r.context.type === 'conversation' ? 'the customer\'s latest message' : 'the post\'s base copy'}.`
     : null;
   const prompt = buildAssistantPrompt({ task: r.task, allowed, request, targetLanguage, sources, extra });
-  const model = config().AI_MODEL;
+  const model = requireModel(); // the client resolved, so AI_MODEL is set
   let reservation;
   try {
     reservation = await reserveTokens(r.workspace_id, ASSISTANT_MAX_OUTPUT_TOKENS + Math.ceil((ASSISTANT_SYSTEM_PROMPT.length + prompt.length) / 3) + 1_500, { userId: r.requested_by, ref: `ai-run:${r.id}` });
@@ -302,7 +302,8 @@ export async function executeRun(runId: string, workerId: string): Promise<Assis
   }
   const latency = Date.now() - t0;
   const servedModel = res.model || model;
-  const cost = costEstimateUsd(servedModel, res.inputTokens, res.outputTokens);
+  // Stored for reference (0 when no price is configured); readers compute estimates from tokens × configured prices.
+  const cost = costEstimateUsd(servedModel, res.inputTokens, res.outputTokens) ?? 0;
   await settleUsage(reservation.id, res.inputTokens + res.outputTokens).catch(() => undefined);
   await db.query(
     `INSERT INTO ai_usage(workspace_id, brand_id, post_id, user_id, model, task, status, period, reserved_tokens, input_tokens, output_tokens, cost_estimate_usd, correlation_id, ai_run_id)

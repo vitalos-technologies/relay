@@ -7,7 +7,7 @@ export const isVideoMedia = (m: Pick<PublishMedia, 'kind' | 'mime'>): boolean =>
 export function factsOf(media: PublishInput['media']): MediaFacts[] {
   return media.map((m) => ({
     assetId: m.assetId, status: 'ready', mime: m.mime, bytes: m.bytes, width: m.width, height: m.height,
-    kind: m.kind, durationMs: m.durationMs, videoCodec: m.videoCodec, audioCodec: m.audioCodec, frameRate: m.frameRate,
+    kind: m.kind, durationMs: m.durationMs, videoCodec: m.videoCodec, audioCodec: m.audioCodec, frameRate: m.frameRate, altText: m.altText,
   }));
 }
 

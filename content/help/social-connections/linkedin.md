@@ -68,8 +68,8 @@ sources:
 | Format | In Relay | Notes |
 |---|---|---|
 | Text | Text, link appended | |
-| Image | One image | |
-| Multi-image | 2–20 images | Images only |
+| Image | One image | The image's library alt text is sent with it |
+| Multi-image | 2–20 images | Images only; each image's alt text is sent |
 | Video | One video | Optional **Video title** in the LinkedIn variant |
 
 The LinkedIn variant also has **Visibility**: *Public* or *Connections only*. Connections-only applies to profile posts;

@@ -61,7 +61,9 @@ export async function metaHealth(
   try {
     const perms = await grantedPermissions(ctx, permToken);
     if (perms.ok) {
-      const missing = missingScopes(required, grantedFrom(perms.data));
+      const granted = grantedFrom(perms.data);
+      metadata.granted_scopes = granted; // refreshes capabilities.canReadMetrics (insights permissions; fix H7)
+      const missing = missingScopes(required, granted);
       if (missing.length) {
         return {
           status: 'missing_permission', checkedAt, missingPermissions: missing, metadata,

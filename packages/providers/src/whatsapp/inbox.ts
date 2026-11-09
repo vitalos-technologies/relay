@@ -7,14 +7,16 @@
 //    attempt id there so a send whose response was lost is reconciled from the status webhook (no list API exists).
 //  - Free-form messages only inside the 24 h customer service window (since the customer's last message); outside it
 //    only approved templates (error 131047 otherwise).
-//  - Pricing: per-message pricing since 2025-07-01 — template messages are charged per DELIVERED message by category
-//    (marketing / utility / authentication) and recipient country; service (free-form) messages are free; utility
-//    templates sent inside an open customer service window are free. Actual pricing per message arrives in the
-//    status webhook (`pricing {billable, pricing_model, category, type}`) and is stored on the message.
+//  - Pricing (re-checked 2026-11-09, developers.facebook.com/docs/whatsapp/pricing): per DELIVERED message by category
+//    (marketing / utility / authentication / service) and recipient country. Since 2026-10-01 utility templates inside
+//    an open customer service window are charged, and service (free-form) messages are charged after 1,000 free per
+//    month per business phone number (see core/contracts/whatsapp-charges.ts). Actual pricing per message arrives in
+//    the status webhook (`pricing {billable, pricing_model, category, type}`) and is stored on the message.
 //  - Templates: GET /{waba-id}/message_templates?fields=name,language,status,category,components.
 //  - Webhooks object=whatsapp_business_account, field=messages: value.messages[] (inbound), value.statuses[]
 //    (sent/delivered/read/failed + pricing). Signature X-Hub-Signature-256 (connector ingress verifier 'whatsapp').
 //  - Media: GET /{media-id} → {url, mime_type}; the url needs the same Bearer token (host lookaside.fbsbx.com).
+import { whatsAppChargeFor, type WhatsAppChargeNotice, type WhatsAppRates, type WhatsAppServiceAllowance } from '@social-lite/core/contracts/whatsapp-charges';
 import { TransportError, type AdapterContext, type ProviderCredentials, type PublishConnection } from '@social-lite/core';
 import type {
   ChannelCapability, InboundItem, InboxAdapter, ReplyRulesInput, ReplyRulesResult, SendReplyResult, TemplateInfo, TemplateSend,
@@ -132,14 +134,13 @@ export function whatsAppReplyRules(i: ReplyRulesInput): ReplyRulesResult {
   return { allowed: false, code: 'reply_window_closed', message: 'More than 24 hours since the customer last wrote. Send an approved template instead (charged by Meta).' };
 }
 
-/** The charge shown BEFORE sending (Meta per-message pricing; exact rates depend on the recipient's country). */
-export function whatsAppCharge(input: { template: TemplateSend | null; windowOpen: boolean; rates?: Partial<Record<'marketing' | 'utility' | 'authentication', { amount: number; currency: string }>> | null }): { billable: boolean; category: string; estimate: { amount: number; currency: string } | null; note: string } {
-  if (!input.template) return { billable: false, category: 'service', estimate: null, note: 'Free: a reply inside the 24-hour customer service window.' };
-  const cat = input.template.category ?? 'marketing';
-  if (cat === 'utility' && input.windowOpen) return { billable: false, category: 'utility', estimate: null, note: 'Free: a utility template inside the 24-hour customer service window.' };
-  if (cat === 'service') return { billable: false, category: 'service', estimate: null, note: 'Free: a service message.' };
-  const rate = input.rates?.[cat as 'marketing' | 'utility' | 'authentication'] ?? null;
-  return { billable: true, category: cat, estimate: rate, note: `Charged by Meta per delivered message (${cat} rate for the recipient’s country).` };
+/**
+ * The charge shown BEFORE sending (Meta per-message pricing; exact rates depend on the recipient's country). Rules live in
+ * core (`whatsAppChargeFor`): from 2026-10-01 utility templates inside the window are charged, and service replies are
+ * charged once the number's 1,000 free service messages for the month are used.
+ */
+export function whatsAppCharge(input: { template: TemplateSend | null; windowOpen: boolean; now?: Date; service?: WhatsAppServiceAllowance | null; rates?: WhatsAppRates | null }): WhatsAppChargeNotice {
+  return whatsAppChargeFor({ template: input.template ? { category: input.template.category } : null, windowOpen: input.windowOpen, now: input.now ?? new Date(), service: input.service ?? null, rates: input.rates ?? null });
 }
 
 function templateComponents(t: TemplateSend): unknown[] {

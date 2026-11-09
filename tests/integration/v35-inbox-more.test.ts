@@ -151,12 +151,21 @@ describe('V3.5 stream B — WhatsApp', () => {
     expect(sent).toHaveLength(1);
     expect(sent[0]).toMatchObject({ template: 'we_miss_you', callback: `relay-attempt:${t.attempt.id}` });
 
-    // Customer writes again → window open: free-form is free; a utility template inside the window is free too.
+    // Customer writes again → window open: free-form is within the free service tier; a utility template inside the
+    // window is CHARGED since Meta's 2026-10-01 change (H2), so it needs the acknowledgement too.
     await simulateInbound(w.owner, ch.id, { kind: 'dm', text: 'Thanks', thread: sent[0]!.waId });
     c = await only(w);
-    expect((await send(w.agent, c.id, 'You are welcome!', 'private_message')).state).toBe('sent');
-    const u = await send(w.agent, c.id, 'template', 'private_message', { template: { name: 'order_update', language: 'en', params: ['Wes', '#42'] } });
-    expect(u.attempt.charge).toMatchObject({ billable: false, category: 'utility' });
+    expect(c.reply.service_charge).toMatchObject({ billable: false, category: 'service' });
+    const free = await send(w.agent, c.id, 'You are welcome!', 'private_message');
+    expect(free.state).toBe('sent');
+    expect(free.attempt.charge).toMatchObject({ billable: false, category: 'service' });
+    const utility = { name: 'order_update', language: 'en', params: ['Wes', '#42'] };
+    c = await getConversation(w.agent, c.id);
+    await expect(requestReply(w.agent, c.id, { mode: 'private_message', body: 'template', base_version: c.version, idempotency_key: key(), template: utility } as never))
+      .rejects.toMatchObject({ details: { reason: 'charge_ack_required', charge: { billable: true, category: 'utility' } } });
+    const u = await send(w.agent, c.id, 'template', 'private_message', { template: utility, acknowledge_charge: true });
+    expect(u.state).toBe('sent');
+    expect(u.attempt.charge).toMatchObject({ billable: true, category: 'utility' });
 
     // Status webhook: delivered/read receipts + actual pricing from the provider.
     const phone = ch.external_account_id;
@@ -168,6 +177,47 @@ describe('V3.5 stream B — WhatsApp', () => {
     const d = await getConversation(w.agent, c.id);
     const out = d.timeline.find((x) => x.type === 'message' && x.message.external_id === msgId);
     expect(out?.type === 'message' && out.message).toMatchObject({ delivery: 'read', pricing: { billable: true, category: 'marketing' } });
+  });
+
+  it('service replies are charged once the number has used its 1,000 free service messages this month (H2)', async () => {
+    const w = await world();
+    const { ch } = await wa(w);
+    await simulateInbound(w.owner, ch.id, { kind: 'dm', text: 'Hello?', name: 'Ola' });
+    let c = await only(w);
+    const first = await send(w.agent, c.id, 'Hi Ola', 'private_message');
+    expect(first.attempt.charge).toMatchObject({ billable: false, category: 'service' });
+    // 998 more service messages sent through Relay this month on the same number → 999 used: one free message left.
+    await testPool().query(
+      `INSERT INTO inbox_reply_attempts SELECT (jsonb_populate_record(NULL::inbox_reply_attempts, to_jsonb(a) || jsonb_build_object('id', gen_random_uuid(),
+         'idempotency_key', 'bulk-' || g, 'state', 'sent', 'provider_message_id', NULL))).* FROM inbox_reply_attempts a, generate_series(1, 998) g WHERE a.id=$1`, [first.attempt.id]);
+    c = await getConversation(w.agent, c.id);
+    expect(c.reply.service_charge).toMatchObject({ billable: false });
+    expect((await send(w.agent, c.id, 'The 1,000th', 'private_message')).attempt.charge).toMatchObject({ billable: false });
+    // Allowance used: the next one is charged and must be acknowledged before anything is queued.
+    c = await getConversation(w.agent, c.id);
+    expect(c.reply.service_charge).toMatchObject({ billable: true, category: 'service' });
+    await expect(requestReply(w.agent, c.id, { mode: 'private_message', body: 'One more', base_version: c.version, idempotency_key: key() }))
+      .rejects.toMatchObject({ details: { reason: 'charge_ack_required', charge: { billable: true, category: 'service' } } });
+    const charged = await send(w.agent, c.id, 'One more', 'private_message', { acknowledge_charge: true });
+    expect(charged.state).toBe('sent');
+    expect(charged.attempt.charge).toMatchObject({ billable: true, category: 'service' });
+  });
+
+  it('a service message Meta already priced as billable this month means the free tier is used up, even if Relay counted fewer (H2)', async () => {
+    const w = await world();
+    const { i, ch } = await wa(w);
+    await simulateInbound(w.owner, ch.id, { kind: 'dm', text: 'Hello?', name: 'Pia' });
+    const c = await only(w);
+    const r = await send(w.agent, c.id, 'Hi Pia', 'private_message');
+    const sent = await simulatedWhatsAppSent({ store: store() }, (await testPool().query(`SELECT external_account_id FROM integration_connections WHERE id=$1`, [i.id])).rows[0].external_account_id);
+    const mine = sent.find((x) => x.callback === `relay-attempt:${r.attempt.id}`)!;
+    await ingestWhatsAppPayload({ object: 'whatsapp_business_account', entry: [{ changes: [{ field: 'messages', value: { metadata: { phone_number_id: ch.external_account_id }, statuses: [
+      { id: mine.id, status: 'delivered', timestamp: '1', recipient_id: mine.waId, pricing: { billable: true, pricing_model: 'PMP', category: 'service', type: 'regular' } },
+    ] } }] }] }, true);
+    const d = await getConversation(w.agent, c.id);
+    expect(d.reply.service_charge).toMatchObject({ billable: true, category: 'service' });
+    await expect(requestReply(w.agent, c.id, { mode: 'private_message', body: 'Again', base_version: d.version, idempotency_key: key() }))
+      .rejects.toMatchObject({ details: { reason: 'charge_ack_required' } });
   });
 
   it('AT13: lost send response confirmed by the status webhook marker; attachments fetched safely on request', async () => {
