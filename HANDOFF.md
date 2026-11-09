@@ -1,6 +1,6 @@
 # Relay — handoff (read this first)
 
-Last updated: 2026-11-08 13:52 UTC
+Last updated: 2026-11-09 10:24 UTC
 
 ## Resume in a new session / another Claude account
 1. Clone `https://github.com/vitalos-technologies/relay` (branch `main`; the lead pushes after each milestone). Working dir used here: `/home/user/social-lite`.
@@ -68,9 +68,9 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
 5. V3.1 Admin **done** (see below; tag v3.1.1 suggested on the admin commit)
 6. Collaboration completion **done** (0f0bcd9; migration 027; docs/collaboration/*). Full E2E 56 passed / 1 skipped; unit 505; integration 413. Open: security.spec back-channel logout test needs its own user isolation; decisions taken by lead: email never includes post titles, clients can comment on shared reviews (on), change feed 7 d / presence 10 min retention, demo collab data kept.
 6b. (Support inbox proposal → superseded by V4.) Platform host restriction (ops.<domain>, office/VPN IPs) is an activation item.
-7. **V3.5** (`docs/queue/03f_V3_5_PROMPT.md`) **done** — foundation (102498a), streams B–E (33f3e12), stream F (admin + MCP + wiring + final docs; `docs/v3-5/*`). Open for user: Inbox in phone bottom bar; main nav grouping (copy-cleanup pass). → 7b. **V4 done** commercial + customer support (`docs/queue/03g_V4_PROMPT.md`: Relay support tickets, Platform → Support, plans/trials/subscriptions/billing via Stripe test mode behind a billing service, entitlements, tenant lifecycle; no Stripe keys in this environment → build against a provider interface with a test double + locally signed webhook fixtures; never request keys in chat) → 7c. **V5 done** (`docs/queue/03h_V5_PROMPT.md`, queued by the user 2026-11-08: one-page marketing site, Standard £10 / Professional £25 per user per month + 14-day trial on V4's billing, marketing support widget → Platform → Support, AI workspace with real workflows) → 8. Copy cleanup (03e) → 9. Docs + Help Centre (04) → 10. One consolidated activation checklist + user reminder.
+7. **V3.5** (`docs/queue/03f_V3_5_PROMPT.md`) **done** — foundation (102498a), streams B–E (33f3e12), stream F (admin + MCP + wiring + final docs; `docs/v3-5/*`). Open for user: Inbox in phone bottom bar; main nav grouping (copy-cleanup pass). → 7b. **V4 done** commercial + customer support (`docs/queue/03g_V4_PROMPT.md`: Relay support tickets, Platform → Support, plans/trials/subscriptions/billing via Stripe test mode behind a billing service, entitlements, tenant lifecycle; no Stripe keys in this environment → build against a provider interface with a test double + locally signed webhook fixtures; never request keys in chat) → 7c. **V5 done** (`docs/queue/03h_V5_PROMPT.md`, queued by the user 2026-11-08: one-page marketing site, Standard £10 / Professional £25 per user per month + 14-day trial on V4's billing, marketing support widget → Platform → Support, AI workspace with real workflows) → 8. **Copy cleanup done** (03e) → 9. Docs + Help Centre (04) → 10. One consolidated activation checklist + user reminder.
 
-## Current state (keep updated) — 2026-11-08 13:52 UTC
+## Current state (keep updated) — 2026-11-09 10:24 UTC
 - Working branch for this session: **`claude/dazzling-pasteur-8yny50`** (pushed after each milestone; merge to `main` via PR
   when the user asks). Working dir `/home/user/relay`.
 - **V3.5 complete** (stream F committed: 8eb8d35): tsc clean, unit 564, integration 489/489,
@@ -87,9 +87,11 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
   Marketing; support widget (037) on the V4 support service; AI workspace with five real workflows (038). Full E2E
   113 passed / 0 failed / 9 skipped; unit 624; integration 592/592; mobile QA 56 checks 0 overflow; `/` LCP 232 ms desktop
   / 1.7 s throttled mobile, CLS 0. Docs `docs/v5/*` (matrix, test, perf, mobile, gaps, activation). Decisions D21–D27.
-- **Next in the queue:** copy cleanup (`docs/queue/03e_COPY_CLEANUP_PROMPT.md`, includes the open nav-grouping and phone
-  bottom-bar decisions) → Docs + Help Centre (`04`) → one consolidated activation checklist (merge `docs/v3-5`, `docs/v4`,
-  `docs/v5` checklists) + the user reminder.
+- **Copy cleanup done** (aca4a26; streams CA/CB/CC, notes `docs/copy-progress/*`) incl. user decisions D28 (grouped nav
+  Publish · Engage · Insights · Workspace; Connections = Social accounts + Business apps tabs) and D29 (role-based phone
+  bar). Unit 630, integration 592/592; full E2E confirmation run after the last selector fix: see the lead's next update.
+- **Next in the queue:** Docs + Help Centre (`docs/queue/04_DOCUMENTATION_PROMPT.md`) → one consolidated activation
+  checklist (merge `docs/v3-5`, `docs/v4`, `docs/v5` checklists) + the user reminder (top of this file).
 - **If this session is gone:** everything through V5 is committed on `claude/dazzling-pasteur-8yny50`; `wip/streams` holds
   only snapshots of in-flight stream work (stale once a phase is committed). Restore with `git cherry-pick --no-commit origin/wip/streams` on a clean tree, then relaunch each stream with
   its progress note + the briefing.
@@ -98,9 +100,8 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
   pnpm db:seed && pnpm db:seed:e2e`. Migrations 001–038 applied (033 and 039 unused); next free **040**. Web = production
   build on :3000 (`next start`), worker = `apps/worker/dist/main.mjs`; rebuild/restart/Playwright only under
   `flock -o .data/devserver-v2.lock …`, servers started with `3>&- 9>&-`.
-- **Open user decisions:** Inbox in the phone bottom bar for inbox users (lead recommends replacing Planner for them);
-  main nav grouping (proposal in `docs/v3-5-progress/final.md`) — decide in the copy-cleanup pass; V3.1 Admin G-A1 / G-A5;
-  marketing palette (V5 mockup is purple; app brand is orange) — record in DECISIONS when V5 starts.
+- **Open user decisions:** V3.1 Admin G-A1 / G-A5; widget default (off); MFA before a self-serve owner's first paid plan;
+  marketing palette decided (D24: purple on marketing only).
 - **Activation items collected so far** (final consolidated list after Docs + Help Centre): see
   `docs/v3-5/FINAL_ACTIVATION_CHECKLIST.md` (V3.5) — plus V4/V5: Stripe live keys + products/prices for Standard and
   Professional + webhook endpoint, final allowances and grace policy, support staff assignments, email sender, billing/
