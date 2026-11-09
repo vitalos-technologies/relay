@@ -125,7 +125,8 @@ function InboxRow({ a, tz, expanded, onToggle }: { a: InboxItem; tz: string; exp
             </span>
           ) : null}
           {a.destinations.length ? <span className="hidden sm:block"><PlatformStack providers={a.destinations.map((x) => x.provider)} size="sm" /></span> : null}
-          <Badge tone={d.tone} className="shrink-0" icon={<ToneIcon tone={d.tone === 'neutral' ? 'neutral' : d.tone} className="size-3.5" />}>{d.label}</Badge>
+          {/* Waiting rows sit under the Waiting filter; the badge would only repeat it. */}
+          {a.decision !== 'pending' ? <Badge tone={d.tone} className="shrink-0" icon={<ToneIcon tone={d.tone === 'neutral' ? 'neutral' : d.tone} className="size-3.5" />}>{d.label}</Badge> : null}
           <ArrowRight aria-hidden className="hidden size-4 shrink-0 text-subtle sm:block" />
         </Link>
       </div>

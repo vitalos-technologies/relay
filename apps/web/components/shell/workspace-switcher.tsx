@@ -23,7 +23,7 @@ export function WorkspaceSwitcher({ compact }: { compact?: boolean }) {
       // Drop every cache from the previous workspace (memory, storage, other tabs), then hard-reload.
       enterWorkspace(id);
     } catch (e) {
-      toast.error(e, 'Could not switch workspace');
+      toast.error(e, 'Couldn’t switch workspace');
       setBusy(false);
     }
   };

@@ -1,0 +1,7 @@
+/accounts/diagnostics
+
+Connections
+Test centre
+Read-only
+Connections
+Not turned on

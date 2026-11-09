@@ -1,0 +1,39 @@
+/team/invitations?new=1
+
+[DIALOG]
+Invite
+Member
+Guest reviewer
+Email
+Role
+Editor
+Publisher
+Approver
+Brand manager
+Analyst
+Viewer
+Exporter
+Admin
+
+Draft, upload, submit
+
+Brands (none = all)
+TipSignal (demo)
+Vitalos (demo)
+Teams
+Editorial
+Publishing
+Publishing
+TipSignal desk
+Cancel
+Send
+(unavailable: Enter an email)
+[PAGE]
+Team
+Bulk
+Invite
+Members
+Invitations
+Teams
+Held posts
+No open invitations

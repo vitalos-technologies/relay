@@ -1,0 +1,113 @@
+/overview
+
+Overview
+Sunday 8 November · GMT · All brands
+Create post
+Scheduled
+1
+Next 7 days
+In review
+0
+Awaiting a decision
+Published
+0
+Last 7 days
+Issues
+8
+Unresolved deliveries
+Upcoming
+Planner
+Tomorrow
+Scheduled: spring check-in
+09:00 GMT
+Instagram (simulated): Scheduled
+Facebook (simulated): Scheduled
+Telegram (simulated): Scheduled
+X (simulated): Scheduled
+Vitalos (demo)
+Scheduled
+Performance
+· 28 days
+Demo data
+Analytics
+
+No network data yet
+
+0 of 0 posts reporting
+Needs attention8
+
+Partial: event reminder
+Simulated
+
+Vitalos X — rejects posts (simulated) · Missed: the publish-before deadline passed before this could be sent (for example during downtime or a pause). Review and reschedule if still relevant.
+
+Expired
+Resolve
+Vitalos X — rejects posts (simulated) (expired)
+
+Partial: event reminder
+Simulated
+
+Vitalos Facebook (simulated) · Missed: the publish-before deadline passed before this could be sent (for example during downtime or a pause). Review and reschedule if still relevant.
+
+Expired
+Resolve
+Vitalos Facebook (simulated) (expired)
+
+Published: welcome post
+Simulated
+
+Vitalos X (simulated) · Missed: the publish-before deadline passed before this could be sent (for example during downtime or a pause). Review and reschedule if still relevant.
+
+Expired
+Resolve
+Vitalos X (simulated) (expired)
+
+Partial: event reminder
+Simulated
+
+Vitalos Instagram (simulated) · Missed: the publish-before deadline passed before this could be sent (for example during downtime or a pause). Review and reschedule if still relevant.
+
+Expired
+Resolve
+Vitalos Instagram (simulated) (expired)
+
+Published: welcome post
+Simulated
+
+Vitalos Telegram (simulated) · Missed: the publish-before deadline passed before this could be sent (for example during downtime or a pause). Review and reschedule if still relevant.
+
+Expired
+Resolve
+Vitalos Telegram (simulated) (expired)
+
+Published: welcome post
+Simulated
+
+Vitalos Instagram (simulated) · Missed: the publish-before deadline passed before this could be sent (for example during downtime or a pause). Review and reschedule if still relevant.
+
+Expired
+Resolve
+Vitalos Instagram (simulated) (expired)
+
+Published: welcome post
+Simulated
+
+Vitalos Facebook (simulated) · Missed: the publish-before deadline passed before this could be sent (for example during downtime or a pause). Review and reschedule if still relevant.
+
+Expired
+Resolve
+Vitalos Facebook (simulated) (expired)
+
+Partial: event reminder
+Simulated
+
+Vitalos Telegram (simulated) · Missed: the publish-before deadline passed before this could be sent (for example during downtime or a pause). Review and reschedule if still relevant.
+
+Expired
+Resolve
+Vitalos Telegram (simulated) (expired)
+Channel health
+Connections
+
+All connections healthy

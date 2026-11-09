@@ -58,7 +58,7 @@ export async function adminOverview(ctx: Ctx, db: Queryable = getPool()): Promis
       `SELECT count(*)::int n, min(requested_at) oldest FROM approvals WHERE workspace_id=$1 AND decision='pending' AND ($2::uuid[] IS NULL OR brand_id = ANY($2))`, [ws, brands]);
     const oldH = ap.oldest ? (Date.now() - ap.oldest.getTime()) / 3600_000 : 0;
     cards.push({ key: 'approvals', label: 'Approval backlog', state: ap.n === 0 ? 'healthy' : oldH > 24 ? 'degraded' : 'healthy', value: ap.n,
-      detail: ap.oldest ? `Oldest ${ago(ap.oldest)}` : 'Inbox clear', href: '/admin/approvals' });
+      detail: ap.oldest ? `Oldest ${ago(ap.oldest)}` : 'Nothing waiting', href: '/admin/approvals' });
   }
 
   if (can('connections.read')) {
@@ -81,7 +81,7 @@ export async function adminOverview(ctx: Ctx, db: Queryable = getPool()): Promis
     const qAge = q.oldest ? (Date.now() - q.oldest.getTime()) / 1000 : 0;
     const state: HealthState = hbAge > 60 ? 'failed' : qAge > 120 ? 'degraded' : 'healthy';
     cards.push({ key: 'queue', label: 'Queue and workers', state, value: q.n,
-      detail: hbAge === Infinity ? 'No worker seen' : `Oldest due ${qAge ? ago(q.oldest) : '—'} · worker ${ago(hb!.last)} ago`, href: '/admin/operations' });
+      detail: hbAge === Infinity ? 'No worker seen' : `${qAge ? `Oldest due ${ago(q.oldest)} · worker` : 'Worker'} seen ${ago(hb!.last)} ago`, href: '/admin/operations' });
   }
 
   if (can('analytics.read')) {
@@ -121,7 +121,7 @@ export async function adminOverview(ctx: Ctx, db: Queryable = getPool()): Promis
     const support = await one<{ active: number; pending: number }>(db,
       `SELECT count(*) FILTER (WHERE status='active' AND expires_at > now())::int active, count(*) FILTER (WHERE status='requested' AND request_expires_at > now())::int pending
          FROM support_access_grants WHERE workspace_id=$1 AND status IN ('requested','active')`, [ws]);
-    cards.push({ key: 'security', label: 'Security events · 7 d', state: support.pending ? 'degraded' : 'healthy', value: s.n,
+    cards.push({ key: 'security', label: 'Security events · 7 days', state: support.pending ? 'degraded' : 'healthy', value: s.n,
       detail: support.active ? `Support access active` : support.pending ? `${plural(support.pending, 'support request')} waiting` : 'Access and sign-in changes',
       href: support.pending || support.active ? '/admin/security/support' : '/admin/security/audit?category=security' });
     const rows = await many<{ id: string; action: string; created_at: Date; actor: string | null; resource_type: string }>(db,

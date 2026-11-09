@@ -8,7 +8,7 @@ import { useSearchParams } from 'next/navigation';
 import { Fingerprint, KeyRound, LifeBuoy, LogOut, MonitorSmartphone, ShieldCheck, ShieldAlert, Smartphone } from 'lucide-react';
 import { api, isApiError, stepUpHref } from '@/lib/client/api';
 import { useApi } from '@/lib/client/use-api';
-import { fmtRelative } from '@/lib/client/format';
+import { fmtRelative, plural } from '@/lib/client/format';
 import { useBrowserTimeZone } from '@/lib/client/hooks';
 import {
   Badge, Banner, Button, Card, CardHeader, ConfirmDialog, ErrorState, InfoTip, PageHeader, SkeletonRows, TimeWithZone, useToast,
@@ -75,7 +75,7 @@ export function SecurityPage() {
       window.location.assign(r.redirect_url);
     } catch (e) {
       setBusy(null);
-      if (!(isApiError(e) && e.code === 'step_up_required')) toast.error(e, 'Could not start');
+      if (!(isApiError(e) && e.code === 'step_up_required')) toast.error(e, 'Couldn’t start');
     }
   };
 
@@ -112,7 +112,7 @@ export function SecurityPage() {
         ) : setup === 'mfa' && !hasFactor ? (
           <Banner tone="info" title="Set up two-step verification first" />
         ) : null}
-        {!f.available ? <Banner tone="warn" title="Sign-in methods unavailable">The identity provider could not be reached.</Banner> : null}
+        {!f.available ? <Banner tone="warn" title="Sign-in methods unavailable">Couldn’t reach the sign-in provider. Try again later.</Banner> : null}
 
         <Card aria-labelledby="mfa-h">
           <CardHeader id="mfa-h" title={<span className="inline-flex items-center gap-2">Two-step verification <InfoTip label="About two-step verification">Managed by the identity provider. Removing a method or regenerating codes asks you to verify again.</InfoTip></span>} />
@@ -149,7 +149,7 @@ export function SecurityPage() {
         <Card aria-labelledby="sess-h">
           <CardHeader id="sess-h" title="Sessions" actions={data.sessions.length > 1 ? (
             <Button size="sm" variant="secondary" icon={<LogOut aria-hidden className="size-4" />} data-testid="revoke-others"
-              onClick={() => setConfirm({ title: 'Sign out all other sessions?', label: 'Sign out others', run: async () => { const r = await api.post<{ revoked: number }>('/api/security/sessions/revoke-others', {}); toast.success(`Signed out ${r.revoked}`); await refetch(); } })}>Sign out others</Button>
+              onClick={() => setConfirm({ title: 'Sign out all other sessions?', label: 'Sign out others', run: async () => { const r = await api.post<{ revoked: number }>('/api/security/sessions/revoke-others', {}); toast.success(`${plural(r.revoked, 'session')} signed out`); await refetch(); } })}>Sign out others</Button>
           ) : null} />
           <ul className="divide-y divide-border px-4 pb-2" data-testid="session-list">
             {data.sessions.map((s) => (
@@ -178,7 +178,7 @@ export function SecurityPage() {
                 </li>
               ))}
             </ul>
-          ) : <p className="px-4 pb-4 text-sm text-muted">No activity yet.</p>}
+          ) : <p className="px-4 pb-4 text-sm text-muted">No activity yet</p>}
         </Card>
       </div>
       {confirm ? (

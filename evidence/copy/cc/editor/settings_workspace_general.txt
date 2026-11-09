@@ -1,0 +1,56 @@
+Settings
+
+Search settings
+
+PERSONAL
+
+Profile
+Appearance
+Notifications
+Security and sessions
+
+WORKSPACE
+
+General
+Brands
+Time zone and locale
+Draft recovery
+
+PUBLISHING
+
+Defaults
+Approval policies
+Posting slots
+Safety rules
+
+CONNECTIONS
+
+Social accounts
+Google Drive and Docs
+Notion
+Connection health
+
+LISTENING
+
+Sources
+
+AI AND AUTOMATION
+
+Brand voice
+
+DEVELOPER
+
+MCP
+
+OPERATIONS
+
+Data export
+Settings
+Workspace
+General
+View only
+Name
+Created
+Sun 8 Nov
+Type
+Demo (simulated)

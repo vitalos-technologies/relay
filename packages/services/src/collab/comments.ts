@@ -307,7 +307,7 @@ export async function startThread(tx: Queryable, ctx: Ctx, post: { id: string; b
     revisionId = a.revision_id;
   }
   const anchor = input.anchor === undefined || input.anchor === null ? null : parseAnchor(input.anchor);
-  if (input.anchor && !anchor) throw new AppError('validation_failed', 'The selection could not be attached', { anchor: 'Invalid' });
+  if (input.anchor && !anchor) throw new AppError('validation_failed', 'Couldn’t attach the comment to that text. Select it again.', { anchor: 'Invalid' });
   if (anchor?.kind === 'media') {
     // Only media of this post's own brand can be referenced (never another tenant's or brand's asset id).
     const ok = await maybeOne(tx, `SELECT 1 FROM assets WHERE id=$1 AND workspace_id=$2 AND brand_id=$3`, [anchor.asset_id, ctx.access.workspaceId, post.brand_id]);

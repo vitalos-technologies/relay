@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { RefreshCw } from 'lucide-react';
 import { useApi } from '@/lib/client/use-api';
 import { useQueryState } from '@/lib/client/hooks';
-import { fmtBytes } from '@/lib/client/format';
+import { fmtBytes, humanize, plural } from '@/lib/client/format';
 import { Badge, Button, Card, CardHeader, EmptyState, ErrorState, FilterBar, FilterSelect, PageHeader, SkeletonRows } from '@/components/ui';
 import { useAdminTopics } from '@/components/admin/sync';
 import { Ago, RecordList } from '@/components/admin/ui';
@@ -14,9 +14,9 @@ import type { AdminJob, JobKind } from '@social-lite/services/admin/reads';
 
 const KIND: Record<JobKind, string> = { import: 'Import', export: 'Export', writeback: 'Writeback', report: 'Report', bulk: 'Bulk change', media: 'Media' };
 const WHERE: Record<JobKind, { href: string; label: string }> = {
-  import: { href: '/library?tab=sources', label: 'Content hub' }, export: { href: '/library?tab=sources', label: 'Content hub' },
-  writeback: { href: '/library?tab=sources', label: 'Content hub' }, report: { href: '/analytics', label: 'Analytics' },
-  bulk: { href: '/history', label: 'History' }, media: { href: '/library', label: 'Library' },
+  import: { href: '/library?tab=sources', label: 'Sources' }, export: { href: '/library?tab=sources', label: 'Sources' },
+  writeback: { href: '/library?tab=sources', label: 'Sources' }, report: { href: '/analytics', label: 'Analytics' },
+  bulk: { href: '/history', label: 'History' }, media: { href: '/library', label: 'Content library' },
 };
 
 export default function AdminContentPage() {
@@ -31,7 +31,7 @@ export default function AdminContentPage() {
       <PageHeader title="Jobs and storage" actions={<Button size="sm" icon={<RefreshCw aria-hidden className="size-4" />} loading={refreshing} onClick={() => void refetch()}>Refresh</Button>} />
       {data?.storage ? (
         <section aria-label="Storage" className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-          {[['Media stored', fmtBytes(data.storage.bytes), `${data.storage.assets} files`, '/library'],
+          {[['Media stored', fmtBytes(data.storage.bytes), plural(data.storage.assets, 'file'), '/library'],
             ['Files in trash', String(data.storage.trashed_assets), data.storage.held ? `${data.storage.held} kept (in use)` : 'Purged after retention', '/trash?kind=asset'],
             ['Posts in trash', String(data.storage.trashed_posts), 'Restorable until purge', '/trash?kind=post'],
           ].map(([l, v, d, h]) => (
@@ -58,7 +58,7 @@ export default function AdminContentPage() {
             columns={[
               { key: 'k', label: 'Kind', cell: (j) => <span className="whitespace-nowrap">{KIND[j.kind]}</span> },
               { key: 't', label: 'Item', cell: (j) => <span className="block max-w-[260px] truncate">{j.title}</span> },
-              { key: 's', label: 'Status', cell: (j) => <Badge tone={j.failed ? 'danger' : ['completed', 'ready', 'written', 'succeeded'].includes(j.status) ? 'success' : 'neutral'}>{j.status.replace(/_/g, ' ')}</Badge> },
+              { key: 's', label: 'Status', cell: (j) => <Badge tone={j.failed ? 'danger' : ['completed', 'ready', 'written', 'succeeded'].includes(j.status) ? 'success' : 'neutral'}>{humanize(j.status)}</Badge> },
               { key: 'e', label: 'Error', secondary: true, cell: (j) => <span className="block max-w-[280px] truncate text-xs text-muted" title={j.error ?? ''}>{j.error ?? '—'}</span> },
               { key: 'by', label: 'By', secondary: true, cell: (j) => <span className="text-muted">{j.by ?? 'system'}</span> },
               { key: 'at', label: 'Started', cell: (j) => <Ago at={j.created_at} className="text-muted" /> },
@@ -66,7 +66,7 @@ export default function AdminContentPage() {
             ]}
             card={(j) => (
               <span className="flex flex-col gap-1">
-                <span className="flex items-center gap-2"><span className="min-w-0 flex-1 truncate font-medium">{j.title}</span><Badge tone={j.failed ? 'danger' : 'neutral'}>{j.status.replace(/_/g, ' ')}</Badge></span>
+                <span className="flex items-center gap-2"><span className="min-w-0 flex-1 truncate font-medium">{j.title}</span><Badge tone={j.failed ? 'danger' : 'neutral'}>{humanize(j.status)}</Badge></span>
                 <span className="text-xs text-muted">{KIND[j.kind]} · <Ago at={j.created_at} />{j.error ? ` · ${j.error}` : ''}</span>
                 <Link className="text-[13px] font-medium text-accent-text" href={WHERE[j.kind].href}>Open in {WHERE[j.kind].label}</Link>
               </span>

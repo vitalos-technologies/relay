@@ -29,7 +29,7 @@ export default function PlatformIntegrationsPage() {
             card={(i) => <span className="flex flex-col gap-1"><span className="flex items-center gap-2"><span className="min-w-0 flex-1 font-medium">{label(i)}</span><Badge tone={STATUS[i.status][1]}>{STATUS[i.status][0]}</Badge></span>{i.missing.length ? <span className="text-xs text-muted">Missing: {i.missing.join(', ')}</span> : null}</span>} />
         </Card>
       )}
-      <p className="mt-4 text-xs text-muted">Keys are entered in Instance setup or the server environment. Secrets are never shown.</p>
+      <p className="mt-4 text-xs text-muted">Keys go in Instance setup or the server environment; secrets are never shown. Each network also reviews the Relay app separately.</p>
     </>
   );
 }

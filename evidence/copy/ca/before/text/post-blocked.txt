@@ -1,0 +1,194 @@
+/posts/c88f0b8b-ca44-4b6d-b17c-0ba6f765a838
+
+Vitalos (demo)
+
+Edit post: Affected launch e62b
+Post title (internal)
+Collaborate
+Needs attention
+Base content
+Shared by 2 destinations
+Health FB e62b
+Facebook
+1
+issue
+Health TG e62b
+Telegram
+Destinations 2
+selected
+Search destinations
+
+INSTAGRAM
+
+E2E Instagram (simulated)
+(Instagram)
+Vitalos Instagram (simulated)
+(Instagram)
+
+FACEBOOK
+
+E2E Final Page (simulated)
+(Facebook)
+E2E Inbox Page (simulated)
+(Facebook)
+E2E Integrations Page (simulated)
+(Facebook)
+Health FB 66e1
+(Facebook)
+Missing permission
+
+Reconnect and approve all Facebook permissions.
+
+Health FB ba92
+(Facebook)
+Missing permission
+
+Reconnect and approve all Facebook permissions.
+
+Health FB e62b
+(Facebook)
+Missing permission
+
+Reconnect and approve all Facebook permissions.
+
+Vitalos Facebook (simulated)
+(Facebook)
+
+TELEGRAM
+
+Health TG 66e1
+(Telegram)
+Health TG ba92
+(Telegram)
+Reconnect required
+
+Reconnect with a new @BotFather token.
+
+Health TG e62b
+(Telegram)
+Vitalos Telegram (simulated)
+(Telegram)
+
+X
+
+Ready X 26ac
+(X)
+Ready X 62a6
+(X)
+Ready X e2ce
+(X)
+Vitalos X (simulated)
+(X)
+Vitalos X — rejects posts (simulated)
+(X)
+Base content
+Shared by 2 destinations
+Text
+Facebook Health FB e62b:
+24 / 10,000
+characters
+Telegram Health TG e62b:
+24 / 4,096
+UTF-16 units
+CTA
+(brand call to action)
+Hashtags
+LinkOptional
+
+Media
+
+Add
+Facebook Health FB e62b:
+Image
+Album
+Video
+Telegram Health TG e62b:
+Image
+Album
+Video
+Delivery
+Needs attention
+Cancel
+schedule
+Scheduled
+Sun, 8 Nov 2026, 19:17GMT
+Zone
+Europe/London
+Deadline
+Sun, 8 Nov 2026, 19:32GMT
+Status
+Active · r1
+By
+owner@demo.social-lite.test
+Health FB e62b
+Simulated
+
+Due Sun, 8 Nov 2026, 19:17GMT
+
+Blocked
+
+Blocked
+
+Meta permissions missing: pages_manage_posts. Reconnect and allow every requested permission.
+
+Deadline Sun, 8 Nov 2026, 19:32GMT
+
+Health TG e62b
+Simulated
+
+Due Sun, 8 Nov 2026, 19:17GMT
+
+Overdue
+Integrations
+GOOGLE BUSINESS PROFILE
+Post to locations
+TASKS
+Create task
+Link task
+Readiness
+Verified
+
+Health FB e62b needs attention (missing permission). Fix it on Accounts or deselect it.
+
+Health FB e62b
+Preview
+Preview destination
+Facebook · Health FB e62b
+Telegram · Health TG e62b
+Facebook
+· Approximate preview
+Simulated
+
+Health FB e62b
+
+Just now ·
+
+Launch day reminder e62b
+
+Discussion
+Tasks
+Review
+Activity
+History
+Internal
+Shared with client
+New internal comment
+Comment
+(unavailable: Write something first.)
+Open
+0
+Resolved
+0
+No open discussions
+Saved 13:17 GMT
+Assist
+(unavailable: AI not configured)
+Assistant
+Save draft
+now
+Reschedule
+(unavailable: Fix 1 issue first.)
+Queue
+(unavailable: Fix 1 issue first.)
+Publish now
+(unavailable: Fix 1 issue first.)

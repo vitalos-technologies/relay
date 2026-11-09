@@ -10,9 +10,10 @@ import type { PlatformWorkspaceDetail } from '@social-lite/core/contracts/v31-ad
 import { api } from '@/lib/client/api';
 import { useApi } from '@/lib/client/use-api';
 import { useSession } from '@/lib/client/session';
+import { humanize, plural } from '@/lib/client/format';
 import { Badge, Banner, Button, Card, CardHeader, ErrorState, Facts, Field, Input, PageHeader, Select, SkeletonRows, useToast } from '@/components/ui';
 import { Ago, ReasonDialog } from '@/components/admin/ui';
-import { SUPPORT_TONE, WsState } from '@/components/admin/badges';
+import { SUPPORT_LABEL, SUPPORT_TONE, WsState } from '@/components/admin/badges';
 import { PlatformBillingPanel } from '@/components/billing/platform-billing-panel';
 import { PlatformEntitlements } from '@/components/entitlements/platform-entitlements';
 
@@ -41,15 +42,15 @@ export default function PlatformWorkspacePage() {
             : <Button size="sm" variant="danger" onClick={() => setDialog('suspend')}>Suspend</Button>) : null}
         </>} />
       <div className="flex flex-col gap-6">
-        {w.state === 'suspended' ? <Banner tone="danger" title="Suspended — members can’t sign in to it and nothing publishes">{w.suspended_reason}</Banner> : null}
+        {w.state === 'suspended' ? <Banner tone="danger" title="Suspended — members can’t sign in and nothing publishes">{w.suspended_reason}</Banner> : null}
         {mine ? <Banner tone="info" title={mine.status === 'active' ? 'Your support access is active' : 'Your request is waiting for the workspace'}
-          actions={<Button size="sm" onClick={async () => { await api.post(`/api/platform/support-access/${mine.id}/end`, {}); toast.success('Ended'); await refetch(); }}>{mine.status === 'active' ? 'End' : 'Cancel'}</Button>}>
+          actions={<Button size="sm" onClick={async () => { await api.post(`/api/platform/support-access/${mine.id}/end`, {}); toast.success(mine.status === 'active' ? 'Access ended' : 'Request cancelled'); await refetch(); }}>{mine.status === 'active' ? 'End access' : 'Cancel request'}</Button>}>
           {mine.status === 'active' ? <>Read-only until <Ago at={mine.expires_at} />. Switch to this workspace to view it.</> : mine.reason}</Banner> : null}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <Card>
             <CardHeader title="Workspace" />
             <Facts className="px-4 pb-4" items={[
-              ['Created', new Date(w.created_at).toLocaleDateString()],
+              ['Created', new Date(w.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })],
               ['Owners', w.owners.map((o) => o.email).join(', ') || '—'],
               ['Members', Object.entries(w.member_status).map(([k, v]) => `${v} ${k}`).join(' · ') || '0'],
               ['Brands', w.brands],
@@ -64,11 +65,11 @@ export default function PlatformWorkspacePage() {
           <Card>
             <CardHeader title="Publishing · 7 days (live)" />
             <div className="flex flex-wrap gap-2 px-4 pb-4">
-              {Object.keys(w.deliveries_7d).length ? Object.entries(w.deliveries_7d).map(([k, v]) => <Badge key={k} tone={k === 'published' ? 'success' : ['failed', 'unknown', 'expired'].includes(k) ? 'warn' : 'neutral'}>{k} {v}</Badge>) : <span className="text-[13px] text-muted">No live results</span>}
+              {Object.keys(w.deliveries_7d).length ? Object.entries(w.deliveries_7d).map(([k, v]) => <Badge key={k} tone={k === 'published' ? 'success' : ['failed', 'unknown', 'expired'].includes(k) ? 'warn' : 'neutral'}>{humanize(k)} {v}</Badge>) : <span className="text-[13px] text-muted">No live results</span>}
             </div>
             <CardHeader title="Accounts" />
             <ul className="px-4 pb-4 text-[13px]">
-              {w.connections_by_provider.length ? w.connections_by_provider.map((c) => <li key={`${c.provider}-${c.status}`} className="flex gap-2 py-1"><span className="flex-1">{PROVIDER_LABEL[c.provider]}</span><span className="text-muted">{c.status}</span><span className="tabular">{c.n}{c.simulated ? ` (${c.simulated} sim)` : ''}</span></li>) : <li className="text-muted">None</li>}
+              {w.connections_by_provider.length ? w.connections_by_provider.map((c) => <li key={`${c.provider}-${c.status}`} className="flex gap-2 py-1"><span className="flex-1">{PROVIDER_LABEL[c.provider]}</span><span className="text-muted">{humanize(c.status)}</span><span className="tabular">{c.n}{c.simulated ? ` (${c.simulated} sim)` : ''}</span></li>) : <li className="text-muted">None</li>}
             </ul>
           </Card>
         </div>
@@ -78,7 +79,7 @@ export default function PlatformWorkspacePage() {
           <CardHeader title="Support access" />
           <ul className="divide-y divide-border px-4 pb-2 text-[13px]">
             {!w.support_access.length ? <li className="py-3 text-muted">None</li> : w.support_access.map((s) => (
-              <li key={s.id} className="flex flex-wrap items-center gap-2 py-2"><Badge tone={SUPPORT_TONE[s.status]}>{s.status}</Badge><span>{s.operator.email}</span><span className="min-w-0 flex-1 truncate text-muted">{s.reason}</span><Ago at={s.requested_at} className="text-xs text-muted" /></li>
+              <li key={s.id} className="flex flex-wrap items-center gap-2 py-2"><Badge tone={SUPPORT_TONE[s.status]}>{SUPPORT_LABEL[s.status]}</Badge><span>{s.operator.email}</span><span className="min-w-0 flex-1 truncate text-muted">{s.reason}</span><Ago at={s.requested_at} className="text-xs text-muted" /></li>
             ))}
           </ul>
         </Card>
@@ -92,13 +93,13 @@ export default function PlatformWorkspacePage() {
         </Card>
       </div>
       <ReasonDialog open={dialog === 'suspend'} onOpenChange={(o) => !o && setDialog(null)} confirmVariant="danger" confirmLabel="Suspend workspace"
-        title={`Suspend ${w.name}?`} description={`Members lose access on their next request and ${w.scheduled} scheduled post(s) hold at send time. Memberships and content are kept. Needs a fresh sign-in.`}
+        title={`Suspend ${w.name}?`} description={`Members lose access on their next request and ${plural(w.scheduled, 'scheduled post')} ${w.scheduled === 1 ? 'holds' : 'hold'} at send time. Memberships and content are kept. Needs a fresh sign-in.`}
         onConfirm={async (reason) => { await api.post(`/api/platform/workspaces/${w.id}/suspend`, { reason }); toast.success('Suspended'); await refetch(); }} />
       <ReasonDialog open={dialog === 'reactivate'} onOpenChange={(o) => !o && setDialog(null)} confirmLabel="Reactivate"
         title={`Reactivate ${w.name}?`} description="Members regain access. Held posts still on time are queued again."
         onConfirm={async (reason) => { await api.post(`/api/platform/workspaces/${w.id}/reactivate`, { reason }); toast.success('Reactivated'); await refetch(); }} />
       <ReasonDialog open={dialog === 'concurrency'} onOpenChange={(o) => !o && setDialog(null)} confirmLabel="Save"
-        title="Dispatch share" description="Maximum publications this workspace sends at once across all workers. Empty = installation default."
+        title="Dispatch share" description="Most publications this workspace sends at once, across all workers. Leave empty for the installation default."
         onConfirm={async (reason) => { await api.post(`/api/platform/workspaces/${w.id}/dispatch-concurrency`, { dispatch_concurrency: cc ? Number(cc) : null, reason }); toast.success('Saved'); await refetch(); }}>
         <Field label="Concurrent sends"><Input type="number" min={1} max={32} inputMode="numeric" value={cc} onChange={(e) => setCc(e.target.value)} placeholder="Default" /></Field>
       </ReasonDialog>

@@ -200,7 +200,7 @@ export async function createConversation(c: WidgetCaller, raw: unknown, db: Quer
 
 async function createMemberConversation(c: WidgetCaller, raw: unknown, db: Queryable): Promise<WidgetConversation> {
   const input = memberCreateSchema.parse(raw);
-  if (input.website) throw new AppError('validation_failed', 'Your message could not be sent. Reload the page and try again.');
+  if (input.website) throw new AppError('validation_failed', 'Couldn’t send your message. Reload the page and try again.');
   const m = c.member!;
   const ctx = await memberCtx(m, input.workspace_id, db);
   await enforceRateLimit('supportCreate', ctx.actor.userId, CREATE_RATE); // same bucket as Help → Contact support
@@ -219,7 +219,7 @@ async function createMemberConversation(c: WidgetCaller, raw: unknown, db: Query
 
 async function createVisitorConversation(c: WidgetCaller, raw: unknown, db: Queryable): Promise<CreateResult> {
   const input = visitorCreateSchema.parse(raw);
-  if (input.website) throw new AppError('validation_failed', 'Your message could not be sent. Reload the page and try again.');
+  if (input.website) throw new AppError('validation_failed', 'Couldn’t send your message. Reload the page and try again.');
   checkFormToken(input.form_token);
   if (c.visitor?.visitor.blocked) throw new AppError('forbidden', 'Messages from this browser can’t be sent. Email us instead.');
   const hash = requestHash({ name: input.name, email: input.email.toLowerCase(), message: input.message, topic: input.topic ?? null, attachment_ids: input.attachment_ids });

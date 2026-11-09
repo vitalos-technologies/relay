@@ -1,0 +1,11 @@
+/approvals
+
+Approvals
+Waiting
+Decided
+Due
+Brand
+Assignee
+All
+Mine
+All caught up

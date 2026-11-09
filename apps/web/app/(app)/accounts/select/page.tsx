@@ -25,7 +25,7 @@ export default function SelectDestinationsPage() {
   const [submitError, setSubmitError] = useState<unknown>(null);
 
   if (!flow) {
-    return <><PageHeader title="Choose destinations" /><EmptyState icon={<Plug aria-hidden />} title="Nothing in progress" action={<LinkButton href="/accounts" variant="primary">Accounts</LinkButton>} /></>;
+    return <><PageHeader title="Choose destinations" /><EmptyState icon={<Plug aria-hidden />} title="Nothing in progress" action={<LinkButton href="/accounts" variant="primary">Connections</LinkButton>} /></>;
   }
   const brandName = data ? session.brands.find((b) => b.id === data.brand_id)?.name : undefined;
   const expired = data && new Date(data.expires_at).getTime() < Date.now();
@@ -51,7 +51,7 @@ export default function SelectDestinationsPage() {
       {error && !data ? <ErrorState error={error} onRetry={refetch} title="Link can’t be used" /> : loading || !data ? <SkeletonRows rows={3} /> : (
         <Card className="max-w-2xl">
           <div className="p-4">
-            {expired ? <ErrorNotice error={new Error('Expired. Start again from Accounts.')} className="mb-4" /> : (
+            {expired ? <ErrorNotice error={new Error('Expired. Start again from Connections.')} className="mb-4" /> : (
               <p className="mb-4 text-xs text-muted">Expires <TimeWithZone instant={data.expires_at} tz={session.workspace?.timezone ?? 'UTC'} format="time" />.</p>
             )}
             {!data.candidates.length ? (

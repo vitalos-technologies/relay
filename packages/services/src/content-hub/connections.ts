@@ -422,8 +422,8 @@ async function sessionsFor(c: ContentConnectionRow, force = false): Promise<Sour
   try {
     creds = decryptSecret<StoredCreds>(c.credentials_enc, contentCredAad(c.workspace_id, c.id));
   } catch {
-    await markReconnect(c.id, 'Stored credentials could not be read. Reconnect the source.');
-    throw new AppError('invalid_state', 'Stored credentials could not be read. Reconnect the source.');
+    await markReconnect(c.id, 'Couldn’t read the saved credentials. Reconnect the source.');
+    throw new AppError('invalid_state', 'Couldn’t read the saved credentials. Reconnect the source.');
   }
   if (creds.kind === 'test') {
     return { transport, isTest: true, google: c.source === 'google' ? { transport, accessToken: 'test-token' } : undefined, notion: c.source === 'notion' ? { transport, accessToken: 'test-token' } : undefined };

@@ -1,0 +1,7 @@
+/accounts/health
+
+Connections
+Connection health
+Refresh
+All connections healthy
+9 healthy

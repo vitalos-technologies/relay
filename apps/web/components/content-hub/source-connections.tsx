@@ -9,13 +9,13 @@ import { useApi } from '@/lib/client/use-api';
 import { useQueryState } from '@/lib/client/hooks';
 import { useSession } from '@/lib/client/session';
 import { fmtRelative } from '@/lib/client/format';
-import { Badge, Banner, Button, Card, CardHeader, ConfirmDialog, ErrorNotice, ErrorState, Select, SkeletonRows, Switch, useToast } from '@/components/ui';
+import { Badge, Banner, Button, Card, CardHeader, ConfirmDialog, ErrorNotice, ErrorState, LinkButton, Select, SkeletonRows, Switch, useToast } from '@/components/ui';
 
 const LABEL: Record<ContentSource, string> = { google: 'Google Drive & Docs', notion: 'Notion' };
 const ERRORS: Record<string, string> = {
   access_denied: 'Access was not granted.', scope_denied: 'Relay needs “files you choose” access to Drive.', session_mismatch: 'Finish connecting in the same browser session.',
-  invalid_state: 'The connection request expired. Try again.', forbidden: 'You no longer have permission to connect sources.', token_exchange_failed: 'The provider did not accept the authorization.',
-  not_configured: 'This source is not configured yet.', account_mismatch: 'Reconnect with the same account.',
+  invalid_state: 'The connection request expired. Try again.', forbidden: 'You no longer have permission to connect sources.', token_exchange_failed: 'Couldn’t connect. Try again.',
+  not_configured: 'Not set up yet.', account_mismatch: 'Reconnect with the same account.',
 };
 
 function StatusBadge({ c }: { c: ContentConnectionDto }) {
@@ -25,8 +25,9 @@ function StatusBadge({ c }: { c: ContentConnectionDto }) {
 }
 
 function SourceBlock({ status, connections, onChanged }: { status: ContentHubSourceStatus; connections: ContentConnectionDto[]; onChanged: () => void }) {
-  const { session, canV2 } = useSession();
+  const { session, can, canV2 } = useSession();
   const toast = useToast();
+  const owner = can('setup.manage');
   const [scope, setScope] = useState<string>(session.brands[0]?.id ?? '');
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<unknown>(null);
@@ -55,8 +56,14 @@ function SourceBlock({ status, connections, onChanged }: { status: ContentHubSou
     <Card aria-labelledby={`src-${status.source}`}>
       <CardHeader id={`src-${status.source}`} title={LABEL[status.source]} />
       <div className="flex flex-col gap-4 p-4 pt-0">
-        {!status.configured ? <Banner tone="info" title="Not configured">An owner adds {status.missing.join(', ')} in Setup. Redirect URI: <code className="break-all">{status.redirect_uri}</code></Banner> : null}
-        {status.source === 'google' && status.configured && !status.picker_configured ? <Banner tone="warn" title="File picker not configured (GOOGLE_PICKER_API_KEY, GOOGLE_PICKER_APP_ID)" /> : null}
+        {!status.configured ? (
+          <Banner tone="info" title="Not set up" actions={owner ? <LinkButton size="sm" href="/setup">Setup</LinkButton> : null}>
+            {owner ? <>Add {status.missing.join(', ')} in Setup.</> : 'An owner can set this up.'}
+          </Banner>
+        ) : null}
+        {status.source === 'google' && status.configured && !status.picker_configured ? (
+          <Banner tone="warn" title="File picker not set up">{owner ? 'Add GOOGLE_PICKER_API_KEY and GOOGLE_PICKER_APP_ID in Setup.' : 'An owner can set this up.'}</Banner>
+        ) : null}
         <ul className="flex flex-col divide-y divide-border">
           {connections.map((c) => (
             <li key={c.id} className="flex flex-wrap items-center gap-3 py-3">
@@ -83,7 +90,7 @@ function SourceBlock({ status, connections, onChanged }: { status: ContentHubSou
               <option value="">All brands (workspace)</option>
               {session.brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
             </Select>
-            <Button variant="primary" icon={<Plug aria-hidden className="size-4" />} onClick={() => start()} loading={busy === 'new'} disabledReason={status.configured ? null : 'Not configured'}>Connect</Button>
+            <Button variant="primary" icon={<Plug aria-hidden className="size-4" />} onClick={() => start()} loading={busy === 'new'} disabledReason={status.configured ? null : 'Not set up'}>Connect</Button>
             {status.test_mode_available ? <Button variant="ghost" onClick={testConnect} loading={busy === 'test'}>Use test data</Button> : null}
           </div>
         ) : null}
@@ -107,7 +114,7 @@ export function SourceConnectionsSettings({ source }: { source?: 'google' | 'not
   const error = params.get('error');
   return (
     <div className="flex max-w-3xl flex-col gap-4">
-      {error ? <Banner tone="danger" title={ERRORS[error] ?? 'The connection could not be completed.'} /> : null}
+      {error ? <Banner tone="danger" title={ERRORS[error] ?? 'Couldn’t connect. Try again.'} /> : null}
       {params.get('connected') ? <Banner tone="success" title="Connected" /> : null}
       <p className="text-[13px] text-muted">Relay only reads items you pick. Imports are private copies; source sharing is never changed.</p>
       {status.data.filter((s) => !source || s.source === source).map((s) => <SourceBlock key={s.source} status={s} connections={conns.data!.filter((c) => c.source === s.source)} onChanged={() => void conns.refetch()} />)}

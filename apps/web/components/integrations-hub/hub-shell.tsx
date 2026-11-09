@@ -1,6 +1,7 @@
 'use client';
-// Integrations area: left navigation of the seven business integrations (≥1024 px); smaller screens use the hub list
-// and a back link. Status dots come from stored installation state (no provider calls while rendering).
+// Integrations area: left navigation of the seven business integrations (≥1024 px) on a connector's page; smaller screens
+// use the hub list and a back link. The hub itself is the "Business apps" tab of Connections (D28), shown full width like
+// the Social accounts tab. Status dots come from stored installation state (no provider calls while rendering).
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
@@ -27,17 +28,17 @@ export function IntegrationsShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const hub = useHub();
   const onIndex = pathname === '/integrations';
+  if (onIndex) return <>{children}</>;
   return (
     <div className="lg:grid lg:grid-cols-[232px_minmax(0,1fr)] lg:gap-10">
-      <aside aria-label="Integrations" className="hidden lg:block">
+      <aside aria-label="Business apps" className="hidden lg:block">
         <div className="sticky top-[88px] max-h-[calc(100dvh-112px)] overflow-y-auto pb-6 pr-1">
-          <p className="mb-3 text-[13px] font-semibold text-muted">Integrations</p>
-          <nav aria-label="Integrations">
+          <p className="mb-3 text-[13px] font-semibold text-muted">Business apps</p>
+          <nav aria-label="Business apps">
             <ul className="flex flex-col gap-0.5">
               <li>
-                <Link href="/integrations" aria-current={onIndex ? 'page' : undefined}
-                  className={cn('flex h-9 items-center gap-2 rounded-lg px-2.5 text-[13px] font-medium', onIndex ? 'bg-raised text-fg' : 'text-muted hover:bg-raised hover:text-fg')}>
-                  <LayoutDashboard aria-hidden className="size-4" />All integrations
+                <Link href="/integrations" className="flex h-9 items-center gap-2 rounded-lg px-2.5 text-[13px] font-medium text-muted hover:bg-raised hover:text-fg">
+                  <LayoutDashboard aria-hidden className="size-4" />All apps
                 </Link>
               </li>
               {HUB_CONNECTORS.map((c) => {
@@ -60,11 +61,9 @@ export function IntegrationsShell({ children }: { children: ReactNode }) {
         </div>
       </aside>
       <div className="min-w-0">
-        {!onIndex ? (
-          <Link href="/integrations" className="touch-target -ml-2 mb-1 inline-flex h-9 items-center gap-1 rounded-lg px-2 text-[13px] font-medium text-muted hover:bg-raised hover:text-fg lg:hidden">
-            <ChevronLeft aria-hidden className="size-4" />Integrations
-          </Link>
-        ) : null}
+        <Link href="/integrations" className="touch-target -ml-2 mb-1 inline-flex h-9 items-center gap-1 rounded-lg px-2 text-[13px] font-medium text-muted hover:bg-raised hover:text-fg lg:hidden">
+          <ChevronLeft aria-hidden className="size-4" />Business apps
+        </Link>
         {children}
       </div>
     </div>

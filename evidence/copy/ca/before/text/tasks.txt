@@ -1,0 +1,27 @@
+/tasks
+
+Tasks
+New task
+Assigned to me
+0
+Overdue
+0
+Due this week
+0
+Created by me
+0
+Show
+Assigned to me
+Created by me
+Team
+Status
+Open
+Done
+Due
+Any time
+Overdue
+Next 7 days
+No deadline
+Needs a new assignee
+Nothing assigned to you
+New task

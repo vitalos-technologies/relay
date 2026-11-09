@@ -34,7 +34,7 @@ export default function TasksPage() {
 
   return (
     <>
-      <PageHeader title="Tasks" meta={<InfoTip label="About tasks">Deadlines here are editorial. Moving one never changes when a post publishes, and finishing a task never approves anything.</InfoTip>}
+      <PageHeader title="Tasks" meta={<InfoTip label="About tasks">Task deadlines never change when a post publishes, and finishing a task never approves anything.</InfoTip>}
         actions={<Button variant="primary" icon={<Plus aria-hidden className="size-4" />} onClick={() => setCreating(true)} disabledReason={!session.brands.length ? 'No brands yet.' : null}>New task</Button>} />
       {w ? (
         <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">

@@ -86,7 +86,7 @@ async function gate(db: Queryable, d: ClaimedDelivery): Promise<GateResult> {
   }
   if (g.conn_disconnected) return { ok: false, state: 'blocked', code: 'disconnected', message: 'The account was disconnected. Reconnect it to publish.' };
   if (!['ready', 'expiring'].includes(g.conn_status)) {
-    return { ok: false, state: 'blocked', code: g.conn_status, message: `The account needs attention (${g.conn_status.replace(/_/g, ' ')}). Fix it on Accounts; this post will resume if still timely.` };
+    return { ok: false, state: 'blocked', code: g.conn_status, message: `The account needs attention (${g.conn_status.replace(/_/g, ' ')}). Fix it on Connections; this post resumes if still timely.` };
   }
   if (g.conn_is_mock !== d.is_mock || (d.is_mock && !g.conn_account.startsWith('mock_'))) {
     return { ok: false, state: 'blocked', code: 'identity_mismatch', message: 'The destination identity changed. Review and reschedule.' };

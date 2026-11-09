@@ -1,0 +1,121 @@
+/planner?view=list
+
+Planner
+Europe/London · GMT
+Assistant
+History
+Create post
+Today
+8 Nov – 21 Nov 2026
+Week
+Month
+List
+Account
+All accounts
+Campaign
+All campaigns
+Autumn launch
+Status
+All statuses
+Scheduled
+Awaiting approval
+Publishing
+Published
+Partial success
+Needs attention
+Failed
+Expired
+Cancelled
+2 in conflict
+Mon
+Tue
+Wed
+Thu
+Fri
+Sat
+Sun
+8
+Today
+09:33
+Latte art Friday (demo)
+Simulated · delivered
+LinkedIn (simulated): Simulated · delivered
+Autumn launch
+09:52
+Reusable cup rewards (demo)
+Simulated · delivered
+Facebook (simulated): Simulated · delivered
+Autumn launch
+12:14
+Fresh this morning
+Simulated · delivered
+Facebook (simulated): Simulated · delivered
+Instagram (simulated): Simulated · delivered
+
+Conflict
+
+12:14
+Thank you, neighbours
+Simulated · delivered
+Facebook (simulated): Simulated · delivered
+Instagram (simulated): Simulated · delivered
+
+Conflict
+
+9
+09:30
+Spring menu launch
+Scheduled
+Instagram (simulated): Scheduled
+Facebook (simulated): Scheduled
+LinkedIn (simulated): Scheduled
+Threads (simulated): Scheduled
+12:00
+Behind the scenes: 5am bake
+Scheduled
+Instagram (simulated): Scheduled
+Threads (simulated): Scheduled
+10
+10:00
+Meet the team: Priya
+Scheduled
+Instagram (simulated): Scheduled
+Facebook (simulated): Scheduled
+LinkedIn (simulated): Scheduled
+18:00
+Supper club: spring tasting
+Awaiting approval
+Facebook (simulated): Not scheduled yet
+Bluesky (simulated): Not scheduled yet
+Instagram (simulated): Not scheduled yet
+Review pending
+11
+08:45
+Weekend brunch is back
+Scheduled
+Instagram (simulated): Scheduled
+Facebook (simulated): Scheduled
+LinkedIn (simulated): Scheduled
+Threads (simulated): Scheduled
+12
+16:15
+Customer story: the Okafor family
+Scheduled
+Facebook (simulated): Scheduled
+LinkedIn (simulated): Scheduled
+13
+11:00
+Sourdough workshop
+Awaiting approval
+Facebook (simulated): Not scheduled yet
+Bluesky (simulated): Not scheduled yet
+Instagram (simulated): Not scheduled yet
+Review pending
+14
+15
+16
+17
+18
+19
+20
+21

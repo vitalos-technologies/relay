@@ -87,9 +87,9 @@ export function BillingSettings() {
       </div>
       {welcome ? <Banner tone="success" title="Your 14-day free trial has started">No card needed. Choose a plan any time before {day(d.trial?.ends_at)}.</Banner> : null}
       {confirming ? (
-        <Banner tone="info" icon={<Spinner label="Confirming" />} title="Confirming with the payment provider…">Your plan updates as soon as the provider confirms payment.</Banner>
+        <Banner tone="info" icon={<Spinner label="Confirming" />} title="Confirming with the payment provider…">Your plan updates once payment is confirmed.</Banner>
       ) : returned === 'returned' && !d.payment_method ? (
-        <Banner tone="warn" title="Not confirmed yet">We haven’t received confirmation from the payment provider. If you completed checkout, this page updates within a few minutes.</Banner>
+        <Banner tone="warn" title="Not confirmed yet">The payment provider hasn’t confirmed yet. If you completed checkout, this page updates within a few minutes.</Banner>
       ) : null}
       {returned === 'cancelled' ? <Banner tone="neutral" title="Checkout cancelled">Nothing was charged.</Banner> : null}
       <AccessBanner d={d} onPortal={() => void openPortal('payment_method_update')} />

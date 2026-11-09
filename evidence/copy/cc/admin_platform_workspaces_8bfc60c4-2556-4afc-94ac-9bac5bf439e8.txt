@@ -1,0 +1,113 @@
+Workspaces
+Demo Workspace
+Active
+Demo
+Request support access
+Suspend
+Workspace
+Created
+8 Nov 2026
+Owners
+owner@demo.social-lite.test
+Members
+10 active
+Brands
+2
+Last activity
+13h ago
+Publishing
+On
+Dispatch share
+Default
+Change
+Flag overrides
+None
+Open support requests
+0
+Publishing · 7 days (live)
+No live results
+Accounts
+Instagram
+Ready
+2 (2 sim)
+Facebook
+Ready
+2 (2 sim)
+Telegram
+Ready
+2 (2 sim)
+X
+Ready
+3 (3 sim)
+Billing
+Legacy
+Access: full
+Plan
+Legacy · v1
+Seats
+0 seats · 9 billable
+Trial
+—
+Period
+—
+Cancels
+—
+Scheduled
+—
+Provider
+None
+Customer
+—
+Subscription
+—
+Provider status
+—
+Last synced
+—
+Trial redeemed by
+—
+Schedule suspension
+Invoices (0)
+Lifecycle history
+legacy_assigned
+— → legacy
+035_v4_billing
+12h ago
+Entitlements
+Apply override
+Plan
+Legacy
+Status
+Legacy
+Access
+full
+Held work
+None
+
+AI tokens
+
+0 of 200,000 this period · default safety cap
+
+Media storage
+
+0 MB used · not limited by plan
+
+X API posts
+
+0 of 100 this period · your budget
+
+X API reads
+
+0 of 300 this period · your budget
+
+Connected social accounts
+
+9 used · not limited by plan
+
+Overrides
+None
+Support access
+None
+Platform audit
+All
+None

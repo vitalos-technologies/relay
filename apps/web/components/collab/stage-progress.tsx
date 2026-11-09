@@ -24,7 +24,7 @@ export function StageProgressList({ stages, current, compact }: { stages: StageP
       })}
       {!compact ? (
         <li className="text-[11px] text-subtle">
-          Distinct people<InfoTip label="About quorum" className="ml-1">Each person counts once, and only while they are still eligible. Any change to the content, media, destinations, links, time or policy needs a fresh review.</InfoTip>
+          Distinct people<InfoTip label="About quorum" className="ml-1">Each person counts once, while still eligible. Any change to content, media, destinations, links, time or policy needs a new review.</InfoTip>
         </li>
       ) : null}
     </ol>

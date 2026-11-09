@@ -84,12 +84,17 @@ function ConnectCard({ connector, setup, canManage, onDone }: { connector: HubCo
           </Banner>
         ) : null}
         <Facts items={[
-          ...(setup.redirect_uri ? [['Redirect URI', <code key="r" className="text-xs [overflow-wrap:anywhere]">{setup.redirect_uri}</code>] as [string, React.ReactNode]] : []),
-          ...(setup.webhook_url ? [['Webhook URL', <code key="w" className="text-xs [overflow-wrap:anywhere]">{setup.webhook_url}</code>] as [string, React.ReactNode]] : []),
           ['Permissions requested', <span key="s" className="[overflow-wrap:anywhere]">{setup.scopes.length ? setup.scopes.join(', ') : 'Account-wide (no granular scopes)'}</span>],
           ['Before you connect', <ul key="p" className="list-disc pl-4">{setup.prerequisites.map((p) => <li key={p}>{p}</li>)}</ul>],
-          ['Docs checked', setup.verified_on],
         ]} />
+        <details className="text-[13px]">
+          <summary className="cursor-pointer font-medium text-muted hover:text-fg">Setup details</summary>
+          <Facts className="mt-3" items={[
+            ...(setup.redirect_uri ? [['Redirect URI', <code key="r" className="text-xs [overflow-wrap:anywhere]">{setup.redirect_uri}</code>] as [string, React.ReactNode]] : []),
+            ...(setup.webhook_url ? [['Webhook URL', <code key="w" className="text-xs [overflow-wrap:anywhere]">{setup.webhook_url}</code>] as [string, React.ReactNode]] : []),
+            ['Docs checked', setup.verified_on],
+          ]} />
+        </details>
         {canManage ? (
           <div className="flex flex-wrap items-end gap-3">
             {!operator ? (
@@ -137,7 +142,7 @@ function InstallationPanel({ id, connector, onChanged }: { id: string; connector
   return (
     <>
       <Card aria-labelledby="h-inst" data-testid="installation">
-        <CardHeader id="h-inst" title={<span className="flex flex-wrap items-center gap-2">{i.display_name}{i.is_simulated && i.status === 'active' ? null : <Badge tone={st.tone}>{st.label}</Badge>}{i.is_simulated ? <SimulatedBadge /> : null}<MetaChip>{i.brand_id ? 'Brand' : 'Workspace'}</MetaChip></span>}
+        <CardHeader id="h-inst" title={<span className="flex flex-wrap items-center gap-2">{i.display_name}{i.is_simulated && i.status === 'active' ? null : <Badge tone={st.tone}>{st.label}</Badge>}{i.is_simulated && !/simulated/i.test(i.display_name) ? <SimulatedBadge /> : null}<MetaChip>{i.brand_id ? 'Brand' : 'Workspace'}</MetaChip></span>}
           actions={manage ? <>
             <Button size="sm" variant="ghost" icon={<Stethoscope aria-hidden className="size-4" />} loading={busy === 'diag'} onClick={() => run('diag', async () => { const r = await api.post<{ message: string }>(`/api/connectors/hub/${id}/diagnose`); toast.info(r.message); })}>Diagnose</Button>
             {i.status === 'reconnect_required' && !i.is_simulated ? (

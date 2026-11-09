@@ -1,0 +1,52 @@
+/tasks
+
+[DIALOG]
+New task
+Brand
+TipSignal (demo)
+Vitalos (demo)
+Task
+DetailsOptional
+AssigneeOptional
+Unassigned
+Me (Olivia Owner)
+Adam Admin · admin@demo.social-lite.test
+April Approver · approver@demo.social-lite.test
+Eden Editor · editor@demo.social-lite.test
+Vic Viewer · viewer@demo.social-lite.test
+DeadlineOptional
+Time zone
+Priority
+Low
+Normal
+High
+Urgent
+Cancel
+Create task
+(unavailable: Give the task a title.)
+[PAGE]
+Tasks
+New task
+Assigned to me
+0
+Overdue
+0
+Due this week
+0
+Created by me
+0
+Show
+Assigned to me
+Created by me
+Team
+Status
+Open
+Done
+Due
+Any time
+Overdue
+Next 7 days
+No deadline
+Needs a new assignee
+Nothing assigned to you
+New task

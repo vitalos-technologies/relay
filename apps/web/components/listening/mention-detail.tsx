@@ -21,7 +21,7 @@ export function MentionDetail({ id }: { id: string }) {
       <Card><MentionRow m={d} onChanged={m.refetch} /></Card>
       <Card className="p-4">
         <Facts items={[
-          ['Source', `${d.source.label}${d.source.channel_name ? ` · ${d.source.channel_name}` : ''}${d.is_simulated ? ' (simulated)' : ''}`],
+          ['Source', `${d.source.label}${d.source.channel_name ? ` · ${d.source.channel_name}` : ''}${d.is_simulated && !/simulated/i.test(d.source.channel_name ?? '') ? ' (simulated)' : ''}`],
           ['Posted', fmtWhen(d.occurred_at)],
           ['Retrieved', fmtWhen(d.observed_at)],
           ['Language', langTag(d.language)],

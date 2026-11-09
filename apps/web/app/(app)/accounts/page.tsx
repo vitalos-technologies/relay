@@ -20,6 +20,7 @@ import {
   Banner, Button, ConfirmDialog, Dialog, EmptyState, ErrorState, IconButton, IntegrationCard, LinkButton, Menu, MenuContent, MenuItem,
   MenuLabel, MenuSeparator, MenuTrigger, PageHeader, PlatformIcon, SectionHeader, Select, SimulatedBadge, SkeletonRows, TimeWithZone, useToast, cn,
 } from '@/components/ui';
+import { ConnectionsTabs } from '@/components/shell/connections-tabs';
 import { BlueskyDialog, MOCK_SCENARIOS, MOCK_SCENARIO_LABEL, MockDialog, NotConfiguredDialog, TelegramDialog } from '@/components/accounts/connect-dialogs';
 import dynamic from 'next/dynamic';
 // Content sources (Google/Notion) render below the social accounts; their code loads after the page.
@@ -59,6 +60,7 @@ export default function ConnectionsPage() {
         {diagOn ? <LinkButton href={brand ? `/accounts/diagnostics?brand=${brand}` : '/accounts/diagnostics'} variant="ghost" icon={<Stethoscope aria-hidden className="size-4" />}>Test centre</LinkButton> : null}
         <LinkButton href={brand ? `/accounts/health?brand=${brand}` : '/accounts/health'} icon={<HeartPulse aria-hidden className="size-4" />}>Health</LinkButton>
       </>} />
+      <ConnectionsTabs />
       {err ? (
         <Banner tone="danger" role="alert" className="mb-6" title="Couldn’t connect" actions={<Button size="sm" variant="ghost" onClick={() => setParams({ error: null })}>Dismiss</Button>}>
           {CALLBACK_ERRORS[err] ?? 'Something went wrong.'} <span className="font-mono text-[11px] text-subtle">({err})</span>

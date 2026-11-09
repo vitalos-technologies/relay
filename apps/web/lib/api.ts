@@ -96,9 +96,9 @@ export function route<P = Record<string, string>>(handler: Handler<P>, opts: Rou
     const correlationId = req.headers.get('x-correlation-id')?.slice(0, 64) || randomUUID();
     try {
       const resolved = await currentSession();
-      if (!resolved) throw new AppError('unauthenticated', 'Please sign in again');
+      if (!resolved) throw new AppError('unauthenticated', 'Your session ended. Sign in again.');
       if (MUTATING.has(req.method)) {
-        if (!originAllowed(req)) throw new AppError('csrf_failed', 'Request origin not allowed');
+        if (!originAllowed(req)) throw new AppError('csrf_failed', 'Request blocked. Reload the page and try again.');
         if (!csrfMatches(resolved.session.csrfToken, req.headers.get('x-csrf-token'))) {
           throw new AppError('csrf_failed', 'Your session token is out of date. Reload the page and try again.');
         }
@@ -166,9 +166,9 @@ export function platformRoute<P = Record<string, string>>(handler: (a: PlatformR
     const correlationId = req.headers.get('x-correlation-id')?.slice(0, 64) || randomUUID();
     try {
       const resolved = await currentSession();
-      if (!resolved) throw new AppError('unauthenticated', 'Please sign in again');
+      if (!resolved) throw new AppError('unauthenticated', 'Your session ended. Sign in again.');
       if (MUTATING.has(req.method)) {
-        if (!originAllowed(req)) throw new AppError('csrf_failed', 'Request origin not allowed');
+        if (!originAllowed(req)) throw new AppError('csrf_failed', 'Request blocked. Reload the page and try again.');
         if (!csrfMatches(resolved.session.csrfToken, req.headers.get('x-csrf-token'))) {
           throw new AppError('csrf_failed', 'Your session token is out of date. Reload the page and try again.');
         }

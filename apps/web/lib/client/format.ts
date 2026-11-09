@@ -49,6 +49,12 @@ export function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`;
 }
 
+/** Display form of a stored code ("payment_failed" → "Payment failed"). Display only; never send it back. */
+export function humanize(code: string): string {
+  const t = code.replace(/[_.]+/g, ' ').trim();
+  return t ? t[0]!.toUpperCase() + t.slice(1) : t;
+}
+
 export const ROLE_LABEL: Record<string, string> = {
   owner: 'Owner', admin: 'Admin', editor: 'Editor', approver: 'Approver', viewer: 'Viewer',
 };

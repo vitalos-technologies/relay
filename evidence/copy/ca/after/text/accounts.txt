@@ -1,0 +1,103 @@
+/accounts
+
+Connections
+Health
+TipSignal (demo)
+4
+Connect
+a network to TipSignal (demo)
+TipSignal Instagram (simulated)
+Instagram
+Connected
+Publishes
+Image · Album · Reel
+Analytics
+Not available
+TipSignal Facebook (simulated)
+Facebook
+Connected
+Publishes
+Text · Image · Album · Video
+Analytics
+Not available
+TipSignal Telegram (simulated)
+Telegram
+Connected
+Publishes
+Text · Image · Album · Video
+Analytics
+Not available
+TipSignal X (simulated)
+X
+Connected
+Publishes
+Text · Image · Album · Video
+Analytics
+Not available
+Vitalos (demo)
+5
+Connect
+a network to Vitalos (demo)
+Vitalos Instagram (simulated)
+Instagram
+Connected
+Publishes
+Image · Album · Reel
+Analytics
+Not available
+Vitalos Facebook (simulated)
+Facebook
+Connected
+Publishes
+Text · Image · Album · Video
+Analytics
+Not available
+Vitalos Telegram (simulated)
+Telegram
+Connected
+Publishes
+Text · Image · Album · Video
+Analytics
+Not available
+Vitalos X (simulated)
+X
+Connected
+Publishes
+Text · Image · Album · Video
+Analytics
+Not available
+Vitalos X — rejects posts (simulated)
+X
+Connected
+Publishes
+Text · Image · Album · Video
+Analytics
+Not available
+Content sources
+
+Relay only reads items you pick. Imports are private copies; source sharing is never changed.
+
+Google Drive & Docs
+
+Not set up
+
+Add GOOGLE_CONTENT_CLIENT_ID, GOOGLE_CONTENT_CLIENT_SECRET, GOOGLE_PICKER_API_KEY, GOOGLE_PICKER_APP_ID in Setup.
+Setup
+All brands (workspace)
+TipSignal (demo)
+Vitalos (demo)
+Connect
+(unavailable: Not set up)
+Use test data
+Notion
+
+Not set up
+
+Add NOTION_CLIENT_ID, NOTION_CLIENT_SECRET in Setup.
+Setup
+All brands (workspace)
+TipSignal (demo)
+Vitalos (demo)
+Connect
+(unavailable: Not set up)
+Use test data

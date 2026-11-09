@@ -23,4 +23,5 @@ export function WsState({ w }: { w: Pick<PlatformWorkspaceItem, 'state' | 'is_de
 }
 
 
+export const SUPPORT_LABEL: Record<SupportAccessDto['status'], string> = { requested: 'Waiting for approval', active: 'Active', declined: 'Declined', ended: 'Ended', cancelled: 'Cancelled', lapsed: 'Lapsed' };
 export const SUPPORT_TONE: Record<SupportAccessDto['status'], 'info' | 'success' | 'neutral' | 'warn'> = { requested: 'warn', active: 'success', declined: 'neutral', ended: 'neutral', cancelled: 'neutral', lapsed: 'neutral' };

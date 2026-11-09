@@ -64,6 +64,6 @@ export async function resolveOidcUser(tx: Queryable, id: OidcIdentity): Promise<
   const created = await maybeOne<{ id: string }>(tx,
     `INSERT INTO users(oidc_issuer, oidc_subject, email, email_verified, name, last_login_at) VALUES ($1,$2,$3,true,$4,now())
      ON CONFLICT DO NOTHING RETURNING id`, [id.issuer, id.subject, email, name]);
-  if (!created) throw new LoginError('account_conflict', 'Sign-in raced with another login. Please try again.');
+  if (!created) throw new LoginError('account_conflict', 'Another sign-in was in progress. Try again.');
   return { userId: created.id, created: true, bound: false };
 }

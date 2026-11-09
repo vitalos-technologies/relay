@@ -6,7 +6,7 @@ import type { DraftRecoveryPolicy, LocalRecoveryMode } from '@social-lite/core/c
 import { api } from '@/lib/client/api';
 import { useApi } from '@/lib/client/use-api';
 import { useSession } from '@/lib/client/session';
-import { Button, Card, CardHeader, ErrorNotice, ErrorState, Field, Input, MetaChip, RadioGroup, Skeleton, Switch, useToast } from '@/components/ui';
+import { Button, Card, ErrorNotice, ErrorState, Field, Input, MetaChip, RadioGroup, Skeleton, Switch, useToast } from '@/components/ui';
 
 type Policy = DraftRecoveryPolicy & { can_manage: boolean };
 
@@ -36,7 +36,7 @@ export function DraftRecoverySettings() {
       const next = await api.put<DraftRecoveryPolicy>('/api/workspace/data-policy', { local_recovery: f.mode, max_age_hours: hours, clear_on_logout: f.clear });
       setData({ ...next, can_manage: data.can_manage });
       await refresh();
-      toast.success('Draft recovery saved');
+      toast.success('Saved');
     } catch (e) {
       setErr(e);
     } finally {
@@ -46,8 +46,8 @@ export function DraftRecoverySettings() {
   const ro = !data.can_manage;
   return (
     <Card className="max-w-2xl">
-      <CardHeader title="Unsaved drafts in the browser" actions={ro ? <MetaChip>View only</MetaChip> : null} />
-      <div className="flex flex-col gap-6 p-4 pt-0">
+      <div className="flex flex-col gap-6 p-4">
+        {ro ? <div className="-mb-2 flex justify-end"><MetaChip>View only</MetaChip></div> : null}
         <RadioGroup legend="Keep unsaved copies" name="local-recovery" value={f.mode} onChange={(v) => setF({ ...f, mode: v })} options={MODES.map((m) => ({ ...m, disabled: ro }))} />
         {f.mode !== 'off' ? (
           <>

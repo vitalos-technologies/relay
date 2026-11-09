@@ -71,7 +71,7 @@ export async function idpKeys(): Promise<KeyResolver> {
     if (!uri) throw new AppError('provider_error', 'The identity provider does not publish signing keys.');
     keyResolver = { key, resolve: jwksResolver(async () => {
       const res = await fetch(uri, { signal: AbortSignal.timeout(8000) });
-      if (!res.ok) throw new AppError('provider_error', 'Signing keys could not be fetched.');
+      if (!res.ok) throw new AppError('provider_error', 'Couldn’t reach the sign-in provider. Try again.');
       return (await res.json()) as { keys: Jwk[] };
     }) };
   }
@@ -215,7 +215,7 @@ async function exchange(callbackParams: URLSearchParams, state: string, verifier
     return { claims: verified.claims, idToken: tokens.id_token, accessToken: tokens.access_token };
   } catch (err) {
     log.warn('oidc_code_exchange_failed', { err: { name: (err as Error).name, code: (err as { code?: string }).code } });
-    throw new LoginError('token_exchange_failed', 'Sign-in could not be completed. Please try again.');
+    throw new LoginError('token_exchange_failed', 'Couldn’t complete sign-in. Try again.');
   }
 }
 
@@ -231,7 +231,7 @@ export async function completeLogin(
   db = getPool(),
 ): Promise<LoginResult> {
   const state = callbackParams.get('state');
-  if (!state || state.length > 200) throw new LoginError('invalid_state', 'Your sign-in link is invalid or expired. Please sign in again.');
+  if (!state || state.length > 200) throw new LoginError('invalid_state', 'Your sign-in link is invalid or expired. Sign in again.');
 
   // Single use: consume atomically; expired or replayed states match nothing.
   const row = await maybeOne<{ id: string; purpose: Purpose; code_verifier_enc: EncryptedBlob; nonce: string; redirect_after: string | null; invitation_token_hash: Buffer | null;
@@ -239,10 +239,10 @@ export async function completeLogin(
     `UPDATE oauth_states SET consumed_at=now()
       WHERE state_hash=$1 AND purpose IN ('login','step_up','idp_action') AND consumed_at IS NULL AND expires_at > now()
       RETURNING id, purpose, code_verifier_enc, nonce, redirect_after, invitation_token_hash, session_id, user_id, idp_action, created_at`, [sha256(state)]);
-  if (!row) throw new LoginError('invalid_state', 'Your sign-in link is invalid or expired. Please sign in again.');
+  if (!row) throw new LoginError('invalid_state', 'Your sign-in link is invalid or expired. Sign in again.');
   const secret = decryptSecret<StateSecret>(row.code_verifier_enc, pkceAad);
   if (!p.binding || sha256(p.binding).toString('base64url') !== secret.b) {
-    throw new LoginError('invalid_state', 'Sign-in must be completed in the same browser that started it. Please sign in again.');
+    throw new LoginError('invalid_state', 'Sign-in must be completed in the same browser that started it. Sign in again.');
   }
   const actionStatus = callbackParams.get('kc_action_status') ?? undefined;
   if (row.purpose !== 'login') return completeSessionUpgrade(callbackParams, state, row, secret, p.currentSession ?? null, actionStatus, db);
@@ -250,7 +250,7 @@ export async function completeLogin(
   if (callbackParams.get('error')) throw new LoginError('idp_error', 'Sign-in was cancelled or refused by the identity provider.');
   const { claims, idToken, accessToken } = await exchange(callbackParams, state, secret.v, row.nonce);
   const sub = typeof claims.sub === 'string' ? claims.sub : null;
-  if (!sub) throw new LoginError('token_exchange_failed', 'Sign-in could not be completed. Please try again.');
+  if (!sub) throw new LoginError('token_exchange_failed', 'Couldn’t complete sign-in. Try again.');
   const cfg = await oidcConfiguration();
 
   let email = typeof claims.email === 'string' ? claims.email : undefined;
@@ -318,7 +318,7 @@ async function completeSessionUpgrade(
 ): Promise<LoginResult> {
   // Must return to the same live session that started the step-up / action.
   if (!current || current.id !== row.session_id || current.userId !== row.user_id) {
-    throw new LoginError('session_mismatch', 'Your session changed while you were verifying. Please sign in again.');
+    throw new LoginError('session_mismatch', 'Your session changed while you were verifying. Sign in again.');
   }
   const redirectTo = row.redirect_after ?? '/security';
   const auditBase = { workspaceId: null, actorUserId: current.userId, resourceType: 'session', resourceId: current.id };
@@ -338,7 +338,7 @@ async function completeSessionUpgrade(
   }
   const a = assuranceFromClaims(claims);
   if (fresh && (!a.authTime || a.authTime.getTime() < row.created_at.getTime() - 5_000)) {
-    throw new LoginError('step_up_not_fresh', 'The identity provider did not re-authenticate you. Please try again.');
+    throw new LoginError('step_up_not_fresh', 'The sign-in provider didn’t confirm it’s you. Try again.');
   }
   let assurance: SessionAssurance = { acr: a.acr, amr: a.amr, authTime: a.authTime, mfaVerified: a.mfaVerified };
   if (row.purpose === 'idp_action') {

@@ -284,7 +284,7 @@ test.describe('identity & security (Keycloak)', () => {
     const everyone = card.getByRole('switch', { name: 'Require two-step for everyone' });
     await everyone.click();
     await card.getByTestId('policy-save').click();
-    await ui(page.getByText('Security policy saved')).toBeVisible();
+    await ui(page.getByRole('status').getByText('Saved', { exact: true })).toBeVisible();
     expect((await (await api(page)).get('/api/workspace/security-policy')).body.policy.mfa_required_all).toBe(!before.mfa_required_all);
     await page.screenshot({ path: 'evidence/v2/security-policy-settings.png', fullPage: true });
     // Restore (weakening if it was turned on: allowed because this sign-in is fresh).

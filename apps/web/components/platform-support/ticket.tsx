@@ -19,6 +19,7 @@ import {
   Select, SkeletonRows, Textarea, useToast,
 } from '@/components/ui';
 import { Ago } from '@/components/admin/ui';
+import { SUPPORT_LABEL } from '@/components/admin/badges';
 import { AttachmentLinks, AttachmentPicker, useAttachments } from '@/components/support/attachments';
 import { PRIORITY_TONE, STAFF_STATUS, useStaffFeed } from './inbox';
 
@@ -56,7 +57,7 @@ export function StaffTicketView({ reference }: { reference: string }) {
   if (loading || !data) return <SkeletonRows rows={6} />;
   const run = async (name: string, fn: () => Promise<StaffTicketDetail>, msg: string) => {
     setBusy(name); setErr(null);
-    try { setData(await fn()); toast.success(msg); } catch (e) { setErr(e); toast.error(e, 'Not done'); } finally { setBusy(null); }
+    try { setData(await fn()); toast.success(msg); } catch (e) { setErr(e); toast.error(e, 'Couldn’t complete that'); } finally { setBusy(null); }
   };
   const patch = (b: Record<string, unknown>, msg = 'Saved') => run('patch', () => api.patch<StaffTicketDetail>(path, b), msg);
   const send = () => run(mode, async () => {
@@ -172,7 +173,7 @@ export function StaffTicketView({ reference }: { reference: string }) {
                 ...(ctx.commercial ? [['Plan', [ctx.commercial.plan, ctx.commercial.status, ctx.commercial.access && ctx.commercial.access !== 'full' ? ctx.commercial.access : null].filter(Boolean).join(' · ') || '—'] as [string, string]] : []),
                 ['Connections', ctx.connections.total ? `${ctx.connections.healthy}/${ctx.connections.total} healthy` : 'None'],
                 ...(ctx.connections.problems.length ? [['Problems', ctx.connections.problems.map((p) => `${p.provider} ${p.status.replace(/_/g, ' ')} ×${p.count}`).join(', ')] as [string, string]] : []),
-                ['Failures (7d)', ctx.recent_failures.failed || ctx.recent_failures.unknown ? `${ctx.recent_failures.failed} failed · ${ctx.recent_failures.unknown} unknown${ctx.recent_failures.codes.length ? ` · ${ctx.recent_failures.codes.map((c) => c.code).join(', ')}` : ''}` : 'None'],
+                ['Failures (7 days)', ctx.recent_failures.failed || ctx.recent_failures.unknown ? `${ctx.recent_failures.failed} failed · ${ctx.recent_failures.unknown} unknown${ctx.recent_failures.codes.length ? ` · ${ctx.recent_failures.codes.map((c) => c.code).join(', ')}` : ''}` : 'None'],
                 ['Participants', data.participants.length ? data.participants.map((p) => p.name ?? p.email).join(', ') : '—'],
               ]} />
             </div>
@@ -200,7 +201,7 @@ export function StaffTicketView({ reference }: { reference: string }) {
       <ResolveDialog open={dialog === 'resolve'} onOpenChange={(o) => !o && setDialog(null)} onResolve={(reason) => api.patch<StaffTicketDetail>(path, { status: 'resolved', resolution_reason: reason }).then(setData)} />
       <DuplicateDialog open={dialog === 'duplicate'} onOpenChange={(o) => !o && setDialog(null)} onSubmit={(of) => api.post<StaffTicketDetail>(`${path}/duplicate`, { of }).then(setData)} />
       <AccessDialog open={dialog === 'access'} onOpenChange={(o) => !o && setDialog(null)} workspace={data.workspace?.name ?? ''} reference={data.reference}
-        onSubmit={(b) => api.post<StaffTicketDetail>(`${path}/access`, b).then((d) => { setData(d); toast.success('Requested — the workspace owner decides'); })} />
+        onSubmit={(b) => api.post<StaffTicketDetail>(`${path}/access`, b).then((d) => { setData(d); toast.success('Request sent — a workspace owner or admin decides'); })} />
     </>
   );
 }
@@ -211,9 +212,9 @@ function SupportAccessCard({ ctx, ticketId, onRequest, canRequest }: { ctx: Staf
     <Card>
       <CardHeader title="Support access" actions={canRequest && !open.length ? <Button size="sm" variant="ghost" icon={<KeyRound aria-hidden className="size-4" />} onClick={onRequest}>Request</Button> : null} />
       <ul className="flex flex-col gap-1.5 px-4 pb-4 text-[13px]">
-        {!ctx.support_access.length ? <li className="text-muted">None. Ticket access does not include workspace access.</li> : ctx.support_access.map((g) => (
+        {!ctx.support_access.length ? <li className="text-muted">None. Ticket access doesn’t include workspace access.</li> : ctx.support_access.map((g) => (
           <li key={g.id} className="flex flex-wrap items-center gap-2">
-            <Badge tone={g.status === 'active' ? 'warn' : g.status === 'requested' ? 'info' : 'neutral'}>{g.status}</Badge>
+            <Badge tone={g.status === 'active' ? 'warn' : g.status === 'requested' ? 'info' : 'neutral'}>{SUPPORT_LABEL[g.status as keyof typeof SUPPORT_LABEL] ?? g.status}</Badge>
             <span className="min-w-0 flex-1 truncate">{g.operator}{g.support_ticket_id === ticketId ? ' · this ticket' : ''}</span>
             <span className="text-xs text-muted">{g.status === 'active' ? <>ends <Ago at={g.expires_at} /></> : g.status === 'requested' ? <>lapses <Ago at={g.request_expires_at} /></> : null}</span>
           </li>

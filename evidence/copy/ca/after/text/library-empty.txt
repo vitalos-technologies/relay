@@ -1,0 +1,21 @@
+/library
+
+Content library
+Assistant
+Brand
+Northwind Bakery (demo)
+Media
+Templates
+Sources
+Choose files
+
+or drop JPEG / PNG
+
+Search media
+Status
+All statuses
+Ready
+Processing
+Rejected
+Archived
+No media yet

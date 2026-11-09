@@ -13,7 +13,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
           fallback={<ShellSkeleton />}
           renderError={(e, retry) => (
             <div className="mx-auto max-w-lg px-6 py-24">
-              <ErrorState error={e} onRetry={retry} title="We couldn’t load your session" />
+              <ErrorState error={e} onRetry={retry} title="Couldn’t load your session" />
             </div>
           )}
         >

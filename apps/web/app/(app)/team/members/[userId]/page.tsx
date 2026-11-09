@@ -104,10 +104,10 @@ export default function MemberPage() {
       <TeamNav />
       {m.status === 'suspended' ? <Banner tone="warn" className="mb-6" title="Suspended">{m.status_reason}</Banner> : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-6">
           <Card aria-labelledby="h-access">
-            <CardHeader id="h-access" title={<>Effective access {access.data ? <span className="ml-1 font-normal text-muted">policy v{access.data.policy_version}</span> : null}</>} />
+            <CardHeader id="h-access" title="Effective access" />
             <div className="px-4 pb-4">
               {access.error ? <ErrorNotice error={access.error} /> : !access.data ? <SkeletonRows rows={3} /> : (
                 <AccessMatrix a={access.data} />
@@ -202,7 +202,7 @@ const LABEL: Record<string, string> = {
   'content.read': 'Read', 'content.create': 'Create', 'content.edit': 'Edit', 'content.submit': 'Submit', 'content.archive': 'Archive',
   'content.approve': 'Approve', 'comments.internal': 'Internal notes', 'comments.shared': 'Comment',
   'content.schedule': 'Schedule', 'content.publish': 'Publish', 'publishing.pause': 'Pause', 'publishing.resume': 'Resume', 'publishing.retry': 'Retry',
-  'brands.read': 'Brand', 'brands.manage': 'Edit brand', 'connections.read': 'Accounts', 'connections.manage': 'Connect accounts', 'assets.read': 'Library',
+  'brands.read': 'View brand', 'brands.manage': 'Edit brand', 'connections.read': 'Connections', 'connections.manage': 'Manage connections', 'assets.read': 'Library',
   'assets.upload': 'Upload', 'assets.manage': 'Manage library', 'analytics.read': 'Analytics', 'exports.create': 'Export',
 };
 

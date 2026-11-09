@@ -1,0 +1,76 @@
+Settings
+
+Search settings
+
+PERSONAL
+
+Profile
+Appearance
+Notifications
+Security and sessions
+
+WORKSPACE
+
+General
+Brands
+Time zone and locale
+Plan and billing
+Draft recovery
+
+PEOPLE AND ACCESS
+
+Members
+Invitations
+Teams
+Workspace security
+
+PUBLISHING
+
+Defaults
+Approval policies
+Posting slots
+Safety rules
+
+CONNECTIONS
+
+Social accounts
+Google Drive and Docs
+Notion
+Connection health
+Business integrations
+
+INBOX
+
+Channels
+Service levels
+Saved replies
+
+LISTENING
+
+Sources
+
+AI AND AUTOMATION
+
+Brand voice
+Inbound sources
+
+DEVELOPER
+
+MCP
+API and service accounts
+
+OPERATIONS
+
+Audit log
+Usage and limits
+Feature flags
+Data export
+Settings
+Workspace
+General
+Name
+Created
+Sun 8 Nov
+Type
+Demo (simulated)
+Save

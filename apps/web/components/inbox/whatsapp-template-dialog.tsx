@@ -46,7 +46,7 @@ function TemplateDialog({ channelId, conversationId, baseVersion, windowOpen, on
   const charge = chargeFor(t, windowOpen, data?.rates ?? null);
   const missing = values.some((v) => !v.trim());
   return (
-    <Dialog open size="lg" onOpenChange={(o) => !o && onClose()} title="Send a WhatsApp template" description={windowOpen ? 'Approved templates can be sent at any time.' : 'More than 24 hours since the customer wrote: only an approved template can be sent.'} footer={<>
+    <Dialog open size="lg" onOpenChange={(o) => !o && onClose()} title="Send a WhatsApp template" description={windowOpen ? undefined : 'Over 24 hours since the customer wrote: only an approved template can be sent.'} footer={<>
       <Button variant="ghost" onClick={onClose}>Cancel</Button>
       <Button variant="primary" loading={busy} disabledReason={!t ? 'Choose a template' : missing ? 'Fill in every value' : charge.billable && !ack ? 'Confirm the charge' : null} onClick={async () => {
         if (!t) return;

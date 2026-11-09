@@ -35,7 +35,7 @@ export function PresenceBar({ people, className }: { people: PresencePerson[]; c
         ))}
       </ul>
       <span className="hidden truncate text-xs text-muted sm:inline">{summary}</span>
-      <InfoTip label="About presence">Shows who has this post open (updated every 20 s). It doesn’t lock the post; saving still checks for newer versions.</InfoTip>
+      <InfoTip label="About presence">Who has this post open. It doesn’t lock the post; saving still checks for newer versions.</InfoTip>
     </div>
   );
 }

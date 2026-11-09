@@ -54,7 +54,7 @@ export function ListeningOverview() {
               {simulatedOnly ? <Badge tone="info" className="ml-2 align-middle">Simulated</Badge> : null}
             </p>
             <p className="mt-1 text-[13px] text-muted">
-              {monitoring.length ? `Public comments, mentions and reviews${since ? ` since ${fmtDay(since)}` : ''}. Private messages are never included.` : 'Add a channel to the inbox to start collecting public comments and reviews.'}
+              {monitoring.length ? `Public comments, mentions and reviews${since ? ` since ${fmtDay(since)}` : ''}. Private messages are never included.` : 'Add an inbox channel to collect public comments and reviews.'}
             </p>
           </div>
           <div className="flex flex-wrap gap-2 text-xs">
@@ -123,7 +123,7 @@ export function ListeningOverview() {
           <Card>
             <CardHeader title="Dashboards" actions={items.length ? <LinkButton size="sm" variant="ghost" href="/listening/dashboards/new">New</LinkButton> : undefined} />
             <div className="px-4 pb-4">
-              {!dashboards.data?.items.length ? <p className="text-[13px] text-muted">No saved dashboards.</p> : (
+              {!dashboards.data?.items.length ? <p className="text-[13px] text-muted">No dashboards</p> : (
                 <ul className="flex flex-col gap-1">{dashboards.data.items.map((d) => <li key={d.id}><Link className={cn('text-[13px] hover:underline')} href={`/listening/dashboards/${d.id}`}>{d.name}</Link>{!d.shared ? <span className="ml-2 text-xs text-subtle">Only you</span> : null}</li>)}</ul>
               )}
             </div>

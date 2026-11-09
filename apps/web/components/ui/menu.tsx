@@ -6,6 +6,7 @@ import { cn } from './cn';
 
 export const Menu = M.Root;
 export const MenuTrigger = M.Trigger;
+export const MenuGroup = M.Group;
 
 export function MenuContent({ children, align = 'end', className }: { children: ReactNode; align?: 'start' | 'end' | 'center'; className?: string }) {
   return (

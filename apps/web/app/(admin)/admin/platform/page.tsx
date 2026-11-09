@@ -53,7 +53,7 @@ export default function PlatformHealthPage() {
                 {data.queues.map((q) => <li key={q.queue} className="flex items-center gap-2 py-2"><span className="flex-1">{q.queue}</span><span className="tabular">{q.waiting} waiting</span><span className="text-muted">oldest {secs(q.oldest_age_seconds)}</span></li>)}
                 <li className="flex items-center gap-2 py-2"><span className="flex-1">Outbox</span><span className="tabular">{data.outbox.pending} pending</span>{data.outbox.dead ? <Badge tone="warn">{data.outbox.dead} dead</Badge> : null}</li>
               </ul>
-              {!data.jobs_visible ? <p className="px-4 pb-4 text-xs text-muted">Job queues (pg-boss) aren’t readable by the web role; deliveries and outbox shown.</p> : null}
+              {!data.jobs_visible ? <p className="px-4 pb-4 text-xs text-muted">Job queues aren’t visible here; showing deliveries and outbox.</p> : null}
             </Card>
           </div>
           <Card className="overflow-hidden">
@@ -76,7 +76,7 @@ export default function PlatformHealthPage() {
       <ReasonDialog open={dispatch} onOpenChange={setDispatch} title={data?.dispatch_enabled ? 'Stop dispatch for every workspace?' : 'Start dispatch?'}
         description={data?.dispatch_enabled ? 'No new publication starts anywhere until dispatch is started again. Sends in progress finish.' : 'Due publications start again; past-deadline ones expire.'}
         confirmLabel={data?.dispatch_enabled ? 'Stop dispatch' : 'Start dispatch'} confirmVariant={data?.dispatch_enabled ? 'danger' : 'primary'}
-        onConfirm={async (reason) => { await api.post('/api/platform/dispatch', { enabled: !data?.dispatch_enabled, reason }); toast.success('Saved'); await refetch(); }} />
+        onConfirm={async (reason) => { await api.post('/api/platform/dispatch', { enabled: !data?.dispatch_enabled, reason }); toast.success(data?.dispatch_enabled ? 'Dispatch stopped' : 'Dispatch started'); await refetch(); }} />
     </>
   );
 }

@@ -1,0 +1,137 @@
+/posts/547d68d7-aa7d-4893-8c4f-2cd59547f2f9
+
+[DIALOG]
+Move post to Trash?
+
+Restorable for 30 days.
+
+Nothing on social networks is deleted or changed.
+Restoring it later does not schedule or publish it.
+Cancel
+Move to Trash
+[PAGE]
+Vitalos (demo)
+
+Edit post: Draft: hydration tips
+Post title (internal)
+Collaborate
+Draft
+Base content
+Shared by 4 destinations
+Vitalos Instagram (simulated)
+Instagram
+Vitalos Facebook (simulated)
+Facebook
+Vitalos Telegram (simulated)
+Telegram
+Vitalos X (simulated)
+X
+Destinations 4
+selected
+
+INSTAGRAM
+
+Vitalos Instagram (simulated)
+(Instagram)
+
+FACEBOOK
+
+Vitalos Facebook (simulated)
+(Facebook)
+
+TELEGRAM
+
+Vitalos Telegram (simulated)
+(Telegram)
+
+X
+
+Vitalos X (simulated)
+(X)
+Vitalos X — rejects posts (simulated)
+(X)
+Base content
+Shared by 4 destinations
+Text
+Instagram Vitalos Instagram (simulated):
+51 / 2,200
+characters
+Facebook Vitalos Facebook (simulated):
+51 / 10,000
+characters
+Telegram Vitalos Telegram (simulated):
+52 / 1,024
+UTF-16 units
+X Vitalos X (simulated):
+52 / 280
+X-weighted (links = 23)
+CTA
+(brand call to action)
+Hashtags
+LinkOptional
+
+Media
+
+Add
+Instagram Vitalos Instagram (simulated):
+Image
+Album
+Reel
+Facebook Vitalos Facebook (simulated):
+Image
+Album
+Video
+Telegram Vitalos Telegram (simulated):
+Image
+Album
+Video
+X Vitalos X (simulated):
+Image
+Album
+Video
+Readiness
+Verified
+Similar to Scheduled: spring check-in on Vitalos Instagram (simulated) · in 13 hours · same media
+Similar to Scheduled: spring check-in on Vitalos Facebook (simulated) · in 13 hours · same media
+Similar to Scheduled: spring check-in on Vitalos Telegram (simulated) · in 13 hours · same media
+
+Ready
+
+Preview
+Preview destination
+Instagram · Vitalos Instagram (simulated)
+Facebook · Vitalos Facebook (simulated)
+Telegram · Vitalos Telegram (simulated)
+X · Vitalos X (simulated)
+Instagram
+· Approximate preview
+Simulated
+
+Vitalos Instagram (simulated)
+
+Vitalos Instagram (simulated)Five small habits for better hydration this week. 💧
+
+Discussion
+Tasks
+Review
+Activity
+History
+Internal
+Shared with client
+New internal comment
+Comment
+(unavailable: Write something first.)
+Open
+0
+Resolved
+0
+No open discussions
+Saved 06:44 GMT
+Assist
+(unavailable: AI not configured)
+Assistant
+Save draft
+now
+Schedule
+Queue
+Publish now

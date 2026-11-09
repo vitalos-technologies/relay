@@ -52,7 +52,7 @@ export default function MembersPage() {
   }
   return (
     <>
-      <PageHeader title="Team" meta={data ? `v${data.policy_version}` : undefined}
+      <PageHeader title="Team"
         actions={canV2('members.invite') ? <LinkButton href={th("/team/invitations?new=1")} variant="primary" icon={<UserPlus aria-hidden className="size-4" />}>Invite</LinkButton> : null} />
       <TeamNav />
       {transfer ? (

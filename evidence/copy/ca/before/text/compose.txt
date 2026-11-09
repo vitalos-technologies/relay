@@ -1,0 +1,22 @@
+/compose
+
+Create
+New post
+Brand
+TipSignal (demo)
+Vitalos (demo)
+
+Approval required
+
+TemplateOptional
+No templates
+Create draft
+Import CSV
+From Drive or Notion
+Drafts
+
+Draft: weekend preview
+
+Edited 13 hours ago
+
+Draft

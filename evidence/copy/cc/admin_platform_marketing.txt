@@ -1,0 +1,28 @@
+Marketing
+Open page
+Support widget
+
+Messages go to Platform → Support.
+
+Show the widget on the marketing page
+Also show it inside the app
+Staffed live chat
+
+Turn on only while someone is watching the support inbox.
+
+Visitors see: 
+Send us a message
+
+Footer links
+
+A path on this site (/…) or an https:// address. Empty links show as “not published yet”.
+
+Privacy notice
+Terms of service
+Public support emailOptional
+
+Shown next to the widget link.
+
+Save
+(unavailable: No changes)
+Changed 7h ago

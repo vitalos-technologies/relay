@@ -39,7 +39,7 @@ async function adminToken(): Promise<string> {
     body: new URLSearchParams({ grant_type: 'client_credentials' }),
     signal: AbortSignal.timeout(8000),
   });
-  if (!res.ok) throw new AppError('provider_error', 'The identity provider could not be reached.');
+  if (!res.ok) throw new AppError('provider_error', 'Couldn’t reach the sign-in provider. Try again.');
   const j = (await res.json()) as { access_token: string; expires_in: number };
   token = { value: j.access_token, exp: Date.now() + j.expires_in * 1000, key };
   return j.access_token;

@@ -1,0 +1,185 @@
+/planner
+
+Planner
+Europe/London · GMT
+Assistant
+History
+Create post
+Today
+2 Nov – 8 Nov 2026
+Week
+Month
+List
+Account
+All accounts
+Campaign
+All campaigns
+Always-on
+Autumn launch
+Status
+All statuses
+Scheduled
+Awaiting approval
+Publishing
+Published
+Partial success
+Needs attention
+Failed
+Expired
+Cancelled
+2 in conflict
+Mon
+Tue
+Wed
+Thu
+Fri
+Sat
+Sun
+2
+09:35
+Weekend opening hours (demo)
+Simulated · delivered
+Facebook (simulated): Simulated · delivered
+12:11
+Behind the roaster (demo)
+Simulated · delivered
+LinkedIn (simulated): Simulated · delivered
+Always-on
+16:42
+Cold brew how-to (demo)
+Simulated · delivered
+Threads (simulated): Simulated · delivered
+Always-on
+20:16
+Customer of the month (demo)
+Simulated · delivered
+Instagram (simulated): Simulated · delivered
+Always-on
+3
+06:56
+Reusable cup rewards (demo)
+Simulated · delivered
+LinkedIn (simulated): Simulated · delivered
+Autumn launch
+13:29
+Weekend opening hours (demo)
+Simulated · delivered
+Facebook (simulated): Simulated · delivered
+Autumn launch
+14:11
+Autumn blend is here (demo)
+Simulated · delivered
+Instagram (simulated): Simulated · delivered
+Autumn launch
+17:11
+New pastry menu (demo)
+Simulated · delivered
+Threads (simulated): Simulated · delivered
+Always-on
+4
+09:11
+Farm partner spotlight (demo)
+Simulated · delivered
+LinkedIn (simulated): Simulated · delivered
+13:12
+Latte art Friday (demo)
+Simulated · delivered
+Facebook (simulated): Simulated · delivered
+Always-on
+16:55
+Customer of the month (demo)
+Simulated · delivered
+Threads (simulated): Simulated · delivered
+Always-on
+19:36
+Autumn blend is here (demo)
+Simulated · delivered
+Instagram (simulated): Simulated · delivered
+Always-on
+5
+06:09
+Autumn blend is here (demo)
+Simulated · delivered
+LinkedIn (simulated): Simulated · delivered
+13:56
+Reusable cup rewards (demo)
+Simulated · delivered
+Facebook (simulated): Simulated · delivered
+Autumn launch
+17:27
+Farm partner spotlight (demo)
+Simulated · delivered
+Instagram (simulated): Simulated · delivered
+Autumn launch
+23:56
+Customer of the month (demo)
+Simulated · delivered
+Threads (simulated): Simulated · delivered
+Always-on
+6
+06:15
+Brew guide: V60 (demo)
+Simulated · delivered
+LinkedIn (simulated): Simulated · delivered
+Autumn launch
+13:40
+New pastry menu (demo)
+Simulated · delivered
+Facebook (simulated): Simulated · delivered
+Always-on
+16:26
+Weekend opening hours (demo)
+Simulated · delivered
+Threads (simulated): Simulated · delivered
+Autumn launch
+18:57
+Weekend opening hours (demo)
+Simulated · delivered
+Instagram (simulated): Simulated · delivered
+7
+09:07
+Customer of the month (demo)
+Simulated · delivered
+LinkedIn (simulated): Simulated · delivered
+09:32
+Latte art Friday (demo)
+Simulated · delivered
+Facebook (simulated): Simulated · delivered
+Autumn launch
+15:35
+Customer of the month (demo)
+Simulated · delivered
+Instagram (simulated): Simulated · delivered
+Autumn launch
+18:36
+Behind the roaster (demo)
+Simulated · delivered
+Threads (simulated): Simulated · delivered
+Always-on
+8
+Today
+09:33
+Latte art Friday (demo)
+Simulated · delivered
+LinkedIn (simulated): Simulated · delivered
+Autumn launch
+09:52
+Reusable cup rewards (demo)
+Simulated · delivered
+Facebook (simulated): Simulated · delivered
+Autumn launch
+12:14
+Fresh this morning
+Simulated · delivered
+Facebook (simulated): Simulated · delivered
+Instagram (simulated): Simulated · delivered
+
+Conflict
+
+12:14
+Thank you, neighbours
+Simulated · delivered
+Facebook (simulated): Simulated · delivered
+Instagram (simulated): Simulated · delivered
+
+Conflict

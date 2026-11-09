@@ -83,12 +83,12 @@ function SetupRow({ item, onSaved }: { item: SetupItem; onSaved: (i: SetupItem) 
             {item.secret ? <KeyRound aria-hidden className="size-3.5 text-muted" /> : null}
             {item.label}
           </label>
-          <p className="mt-0.5 font-mono text-[11px] text-subtle">{item.key}</p>
-          {item.hint ? <p className="mt-1 text-xs text-muted">{item.hint}</p> : null}
+          <p className="mt-0.5 font-mono text-[11px] text-subtle [overflow-wrap:anywhere]">{item.key}</p>
+          {item.hint ? <p className="mt-1 text-xs text-muted [overflow-wrap:anywhere]">{item.hint}</p> : null}
         </div>
         <div className="flex items-center gap-2">
           {item.is_set
-            ? <Badge tone="success" icon={<CircleCheck aria-hidden className="size-3.5" />}>{fromEnv ? 'Env' : 'Set'}</Badge>
+            ? <Badge tone="success" icon={<CircleCheck aria-hidden className="size-3.5" />}>Set</Badge>
             : <Badge tone="warn" icon={<CircleDashed aria-hidden className="size-3.5" />}>Not set</Badge>}
           {item.docs_url ? (
             <a href={item.docs_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-muted hover:text-fg">
@@ -97,7 +97,7 @@ function SetupRow({ item, onSaved }: { item: SetupItem; onSaved: (i: SetupItem) 
           ) : null}
         </div>
       </div>
-      {item.warning ? <p role="alert" className="rounded-lg bg-warn-soft px-3 py-2 text-xs">{item.warning}</p> : null}
+      {item.warning ? <p role="alert" className="rounded-lg bg-warn-soft px-3 py-2 text-xs [overflow-wrap:anywhere]">{item.warning}</p> : null}
       {locked ? (
         <p className="flex items-center gap-2 text-xs text-muted"><Server aria-hidden className="size-3.5" /> Environment only</p>
       ) : fromEnv ? (
@@ -119,7 +119,7 @@ function SetupRow({ item, onSaved }: { item: SetupItem; onSaved: (i: SetupItem) 
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-3">
-          <span id={id} className="font-mono text-[13px] text-muted">{item.secret ? '••••••••' : item.value || '—'}<span className="sr-only">{item.secret ? ' (hidden)' : ''}</span></span>
+          <span id={id} className="min-w-0 font-mono text-[13px] text-muted [overflow-wrap:anywhere]">{item.secret ? '••••••••' : item.value || '—'}<span className="sr-only">{item.secret ? ' (hidden)' : ''}</span></span>
           <Button size="sm" onClick={() => setEditing(true)}>{item.secret ? 'Replace' : 'Edit'}</Button>
         </div>
       )}

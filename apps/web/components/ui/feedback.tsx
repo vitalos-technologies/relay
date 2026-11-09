@@ -103,10 +103,10 @@ export function CorrelationRef({ id }: { id: string }) {
 }
 
 /** Inline error with message, field errors and correlation id. */
-export function ErrorNotice({ error, className, title }: { error: unknown; className?: string; title?: string }) {
-  const msg = isApiError(error) ? error.message : error instanceof Error ? error.message : 'Something went wrong.';
+export function ErrorNotice({ error, className, title, hideRef }: { error: unknown; className?: string; title?: string; hideRef?: boolean }) {
+  const msg = isApiError(error) ? error.message : error instanceof Error ? error.message : 'Something went wrong. Try again.';
   const fields = isApiError(error) ? error.fieldErrors : undefined;
-  const ref = isApiError(error) ? error.correlationId : null;
+  const ref = isApiError(error) && !hideRef ? error.correlationId : null;
   const offline = isApiError(error) && error.isNetwork;
   return (
     <div role="alert" className={cn('rounded-lg border px-3.5 py-3 text-[13px]', toneClass.danger, className)}>
@@ -130,12 +130,13 @@ export function ErrorNotice({ error, className, title }: { error: unknown; class
 }
 
 /** Section-level error with retry. */
-export function ErrorState({ error, onRetry, title = 'This could not be loaded', className }: { error: unknown; onRetry?: () => void; title?: string; className?: string }) {
+export function ErrorState({ error, onRetry, title = 'Couldn’t load this', className }: { error: unknown; onRetry?: () => void; title?: string; className?: string }) {
   const status = isApiError(error) ? error.status : 0;
-  const t = status === 404 ? 'Not found' : status === 403 ? 'You don’t have access to this' : title;
+  // 404: the server message already names what is missing ("Invitation not found"); no extra title or reference.
+  const t = status === 404 ? undefined : status === 403 ? 'You don’t have access to this' : title;
   return (
     <div className={cn('flex flex-col items-start gap-3', className)}>
-      <ErrorNotice error={error} title={t} className="w-full" />
+      <ErrorNotice error={error} title={t} hideRef={status === 404} className="w-full" />
       {onRetry && status !== 403 && status !== 404 ? (
         <button type="button" onClick={onRetry} className="touch-target inline-flex h-8 items-center gap-2 rounded-lg border border-border bg-raised px-3 text-[13px] font-medium hover:border-border-strong">
           <RefreshCw aria-hidden className="size-3.5" /> Try again

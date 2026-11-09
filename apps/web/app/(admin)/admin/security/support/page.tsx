@@ -11,7 +11,7 @@ import { useSession } from '@/lib/client/session';
 import { Badge, Button, Card, ConfirmDialog, EmptyState, ErrorState, Facts, Field, PageHeader, SkeletonRows, Textarea, useToast } from '@/components/ui';
 import { useAdminTopics } from '@/components/admin/sync';
 import { Ago } from '@/components/admin/ui';
-import { SUPPORT_TONE } from '@/components/admin/badges';
+import { SUPPORT_LABEL, SUPPORT_TONE } from '@/components/admin/badges';
 
 const mins = (m: number) => duration(m * 60);
 
@@ -35,7 +35,7 @@ export default function WorkspaceSupportAccessPage() {
             <Card as="li" key={g.id} className="p-4">
               <div className="flex flex-wrap items-start gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="flex flex-wrap items-center gap-2 text-[14px] font-medium">{g.operator.name || g.operator.email}<Badge tone={SUPPORT_TONE[g.status]}>{g.status}</Badge><span className="text-xs font-normal text-muted">Read-only · {mins(g.duration_minutes)}</span></p>
+                  <p className="flex flex-wrap items-center gap-2 text-[14px] font-medium">{g.operator.name || g.operator.email}<Badge tone={SUPPORT_TONE[g.status]}>{SUPPORT_LABEL[g.status]}</Badge><span className="text-xs font-normal text-muted">Read-only · {mins(g.duration_minutes)}</span></p>
                   <p className="mt-1 text-[13px]">{g.reason}</p>
                   <Facts className="mt-3" items={[
                     ['Requested', <Ago key="r" at={g.requested_at} />],

@@ -1,0 +1,80 @@
+Integrations
+Integration infrastructure
+Integration	Relay app	Missing	Accounts	Note
+
+Instagram
+	
+Not configured
+	META_APP_ID, META_APP_SECRET	0 live · 11 sim	
+
+Facebook
+	
+Not configured
+	META_APP_ID, META_APP_SECRET	0 live · 14 sim	
+
+Telegram
+	
+No app needed
+	—	0 live · 7 sim	Each customer brings their own credentials
+
+X
+	
+Not configured
+	X_CLIENT_ID	0 live · 9 sim	
+
+TikTok
+	
+Not configured
+	TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET	0 live	
+
+YouTube
+	
+Not configured
+	GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET	0 live	
+
+LinkedIn
+	
+Not configured
+	LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET	0 live · 2 sim	
+
+Threads
+	
+Not configured
+	THREADS_APP_ID, THREADS_APP_SECRET	0 live · 2 sim	
+
+Pinterest
+	
+Not configured
+	PINTEREST_APP_ID, PINTEREST_APP_SECRET	0 live	
+
+Bluesky
+	
+No app needed
+	—	0 live · 1 sim	Each customer brings their own credentials
+
+Google Drive and Docs
+	
+Not configured
+	GOOGLE_CONTENT_CLIENT_ID, GOOGLE_CONTENT_CLIENT_SECRET, GOOGLE_PICKER_API_KEY	0 live	Reuses the YouTube OAuth client
+
+Notion
+	
+Not configured
+	NOTION_CLIENT_ID, NOTION_CLIENT_SECRET	0 live	
+
+MCP endpoint
+	
+Not configured
+	public HTTPS URL	—	Real MCP clients need public HTTPS
+
+Email (SMTP)
+	
+Not configured
+	production SMTP (local capture in use)	—	
+
+AI assistance
+	
+Not configured
+	ANTHROPIC_API_KEY	—	Development installation
+
+Keys go in Instance setup or the server environment; secrets are never shown. Each network also reviews the Relay app separately.

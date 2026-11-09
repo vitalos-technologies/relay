@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { CircleCheck, OctagonX, Pause, Play, RefreshCw, RotateCcw } from 'lucide-react';
 import { api } from '@/lib/client/api';
 import { useApi } from '@/lib/client/use-api';
+import { humanize, plural } from '@/lib/client/format';
 import { useSession } from '@/lib/client/session';
 import type { DeadLetterItem } from '@social-lite/core/contracts/v31-admin';
 import type { WorkloadResponse } from '@social-lite/core/contracts/v31-perf';
@@ -39,7 +40,7 @@ export default function AdminOperationsPage() {
   const requeue = async (id: string) => {
     setBusy(id);
     try { const r = await api.post<{ requeued: boolean }>(`/api/admin/dead-letters/${id}/requeue`, {}); toast.success(r.requeued ? 'Requeued' : 'Already requeued'); await dead.refetch(); }
-    catch (e) { toast.error(e, 'Not requeued'); } finally { setBusy(null); }
+    catch (e) { toast.error(e, 'Couldn’t requeue'); } finally { setBusy(null); }
   };
 
   return (
@@ -68,7 +69,7 @@ export default function AdminOperationsPage() {
                 );
               })}
             </ul>
-            <p className="text-xs text-muted">Checked when each post is about to send. Posts already sending finish; provider-scheduled releases are cancelled at the provider where it supports it.</p>
+            <p className="text-xs text-muted">Applies at send time. Posts already sending finish; provider-scheduled posts are cancelled where the network allows it.</p>
           </div>
         </Card>
 
@@ -108,7 +109,7 @@ export default function AdminOperationsPage() {
                 <tbody>
                   {work.data.classes.map((c) => (
                     <tr key={c.class} className="border-b border-border last:border-0">
-                      <th scope="row" className="px-4 py-2 text-left font-medium">{c.class.replace(/_/g, ' ')}</th><td className="px-3 py-2 tabular">{c.finished}</td>
+                      <th scope="row" className="px-4 py-2 text-left font-medium">{humanize(c.class)}</th><td className="px-3 py-2 tabular">{c.finished}</td>
                       <td className="px-3 py-2 tabular">{c.failed || '—'}</td><td className="px-3 py-2 tabular">{ms(c.dispatch_delay.p95_ms)}</td><td className="px-3 py-2 tabular">{ms(c.processing.p95_ms)}</td><td className="px-3 py-2 tabular">{c.provider ? ms(c.provider.p95_ms) : '—'}</td>
                     </tr>
                   ))}
@@ -126,7 +127,7 @@ export default function AdminOperationsPage() {
               <ul className="divide-y divide-border">
                 {dead.data.items.map((d) => (
                   <li key={d.id} className="flex flex-wrap items-center gap-2 py-2.5 text-[13px]">
-                    <code className="text-[12px]">{d.event_type}</code><span className="text-muted">{d.attempts} attempts</span><Ago at={d.created_at} className="text-xs text-muted" />
+                    <code className="text-[12px]">{d.event_type}</code><span className="text-muted">{plural(d.attempts, 'attempt')}</span><Ago at={d.created_at} className="text-xs text-muted" />
                     <span className="min-w-0 flex-1 truncate text-xs text-muted">{d.last_error}</span>
                     <Button size="sm" icon={<RotateCcw aria-hidden className="size-4" />} loading={busy === d.id} disabledReason={d.requeue_allowed ? null : d.reason} onClick={() => void requeue(d.id)}>Requeue</Button>
                   </li>
@@ -142,7 +143,7 @@ export default function AdminOperationsPage() {
             {!diag.data ? <SkeletonRows rows={3} /> : diag.data.checks.map((c) => (
               <li key={c.name} className="flex items-start gap-2 py-1.5 text-[13px]">
                 {c.ok ? <CircleCheck aria-hidden className="mt-0.5 size-4 text-success" /> : <OctagonX aria-hidden className="mt-0.5 size-4 text-danger" />}
-                <span className="min-w-0"><span className="font-medium">{c.name.replace(/_/g, ' ')}</span>{c.detail ? <span className="block break-words text-xs text-muted">{c.detail}</span> : null}</span>
+                <span className="min-w-0"><span className="font-medium">{humanize(c.name)}</span>{c.detail ? <span className="block break-words text-xs text-muted">{c.detail}</span> : null}</span>
               </li>
             ))}
           </ul>

@@ -28,12 +28,12 @@ export function DeliveryCard({ delivery: d, tz, onChanged, canAct = true, expand
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
             <span className="truncate text-sm font-medium">{d.display_name}</span>
-            {d.is_mock ? <SimulatedBadge className="shrink-0" /> : null}
+            {d.is_mock && d.state !== 'published' ? <SimulatedBadge className="shrink-0" /> : null}
           </div>
           {/* relative: the sr-only label is absolutely positioned and would otherwise escape the truncation (320 px overflow). */}
           <p className="relative truncate text-xs text-muted tabular">
             {d.state === 'published' && d.published_at ? (
-              <>{d.is_mock ? 'Simulated delivery' : 'Published'} <TimeWithZone instant={d.published_at} tz={tz} /></>
+              <>{d.is_mock ? 'Delivered' : 'Published'} <TimeWithZone instant={d.published_at} tz={tz} /></>
             ) : (
               <>Due <TimeWithZone instant={d.due_at} tz={tz} /></>
             )}

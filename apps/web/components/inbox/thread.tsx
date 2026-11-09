@@ -184,7 +184,7 @@ export function InboxThread({ id, onBack, onDetails, onChanged }: { id: string; 
   const count = entries.length;
   useEffect(() => { const el = scroller.current; if (el) el.scrollTop = el.scrollHeight; }, [count]);
 
-  if (error && !c) return <div className="p-6"><Banner tone="danger" title="This conversation could not be loaded">{error.message}</Banner></div>;
+  if (error && !c) return <div className="p-6"><Banner tone="danger" title="Couldn’t load this conversation">{error.message}</Banner></div>;
   if (!c) return <div className="p-6 text-[13px] text-muted">Loading…</div>;
 
   const modes: Array<ComposerMode<Mode>> = [

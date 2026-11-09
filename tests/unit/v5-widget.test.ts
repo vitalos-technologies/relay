@@ -24,10 +24,10 @@ describe('form token (time trap)', () => {
     expect(() => checkFormToken(issueFormToken(now), now)).toThrow(/wait a moment/);
     const t = issueFormToken(now - 5000);
     const [ts, mac] = t.split('.');
-    expect(() => checkFormToken(`${Number(ts) - 1000}.${mac}`, now)).toThrow(/could not be sent/); // re-dated
-    expect(() => checkFormToken(`${ts}.${mac!.slice(0, -2)}xx`, now)).toThrow(/could not be sent/);
-    expect(() => checkFormToken('garbage', now)).toThrow(/could not be sent/);
-    expect(() => checkFormToken(undefined, now)).toThrow(/could not be sent/);
+    expect(() => checkFormToken(`${Number(ts) - 1000}.${mac}`, now)).toThrow(/Couldn’t send your message/); // re-dated
+    expect(() => checkFormToken(`${ts}.${mac!.slice(0, -2)}xx`, now)).toThrow(/Couldn’t send your message/);
+    expect(() => checkFormToken('garbage', now)).toThrow(/Couldn’t send your message/);
+    expect(() => checkFormToken(undefined, now)).toThrow(/Couldn’t send your message/);
     expect(() => checkFormToken(issueFormToken(now - 7 * 3600_000), now)).toThrow(/expired/);
     expect(() => checkFormToken(issueFormToken(now + 5 * 60_000), now)).toThrow(/expired/); // issued in the future
   });

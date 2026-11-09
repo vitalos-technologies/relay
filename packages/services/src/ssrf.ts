@@ -166,7 +166,7 @@ function request(v: Vetted, opts: SafeFetchOptions, deadline: number): Promise<{
     });
     const timer = setTimeout(() => req.destroy(new AppError('provider_error', 'The remote server took too long to respond.')), remaining);
     req.on('timeout', () => req.destroy(new AppError('provider_error', 'The remote server took too long to respond.')));
-    req.on('error', (err) => reject(err instanceof AppError ? err : new AppError('provider_error', 'The remote server could not be reached.')));
+    req.on('error', (err) => reject(err instanceof AppError ? err : new AppError('provider_error', 'Couldn’t reach the remote server. Try again.')));
     req.on('close', () => clearTimeout(timer));
     req.end();
   });

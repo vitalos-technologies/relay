@@ -72,7 +72,7 @@ export function ServiceAccountsSettings() {
                     <p className="mt-0.5 text-xs text-muted">
                       {sa.grants.map((g) => `${ROLE_LABEL[g.role] ?? g.role} · ${g.brand_name ?? 'workspace'}`).join(', ') || 'No access'}
                       {' · '}owner {sa.owner.name ?? sa.owner.email}
-                      {sa.expires_at ? ` · expires ${new Date(sa.expires_at).toLocaleDateString()}` : ''}
+                      {sa.expires_at ? ` · expires ${new Date(sa.expires_at).toLocaleDateString('en-GB')}` : ''}
                       {' · '}{sa.last_used_at ? `used ${fmtRelative(sa.last_used_at)}` : 'never used'}
                     </p>
                   </div>
@@ -90,7 +90,7 @@ export function ServiceAccountsSettings() {
                         <span className="flex min-w-0 flex-wrap items-center gap-2">
                           <code className="font-mono text-[12px]">{k.prefix}_…</code>
                           <Badge tone={statusTone(k.status)}>{k.status}</Badge>
-                          <span className="text-muted">{k.last_used_at ? `used ${fmtRelative(k.last_used_at)}` : 'never used'}{k.expires_at ? ` · expires ${new Date(k.expires_at).toLocaleDateString()}` : ''}</span>
+                          <span className="text-muted">{k.last_used_at ? `used ${fmtRelative(k.last_used_at)}` : 'never used'}{k.expires_at ? ` · expires ${new Date(k.expires_at).toLocaleDateString('en-GB')}` : ''}</span>
                         </span>
                         {k.status === 'active' && sa.status === 'active' ? (
                           <span className="flex gap-1">

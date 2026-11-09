@@ -6,7 +6,7 @@ import { ShieldCheck } from 'lucide-react';
 import { api } from '@/lib/client/api';
 import { useApi } from '@/lib/client/use-api';
 import { useSession } from '@/lib/client/session';
-import { Button, Card, CardHeader, EmptyState, ErrorNotice, ErrorState, Field, Input, Skeleton, Switch, useToast } from '@/components/ui';
+import { Button, Card, EmptyState, ErrorNotice, ErrorState, Field, Input, Skeleton, Switch, useToast } from '@/components/ui';
 
 interface Policy { mfa_required_all: boolean; mfa_required_for: string[]; step_up_seconds: number; invite_ttl_hours: number; guest_max_days: number; guest_default_days: number }
 interface View { policy: Policy; policy_version: number; roles: string[] }
@@ -42,14 +42,13 @@ function PolicyForm({ view, onSaved }: { view: View; onSaved: (v: View) => void 
     try {
       const r = await api.put<{ policy: Policy; policy_version: number }>('/api/workspace/security-policy', { ...p, expected_policy_version: view.policy_version });
       onSaved({ ...view, policy: r.policy, policy_version: r.policy_version });
-      toast.success('Security policy saved');
+      toast.success('Saved');
     } catch (e) { setErr(e); } finally { setBusy(false); }
   };
 
   return (
     <Card className="max-w-2xl" data-testid="security-policy">
-      <CardHeader title="Security policy" />
-      <div className="flex flex-col gap-6 p-4 pt-0">
+      <div className="flex flex-col gap-6 p-4">
         <Switch checked={p.mfa_required_all} onCheckedChange={(v) => set({ mfa_required_all: v })} label="Require two-step for everyone"
           description="Members without it keep reading but can’t do sensitive actions." />
         {!p.mfa_required_all ? (

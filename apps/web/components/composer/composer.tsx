@@ -610,11 +610,8 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
         <Banner
           tone="info"
           className="mb-6"
-          title={isPublished ? (allMock ? 'Delivered to simulated destinations · read only' : 'Published · read only') : 'View only'}
-          actions={<>
-            {can('drafts.edit') ? <Button size="sm" variant="secondary" icon={<Copy aria-hidden className="size-4" />} onClick={() => void duplicate()}>Duplicate</Button> : null}
-            {isPublished && post.can.edit ? <Button size="sm" variant="ghost" onClick={() => setEditPublished(true)}>Edit</Button> : null}
-          </>}
+          title={isPublished ? 'Already sent' : 'View only'}
+          actions={isPublished && post.can.edit ? <Button size="sm" variant="ghost" onClick={() => setEditPublished(true)}>Edit</Button> : null}
         />
       ) : null}
       {paused ? <Banner tone="warn" className="mb-6" title={`${session.workspace?.publishing_paused ? 'Workspace' : post.brand.name} paused — nothing will send`} /> : null}
@@ -674,7 +671,7 @@ function ComposerLoaded({ post, refetch, reload }: { post: PostDetail; refetch: 
                   {pendingSelection ? (
                     <Button size="sm" variant="secondary" icon={<MessageSquarePlus aria-hidden className="size-4" />}
                       onMouseDown={(e) => e.preventDefault()} onClick={() => { setSelection(pendingSelection); openCollab('discussion'); }}>Comment on selection</Button>
-                  ) : selectedConns.length ? <span className="text-xs text-muted">Shared by {selectedConns.length === 1 ? '1 destination' : `${selectedConns.length} destinations`}</span> : null}
+                  ) : selectedConns.length ? <span className="text-xs text-muted lg:hidden">Shared by {selectedConns.length === 1 ? '1 destination' : `${selectedConns.length} destinations`}</span> : null}
                 </div>
                 <BaseEditor
                   draft={draft}

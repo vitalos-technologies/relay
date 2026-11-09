@@ -21,7 +21,7 @@ export default function PlatformMarketingPage() {
   const { data, error, loading, refetch, setData } = useApi<MarketingConfig>('/api/platform/marketing');
   return (
     <>
-      <PageHeader title="Marketing" meta={<span className="text-[13px] text-muted">Public page settings. No secrets are stored here.</span>}
+      <PageHeader title="Marketing"
         actions={<a href="/" target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 text-[13px] font-medium text-accent-text hover:underline">Open page<ExternalLink aria-hidden className="size-3.5" /></a>} />
       {error && !data ? <ErrorState error={error} onRetry={refetch} /> : loading || !data ? <SkeletonRows rows={4} /> : <MarketingForm key={data.updated_at ?? 'defaults'} data={data} onSaved={setData} />}
     </>
@@ -50,23 +50,23 @@ function MarketingForm({ data, onSaved }: { data: MarketingConfig; onSaved: (c: 
             <Switch checked={draft.widget_in_app} onCheckedChange={(v) => set('widget_in_app', v)} label="Also show it inside the app" disabled={!operator} />
             <div className="flex flex-col gap-1">
               <Switch checked={draft.widget_staffed} onCheckedChange={(v) => set('widget_staffed', v)} label="Staffed live chat" disabled={!operator || !draft.widget_enabled} />
-              <p className="text-xs text-muted">Turn on only when someone is watching the support inbox. Off: the widget says “Send us a message” and shows no online status.</p>
+              <p className="text-xs text-muted">Turn on only while someone is watching the support inbox.</p>
             </div>
             <p className="text-xs text-muted" data-testid="mkt-widget-state">Visitors see: <Badge tone={draft.widget_enabled ? (draft.widget_staffed ? 'success' : 'info') : 'neutral'}>{draft.widget_enabled ? (draft.widget_staffed ? 'Chat with us' : 'Send us a message') : 'No widget'}</Badge></p>
           </Card>
           <Card className="flex flex-col gap-4 p-5">
             <div>
               <h2 className="text-[15px] font-semibold">Footer links</h2>
-              <p className="mt-0.5 text-[13px] text-muted">A path on this site (/…) or an https:// address. Empty = shown as “not published yet”.</p>
+              <p className="mt-0.5 text-[13px] text-muted">A path on this site (/…) or an https:// address. Empty links show as “not published yet”.</p>
             </div>
             <Field label="Privacy notice"><Input value={draft.privacy_url} onChange={(e) => set('privacy_url', e.target.value)} placeholder="https://…" maxLength={500} disabled={!operator} /></Field>
             <Field label="Terms of service"><Input value={draft.terms_url} onChange={(e) => set('terms_url', e.target.value)} placeholder="https://…" maxLength={500} disabled={!operator} /></Field>
-            <Field label="Public support email" hint="Optional. Shown next to the widget link."><Input type="email" value={draft.support_email} onChange={(e) => set('support_email', e.target.value)} placeholder="support@…" maxLength={254} disabled={!operator} /></Field>
+            <Field label="Public support email" optional hint="Shown next to the widget link."><Input type="email" value={draft.support_email} onChange={(e) => set('support_email', e.target.value)} placeholder="support@…" maxLength={254} disabled={!operator} /></Field>
           </Card>
           <div className="flex flex-wrap items-center gap-3">
-            <Button type="submit" variant="primary" disabledReason={!operator ? 'Operators only' : !dirty ? 'No changes' : null}>Save changes</Button>
+            <Button type="submit" variant="primary" disabledReason={!operator ? 'Operators only' : !dirty ? 'No changes' : null}>Save</Button>
             {dirty ? <Button type="button" variant="ghost" onClick={() => setDraft(toDraft(data))}>Discard</Button> : null}
-            {data.updated_at ? <span className="text-xs text-muted">Changed <Ago at={data.updated_at} /></span> : <span className="text-xs text-muted">Defaults (never changed)</span>}
+            {data.updated_at ? <span className="text-xs text-muted">Changed <Ago at={data.updated_at} /></span> : <span className="text-xs text-muted">Defaults</span>}
           </div>
         </form>
       )}

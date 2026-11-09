@@ -1,21 +1,18 @@
 'use client';
-// V3 app shell: primary nav (240px expanded ≥1280, 72px rail 768–1279, bottom bar + More on phones), a slim top bar with
+// V3 app shell: primary nav grouped per D28 (240px expanded ≥1280, 72px rail 768–1279, role-based bottom bar + More on phones per D29), a slim top bar with
 // workspace/brand scope + notifications + account, and the shell banners (offline, paused, demo once per workspace).
 // Settings pages render their own grouped left nav inside the content area (components/settings-shell).
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Suspense, useEffect, useState, type ReactNode } from 'react';
-import {
-  Activity, CalendarDays, PanelsTopLeft, ChartColumn, CheckCheck, Ellipsis, Flag, FolderOpen, LayoutDashboard, Plug, Settings, ShieldCheck, SquarePen, Users, Wrench,
-  type LucideIcon, ListTodo, Inbox, Radar, Sparkles, Blocks, LifeBuoy } from 'lucide-react';
-import type { Action, Permission } from '@social-lite/core';
+import { Ellipsis } from 'lucide-react';
 import { useSession } from '@/lib/client/session';
 import { useApi } from '@/lib/client/use-api';
 import { useHrefWithBrand } from '@/lib/client/hooks';
 import { pruneNamespace } from '@/lib/client/draft-recovery';
 import { FlagsProvider } from '@/lib/client/flags';
 import type { ApprovalSummary } from '@/lib/client/types';
-import { cn, Menu, MenuContent, MenuLabel, MenuLinkItem, MenuSeparator, MenuTrigger, Tooltip } from '@/components/ui';
+import { cn, Menu, MenuContent, MenuGroup, MenuLabel, MenuLinkItem, MenuSeparator, MenuTrigger, Tooltip } from '@/components/ui';
 import { WorkspaceSwitcher } from './workspace-switcher';
 import { BrandFilter } from './brand-filter';
 import { EmergencyPause } from './emergency-pause';
@@ -24,47 +21,9 @@ import { UserMenu } from './user-menu';
 import { ShellBanners } from './shell-banners';
 import { Logo } from './logo';
 import { CommandMenu, SearchTrigger } from './command-menu';
+import { isActive, navFor, type NavGroup, type NavItem } from './nav-config';
 
-interface NavItem {
-  href: string; label: string; icon: LucideIcon; perm?: Action; badge?: 'approvals'; mobile?: boolean;
-  /** V2: shown if any held */ v2?: Permission[];
-  /** Extra path prefixes that mark this item active. */ also?: string[];
-}
-
-export const NAV: NavItem[] = [
-  { href: '/overview', label: 'Overview', icon: LayoutDashboard, mobile: true }, // V5 (D23): app home moved from `/`
-  { href: '/planner', label: 'Planner', icon: CalendarDays, mobile: true, also: ['/history'] },
-  { href: '/compose', label: 'Create', icon: SquarePen, perm: 'drafts.edit', mobile: true, also: ['/posts/'] },
-  { href: '/library', label: 'Content library', icon: FolderOpen },
-  { href: '/campaigns', label: 'Campaigns', icon: Flag },
-  { href: '/approvals', label: 'Approvals', icon: CheckCheck, badge: 'approvals', mobile: true },
-  // V3.5: customer conversations (shown only with inbox access on some brand).
-  { href: '/inbox', label: 'Inbox', icon: Inbox, v2: ['inbox.read'] },
-  // V3.5 stream D: listening (connected-source monitoring), shown with listening.read on some brand.
-  { href: '/listening', label: 'Listening', icon: Radar, v2: ['listening.read'] },
-  // V3.5 stream E: AI assistant (+ automation under it), shown with ai.use or automation.manage.
-  { href: '/assistant', label: 'Assistant', icon: Sparkles, v2: ['ai.use', 'automation.manage'], also: ['/automation'] },
-  { href: '/tasks', label: 'Tasks', icon: ListTodo },
-  { href: '/analytics', label: 'Analytics', icon: ChartColumn, perm: 'history.read' },
-  { href: '/accounts', label: 'Connections', icon: Plug },
-  // V3.5 stream C: business integrations hub (Asana, monday.com, HubSpot, Google Business Profile, Translation, Slack, Mailchimp).
-  { href: '/integrations', label: 'Integrations', icon: Blocks, v2: ['integrations.read'] },
-  { href: '/team', label: 'Team', icon: Users, v2: ['members.read', 'teams.read'] },
-  { href: '/settings', label: 'Settings', icon: Settings, also: ['/security', '/mcp/settings'] },
-  // V4: Relay support (Help → Contact support / My requests). Every member; never gated by billing restrictions.
-  { href: '/help', label: 'Help', icon: LifeBuoy },
-];
-const ADMIN_NAV: NavItem[] = [
-  { href: '/admin', label: 'Admin console', icon: PanelsTopLeft, v2: ['workspace.read'] },
-  { href: '/setup', label: 'Setup', icon: Wrench, perm: 'setup.manage' },
-  { href: '/operations', label: 'Operations', icon: Activity, perm: 'diagnostics.read' },
-  { href: '/activity', label: 'Activity', icon: ShieldCheck, perm: 'workspace.settings' },
-];
-
-function isActive(pathname: string, item: NavItem) {
-  if (pathname === item.href || pathname.startsWith(`${item.href}/`)) return true;
-  return (item.also ?? []).some((p) => (p.endsWith('/') ? pathname.startsWith(p) : pathname === p || pathname.startsWith(`${p}/`)));
-}
+const BOTTOM_COLS: Record<number, string> = { 2: 'grid-cols-2', 3: 'grid-cols-3', 4: 'grid-cols-4', 5: 'grid-cols-5' };
 
 function useApprovalsCount(enabled: boolean) {
   const { data } = useApi<{ items: ApprovalSummary[]; next_cursor?: string | null }>(enabled ? '/api/approvals?status=pending' : null, { poll: 60_000 });
@@ -90,10 +49,7 @@ function ShellInner({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const withBrand = useHrefWithBrand();
   const approvals = useApprovalsCount(true);
-  const visible = NAV.filter((n) => (!n.perm || can(n.perm)) && (!n.v2 || n.v2.some((p) => canV2(p))));
-  const admin = ADMIN_NAV.filter((n) => (!n.perm || can(n.perm)) && (!n.v2 || n.v2.some((p) => canV2(p))));
-  const mobilePrimary = visible.filter((n) => n.mobile);
-  const mobileMore = visible.filter((n) => !n.mobile);
+  const { groups, admin, bottom: mobilePrimary, more: mobileMore } = navFor({ can, canV2 });
 
   const badgeFor = (n: NavItem) =>
     n.badge === 'approvals' && approvals && approvals.count > 0 ? `${approvals.count}${approvals.more ? '+' : ''}` : null;
@@ -113,14 +69,19 @@ function ShellInner({ children }: { children: ReactNode }) {
           <div className="hidden xl:block"><WorkspaceSwitcher /></div>
         </div>
         <nav aria-label="Main" className="flex-1 overflow-y-auto px-3 pb-3">
-          <ul className="flex flex-col gap-0.5">
-            {visible.map((n) => (
-              <NavLink key={n.href} item={n} href={withBrand(n.href)} active={isActive(pathname, n)} badge={badgeFor(n)} />
-            ))}
-          </ul>
+          {groups.map((g, i) => (
+            <div key={g.id} role="group" aria-labelledby={`nav-${g.id}`} className={cn(i > 0 && 'mt-2 border-t border-border pt-2 xl:mt-3 xl:border-t-0 xl:pt-0')}>
+              <p id={`nav-${g.id}`} className="mb-1 px-2.5 text-[11px] font-medium uppercase tracking-[0.06em] text-subtle max-xl:sr-only">{g.label}</p>
+              <ul className="flex flex-col gap-0.5">
+                {g.items.map((n) => (
+                  <NavLink key={n.href} item={n} href={withBrand(n.href)} active={isActive(pathname, n)} badge={badgeFor(n)} />
+                ))}
+              </ul>
+            </div>
+          ))}
           {admin.length ? (
             <div className="mt-4 border-t border-border pt-4" role="group" aria-labelledby="nav-admin">
-              <p id="nav-admin" className="mb-1 px-2 text-[11px] font-medium uppercase tracking-[0.06em] text-subtle max-xl:sr-only">Admin</p>
+              <p id="nav-admin" className="mb-1 px-2.5 text-[11px] font-medium uppercase tracking-[0.06em] text-subtle max-xl:sr-only">Admin</p>
               <ul className="flex flex-col gap-0.5">
                 {admin.map((n) => (
                   <NavLink key={n.href} item={n} href={n.href} active={isActive(pathname, n)} badge={null} />
@@ -154,8 +115,8 @@ function ShellInner({ children }: { children: ReactNode }) {
 
       {/* Mobile bottom nav */}
       <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
-        <ul className="grid grid-cols-5">
-          {mobilePrimary.slice(0, 4).map((n) => {
+        <ul className={cn('grid', BOTTOM_COLS[mobilePrimary.length + 1])}>
+          {mobilePrimary.map((n) => {
             const active = isActive(pathname, n);
             const b = badgeFor(n);
             return (
@@ -175,7 +136,7 @@ function ShellInner({ children }: { children: ReactNode }) {
             );
           })}
           <li>
-            <MobileMore items={mobileMore} admin={admin} pathname={pathname} withBrand={withBrand} />
+            <MobileMore groups={mobileMore} admin={admin} pathname={pathname} withBrand={withBrand} />
           </li>
         </ul>
       </nav>
@@ -183,9 +144,9 @@ function ShellInner({ children }: { children: ReactNode }) {
   );
 }
 
-function MobileMore({ items, admin, pathname, withBrand }: { items: NavItem[]; admin: NavItem[]; pathname: string; withBrand: (h: string) => string }) {
+function MobileMore({ groups, admin, pathname, withBrand }: { groups: NavGroup[]; admin: NavItem[]; pathname: string; withBrand: (h: string) => string }) {
   const [open, setOpen] = useState(false);
-  const active = [...items, ...admin].some((n) => isActive(pathname, n));
+  const active = [...groups.flatMap((g) => g.items), ...admin].some((n) => isActive(pathname, n));
   return (
     <Menu open={open} onOpenChange={setOpen}>
       <MenuTrigger asChild>
@@ -196,11 +157,17 @@ function MobileMore({ items, admin, pathname, withBrand }: { items: NavItem[]; a
           More
         </button>
       </MenuTrigger>
-      <MenuContent align="end" className="mb-2 w-60">
-        {items.map((n) => (
-          <MenuLinkItem key={n.href} href={withBrand(n.href)} icon={<n.icon aria-hidden />} active={isActive(pathname, n)}>
-            {n.label}
-          </MenuLinkItem>
+      <MenuContent align="end" className="mb-2 max-h-[var(--radix-dropdown-menu-content-available-height)] w-60 overflow-y-auto">
+        {groups.map((g, i) => (
+          <MenuGroup key={g.id}>
+            {i > 0 ? <MenuSeparator /> : null}
+            <MenuLabel>{g.label}</MenuLabel>
+            {g.items.map((n) => (
+              <MenuLinkItem key={n.href} href={withBrand(n.href)} icon={<n.icon aria-hidden />} active={isActive(pathname, n)}>
+                {n.label}
+              </MenuLinkItem>
+            ))}
+          </MenuGroup>
         ))}
         {admin.length ? (
           <>

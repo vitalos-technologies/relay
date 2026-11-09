@@ -40,7 +40,7 @@ export function isApiError(e: unknown): e is ApiError {
 export function errorMessage(e: unknown): string {
   if (isApiError(e)) return e.message;
   if (e instanceof Error) return e.message;
-  return 'Something went wrong.';
+  return 'Something went wrong. Try again.';
 }
 
 let csrfToken: string | null = null;
@@ -129,7 +129,7 @@ async function parseError(res: Response): Promise<ApiError> {
   }
   const env = (body ?? {}) as { error?: { code?: string; message?: string; fieldErrors?: Record<string, string>; details?: Record<string, unknown> }; correlation_id?: string };
   const err = env.error;
-  const fallback = res.status === 404 ? 'Not found.' : res.status >= 500 ? 'The server could not complete the request.' : `Request failed (${res.status}).`;
+  const fallback = res.status === 404 ? 'Not found.' : res.status >= 500 ? 'Something went wrong on our side. Try again.' : `Request failed (${res.status}). Try again.`;
   const ref = env.correlation_id ?? correlation;
   if (ref && res.status >= 400) {
     recentRefs.unshift({ id: ref, at: new Date().toISOString(), status: res.status });
@@ -193,7 +193,7 @@ export async function apiFetch<T>(path: string, opts: RequestOptions = {}): Prom
     }
   } catch (e) {
     if ((e as Error)?.name === 'AbortError') throw e;
-    throw new ApiError(0, 'network', 'You appear to be offline, or the server could not be reached. Try again.', undefined, undefined, null);
+    throw new ApiError(0, 'network', 'Can’t reach the server. Check your connection and try again.', undefined, undefined, null);
   }
 
   if (res.ok) {

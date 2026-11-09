@@ -65,7 +65,7 @@ export function DestinationDots({ destinations, size = 'xs' }: { destinations: P
   return (
     <ul className="flex shrink-0 items-center gap-1" aria-label="Destinations">
       {destinations.map((d) => {
-        const label = `${PROVIDER_LABEL[d.provider]}${d.is_mock ? ' (simulated)' : ''}: ${d.overdue ? 'Overdue' : d.state === 'published' && d.is_mock ? 'Simulated · delivered' : DELIVERY_STATE_LABEL[d.state]}`;
+        const label = `${PROVIDER_LABEL[d.provider]}${d.is_mock ? ' (simulated)' : ''}: ${d.overdue ? 'Overdue' : d.state === 'published' && d.is_mock ? 'Simulated · delivered' : DELIVERY_STATE_LABEL[d.state] ?? 'Not scheduled yet'}`;
         return (
           <li key={d.connection_id} className="relative" title={label}>
             <span className="sr-only">{label}</span>

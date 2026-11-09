@@ -8,6 +8,7 @@ import { Pause, Play, RefreshCw, Search, Stethoscope } from 'lucide-react';
 import { PROVIDERS, PROVIDER_LABEL, type Provider } from '@social-lite/core';
 import { api } from '@/lib/client/api';
 import { useApi } from '@/lib/client/use-api';
+import { humanize, plural } from '@/lib/client/format';
 import { useQueryState } from '@/lib/client/hooks';
 import { useSession } from '@/lib/client/session';
 import { useFlag } from '@/lib/client/flags';
@@ -45,7 +46,7 @@ export default function AdminConnectionsPage() {
 
   return (
     <>
-      <PageHeader title="Social accounts" meta={list.data ? `${list.data.items.length} accounts` : undefined}
+      <PageHeader title="Social accounts" meta={list.data ? plural(list.data.items.length, 'account') : undefined}
         actions={<Button size="sm" icon={<RefreshCw aria-hidden className="size-4" />} loading={list.refreshing} onClick={() => { void list.refetch(); void health.refetch(); }}>Refresh</Button>} />
       {counts.critical || counts.warning ? (
         <Banner tone={counts.critical ? 'danger' : 'warn'} className="mb-4" title={`${counts.critical ? `${counts.critical} can’t publish` : ''}${counts.critical && counts.warning ? ' · ' : ''}${counts.warning ? `${counts.warning} need attention soon` : ''}`}
@@ -112,7 +113,7 @@ function ConnectionDrawer({ c, h, app, onClose, onChanged }: { c: AdminConnectio
   const manage = canOn(c.brand_id, 'connections.manage');
   const run = async (k: string, fn: () => Promise<unknown>, msg: string) => {
     setBusy(k);
-    try { await fn(); toast.success(msg); onChanged(); } catch (e) { toast.error(e, 'Not done'); } finally { setBusy(null); }
+    try { await fn(); toast.success(msg); onChanged(); } catch (e) { toast.error(e, 'Couldn’t complete that'); } finally { setBusy(null); }
   };
   const reconnect = () => run('reconnect', async () => {
     if (c.provider === 'telegram' && !c.simulated) { window.location.assign(`/accounts?brand=${c.brand_id}`); return; }
@@ -145,11 +146,11 @@ function ConnectionDrawer({ c, h, app, onClose, onChanged }: { c: AdminConnectio
       <DrawerSection title="Authorization">
         <Facts items={[
           ['Account', c.username ? `@${c.username}` : c.display_name],
-          ['Status', `${c.status.replace(/_/g, ' ')}${c.paused ? ' · paused' : ''}`],
-          ['Token expires', c.token_expires_at ? new Date(c.token_expires_at).toLocaleString() : c.simulated ? 'Simulated' : 'Not reported'],
-          ['Refresh until', c.refresh_expires_at ? new Date(c.refresh_expires_at).toLocaleString() : '—'],
+          ['Status', `${humanize(c.status)}${c.paused ? ' · paused' : ''}`],
+          ['Token expires', c.token_expires_at ? new Date(c.token_expires_at).toLocaleString('en-GB') : c.simulated ? 'Simulated' : 'Not reported'],
+          ['Refresh until', c.refresh_expires_at ? new Date(c.refresh_expires_at).toLocaleString('en-GB') : '—'],
           ['Granted scopes', c.scopes ?? 'Not observable'],
-          ['Throttled until', c.throttled_until ? new Date(c.throttled_until).toLocaleString() : '—'],
+          ['Throttled until', c.throttled_until ? new Date(c.throttled_until).toLocaleString('en-GB') : '—'],
           ['Last checked', <Ago key="ck" at={c.checked_at} />],
         ]} />
       </DrawerSection>

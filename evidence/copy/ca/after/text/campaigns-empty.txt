@@ -1,0 +1,9 @@
+/campaigns
+
+Campaigns
+Active
+Archived
+Northwind Bakery (demo)
+New campaign
+for Northwind Bakery (demo)
+No campaigns yet

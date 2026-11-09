@@ -90,7 +90,7 @@ export async function handleEvent(evt: { event_type: string; workspace_id: strin
       await notify(db, {
         workspaceId: evt.workspace_id, userIds: await recipients(db, evt.workspace_id), severity: c.status === 'expiring' ? 'info' : 'critical',
         kind: 'connection.health', title: `${PROVIDER_LABEL[c.provider]} account ${c.display_name}: ${c.status.replace(/_/g, ' ')}`,
-        body: 'Open Accounts to see the exact fix. Scheduled posts to this account are held until it is fixed.',
+        body: 'Open Connections to see the fix. Scheduled posts to this account are held until it is fixed.',
         referenceType: 'connection', referenceId: c.id, dedupeKey: `connection:${c.id}:${c.status}`, email: !c.is_mock && c.status !== 'expiring',
       });
       return;

@@ -66,7 +66,6 @@ function Invite() {
               ['Role', ROLE_LABEL[data.role] ?? data.role],
               ['Invited email', data.email_hint ?? '—'],
               ['Expires', <TimeWithZone key="e" instant={data.expires_at} tz="UTC" />],
-              ['Status', data.status === 'pending' ? 'Pending' : data.status],
             ]}
           />
           {usable ? (

@@ -47,7 +47,7 @@ export default function TeamPage() {
         </>} />
       <TeamNav />
       {t.publishing ? <Banner tone="info" className="mb-6" title="Adding someone here lets them schedule and publish" /> : null}
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <Card aria-labelledby="h-tm">
           <CardHeader id="h-tm" title={<>Members <span className="ml-1 font-normal text-muted">{t.members.length}</span></>} />
           <ul className="divide-y divide-border">
@@ -88,7 +88,7 @@ export default function TeamPage() {
             </ul>
           </Card>
           <Card aria-labelledby="h-ceil">
-            <CardHeader id="h-ceil" title={<Tooltip content="What this team's managers may hand out when adding members"><span>Manager ceiling</span></Tooltip>} />
+            <CardHeader id="h-ceil" title="What managers can grant" />
             <div className="px-4 pb-4">
               {t.can_edit ? <CeilingEditor team={t} onSaved={(x) => setData({ ...t, ...x })} /> : (
                 <div className="flex flex-wrap gap-1 text-[13px]">
@@ -125,7 +125,7 @@ function CeilingEditor({ team, onSaved }: { team: TeamView; onSaved: (t: TeamVie
     try {
       const r = await api.put<TeamView>(`/api/teams/${team.id}/delegation`, { grantable_roles: roles, brand_ids: brands });
       onSaved(r);
-      toast.success('Ceiling saved');
+      toast.success('Saved');
     } catch (e) {
       setErr(e);
     } finally {
@@ -134,7 +134,7 @@ function CeilingEditor({ team, onSaved }: { team: TeamView; onSaved: (t: TeamVie
   };
   return (
     <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-2 gap-2">{TEAM_ROLES.map((r) => <Checkbox key={r} label={V2_ROLE_LABEL[r]} checked={roles.includes(r)} onChange={() => setRoles(toggle(roles, r))} />)}</div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">{TEAM_ROLES.map((r) => <Checkbox key={r} label={V2_ROLE_LABEL[r]} checked={roles.includes(r)} onChange={() => setRoles(toggle(roles, r))} />)}</div>
       <div className="flex flex-col gap-2 border-t border-border pt-3">{session.brands.map((b) => <Checkbox key={b.id} label={b.name} checked={brands.includes(b.id)} onChange={() => setBrands(toggle(brands, b.id))} />)}</div>
       {err ? <ErrorNotice error={err} /> : null}
       <Button size="sm" loading={busy} onClick={() => void save()}>Save</Button>

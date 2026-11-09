@@ -1,0 +1,37 @@
+/history
+
+History
+Europe/London
+CSV
+export
+Network
+All networks
+Instagram
+Facebook
+Telegram
+X
+TikTok
+YouTube
+LinkedIn
+Threads
+Pinterest
+Bluesky
+Result
+All results
+Scheduled
+Preparing
+Publishing
+Processing
+Retrying soon
+Published
+Failed
+Blocked
+Paused
+Cancelled
+Expired
+Unknown — needs review
+Manual handoff
+From
+–
+To
+No results yet

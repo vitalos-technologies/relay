@@ -112,7 +112,7 @@ function MailchimpExport({ postId, integrationId }: { postId: string; integratio
       {open ? (
         <Dialog open onOpenChange={setOpen} title="Create Mailchimp draft" footer={<>
           <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
-          {!preview ? <Button variant="primary" loading={busy} disabledReason={!body.audience_resource_id ? 'Select an audience in Integrations first' : !subject.trim() ? 'Add a subject' : null}
+          {!preview ? <Button variant="primary" loading={busy} disabledReason={!body.audience_resource_id ? 'Select an audience in Business apps first' : !subject.trim() ? 'Add a subject' : null}
             onClick={async () => { setBusy(true); try { setPreview(await api.post<OutboundPreviewJson>('/api/connectors/mailchimp/exports/preview', body)); } catch (e) { toast.error(e); } finally { setBusy(false); } }}>Review</Button>
             : <Button variant="primary" loading={busy} onClick={async () => { setBusy(true); try { await api.post('/api/connectors/mailchimp/exports', body); toast.success('Draft requested. Send it from Mailchimp.'); setOpen(false); await ex.refetch(); } catch (e) { toast.error(e); } finally { setBusy(false); } }}>Create draft</Button>}
         </>}>

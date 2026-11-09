@@ -1,0 +1,10 @@
+/invite/not-a-real-token
+
+Relay
+
+Not found
+
+Invitation not found
+
+Reference
+02c407cc-5f36-4e53-a0a7-960699b882cc

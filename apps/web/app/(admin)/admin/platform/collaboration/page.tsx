@@ -32,7 +32,7 @@ export default function PlatformCollaborationPage() {
                 ['Oldest waiting event', data.outbox.pending ? duration(data.outbox.oldest_pending_seconds) : '—'],
                 ['Dead-lettered events', String(data.outbox.dead)],
                 ['Workspaces with email failures', String(data.notifications.workspaces_with_failures)],
-                ['Not configured (24 h)', String(data.notifications.not_configured)],
+                ['Skipped, email not set up (24 h)', String(data.notifications.not_configured)],
                 ['Change-feed events (24 h)', String(data.feed.events)],
                 ['Open presence sessions', String(data.feed.presence)],
                 ['Overdue tasks · reviews', `${data.feed.overdue_tasks} · ${data.feed.overdue_reviews}`],

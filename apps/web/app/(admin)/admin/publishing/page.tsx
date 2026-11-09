@@ -112,7 +112,7 @@ function DeliveryDrawer({ id, tz, onClose, onChanged }: { id: string | null; tz:
   const after = async (msg: string) => { toast.success(msg); await refetch(); onChanged(); };
   const run = async (key: string, fn: () => Promise<unknown>, msg: string) => {
     setBusy(key);
-    try { await fn(); await after(msg); } catch (e) { toast.error(e, 'Not done'); } finally { setBusy(null); }
+    try { await fn(); await after(msg); } catch (e) { toast.error(e, 'Couldn’t complete that'); } finally { setBusy(null); }
   };
   const d = data && data.id === id ? data : null;
   const fmt = (iso: string) => new Date(iso).toLocaleString([], { timeZone: tz, dateStyle: 'medium', timeStyle: 'short' });

@@ -69,16 +69,16 @@ export function InboxChannelsSettings() {
   return (
     <div className="flex max-w-4xl flex-col gap-6">
       <Card aria-labelledby="h-ch">
-        <CardHeader id="h-ch" title="Channels in the inbox" actions={manage ? <Button size="sm" variant="secondary" icon={<Plus aria-hidden className="size-4" />} onClick={() => setAdding(true)}>Add channel</Button> : undefined} />
+        <CardHeader id="h-ch" title="Connected" actions={manage ? <Button size="sm" variant="secondary" icon={<Plus aria-hidden className="size-4" />} onClick={() => setAdding(true)}>Add channel</Button> : undefined} />
         {channels.error ? <ErrorState error={channels.error} onRetry={channels.refetch} /> : !channels.data ? <SkeletonRows rows={2} className="p-4" /> : !channels.data.items.length ? (
-          <EmptyState compact title="No channels in the inbox yet" action={manage ? <Button variant="secondary" onClick={() => setAdding(true)}>Add channel</Button> : undefined} />
+          <EmptyState compact title="No channels yet" action={manage ? <Button variant="secondary" onClick={() => setAdding(true)}>Add channel</Button> : undefined} />
         ) : (
           <ul className="divide-y divide-border">
             {channels.data.items.map((c) => (
               <li key={c.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
                 <NetworkIcon kind={c.kind} />
                 <div className="min-w-0 flex-1">
-                  <p className="flex min-w-0 flex-wrap items-center gap-2 text-[14px] font-medium"><span className="min-w-0 break-words">{c.display_name}</span>{c.is_simulated ? <SimulatedBadge /> : null}</p>
+                  <p className="flex min-w-0 flex-wrap items-center gap-2 text-[14px] font-medium"><span className="min-w-0 break-words">{c.display_name}</span>{c.is_simulated && !/simulated/i.test(c.display_name) ? <SimulatedBadge /> : null}</p>
                   <p className="text-xs text-muted">{CHANNEL_LABEL[c.kind]} · {c.enabled_types.map((t) => (t === 'dm' ? 'messages' : `${t}s`)).join(', ')}{c.options?.csat_enabled ? ' · ratings on' : ''}{c.options?.poll?.last_success_at ? ` · checked ${new Date(c.options.poll.last_success_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}</p>
                   {c.status !== 'active' && c.status_detail ? <p className="mt-1 text-xs text-warn">{c.status_detail}</p> : null}
                   {c.missing_permissions.length && !c.missing_permissions.includes('telegram_updates') ? <p className="mt-1 text-xs text-warn">Missing: {c.missing_permissions.join(', ')}</p> : null}
@@ -121,14 +121,14 @@ export function InboxChannelsSettings() {
                       <Tr key={c.kind}>
                         <Td className="font-medium">{CHANNEL_LABEL[c.kind]}</Td>
                         <Td>{cell('dm')}</Td><Td>{cell('comment')}</Td><Td>{c.conversationTypes.review ? cell('review') : cell('mention')}</Td>
-                        <Td>{c.implemented ? <span className="inline-flex items-center gap-1"><Badge tone="success">Built</Badge>{c.live_requires_approval ? <sup className="text-xs text-warn" title="Built and testable with simulated accounts. Live use needs the network’s approval.">*</sup> : null}</span> : <span className="text-xs text-muted">Not yet</span>}</Td>
+                        <Td>{c.implemented ? <span className="inline-flex items-center gap-1"><Badge tone="success">Built</Badge>{c.live_requires_approval ? <sup aria-hidden className="text-xs text-warn">*</sup> : null}</span> : <span className="text-xs text-muted">Not yet</span>}</Td>
                       </Tr>
                     );
                   })}
                 </tbody>
               </Table>
             </div>
-            <p className="px-4 pb-4 text-xs text-muted"><span className="text-warn">*</span> Built and testable with simulated accounts. Live use needs the network’s approval first.</p>
+            <p className="px-4 pb-4 text-xs text-muted"><span aria-hidden className="text-warn">*</span> Built and testable with simulated accounts; live use needs the network’s approval.</p>
           </>
         )}
       </Card>
@@ -147,7 +147,7 @@ function AddChannelDialog({ caps, existing, onClose, onAdded }: { caps: Cap[]; e
   const [brand, setBrand] = useState(session.brands[0]?.id ?? '');
   const cap = kind ? caps.find((c) => c.kind === kind) : null;
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()} size="lg" title={kind ? `Add ${CHANNEL_LABEL[kind]}` : 'Add channel'} description={kind ? undefined : 'Pick a network, then the account to use in the inbox.'}
+    <Dialog open onOpenChange={(o) => !o && onClose()} size="lg" title={kind ? `Add ${CHANNEL_LABEL[kind]}` : 'Add channel'}
       footer={kind ? <Button variant="ghost" onClick={() => setKind(null)}>Back</Button> : <Button variant="ghost" onClick={onClose}>Close</Button>}>
       {!kind ? (
         <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -258,10 +258,10 @@ function IntegrationAccounts({ kind, connector, brand, existing, onAdded }: { ki
       <div className="flex flex-wrap items-center gap-3">
         {connector === 'whatsapp'
           ? (canV2('integrations.manage') ? <Button size="sm" variant="secondary" onClick={() => setConnect(true)}>Connect WhatsApp</Button> : null)
-          : <LinkButton href="/integrations" variant="secondary" size="sm">Open Integrations</LinkButton>}
+          : <LinkButton href="/integrations" variant="secondary" size="sm">Open Business apps</LinkButton>}
         {session.mock_providers_enabled ? <Button size="sm" variant="ghost" icon={<FlaskConical aria-hidden className="size-4" />} loading={busy === 'sim'} onClick={simulated}>Use a simulated {connector === 'whatsapp' ? 'account' : 'profile'}</Button> : null}
       </div>
-      {kind === 'whatsapp' ? <p className="text-xs text-muted">Template messages are charged by Meta per delivered message. Replies inside 24 hours of the customer’s message are free.</p> : null}
+      {kind === 'whatsapp' ? <p className="text-xs text-muted">Meta charges per delivered template message. Replies within 24 hours of the customer’s message are free.</p> : null}
       {connect ? <WhatsAppConnectDialog brand={brand} onClose={() => setConnect(false)} onDone={async (id) => { setConnect(false); await integ.refetch(); setPick(id); }} /> : null}
     </div>
   );
@@ -309,12 +309,12 @@ function TelegramDialog({ channel, onClose, onChanged }: { channel: InboxChannel
   const owner = state?.owner ?? 'unknown';
   const fresh = checkedHere;   // the server also refuses a claim without a check in the last 10 minutes
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()} title="Telegram updates" description="A bot has one place its messages go: a webhook or another app that polls. Relay never takes over a bot another app uses." footer={<Button variant="ghost" onClick={onClose}>Close</Button>}>
+    <Dialog open onOpenChange={(o) => !o && onClose()} title="Telegram updates" description="A bot’s messages go to one place: a webhook or an app that polls. Relay never takes over a bot another app uses." footer={<Button variant="ghost" onClick={onClose}>Close</Button>}>
       <div className="flex flex-col gap-3 text-[13px]">
         {owner === 'relay' ? <Banner tone="success" title="Relay receives this bot’s messages" />
           : owner === 'external' ? <Banner tone="warn" title="Another app receives this bot’s messages">Its webhook points to {state?.external_host ?? 'another server'}. Relay will not overwrite it. Remove it in that app first, then check again.</Banner>
             : owner === 'none' ? <Banner tone="info" title="No webhook is set">Another app may still read this bot by polling. Telegram cannot tell Relay.</Banner>
-              : <p className="text-muted">Not checked yet.</p>}
+              : <p className="text-muted">Not checked</p>}
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="secondary" loading={busy === 'check'} onClick={() => act('check')}>Check bot</Button>
           {owner === 'relay' ? <Button size="sm" variant="ghost" loading={busy === 'release'} onClick={() => act('release')}>Stop receiving</Button> : null}
@@ -358,7 +358,7 @@ function WhatsAppDialog({ channel, onClose, onChanged }: { channel: InboxChannel
         ) : null}
         <fieldset className="flex flex-col gap-2 rounded-lg border border-border p-3">
           <legend className="px-1 text-xs font-medium text-subtle">Rate card for estimates</legend>
-          <p className="text-xs text-muted">Meta charges templates per delivered message; rates depend on the recipient’s country. Enter your typical rates to show an estimate before sending. Leave empty to show “charged” without an amount.</p>
+          <p className="text-xs text-muted">Meta charges per delivered template; rates vary by recipient country. Enter typical rates to show an estimate before sending, or leave empty to show “charged” only.</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {['marketing', 'utility', 'authentication'].map((k) => <Field key={k} label={k[0]!.toUpperCase() + k.slice(1)}><Input inputMode="decimal" value={r[k] ?? ''} onChange={(e) => setRates({ ...r, [k]: e.target.value })} /></Field>)}
             <Field label="Currency"><Input value={cur ?? currency} maxLength={3} onChange={(e) => setCur(e.target.value.toUpperCase())} /></Field>

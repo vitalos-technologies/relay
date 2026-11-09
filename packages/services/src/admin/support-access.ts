@@ -213,7 +213,7 @@ export async function decideSupportAccess(ctx: Ctx, id: string, raw: unknown): P
         `INSERT INTO scoped_role_grants(workspace_id, principal_type, user_id, role, scope_type, expires_at, granted_by, source)
          VALUES ($1,'user',$2,'viewer','workspace', now() + make_interval(mins => $3), $4, 'support_access')
          ON CONFLICT DO NOTHING RETURNING id, expires_at`, [g.workspace_id, g.operator_user_id, g.duration_minutes, ctx.actor.userId])
-        .catch(() => { throw new AppError('conflict', 'This person already holds a viewer grant here; support access is not needed.'); });
+        .catch(() => { throw new AppError('conflict', 'This person already has viewer access here.'); });
       await tx.query(`UPDATE support_access_grants SET status='active', decided_by=$2, decided_at=now(), decision_note=$3, starts_at=now(), expires_at=$4, grant_id=$5, created_membership=$6 WHERE id=$1`,
         [id, ctx.actor.userId, input.note ?? null, grant.expires_at, grant.id, created]);
       await bumpPolicyVersion(tx, g.workspace_id);

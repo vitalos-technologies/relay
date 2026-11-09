@@ -93,7 +93,7 @@ test.describe('V2 product & fairness', () => {
   test('activity centre filters and exports (CSV), budgets and client handover', async ({ page }) => {
     await signInHere(page, 'owner@demo.social-lite.test');
     await page.goto('/activity');
-    await expect(page.getByRole('heading', { name: 'Activity' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Audit log' })).toBeVisible();
     await page.getByRole('radio', { name: 'Accounts' }).click();
     await expect(page.locator('tbody tr').first()).toContainText('connection.');
     await page.screenshot({ path: `${OUT}/product-activity.png`, fullPage: true });
@@ -120,7 +120,7 @@ test.describe('V2 product & fairness', () => {
     await page.goto('/activity');
     await expect(page.getByText('Owners and admins only')).toBeVisible();
     await page.goto('/accounts/health');
-    await expect(page.getByRole('heading', { name: 'Account health' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Connection health' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Reconnect' })).toHaveCount(0);
     await page.screenshot({ path: `${OUT}/product-health-viewer-mobile.png`, fullPage: true });
   });

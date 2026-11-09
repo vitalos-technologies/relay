@@ -22,7 +22,7 @@ export function TimeWithZone({
     <span className={cn('tabular', className)}>
       <time dateTime={d.toISOString()} title={`${tz} · ${d.toISOString()}`}>
         {main}
-        {abbr ? <span className="ml-1 text-muted">{abbr}</span> : null}
+        {abbr ? <> <span className="text-muted">{abbr}</span></> : null}
       </time>
       {differs && browser ? (
         <span className="ml-2 text-xs text-subtle">

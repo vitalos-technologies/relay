@@ -26,8 +26,8 @@ export const PRIORITY_TONE: Record<SupportPriority, 'danger' | 'warn' | 'neutral
 const QUEUES: Array<{ value: SupportQueue; label: string }> = [
   { value: 'unassigned', label: 'New and unassigned' },
   { value: 'mine', label: 'Assigned to me' },
-  { value: 'waiting_on_relay', label: 'Waiting for Relay' },
-  { value: 'waiting_on_customer', label: 'Waiting for customer' },
+  { value: 'waiting_on_relay', label: 'Waiting on Relay' },
+  { value: 'waiting_on_customer', label: 'Waiting on customer' },
   { value: 'resolved', label: 'Resolved' },
   { value: 'archived', label: 'Archived' },
   { value: 'open', label: 'All open' },

@@ -3,7 +3,7 @@ import { Heart, MessageCircle, Repeat2, Send, Eye, Globe } from 'lucide-react';
 import { PROVIDER_LABEL, type ResolvedVariant } from '@social-lite/core';
 import { linkIsSeparate, outgoingText } from '@/lib/client/variants';
 import type { Asset, Connection } from '@/lib/client/types';
-import { PlatformIcon, SimulatedBadge } from '@/components/ui';
+import { PlatformIcon } from '@/components/ui';
 import { PreviewMedia } from '@/components/media/preview-media';
 import { isVideoAsset } from '@/components/media/media-kind';
 
@@ -152,7 +152,6 @@ export function VariantPreview({ variant, connection, assets }: { variant: Resol
         <PlatformIcon provider={connection.provider} size="xs" decorative />
         <span className="font-medium text-fg">{PROVIDER_LABEL[connection.provider]}</span>
         <span>· Approximate preview</span>
-        {connection.is_mock ? <SimulatedBadge className="ml-auto" /> : null}
       </figcaption>
       {card}
     </figure>

@@ -256,10 +256,10 @@ export function CommandMenu() {
               );
             })}
             {empty ? <p className="px-3 py-6 text-center text-[13px] text-muted">No results for “{term}”</p> : null}
-            {error ? <p role="alert" className="px-3 py-3 text-[13px] text-danger">{isApiError(error) ? error.message : 'Search failed.'}</p> : null}
+            {error ? <p role="alert" className="px-3 py-3 text-[13px] text-danger">{isApiError(error) ? error.message : 'Search failed. Try again.'}</p> : null}
           </div>
           <Footer>
-            {res?.partial ? <span className="text-warn">Partial results</span> : res?.truncated.length ? <span>More matches — refine the search</span> : <span><Kbd>↑</Kbd><Kbd>↓</Kbd> move · <Kbd>↵</Kbd> open</span>}
+            {res?.partial ? <span className="text-warn">Partial results</span> : res?.truncated.length ? <span>More matches — refine your search</span> : <span><Kbd>↑</Kbd><Kbd>↓</Kbd> move · <Kbd>↵</Kbd> open</span>}
           </Footer>
         </D.Content>
       </D.Portal>

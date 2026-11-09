@@ -44,7 +44,7 @@ export function HistoryList({ activeId, onOpen, onNew, refreshKey }: { activeId:
       <p className="mb-1 px-2 text-[11px] font-medium uppercase tracking-[0.06em] text-subtle">Recent</p>
       {error && !items ? <ErrorNotice error={error} /> : !items ? (
         <div className="flex flex-col gap-2 px-2">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-9" />)}</div>
-      ) : !items.length ? <p className="px-2 text-[13px] text-muted">Your tasks will appear here.</p> : (
+      ) : !items.length ? <p className="px-2 text-[13px] text-muted">No tasks yet</p> : (
         <ul className="flex min-h-0 flex-col gap-0.5 overflow-y-auto" data-testid="ai-history">
           {items.map((t) => (
             <li key={t.id}>

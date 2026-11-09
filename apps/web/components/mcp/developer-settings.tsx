@@ -33,7 +33,7 @@ export function McpDeveloperSettings() {
 export function McpEndpointCard({ setup }: { setup: McpSetupInfo }) {
   return (
     <Card>
-      <CardHeader title={<span className="flex items-center gap-2"><Cable aria-hidden className="size-4 text-accent" />MCP endpoint</span>} />
+      <CardHeader title={<span className="flex items-center gap-2"><Cable aria-hidden className="size-4 text-accent" />Endpoint</span>} />
       <div className="flex flex-col gap-3 px-4 pb-4">
         <CopyValue value={setup.endpoint} label="endpoint URL" />
         <Facts items={[

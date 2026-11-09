@@ -1,0 +1,23 @@
+/campaigns
+
+[DIALOG]
+New campaign
+Name
+StartsOptional
+EndsOptional
+DescriptionOptional
+Cancel
+Create
+(unavailable: Enter a name.)
+[PAGE]
+Campaigns
+Active
+Archived
+TipSignal (demo)
+No campaigns
+New campaign
+for TipSignal (demo)
+Vitalos (demo)
+No campaigns
+New campaign
+for Vitalos (demo)

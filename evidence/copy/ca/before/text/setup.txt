@@ -1,0 +1,739 @@
+/setup
+
+Setup
+14/70 set
+Core
+Ready
+Public base URL
+
+APP_BASE_URL
+
+The https:// address users reach the app at. Used for cookies, OAuth callbacks and email links.
+
+Env
+
+Uses http (development only)
+
+From environment
+
+Session secret
+
+SESSION_SECRET
+
+32+ random bytes (base64). Set in the server environment.
+
+Env
+
+From environment
+
+Key-encryption keys
+
+KEY_ENCRYPTION_KEYS
+
+"<kid>:<base64 32-byte key>" (comma-separated for rotation; first is active). Keep outside the database.
+
+Env
+
+Contains the local development key — replace before production
+
+From environment
+
+Sign-in (OIDC)
+Ready
+Issuer URL
+
+OIDC_ISSUER
+
+Your OpenID Connect provider issuer URL.
+
+Env
+
+Points at the local development identity provider
+
+From environment
+
+Client ID
+
+OIDC_CLIENT_ID
+
+Client registered with redirect URI <APP_BASE_URL>/api/auth/callback.
+
+Env
+
+From environment
+
+Client secret
+
+OIDC_CLIENT_SECRET
+
+Confidential client secret.
+
+Env
+
+From environment
+
+Media storage
+Ready
+S3 endpoint
+
+S3_ENDPOINT
+
+S3-compatible endpoint used by the server.
+
+Env
+
+From environment
+
+Public S3 endpoint
+
+S3_PUBLIC_ENDPOINT
+
+Optional host used in signed URLs given to browsers and providers.
+
+Not set
+
+Environment only
+
+Bucket
+
+S3_BUCKET
+
+Private bucket (public access blocked).
+
+Env
+
+From environment
+
+Region
+
+S3_REGION
+
+Bucket region.
+
+Env
+
+From environment
+
+Access key ID
+
+S3_ACCESS_KEY_ID
+
+Least-privilege key for this bucket only.
+
+Env
+
+From environment
+
+Secret access key
+
+S3_SECRET_ACCESS_KEY
+
+Stored only in the server environment.
+
+Env
+
+Local development credentials
+
+From environment
+
+Email
+Ready
+SMTP URL
+
+SMTP_URL
+
+smtp(s)://user:pass@host:port — invitations and critical alerts.
+
+Env
+
+Points at local email capture (Mailpit)
+
+From environment
+
+From address
+
+EMAIL_FROM
+
+Sender shown on outgoing email.
+
+Env
+
+From environment
+
+Meta (Facebook & Instagram)Optional
+1/6 set
+Meta app ID
+
+META_APP_ID
+
+Numeric App ID from developers.facebook.com → your app → Settings → Basic. OAuth redirect URI: http://localhost:3000/api/oauth/facebook/callback
+
+Not set
+Guide
+(opens in a new tab)
+Save
+(unavailable: Enter a value.)
+Meta app secret
+
+META_APP_SECRET
+
+App Secret from the same page. Stored encrypted; never shown again.
+
+Not set
+Save
+(unavailable: Enter a value.)
+Graph API version
+
+META_GRAPH_VERSION
+
+Pinned Graph API version, e.g. v26.0.
+
+Env
+
+From environment
+
+Request Meta insights permissions
+
+META_REQUEST_INSIGHTS
+
+Set to true only after Meta approves read_insights / instagram_manage_insights for the app. Unapproved permissions break login for non-test users.
+
+Not set
+Save
+(unavailable: Enter a value.)
+Request Meta inbox permissions
+
+META_REQUEST_INBOX
+
+Set to true only after Meta approves pages_messaging, pages_manage_engagement and pages_read_user_content. Unapproved permissions break login for non-test users.
+
+Not set
+Save
+(unavailable: Enter a value.)
+Meta Human Agent tag approved
+
+META_HUMAN_AGENT_APPROVED
+
+Set to true only after Meta approves the Human Agent feature (replies up to 7 days after the customer’s last message).
+
+Not set
+Save
+(unavailable: Enter a value.)
+TelegramOptional
+0/1 set
+Telegram webhook secret
+
+TELEGRAM_WEBHOOK_SECRET
+
+Random secret (1-256 chars of A-Z a-z 0-9 _ -) sent by Telegram in X-Telegram-Bot-Api-Secret-Token.
+
+Not set
+Save
+(unavailable: Enter a value.)
+XOptional
+0/2 set
+X OAuth 2.0 client ID
+
+X_CLIENT_ID
+
+From the X developer portal → your app → Keys and tokens → OAuth 2.0 Client ID. OAuth redirect URI: http://localhost:3000/api/oauth/x/callback
+
+Not set
+Guide
+(opens in a new tab)
+Save
+(unavailable: Enter a value.)
+X OAuth 2.0 client secret
+
+X_CLIENT_SECRET
+
+Confidential client secret. Stored encrypted; never shown again.
+
+Not set
+Save
+(unavailable: Enter a value.)
+TikTokOptional
+0/3 set
+TikTok client key
+
+TIKTOK_CLIENT_KEY
+
+TikTok for Developers → your app → Credentials (Login Kit + Content Posting API). Redirect URI: <APP_BASE_URL>/api/oauth/tiktok/callback.
+
+Not set
+Guide
+(opens in a new tab)
+Save
+(unavailable: Enter a value.)
+TikTok client secret
+
+TIKTOK_CLIENT_SECRET
+
+Stored encrypted; never shown again.
+
+Not set
+Save
+(unavailable: Enter a value.)
+TikTok Direct Post audit passed
+
+TIKTOK_DIRECT_POST_AUDITED
+
+Set to true only after TikTok approved the Direct Post audit. Unaudited clients can only post SELF_ONLY to private accounts.
+
+Not set
+Save
+(unavailable: Enter a value.)
+YouTube (Google)Optional
+0/2 set
+Google OAuth client ID (YouTube)
+
+GOOGLE_CLIENT_ID
+
+Google Cloud → APIs & Services → Credentials → OAuth client (Web application) with YouTube Data API v3 and YouTube Analytics API enabled. Redirect URI: <APP_BASE_URL>/api/oauth/youtube/callback.
+
+Not set
+Guide
+(opens in a new tab)
+Save
+(unavailable: Enter a value.)
+Google OAuth client secret
+
+GOOGLE_CLIENT_SECRET
+
+Stored encrypted; never shown again.
+
+Not set
+Save
+(unavailable: Enter a value.)
+LinkedInOptional
+0/4 set
+LinkedIn client ID
+
+LINKEDIN_CLIENT_ID
+
+LinkedIn Developer Portal → your app → Auth (products: Share on LinkedIn, Sign In with LinkedIn using OpenID Connect). Redirect URI: <APP_BASE_URL>/api/oauth/linkedin/callback.
+
+Not set
+Guide
+(opens in a new tab)
+Save
+(unavailable: Enter a value.)
+LinkedIn client secret
+
+LINKEDIN_CLIENT_SECRET
+
+Stored encrypted; never shown again.
+
+Not set
+Save
+(unavailable: Enter a value.)
+LinkedIn API version
+
+LINKEDIN_API_VERSION
+
+LinkedIn-Version header (YYYYMM). Default 202610.
+
+Not set
+Save
+(unavailable: Enter a value.)
+LinkedIn organization posting
+
+LINKEDIN_ORGANIZATIONS
+
+Set to true only when the app is approved for the Community Management API (organization scopes).
+
+Not set
+Save
+(unavailable: Enter a value.)
+ThreadsOptional
+0/2 set
+Threads app ID
+
+THREADS_APP_ID
+
+Meta App Dashboard → Threads use case → Threads app ID (not the Facebook app ID). Redirect URI: <APP_BASE_URL>/api/oauth/threads/callback.
+
+Not set
+Guide
+(opens in a new tab)
+Save
+(unavailable: Enter a value.)
+Threads app secret
+
+THREADS_APP_SECRET
+
+Threads app secret. Stored encrypted; never shown again.
+
+Not set
+Save
+(unavailable: Enter a value.)
+PinterestOptional
+0/3 set
+Pinterest app ID
+
+PINTEREST_APP_ID
+
+developers.pinterest.com → My apps. Redirect URI: <APP_BASE_URL>/api/oauth/pinterest/callback.
+
+Not set
+Guide
+(opens in a new tab)
+Save
+(unavailable: Enter a value.)
+Pinterest app secret key
+
+PINTEREST_APP_SECRET
+
+Stored encrypted; never shown again.
+
+Not set
+Save
+(unavailable: Enter a value.)
+Pinterest access tier
+
+PINTEREST_ACCESS_TIER
+
+trial (default: Pins visible only to you) or standard (after Pinterest approved the upgrade).
+
+Not set
+Save
+(unavailable: Enter a value.)
+Google Drive & DocsOptional
+0/4 set
+Google OAuth client ID (Drive & Docs)
+
+GOOGLE_CONTENT_CLIENT_ID
+
+Optional dedicated Web client for the Drive/Docs content connection (falls back to the YouTube client). Enable Google Drive API, Google Docs API and Google Picker API. Redirect URI: <APP_BASE_URL>/api/content-hub/oauth/google/callback. Scope requested: drive.file only.
+
+Not set
+Guide
+(opens in a new tab)
+Save
+(unavailable: Enter a value.)
+Google OAuth client secret (Drive & Docs)
+
+GOOGLE_CONTENT_CLIENT_SECRET
+
+Stored encrypted; never shown again.
+
+Not set
+Save
+(unavailable: Enter a value.)
+Google Picker API key
+
+GOOGLE_PICKER_API_KEY
+
+Browser API key (restrict to your app origin and the Picker API). Used only by the file picker in the browser.
+
+Not set
+Save
+(unavailable: Enter a value.)
+Google Cloud project number (Picker app ID)
+
+GOOGLE_PICKER_APP_ID
+
+Project number of the Cloud project that owns the OAuth client (Picker setAppId).
+
+Not set
+Save
+(unavailable: Enter a value.)
+NotionOptional
+0/4 set
+Notion OAuth client ID
+
+NOTION_CLIENT_ID
+
+Public connection → OAuth client ID. Redirect URI: <APP_BASE_URL>/api/content-hub/oauth/notion/callback. Capabilities: read content (+ update/insert content only if you use writeback/exports).
+
+Not set
+Guide
+(opens in a new tab)
+Save
+(unavailable: Enter a value.)
+Notion OAuth client secret
+
+NOTION_CLIENT_SECRET
+
+Stored encrypted; never shown again.
+
+Not set
+Save
+(unavailable: Enter a value.)
+Notion internal token (test installs)
+
+NOTION_INTERNAL_TOKEN
+
+Internal connection token for a single internal test workspace only. Not available in production; use public OAuth for customers.
+
+Not set
+Save
+(unavailable: Enter a value.)
+Notion webhook verification token
+
+NOTION_WEBHOOK_VERIFICATION_TOKEN
+
+Optional. The verification_token Notion sent to <APP_BASE_URL>/api/webhooks/notion; used to verify X-Notion-Signature.
+
+Not set
+Save
+(unavailable: Enter a value.)
+AI assistanceOptional
+0/1 set
+Anthropic API key
+
+ANTHROPIC_API_KEY
+
+Enables AI-assisted drafting. Stored encrypted; never shown again.
+
+Not set
+Guide
+(opens in a new tab)
+Save
+(unavailable: Enter a value.)
+TipSignalOptional
+0/1 set
+TipSignal signing secret
+
+TIPSIGNAL_SIGNING_SECRET
+
+Shared HMAC secret used to verify TipSignal event signatures.
+
+Not set
+Save
+(unavailable: Enter a value.)
+AsanaOptional
+0/2 set
+Asana client ID
+
+ASANA_CLIENT_ID
+
+Asana developer console → your app → OAuth (scopes: tasks:read, tasks:write, projects:read, users:read, workspaces:read, webhooks:write). Redirect URI: <APP_BASE_URL>/api/connectors/oauth/asana/callback.
+
+Not set
+Guide
+(opens in a new tab)
+Save
+(unavailable: Enter a value.)
+Asana client secret
+
+ASANA_CLIENT_SECRET
+
+Stored encrypted; never shown again.
+
+Not set
+Save
+(unavailable: Enter a value.)
+monday.comOptional
+0/4 set
+monday.com client ID
+
+MONDAY_CLIENT_ID
+
+monday.com Developer Center → your app → OAuth (scopes: boards:read, boards:write, users:read, webhooks:write). Redirect URI: <APP_BASE_URL>/api/connectors/oauth/monday/callback.
+
+Not set
+Guide
+(opens in a new tab)
+Save
+(unavailable: Enter a value.)
+monday.com client secret
+
+MONDAY_CLIENT_SECRET
+
+Stored encrypted; never shown again.
+
+Not set
+Save
+(unavailable: Enter a value.)
+monday.com signing secret
+
+MONDAY_SIGNING_SECRET
+
+App signing secret; verifies the JWT on board webhooks.
+
+Not set
+Save
+(unavailable: Enter a value.)
+monday.com API version
+
+MONDAY_API_VERSION
+
+API-Version header (YYYY-MM). Default 2026-04.
+
+Not set
+Save
+(unavailable: Enter a value.)
+HubSpotOptional
+0/2 set
+HubSpot client ID
+
+HUBSPOT_CLIENT_ID
+
+HubSpot developer account → your app → Auth (scopes: crm.objects.contacts.read, crm.objects.companies.read, tickets, crm.objects.owners.read). Redirect URI: <APP_BASE_URL>/api/connectors/oauth/hubspot/callback.
+
+Not set
+Guide
+(opens in a new tab)
+Save
+(unavailable: Enter a value.)
+HubSpot client secret
+
+HUBSPOT_CLIENT_SECRET
+
+Also verifies webhook signatures (v3). Stored encrypted; never shown again.
+
+Not set
+Save
+(unavailable: Enter a value.)
+Google Business ProfileOptional
+0/4 set
+Google OAuth client ID (Business Profile)
+
+GBP_CLIENT_ID
+
+Web OAuth client in the Google Cloud project approved for the Business Profile APIs (scope business.manage). Redirect URI: <APP_BASE_URL>/api/connectors/oauth/google_business_profile/callback.
+
+Not set
+Guide
+(opens in a new tab)
+Save
+(unavailable: Enter a value.)
+Google OAuth client secret (Business Profile)
+
+GBP_CLIENT_SECRET
+
+Stored encrypted; never shown again.
+
+Not set
+Save
+(unavailable: Enter a value.)
+Pub/Sub push audience
+
+GBP_PUBSUB_AUDIENCE
+
+Audience set on the authenticated Pub/Sub push subscription for review notifications (usually <APP_BASE_URL>/api/connectors/webhooks/google_business_profile).
+
+Not set
+Save
+(unavailable: Enter a value.)
+Pub/Sub push service account
+
+GBP_PUBSUB_SERVICE_ACCOUNT
+
+Service account email the push subscription signs its OIDC token with.
+
+Not set
+Save
+(unavailable: Enter a value.)
+Google Cloud TranslationOptional
+0/4 set
+Cloud Translation project ID
+
+GOOGLE_TRANSLATE_PROJECT_ID
+
+Google Cloud project with the Cloud Translation API enabled and billing attached (paid per character).
+
+Not set
+Guide
+(opens in a new tab)
+Save
+(unavailable: Enter a value.)
+Cloud Translation service account key (JSON)
+
+GOOGLE_TRANSLATE_SERVICE_ACCOUNT_JSON
+
+Key for a service account with roles/cloudtranslate.user only. Stored encrypted; never shown again.
+
+Not set
+Save
+(unavailable: Enter a value.)
+Cloud Translation location
+
+GOOGLE_TRANSLATE_LOCATION
+
+global (default). Glossaries need a regional location such as us-central1.
+
+Not set
+Save
+(unavailable: Enter a value.)
+Translation list price (USD per million characters)
+
+TRANSLATE_PRICE_PER_MILLION_USD
+
+Used for cost estimates. Default 20 (NMT list price checked 2026-11-08).
+
+Not set
+Save
+(unavailable: Enter a value.)
+SlackOptional
+0/4 set
+Slack client ID
+
+SLACK_CLIENT_ID
+
+api.slack.com/apps → your app → Basic information (bot scopes: chat:write, channels:read, groups:read; interactivity URL <APP_BASE_URL>/api/connectors/webhooks/slack). Redirect URI: <APP_BASE_URL>/api/connectors/oauth/slack/callback.
+
+Not set
+Guide
+(opens in a new tab)
+Save
+(unavailable: Enter a value.)
+Slack client secret
+
+SLACK_CLIENT_SECRET
+
+Stored encrypted; never shown again.
+
+Not set
+Save
+(unavailable: Enter a value.)
+Slack signing secret
+
+SLACK_SIGNING_SECRET
+
+Verifies interactive requests (X-Slack-Signature). Stored encrypted; never shown again.
+
+Not set
+Save
+(unavailable: Enter a value.)
+Previous Slack signing secret
+
+SLACK_SIGNING_SECRET_PREVIOUS
+
+Only while rotating the signing secret; clear it afterwards.
+
+Not set
+Save
+(unavailable: Enter a value.)
+MailchimpOptional
+0/3 set
+Mailchimp client ID
+
+MAILCHIMP_CLIENT_ID
+
+Mailchimp → Account → Extras → Registered apps. Access is account-wide (Mailchimp has no granular scopes). Redirect URI: <APP_BASE_URL>/api/connectors/oauth/mailchimp/callback.
+
+Not set
+Guide
+(opens in a new tab)
+Save
+(unavailable: Enter a value.)
+Mailchimp client secret
+
+MAILCHIMP_CLIENT_SECRET
+
+Stored encrypted; never shown again.
+
+Not set
+Save
+(unavailable: Enter a value.)
+Mailchimp webhook signing secret
+
+MAILCHIMP_WEBHOOK_SECRET
+
+Optional. Shown once when a signed webhook is created; verifies X-Mailchimp-Signature.
+
+Not set
+Save
+(unavailable: Enter a value.)

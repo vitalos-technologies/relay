@@ -44,7 +44,7 @@ export default function AdminOverviewPage() {
               </ul>
             </Card>
           ) : null}
-          {data.workspace.is_demo ? <p className="text-xs text-muted">Demo workspace · simulated activity is counted separately and never as live.</p> : null}
+          {data.workspace.is_demo ? <p className="text-xs text-muted">Demo workspace · simulated activity is never counted as live.</p> : null}
         </div>
       )}
     </>

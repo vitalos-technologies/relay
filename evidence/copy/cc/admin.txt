@@ -1,0 +1,66 @@
+Overview
+Updated
+0s ago
+Refresh
+Publishing · 24 h
+Demo
+0
+0 published · 12 simulated
+Needs attention
+Degraded
+8
+last 7 days
+Scheduled · 7 days
+Healthy
+4
+Next in 13h
+Approval backlog
+Healthy
+0
+Nothing waiting
+Connections
+Demo
+0
+0 of 9 need attention · 9 simulated
+Queue and workers
+Failed
+0
+Worker seen 6h ago
+Analytics freshness
+Demo
+—
+No live accounts
+Imports and exports
+Healthy
+0
+No failures · 7 days
+Usage and limits
+Healthy
+0
+X posts / month: 0%
+Security events · 7 days
+Healthy
+1
+Access and sign-in changes
+Recent admin activity
+Audit log
+grant.expired
+system
+13h ago
+post.created
+editor@demo.social-lite.test
+14h ago
+schedule.publish_now
+owner@demo.social-lite.test
+14h ago
+post.created
+owner@demo.social-lite.test
+14h ago
+connection.created
+owner@demo.social-lite.test
+14h ago
+schedule.publish_now
+owner@demo.social-lite.test
+14h ago
+
+Demo workspace · simulated activity is never counted as live.

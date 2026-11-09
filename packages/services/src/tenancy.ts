@@ -35,7 +35,7 @@ function toPermission(action: Action | Permission): Permission {
 function throwFor(r: AuthorizeResult, message?: string): never {
   if (r.reason === 'mfa_required') throw new AppError('mfa_required', 'Verify with your second factor to do this.', undefined, { reason: r.reason, policy_version: r.policyVersion });
   if (r.reason === 'step_up_required') throw new AppError('step_up_required', 'Confirm it’s you to continue.', undefined, { reason: r.reason, policy_version: r.policyVersion });
-  throw new AppError('forbidden', message ?? 'You do not have permission to do that', undefined, { reason: r.reason, policy_version: r.policyVersion });
+  throw new AppError('forbidden', message ?? 'You don’t have permission to do that.', undefined, { reason: r.reason, policy_version: r.policyVersion });
 }
 
 /** Strict check for a known resource. Returns the decision (for audit/policy version). */
@@ -120,7 +120,7 @@ export async function assertBrand(ctx: Ctx, brandId: string, db: Queryable = get
   if (!b) throw notFound('Brand');
   const visible = ctx.access.brandIds === null || ctx.access.brandIds.includes(b.id);
   if (!visible) throw notFound('Brand');
-  if (!brandAllowed(ctx, b.id)) throw forbidden('You do not have permission to do that for this brand');
+  if (!brandAllowed(ctx, b.id)) throw forbidden('You don’t have permission to do that for this brand.');
   return b;
 }
 

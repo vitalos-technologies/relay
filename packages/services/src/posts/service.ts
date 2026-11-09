@@ -158,7 +158,7 @@ export async function validateDraft(db: Queryable, ctx: Ctx, post: PostRow, conn
     const v = resolved.find((x) => x.connectionId === id)!;
     const issues: ValidationResult['issues'] = [];
     if (conn.disconnected_at) issues.push({ connectionId: id, provider: conn.provider, field: 'destination', code: 'disconnected', message: `${conn.display_name} is disconnected. Reconnect it or deselect it.` });
-    else if (!['ready', 'expiring', 'paused'].includes(conn.status)) issues.push({ connectionId: id, provider: conn.provider, field: 'destination', code: 'not_ready', message: `${conn.display_name} needs attention (${conn.status.replace(/_/g, ' ')}). Fix it on Accounts or deselect it.` });
+    else if (!['ready', 'expiring', 'paused'].includes(conn.status)) issues.push({ connectionId: id, provider: conn.provider, field: 'destination', code: 'not_ready', message: `${conn.display_name} needs attention (${conn.status.replace(/_/g, ' ')}). Fix it on Connections or deselect it.` });
     const caps = capabilitiesFor(conn);
     if (!caps) { results.push({ ok: false, issues: [...issues, { connectionId: id, provider: conn.provider, field: 'destination', code: 'no_capabilities', message: `${conn.display_name}: publishing rules are unavailable. Run an account check.` }] }); continue; }
     // V1.1 crops: validate the cropped facts (dims/aspect of the derivative that will actually be sent).

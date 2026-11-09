@@ -26,17 +26,17 @@ export default function AdminAnalyticsPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const resync = async (id: string) => {
     setBusy(id);
-    try { await api.post('/api/analytics/sync', { connection_id: id }); toast.success('Sync requested'); await refetch(); } catch (e) { toast.error(e, 'Not requested'); } finally { setBusy(null); }
+    try { await api.post('/api/analytics/sync', { connection_id: id }); toast.success('Sync requested'); await refetch(); } catch (e) { toast.error(e, 'Couldn’t request a sync'); } finally { setBusy(null); }
   };
   const live = data?.accounts.filter((a) => a.dataset === 'live') ?? [];
   return (
     <>
       <PageHeader title="Analytics ingestion" meta={data ? <>Updated <Ago at={data.generated_at} /></> : undefined}
-        actions={<><Link href="/analytics" className="text-[13px] font-medium text-accent-text hover:underline">Product analytics</Link><Button size="sm" icon={<RefreshCw aria-hidden className="size-4" />} loading={refreshing} onClick={() => void refetch()}>Refresh</Button></>} />
+        actions={<><Link href="/analytics" className="text-[13px] font-medium text-accent-text hover:underline">Open Analytics</Link><Button size="sm" icon={<RefreshCw aria-hidden className="size-4" />} loading={refreshing} onClick={() => void refetch()}>Refresh</Button></>} />
       {error && !data ? <ErrorState error={error} onRetry={refetch} /> : loading || !data ? <SkeletonRows rows={6} /> : (
         <div className="flex flex-col gap-6">
           <section aria-label="Coverage" className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            {[['Live accounts', live.length], ['Stale (48 h)', live.filter((a) => a.stale).length], ['Failed runs · 7 d', data.failed_runs.length], ['Simulated', data.accounts.length - live.length]].map(([l, v]) => (
+            {[['Live accounts', live.length], ['Stale (48 h)', live.filter((a) => a.stale).length], ['Failed runs · 7 days', data.failed_runs.length], ['Simulated', data.accounts.length - live.length]].map(([l, v]) => (
               <div key={l} className="rounded-[var(--radius-card)] border border-border bg-surface p-4"><span className="block text-[13px] text-muted">{l}</span><span className="mt-2 block text-[22px] font-semibold tabular">{v}</span></div>
             ))}
           </section>

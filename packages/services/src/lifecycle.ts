@@ -35,7 +35,7 @@ async function assertActorStill(tx: Queryable, ctx: Ctx, perm: Permission, opts:
   if (!ctx.access.authz) return; // legacy test contexts
   const fresh = await loadUserAuthz(ctx.actor.userId, ctx.access.workspaceId, ctx.access.authz.subject.assurance, tx);
   const ok = authorize(fresh, perm).allowed && (!opts.owner || fresh.subject.grants.some((g) => g.role === 'owner' && g.via === 'direct'));
-  if (!ok) throw forbidden('You no longer have permission to do that');
+  if (!ok) throw forbidden('You no longer have permission to do that.');
 }
 
 async function history(tx: Queryable, ctx: Ctx, userId: string, from: string | null, to: string, reason: string | null) {

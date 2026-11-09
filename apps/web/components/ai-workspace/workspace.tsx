@@ -141,9 +141,8 @@ export function AiWorkspace() {
             ) : (
               <div className="mx-auto flex max-w-[760px] flex-col pb-8 pt-2 sm:pt-8">
                 <h2 className="text-balance text-[26px] font-semibold leading-tight tracking-[-0.01em] sm:text-[30px]">What should we work on{brand ? ` for ${brand.name}` : ''}?</h2>
-                <p className="mt-2 text-[14px] text-muted">Relay reads your brand’s content and data, drafts and plans, and prepares anything external for your review.</p>
                 {!c.status.configured ? (
-                  <Banner className="mt-5" tone="info" title="AI is not set up">Data steps still run for real — reading, checks, plans and reports. AI-written parts are skipped. An owner can add a provider key in Setup.</Banner>
+                  <Banner className="mt-5" tone="info" title="AI is not set up">Data steps (reading, checks, plans, reports) still run; AI-written parts are skipped. An owner can add a provider key in Setup.</Banner>
                 ) : null}
                 {!c.features.ai_workflows ? (
                   <Banner className="mt-5" tone="info" title="Multi-step tasks are on the Professional plan">Your plan includes AI drafting help. <a className="underline" href="/settings/workspace/billing">See plans</a></Banner>

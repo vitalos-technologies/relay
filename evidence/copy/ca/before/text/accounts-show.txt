@@ -1,0 +1,99 @@
+/accounts
+
+Connections
+Health
+Lumen Lane Bakery
+8
+Connect
+a network to Lumen Lane Bakery
+Lumen Lane Instagram
+Instagram
+Connected
+Publishes
+Image · Album · Reel
+Analytics
+Not available
+Lumen Lane Instagram · insights
+Instagram · @lumenlane
+Connected
+Lumen Lane Facebook
+Facebook
+Connected
+Publishes
+Text · Image · Album · Video
+Analytics
+Not available
+Lumen Lane Facebook · insights
+Facebook · @lumenlane
+Connected
+Lumen Lane LinkedIn
+LinkedIn
+Connected
+Publishes
+Text · Image · Album · Video
+Analytics
+Available
+Lumen Lane LinkedIn · insights
+LinkedIn · @lumenlane
+Connected
+Lumen Lane Threads
+Threads
+Connected
+Publishes
+Text · Image · Album · Video
+Analytics
+Available
+Lumen Lane Threads · insights
+Threads · @lumenlane
+Connected
+Lumen Lane Events
+3
+Connect
+a network to Lumen Lane Events
+Lumen Lane Events Instagram
+Instagram
+Connected
+Publishes
+Image · Album · Reel
+Analytics
+Not available
+Lumen Lane Events Facebook
+Facebook
+Connected
+Publishes
+Text · Image · Album · Video
+Analytics
+Not available
+Lumen Lane Events Bluesky
+Bluesky
+Connected
+Publishes
+Text · Image · Album
+Analytics
+Available
+Content sources
+
+Relay only reads items you pick. Imports are private copies; source sharing is never changed.
+
+Google Drive & Docs
+
+Not configured
+
+An owner adds GOOGLE_CONTENT_CLIENT_ID, GOOGLE_CONTENT_CLIENT_SECRET, GOOGLE_PICKER_API_KEY, GOOGLE_PICKER_APP_ID in Setup. Redirect URI: http://localhost:3000/api/content-hub/oauth/google/callback
+All brands (workspace)
+Lumen Lane Bakery
+Lumen Lane Events
+Connect
+(unavailable: Not configured)
+Use test data
+Notion
+
+Not configured
+
+An owner adds NOTION_CLIENT_ID, NOTION_CLIENT_SECRET in Setup. Redirect URI: http://localhost:3000/api/content-hub/oauth/notion/callback
+All brands (workspace)
+Lumen Lane Bakery
+Lumen Lane Events
+Connect
+(unavailable: Not configured)
+Use test data

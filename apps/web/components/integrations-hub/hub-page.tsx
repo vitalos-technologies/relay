@@ -4,6 +4,7 @@
 import { CONNECTOR_SLUG, type HubOverviewJson } from '@social-lite/core/contracts/v35-integrations';
 import { ChevronRight } from 'lucide-react';
 import Link from 'next/link';
+import { ConnectionsTabs } from '@/components/shell/connections-tabs';
 import { Badge, ErrorState, FeatureTile, IntegrationCard, PageHeader, SkeletonRows } from '@/components/ui';
 import { CONNECTOR_META } from './meta';
 import { useHub } from './hub-shell';
@@ -24,7 +25,8 @@ export function IntegrationsHub() {
   const hub = useHub();
   return (
     <>
-      <PageHeader title="Integrations" />
+      <PageHeader title="Connections" />
+      <ConnectionsTabs />
       {hub.error ? <ErrorState error={hub.error} onRetry={hub.refetch} /> : !hub.data ? <SkeletonRows rows={6} /> : (
         <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3" data-testid="integrations-hub">
           {hub.data.connectors.map((c) => {

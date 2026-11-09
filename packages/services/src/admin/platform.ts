@@ -401,7 +401,7 @@ export async function grantOperator(p: PlatformCtx, raw: unknown) {
   const input = grantOperatorSchema.parse(raw);
   return withTx(async (tx) => {
     const u = await maybeOne<{ id: string }>(tx, `SELECT id FROM users WHERE email=$1 AND disabled_at IS NULL`, [input.email]);
-    if (!u) throw new AppError('validation_failed', 'No active Relay user has that email', { email: 'They must sign in once first' });
+    if (!u) throw new AppError('validation_failed', 'No active user has that email. They need to sign in once first.', { email: 'They must sign in once first' });
     if (u.id === p.actor.userId) throw new AppError('forbidden', 'You cannot change your own platform role');
     await tx.query(`INSERT INTO platform_operators(user_id, role, granted_by, granted_via, note) VALUES ($1,$2,$3,'admin',$4)
                     ON CONFLICT (user_id) DO UPDATE SET role=EXCLUDED.role, granted_by=EXCLUDED.granted_by, granted_via='admin', granted_at=now(),
@@ -501,7 +501,7 @@ export async function platformIntegrations(p: PlatformCtx, db: Queryable = getPo
     const c = counts.find((x) => x.provider === s.provider);
     const noApp = s.provider === 'telegram' || s.provider === 'bluesky';
     return { key: s.provider, label: s.provider, kind: 'social' as const, status: noApp ? 'no_app_needed' as const : s.configured ? 'configured' as const : 'not_configured' as const,
-      missing: s.missing, live_accounts: c?.live ?? 0, simulated_accounts: c?.sim ?? 0, note: noApp ? 'Each customer brings their own credentials' : 'Network review/approval is a separate external step' };
+      missing: s.missing, live_accounts: c?.live ?? 0, simulated_accounts: c?.sim ?? 0, note: noApp ? 'Each customer brings their own credentials' : null };
   });
   const g = await googleContentConfig();
   const n = await notionConfig();

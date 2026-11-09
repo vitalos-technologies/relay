@@ -22,7 +22,7 @@ export default function AdminIntegrationsPage() {
       {error && !data ? <ErrorState error={error} onRetry={refetch} /> : loading || !data ? <SkeletonRows rows={6} /> : (
         <div className="flex flex-col gap-6">
           <Card aria-labelledby="h-i">
-            <CardHeader id="h-i" title="Installations" actions={<Link href="/integrations" className="text-[13px] text-[var(--accent-text)]">Open hub</Link>} />
+            <CardHeader id="h-i" title="Installations" actions={<Link href="/integrations" className="text-[13px] text-[var(--accent-text)]">Open Business apps</Link>} />
             {!data.integrations.length ? <EmptyState title="No integrations connected" /> : (
               <ul className="flex flex-col divide-y divide-border px-2 pb-2" data-testid="admin-integrations">
                 {data.integrations.map((i) => {

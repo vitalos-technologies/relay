@@ -61,7 +61,7 @@ export function ServiceLevelsSettings() {
             try {
               const { id, ...rest } = f;
               await api.post('/api/inbox/sla-policies', { ...(id ? { id } : {}), ...rest, brand_id: null, is_default: true });
-              toast.success('Service levels saved'); setForm(null); await refetch();
+              toast.success('Saved'); setForm(null); await refetch();
             } catch (e) { toast.error(e); } finally { setSaving(false); }
           }}>Save</Button></div>
         ) : null}

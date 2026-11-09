@@ -158,7 +158,7 @@ export default function OverviewPage() {
                 <CardHeader id="h-health" title="Channel health" actions={<LinkButton href={withBrand('/accounts')} size="sm" variant="quiet">Connections</LinkButton>} />
                 <div className="px-4 pb-4">
                   {loading && !data ? <Skeleton className="h-12 w-full" /> : !data?.account_warnings.length ? (
-                    <p className="flex items-center gap-2 pb-1 text-[13px] text-muted"><CircleCheck aria-hidden className="size-4 text-success" /> All accounts healthy</p>
+                    <p className="flex items-center gap-2 pb-1 text-[13px] text-muted"><CircleCheck aria-hidden className="size-4 text-success" /> All connections healthy</p>
                   ) : (
                     <ul className="flex flex-col divide-y divide-border">
                       {data.account_warnings.slice(0, showAllHealth ? undefined : 4).map((c) => {

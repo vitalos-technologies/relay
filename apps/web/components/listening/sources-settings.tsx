@@ -40,7 +40,7 @@ export function ListeningSourcesSettings() {
           {connected.map((src) => (
             <li key={src.key} className="px-4 py-3">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="min-w-0 flex-1 text-[14px] font-medium">{src.label}{!src.implemented ? <span className="ml-2 text-xs font-normal text-subtle">inbox adapter not built yet</span> : null}</p>
+                <p className="min-w-0 flex-1 text-[14px] font-medium">{src.label}{!src.implemented ? <span className="ml-2 text-xs font-normal text-subtle">· not available yet</span> : null}</p>
                 <Badge tone={STATUS[src.status].tone}>{STATUS[src.status].label}</Badge>
                 {src.status === 'not_connected' && src.implemented ? <Link href="/settings/inbox/channels" className="text-xs font-medium underline-offset-2 hover:underline">Connect</Link> : null}
               </div>
@@ -50,7 +50,7 @@ export function ListeningSourcesSettings() {
                   {src.channels.map((c) => (
                     <li key={c.id} className="flex flex-wrap items-center gap-3 rounded-md bg-sunken px-3 py-2 text-[13px]">
                       <div className="min-w-0 flex-1">
-                        <p className="flex flex-wrap items-center gap-2 font-medium">{c.display_name}{c.is_simulated ? <SimulatedBadge /> : null}</p>
+                        <p className="flex flex-wrap items-center gap-2 font-medium">{c.display_name}{c.is_simulated && !/simulated/i.test(c.display_name) ? <SimulatedBadge /> : null}</p>
                         <p className="text-xs text-muted">Since {fmtDay(c.monitoring_since)} · {c.observations} stored{c.last_observed_at ? ` · last ${fmtDay(c.last_observed_at)}` : ''}{c.channel_status !== 'active' ? ` · inbox: ${c.channel_status.replace('_', ' ')}` : ''}</p>
                       </div>
                       <Switch label="Monitor" checked={!c.excluded} disabled={!canOn(c.brand_id, 'listening.manage')} onCheckedChange={(on) => toggle(c.id, !on)} />
@@ -65,7 +65,7 @@ export function ListeningSourcesSettings() {
 
       <Card aria-labelledby="h-broad">
         <CardHeader id="h-broad" title="Broader listening" />
-        <p className="px-4 pb-3 text-[13px] text-muted">Wider public sources need an approved API or a licensed provider. None is active, so results only cover connected accounts.</p>
+        <p className="px-4 pb-3 text-[13px] text-muted">Each source needs an approved API or a licensed provider.{broad.some((b) => b.status === 'active') ? '' : ' None is active, so results cover connected accounts only.'}</p>
         <ul className="divide-y divide-border border-t border-border">
           {broad.map((b) => (
             <li key={b.key} className="px-4 py-3">

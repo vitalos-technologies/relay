@@ -1,0 +1,441 @@
+/history
+
+History
+Europe/London
+CSV
+export
+Network
+All networks
+Instagram
+Facebook
+Telegram
+X
+TikTok
+YouTube
+LinkedIn
+Threads
+Pinterest
+Bluesky
+Result
+All results
+Scheduled
+Preparing
+Publishing
+Processing
+Retrying soon
+Published
+Failed
+Blocked
+Paused
+Cancelled
+Expired
+Unknown — needs review
+Manual handoff
+From
+–
+To
+Delivery history
+	Post	Destination	Result	Scheduled	Completed	Attempts
+	
+Customer story: the Okafor family
+Lumen Lane Bakery
+	
+Lumen Lane Facebook
+	
+Scheduled
+	Thu, 12 Nov 2026, 16:15 GMT	—	0/5
+	
+Customer story: the Okafor family
+Lumen Lane Bakery
+	
+Lumen Lane LinkedIn
+	
+Scheduled
+	Thu, 12 Nov 2026, 16:15 GMT	—	0/5
+	
+Weekend brunch is back
+Lumen Lane Bakery
+	
+Lumen Lane Threads
+	
+Scheduled
+	Wed, 11 Nov 2026, 08:45 GMT	—	0/5
+	
+Weekend brunch is back
+Lumen Lane Bakery
+	
+Lumen Lane Instagram
+	
+Scheduled
+	Wed, 11 Nov 2026, 08:45 GMT	—	0/5
+	
+Weekend brunch is back
+Lumen Lane Bakery
+	
+Lumen Lane Facebook
+	
+Scheduled
+	Wed, 11 Nov 2026, 08:45 GMT	—	0/5
+	
+Weekend brunch is back
+Lumen Lane Bakery
+	
+Lumen Lane LinkedIn
+	
+Scheduled
+	Wed, 11 Nov 2026, 08:45 GMT	—	0/5
+	
+Meet the team: Priya
+Lumen Lane Bakery
+	
+Lumen Lane Instagram
+	
+Scheduled
+	Tue, 10 Nov 2026, 10:00 GMT	—	0/5
+	
+Meet the team: Priya
+Lumen Lane Bakery
+	
+Lumen Lane LinkedIn
+	
+Scheduled
+	Tue, 10 Nov 2026, 10:00 GMT	—	0/5
+	
+Meet the team: Priya
+Lumen Lane Bakery
+	
+Lumen Lane Facebook
+	
+Scheduled
+	Tue, 10 Nov 2026, 10:00 GMT	—	0/5
+	
+Behind the scenes: 5am bake
+Lumen Lane Bakery
+	
+Lumen Lane Threads
+	
+Scheduled
+	Mon, 9 Nov 2026, 12:00 GMT	—	0/5
+	
+Behind the scenes: 5am bake
+Lumen Lane Bakery
+	
+Lumen Lane Instagram
+	
+Scheduled
+	Mon, 9 Nov 2026, 12:00 GMT	—	0/5
+	
+Spring menu launch
+Lumen Lane Bakery
+	
+Lumen Lane Instagram
+	
+Scheduled
+	Mon, 9 Nov 2026, 09:30 GMT	—	0/5
+	
+Spring menu launch
+Lumen Lane Bakery
+	
+Lumen Lane Threads
+	
+Scheduled
+	Mon, 9 Nov 2026, 09:30 GMT	—	0/5
+	
+Spring menu launch
+Lumen Lane Bakery
+	
+Lumen Lane Facebook
+	
+Scheduled
+	Mon, 9 Nov 2026, 09:30 GMT	—	0/5
+	
+Spring menu launch
+Lumen Lane Bakery
+	
+Lumen Lane LinkedIn
+	
+Scheduled
+	Mon, 9 Nov 2026, 09:30 GMT	—	0/5
+	
+Thank you, neighbours
+Lumen Lane Bakery
+	
+Lumen Lane Facebook
+	
+Simulated · delivered
+	Sun, 8 Nov 2026, 12:14 GMT	Sun, 8 Nov 2026, 12:14 GMT	1/5
+	
+Thank you, neighbours
+Lumen Lane Bakery
+	
+Lumen Lane Instagram
+	
+Simulated · delivered
+	Sun, 8 Nov 2026, 12:14 GMT	Sun, 8 Nov 2026, 12:14 GMT	1/5
+	
+Fresh this morning
+Lumen Lane Bakery
+	
+Lumen Lane Facebook
+	
+Simulated · delivered
+	Sun, 8 Nov 2026, 12:14 GMT	Sun, 8 Nov 2026, 12:14 GMT	1/5
+	
+Fresh this morning
+Lumen Lane Bakery
+	
+Lumen Lane Instagram
+	
+Simulated · delivered
+	Sun, 8 Nov 2026, 12:14 GMT	Sun, 8 Nov 2026, 12:14 GMT	1/5
+	
+Reusable cup rewards (demo)
+Lumen Lane Bakery
+	
+Lumen Lane Facebook · insights
+	
+Simulated · delivered
+	Sun, 8 Nov 2026, 09:52 UTC	Sun, 8 Nov 2026, 09:52 UTC	1/5
+	
+Latte art Friday (demo)
+Lumen Lane Bakery
+	
+Lumen Lane LinkedIn · insights
+	
+Simulated · delivered
+	Sun, 8 Nov 2026, 09:33 UTC	Sun, 8 Nov 2026, 09:33 UTC	1/5
+	
+Behind the roaster (demo)
+Lumen Lane Bakery
+	
+Lumen Lane Threads · insights
+	
+Simulated · delivered
+	Sat, 7 Nov 2026, 18:36 UTC	Sat, 7 Nov 2026, 18:36 UTC	1/5
+	
+Customer of the month (demo)
+Lumen Lane Bakery
+	
+Lumen Lane Instagram · insights
+	
+Simulated · delivered
+	Sat, 7 Nov 2026, 15:35 UTC	Sat, 7 Nov 2026, 15:35 UTC	1/5
+	
+Latte art Friday (demo)
+Lumen Lane Bakery
+	
+Lumen Lane Facebook · insights
+	
+Simulated · delivered
+	Sat, 7 Nov 2026, 09:32 UTC	Sat, 7 Nov 2026, 09:32 UTC	1/5
+	
+Customer of the month (demo)
+Lumen Lane Bakery
+	
+Lumen Lane LinkedIn · insights
+	
+Simulated · delivered
+	Sat, 7 Nov 2026, 09:07 UTC	Sat, 7 Nov 2026, 09:07 UTC	1/5
+	
+Weekend opening hours (demo)
+Lumen Lane Bakery
+	
+Lumen Lane Instagram · insights
+	
+Simulated · delivered
+	Fri, 6 Nov 2026, 18:57 UTC	Fri, 6 Nov 2026, 18:57 UTC	1/5
+	
+Weekend opening hours (demo)
+Lumen Lane Bakery
+	
+Lumen Lane Threads · insights
+	
+Simulated · delivered
+	Fri, 6 Nov 2026, 16:26 UTC	Fri, 6 Nov 2026, 16:26 UTC	1/5
+	
+New pastry menu (demo)
+Lumen Lane Bakery
+	
+Lumen Lane Facebook · insights
+	
+Simulated · delivered
+	Fri, 6 Nov 2026, 13:40 UTC	Fri, 6 Nov 2026, 13:40 UTC	1/5
+	
+Brew guide: V60 (demo)
+Lumen Lane Bakery
+	
+Lumen Lane LinkedIn · insights
+	
+Simulated · delivered
+	Fri, 6 Nov 2026, 06:15 UTC	Fri, 6 Nov 2026, 06:15 UTC	1/5
+	
+Customer of the month (demo)
+Lumen Lane Bakery
+	
+Lumen Lane Threads · insights
+	
+Simulated · delivered
+	Thu, 5 Nov 2026, 23:56 UTC	Thu, 5 Nov 2026, 23:56 UTC	1/5
+	
+Farm partner spotlight (demo)
+Lumen Lane Bakery
+	
+Lumen Lane Instagram · insights
+	
+Simulated · delivered
+	Thu, 5 Nov 2026, 17:27 UTC	Thu, 5 Nov 2026, 17:27 UTC	1/5
+	
+Reusable cup rewards (demo)
+Lumen Lane Bakery
+	
+Lumen Lane Facebook · insights
+	
+Simulated · delivered
+	Thu, 5 Nov 2026, 13:56 UTC	Thu, 5 Nov 2026, 13:56 UTC	1/5
+	
+Autumn blend is here (demo)
+Lumen Lane Bakery
+	
+Lumen Lane LinkedIn · insights
+	
+Simulated · delivered
+	Thu, 5 Nov 2026, 06:09 UTC	Thu, 5 Nov 2026, 06:09 UTC	1/5
+	
+Autumn blend is here (demo)
+Lumen Lane Bakery
+	
+Lumen Lane Instagram · insights
+	
+Simulated · delivered
+	Wed, 4 Nov 2026, 19:36 UTC	Wed, 4 Nov 2026, 19:36 UTC	1/5
+	
+Customer of the month (demo)
+Lumen Lane Bakery
+	
+Lumen Lane Threads · insights
+	
+Simulated · delivered
+	Wed, 4 Nov 2026, 16:55 UTC	Wed, 4 Nov 2026, 16:55 UTC	1/5
+	
+Latte art Friday (demo)
+Lumen Lane Bakery
+	
+Lumen Lane Facebook · insights
+	
+Simulated · delivered
+	Wed, 4 Nov 2026, 13:12 UTC	Wed, 4 Nov 2026, 13:12 UTC	1/5
+	
+Farm partner spotlight (demo)
+Lumen Lane Bakery
+	
+Lumen Lane LinkedIn · insights
+	
+Simulated · delivered
+	Wed, 4 Nov 2026, 09:11 UTC	Wed, 4 Nov 2026, 09:11 UTC	1/5
+	
+New pastry menu (demo)
+Lumen Lane Bakery
+	
+Lumen Lane Threads · insights
+	
+Simulated · delivered
+	Tue, 3 Nov 2026, 17:11 UTC	Tue, 3 Nov 2026, 17:11 UTC	1/5
+	
+Autumn blend is here (demo)
+Lumen Lane Bakery
+	
+Lumen Lane Instagram · insights
+	
+Simulated · delivered
+	Tue, 3 Nov 2026, 14:11 UTC	Tue, 3 Nov 2026, 14:11 UTC	1/5
+	
+Weekend opening hours (demo)
+Lumen Lane Bakery
+	
+Lumen Lane Facebook · insights
+	
+Simulated · delivered
+	Tue, 3 Nov 2026, 13:29 UTC	Tue, 3 Nov 2026, 13:29 UTC	1/5
+	
+Reusable cup rewards (demo)
+Lumen Lane Bakery
+	
+Lumen Lane LinkedIn · insights
+	
+Simulated · delivered
+	Tue, 3 Nov 2026, 06:56 UTC	Tue, 3 Nov 2026, 06:56 UTC	1/5
+	
+Customer of the month (demo)
+Lumen Lane Bakery
+	
+Lumen Lane Instagram · insights
+	
+Simulated · delivered
+	Mon, 2 Nov 2026, 20:16 UTC	Mon, 2 Nov 2026, 20:16 UTC	1/5
+	
+Cold brew how-to (demo)
+Lumen Lane Bakery
+	
+Lumen Lane Threads · insights
+	
+Simulated · delivered
+	Mon, 2 Nov 2026, 16:42 UTC	Mon, 2 Nov 2026, 16:42 UTC	1/5
+	
+Behind the roaster (demo)
+Lumen Lane Bakery
+	
+Lumen Lane LinkedIn · insights
+	
+Simulated · delivered
+	Mon, 2 Nov 2026, 12:11 UTC	Mon, 2 Nov 2026, 12:11 UTC	1/5
+	
+Weekend opening hours (demo)
+Lumen Lane Bakery
+	
+Lumen Lane Facebook · insights
+	
+Simulated · delivered
+	Mon, 2 Nov 2026, 09:35 UTC	Mon, 2 Nov 2026, 09:35 UTC	1/5
+	
+Latte art Friday (demo)
+Lumen Lane Bakery
+	
+Lumen Lane Instagram · insights
+	
+Simulated · delivered
+	Sun, 1 Nov 2026, 17:00 UTC	Sun, 1 Nov 2026, 17:00 UTC	1/5
+	
+Latte art Friday (demo)
+Lumen Lane Bakery
+	
+Lumen Lane Threads · insights
+	
+Simulated · delivered
+	Sun, 1 Nov 2026, 15:27 UTC	Sun, 1 Nov 2026, 15:27 UTC	1/5
+	
+Behind the roaster (demo)
+Lumen Lane Bakery
+	
+Lumen Lane LinkedIn · insights
+	
+Simulated · delivered
+	Sun, 1 Nov 2026, 10:07 UTC	Sun, 1 Nov 2026, 10:07 UTC	1/5
+	
+Reusable cup rewards (demo)
+Lumen Lane Bakery
+	
+Lumen Lane Facebook · insights
+	
+Simulated · delivered
+	Sun, 1 Nov 2026, 09:19 UTC	Sun, 1 Nov 2026, 09:19 UTC	1/5
+	
+Autumn blend is here (demo)
+Lumen Lane Bakery
+	
+Lumen Lane Threads · insights
+	
+Simulated · delivered
+	Sat, 31 Oct 2026, 22:28 UTC	Sat, 31 Oct 2026, 22:28 UTC	1/5
+Page 1
+Previous
+Next

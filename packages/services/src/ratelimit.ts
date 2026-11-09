@@ -85,7 +85,7 @@ export async function enforceRateLimit(scope: keyof typeof RATE_LIMITS | string,
   if (!p) throw new Error(`unknown rate limit scope ${scope}`);
   const r = await takeShared(`${scope}:${key}`.slice(0, 300), p);
   if (!r.allowed) {
-    throw new AppError('rate_limited', 'Too many requests. Please wait a moment and try again.', undefined,
+    throw new AppError('rate_limited', 'Too many requests. Wait a moment and try again.', undefined,
       { retry_after_seconds: Math.ceil(r.retryAfterMs / 1000) });
   }
 }

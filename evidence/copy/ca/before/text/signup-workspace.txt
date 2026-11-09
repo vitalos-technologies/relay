@@ -1,0 +1,8 @@
+/signup/workspace
+
+Relay
+You already have a workspace
+
+Demo Workspace — choose or change its plan in Billing.
+
+Open Billing

@@ -91,7 +91,7 @@ export const SETTINGS: SettingsGroup[] = [
     { slug: 'google', label: 'Google Drive and Docs', icon: FolderInput, keywords: 'drive docs import sources export', render: () => <SourceConnectionsSettings source="google" />, visible: (p) => p.canV2('connections.read') },
     { slug: 'notion', label: 'Notion', icon: BookText, keywords: 'notion pages databases import sources writeback', render: () => <SourceConnectionsSettings source="notion" />, visible: (p) => p.canV2('connections.read') },
     { slug: 'health', label: 'Connection health', icon: HeartPulse, keywords: 'reconnect permissions expiring', href: '/accounts/health' },
-    { slug: 'business', label: 'Business integrations', icon: Cable, keywords: 'asana monday hubspot google business profile translation slack mailchimp crm tasks', href: '/integrations', visible: (p) => p.canV2('integrations.read') },
+    { slug: 'business', label: 'Business apps', icon: Cable, keywords: 'integrations asana monday hubspot google business profile translation slack mailchimp crm tasks', href: '/integrations', visible: (p) => p.canV2('integrations.read') },
   ]),
   G('inbox', 'Inbox', [
     { slug: 'channels', label: 'Channels', icon: Inbox, keywords: 'inbox messages comments messenger facebook page reply permissions capabilities', render: () => <InboxChannelsSettings />, visible: (p) => p.canV2('inbox.read') },

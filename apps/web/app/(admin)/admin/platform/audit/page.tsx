@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { PlatformAuditItem } from '@social-lite/core/contracts/v31-admin';
 import { useApi } from '@/lib/client/use-api';
+import { humanize } from '@/lib/client/format';
 import { useQueryState } from '@/lib/client/hooks';
 import { Badge, Button, Card, DetailDrawer, DrawerSection, EmptyState, ErrorState, Facts, FilterBar, FilterSelect, PageHeader, SkeletonRows } from '@/components/ui';
 import { Ago, RecordList } from '@/components/admin/ui';
@@ -21,7 +22,7 @@ export default function PlatformAuditPage() {
       <PageHeader title="Platform audit" />
       <FilterBar>
         <FilterSelect id="a-action" label="Area" value={params.get('action') ?? ''} onChange={(v) => { setCursors([]); setParams({ action: v || null }); }}>
-          <option value="">All areas</option>{ACTIONS.map((a) => <option key={a} value={a}>{a.replace(/_/g, ' ')}</option>)}
+          <option value="">All areas</option>{ACTIONS.map((a) => <option key={a} value={a}>{humanize(a)}</option>)}
         </FilterSelect>
         {params.get('workspace_id') ? <Button size="sm" variant="ghost" onClick={() => setParams({ workspace_id: null })}>Clear workspace</Button> : null}
       </FilterBar>
@@ -32,7 +33,7 @@ export default function PlatformAuditPage() {
               { key: 'a', label: 'Action', cell: (a) => <code className="text-[12px]">{a.action}</code> },
               { key: 'w', label: 'Workspace', cell: (a) => <span className="block max-w-[200px] truncate">{a.workspace_name ?? '—'}</span> },
               { key: 'u', label: 'Actor', secondary: true, cell: (a) => <span className="text-muted">{a.actor ?? 'system'}</span> },
-              { key: 'o', label: 'Outcome', cell: (a) => <Badge tone={a.outcome === 'success' ? 'success' : 'danger'}>{a.outcome}</Badge> },
+              { key: 'o', label: 'Outcome', cell: (a) => <Badge tone={a.outcome === 'success' ? 'success' : 'danger'}>{humanize(a.outcome)}</Badge> },
               { key: 't', label: 'When', cell: (a) => <Ago at={a.at} className="text-muted" /> },
             ]}
             card={(a) => <span className="flex flex-col gap-1"><code className="text-[12px]">{a.action}</code><span className="text-xs text-muted">{a.workspace_name ?? 'Installation'} · {a.actor ?? 'system'} · <Ago at={a.at} /></span></span>} />
@@ -45,8 +46,8 @@ export default function PlatformAuditPage() {
       <DetailDrawer open={!!open} onOpenChange={(o) => !o && setParams({ event: null })} title={open?.action ?? ''}>
         {open ? (
           <>
-            <DrawerSection title="Event"><Facts items={[['When', new Date(open.at).toLocaleString()], ['Actor', open.actor ?? 'system'], ['Target', `${open.target_type}${open.target_id ? ` · ${open.target_id}` : ''}`],
-              ['Workspace', open.workspace_name ?? '—'], ['Reason', open.reason ?? '—'], ['Outcome', open.outcome], ['Reference', open.correlation_id ?? '—']]} /></DrawerSection>
+            <DrawerSection title="Event"><Facts items={[['When', new Date(open.at).toLocaleString('en-GB')], ['Actor', open.actor ?? 'system'], ['Target', `${open.target_type}${open.target_id ? ` · ${open.target_id}` : ''}`],
+              ['Workspace', open.workspace_name ?? '—'], ['Reason', open.reason ?? '—'], ['Outcome', humanize(open.outcome)], ['Reference', open.correlation_id ?? '—']]} /></DrawerSection>
             <DrawerSection title="Change"><pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-sunken p-3 text-[12px]">{JSON.stringify(open.diff, null, 2)}</pre></DrawerSection>
           </>
         ) : null}

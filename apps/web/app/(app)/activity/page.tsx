@@ -67,7 +67,7 @@ export default function ActivityPage() {
   const { data, error, loading, refetch } = useApi<ActivityPage>(`/api/activity?${qs}`, { keepPrevious: true });
 
   if (error && isApiError(error) && (error.code === 'forbidden' || error.code === 'mfa_required')) {
-    return <><PageHeader title="Activity" /><EmptyState icon={<ShieldCheck aria-hidden />} title="Owners and admins only" /></>;
+    return <><PageHeader title="Audit log" /><EmptyState icon={<ShieldCheck aria-hidden />} title="Owners and admins only" /></>;
   }
 
   const doExport = async () => {
@@ -85,8 +85,8 @@ export default function ActivityPage() {
   return (
     <>
       <PageHeader
-        title="Activity"
-        actions={data?.can_export ? <Button variant="secondary" icon={<Download aria-hidden className="size-4" />} onClick={doExport} loading={exporting}>CSV<span className="sr-only"> export</span></Button> : null}
+        title="Audit log"
+        actions={data?.can_export ? <Button variant="secondary" icon={<Download aria-hidden className="size-4" />} onClick={doExport} loading={exporting}>Export CSV</Button> : null}
       />
       <div className="mb-4 flex flex-col gap-4">
         <div className="-mx-1 overflow-x-auto px-1"><Segmented label="Category" value={category} onChange={(v) => setParams({ category: v === 'all' ? null : v })} options={CATS} size="sm" /></div>
@@ -103,10 +103,10 @@ export default function ActivityPage() {
         </div>
       </div>
       {error && !data ? <ErrorState error={error} onRetry={refetch} /> : !data ? <SkeletonRows rows={6} /> : !data.items.length ? (
-        <EmptyState icon={<ShieldCheck aria-hidden />} title="No activity" />
+        <EmptyState icon={<ShieldCheck aria-hidden />} title="No events" />
       ) : (
         <>
-          <Table caption="Activity">
+          <Table caption="Audit log">
             <THead>
               <Tr><Th>When</Th><Th>Type</Th><Th>Action</Th><Th className="hidden md:table-cell">By</Th><Th className="hidden lg:table-cell">Brand</Th><Th className="hidden xl:table-cell">Details</Th></Tr>
             </THead>

@@ -37,7 +37,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     info: (title, body) => show({ tone: 'info', title, body }),
     error: (e, title) => show({
       tone: 'danger',
-      title: title ?? (isApiError(e) ? e.message : 'Something went wrong'),
+      title: title ?? (isApiError(e) ? e.message : 'Something went wrong. Try again.'),
       body: title ? (isApiError(e) ? e.message : e instanceof Error ? e.message : undefined) : undefined,
       ref: isApiError(e) ? e.correlationId : null,
     }),

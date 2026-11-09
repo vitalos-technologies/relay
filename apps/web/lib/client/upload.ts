@@ -29,12 +29,12 @@ export async function uploadAsset(brandId: string, file: File, onPhase: (p: Uplo
   try {
     res = await fetch(intent.upload.url, { method: intent.upload.method ?? 'POST', body: fd, credentials: 'omit' });
   } catch {
-    throw new ApiError(0, 'network', 'The upload could not reach storage. Check your connection and try again.', undefined, undefined, null);
+    throw new ApiError(0, 'network', 'Upload failed. Check your connection and try again.', undefined, undefined, null);
   }
   if (!res.ok) {
     const msg = res.status === 400 || res.status === 403
-      ? 'Storage refused the file — it may be larger than allowed, or the upload link expired. Try again.'
-      : `Upload to storage failed (${res.status}). Try again.`;
+      ? 'Upload refused — the file may be too large or the link expired. Try again.'
+      : `Upload failed (${res.status}). Try again.`;
     throw new ApiError(res.status, 'upload_failed', msg, undefined, undefined, null);
   }
   onPhase('validating');

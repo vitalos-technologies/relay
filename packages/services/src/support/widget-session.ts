@@ -105,7 +105,7 @@ export function issueFormToken(now = Date.now()): string {
  * form immediately (or forges a token) is refused with a generic message.
  */
 export function checkFormToken(token: unknown, now = Date.now()): void {
-  const generic = new AppError('validation_failed', 'Your message could not be sent. Reload the page and try again.', { form_token: 'invalid' });
+  const generic = new AppError('validation_failed', 'Couldn’t send your message. Reload the page and try again.', { form_token: 'invalid' });
   if (typeof token !== 'string' || token.length > 120) throw generic;
   const [ts, mac] = token.split('.');
   const issued = Number(ts);

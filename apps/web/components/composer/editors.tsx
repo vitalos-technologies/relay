@@ -185,7 +185,7 @@ export function VariantEditor({
           ? <Banner tone="info" title="Destination paused — sends after it is resumed" />
           : <Banner tone="warn" title="Can’t publish">{connectionFix(connection) ?? connection.health?.message}</Banner>
       ) : null}
-      {!k ? <p className="flex items-center gap-1 text-xs text-muted">Limits unknown<InfoTip label="About limits">Run Check on Accounts to load limits. The server still validates.</InfoTip></p> : null}
+      {!k ? <p className="flex items-center gap-1 text-xs text-muted">Limits unknown<InfoTip label="About limits">Run Check on Connections to load them. The server still validates.</InfoTip></p> : null}
 
       <section aria-labelledby={`txt-${connection.id}`} className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">

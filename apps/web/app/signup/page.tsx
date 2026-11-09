@@ -48,7 +48,7 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
           className="touch-target mt-6 flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-accent text-[15px] font-medium text-on-accent hover:bg-accent-hover sm:w-auto sm:px-6">
           Start free trial on {selectedPlan.name}<ArrowRight aria-hidden className="size-4" />
         </Link>
-        <p className="mt-3 text-xs text-muted">You’ll sign in or create an account, then name your workspace. You’re billed for the active members in your workspace when you subscribe; Billing shows the seats and total before you buy. Prices in GBP; any tax is shown at checkout.</p>
+        <p className="mt-3 text-xs text-muted">Next, sign in or create an account and name your workspace. When you subscribe, you’re billed per active member; Billing shows the seats and total before you buy. Prices in GBP; any tax is shown at checkout.</p>
         <p className="mt-4 text-xs"><Link href="/#pricing" className="font-medium text-accent-text hover:underline">Compare plans</Link></p>
       </div>
     </main>

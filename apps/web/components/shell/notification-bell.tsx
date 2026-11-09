@@ -41,7 +41,7 @@ export function NotificationBell() {
       await api.post('/api/notifications/read-all', {});
       await refetch();
     } catch (e) {
-      toast.error(e, 'Could not mark notifications as read');
+      toast.error(e, 'Couldn’t mark as read');
     }
   };
 

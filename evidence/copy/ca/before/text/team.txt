@@ -1,0 +1,136 @@
+/team
+
+Team
+v3
+Invite
+Members
+Invitations
+Teams
+Held posts
+All statuses
+Active
+Suspended
+All roles
+Owner
+Admin
+Team manager
+Brand manager
+Editor
+Approver
+Publisher
+Analyst
+Viewer
+Exporter
+Guest
+Care agent
+All teams
+Editorial
+Publishing
+TipSignal desk
+10 active
+Members
+Person	Access	Teams	Status	Last sign-in	
+Open
+
+
+OO
+Olivia Owner (you)
+owner@demo.social-lite.test
+	
+Owner · All brands
+	—	
+Active
+	6 hours ago	
+
+
+AA
+Adam Admin
+admin@demo.social-lite.test
+	
+Admin · All brands
+	—	
+Active
+	7 hours ago	
+
+
+AA
+Ana Analyst
+analyst@demo.social-lite.test
+	
+Analyst · Vitalos (demo)
+	—	
+Active
+	7 hours ago	
+
+
+AA
+April Approver
+approver@demo.social-lite.test
+	
+Approver · TipSignal (demo)
+Approver · Vitalos (demo)
+	—	
+Active
+	7 hours ago	
+
+
+EE
+Eden Editor
+editor@demo.social-lite.test
+	
+Editor · TipSignal (demo)
+Editor · Vitalos (demo)
+	Editorial, TipSignal desk	
+Active
+	6 hours ago	
+
+
+EE
+Ezra Expired Guest (demo)
+expired-guest@demo.social-lite.test
+	
+None
+	—	
+Active
+	Never	
+
+
+GG
+Gus Guest
+guest@demo.social-lite.test
+	
+Guest · Vitalos (demo) · Nov 22
+	—	
+Active
+	7 hours ago	
+
+
+PP
+Pia Publisher (demo)
+publisher@demo.social-lite.test
+	
+Publisher · Vitalos (demo)
+	Publishing	
+Active
+	Never	
+
+
+TT
+Tom Team-Manager (demo)
+teammanager@demo.social-lite.test
+	
+Team manager · All brands
+Editor · Vitalos (demo)
+	Editorial ★	
+Active
+	Never	
+
+
+VV
+Vic Viewer
+viewer@demo.social-lite.test
+	
+Viewer · All brands
+	—	
+Active
+	6 hours ago	

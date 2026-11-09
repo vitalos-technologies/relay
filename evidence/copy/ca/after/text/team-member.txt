@@ -1,0 +1,89 @@
+/team/members/41a3d561-cf7b-4f7b-bd8e-ab5e2f3eba28
+
+Team
+Eden Editor
+Active
+Suspend
+Remove
+Make owner
+Members
+Invitations
+Teams
+Held posts
+Effective access
+TipSignal (demo)
+Content
+Read
+Create
+Edit
+Submit
+Archive
+Review
+Internal notes
+Comment
+Publish
+—
+Brand
+View brand
+Connections
+Library
+Upload
+Vitalos (demo)
+Content
+Read
+Create
+Edit
+Submit
+Archive
+Review
+Internal notes
+Comment
+Publish
+—
+Brand
+View brand
+Connections
+Library
+Upload
+
+■ direct
+■ via team
+⏱ expires
+■ denied
+
+Grants
+Add
+Editor · TipSignal (demo)
+via TipSignal desk
+Editor · Vitalos (demo)
+via Editorial
+Restrictions
+Deny
+None
+Email
+editor@demo.social-lite.test
+Teams
+EditorialTipSignal desk
+Joined
+14 hours ago
+Last sign-in
+7 hours ago
+Handover
+Drafts
+1
+Scheduled
+0
+Reviews
+0 requested · 0 assigned
+Service accounts
+0
+Accounts connected
+0
+Other workspaces
+1
+Reassign to
+Choose…
+Adam Admin
+Olivia Owner
+Reassign
+(unavailable: Choose someone)

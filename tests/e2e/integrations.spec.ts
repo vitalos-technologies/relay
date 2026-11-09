@@ -123,7 +123,7 @@ test.describe('Integrations', () => {
     await expect(page.getByTestId('hub-slack')).toBeVisible();
     expect(await page.evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1')).toBe(true);
     await page.getByTestId('integrations-hub').getByRole('link', { name: 'Slack' }).click();
-    await expect(page.getByRole('link', { name: 'Integrations' }).first()).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Business apps' }).first()).toBeVisible();
     expect(await page.evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1')).toBe(true);
   });
 });

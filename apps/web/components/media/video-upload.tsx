@@ -20,7 +20,7 @@ function postWithProgress(url: string, fd: FormData, onPct: (n: number) => void)
     x.open('POST', url);
     x.upload.onprogress = (e) => { if (e.lengthComputable) onPct(Math.round((e.loaded / e.total) * 100)); };
     x.onload = () => resolve(x.status);
-    x.onerror = () => reject(new Error('The upload could not reach storage. Check your connection and try again.'));
+    x.onerror = () => reject(new Error('Upload failed. Check your connection and try again.'));
     x.send(fd);
   });
 }

@@ -107,7 +107,7 @@ function TaskDialog({ mode, relayType, relayId, installs, onClose, onDone }: { m
     <Dialog open onOpenChange={(o) => !o && onClose()} title={mode === 'create' ? 'Create task' : 'Link existing task'} size="lg" footer={<>
       <Button variant="ghost" onClick={onClose}>Cancel</Button>
       {mode === 'create' && !preview ? (
-        <Button variant="primary" loading={busy} disabledReason={!rid ? 'Select a project or board in Integrations first' : !title.trim() ? 'Add a title' : null} onClick={async () => {
+        <Button variant="primary" loading={busy} disabledReason={!rid ? 'Select a project or board in Business apps first' : !title.trim() ? 'Add a title' : null} onClick={async () => {
           setBusy(true); try { const p = await api.post<OutboundPreviewJson>('/api/connectors/tasks/preview', body); setPreview(p); setDesc(p.fields.find((f) => f.label === 'Description')?.value ?? ''); } catch (e) { toast.error(e); } finally { setBusy(false); }
         }}>Review</Button>
       ) : mode === 'create' ? (

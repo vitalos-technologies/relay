@@ -35,7 +35,7 @@ export function UserMenu({ compact }: { compact?: boolean }) {
       // Also end the identity-provider session (RP-initiated logout); it returns to /login.
       if (r?.logout_url) next = r.logout_url;
     } catch (e) {
-      toast.error(e, 'Sign out failed');
+      toast.error(e, 'Couldn’t sign out');
       return;
     }
     window.location.assign(next);

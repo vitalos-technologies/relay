@@ -1,0 +1,8 @@
+/accounts/health
+
+Accounts
+Account health
+9 healthy
+Refresh
+All destinations healthy
+9 healthy

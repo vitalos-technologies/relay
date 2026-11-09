@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Search } from 'lucide-react';
 import type { PlatformBillingListItem } from '@social-lite/core/contracts/v4-billing-dto';
 import { useApi } from '@/lib/client/use-api';
+import { humanize, plural } from '@/lib/client/format';
 import { useQueryState } from '@/lib/client/hooks';
 import { Badge, Card, EmptyState, ErrorState, FilterBar, FilterSelect, Input, PageHeader, SkeletonRows } from '@/components/ui';
 import { RecordList } from '@/components/admin/ui';
@@ -40,11 +41,11 @@ export default function PlatformBillingPage() {
               { key: 'n', label: 'Workspace', cell: (w) => <Link href={`/admin/platform/workspaces/${w.workspace_id}`} onClick={(e) => e.stopPropagation()} className="font-medium hover:underline">{w.name}</Link> },
               { key: 'p', label: 'Plan', cell: (w) => <span className="capitalize">{w.plan_id ?? '—'}</span> },
               { key: 's', label: 'Status', cell: (w) => <Badge tone={STATUS_TONE[w.status]}>{STATUS_LABEL[w.status]}</Badge> },
-              { key: 'a', label: 'Access', secondary: true, cell: (w) => <Badge tone={ACCESS_TONE[w.access]}>{w.access}</Badge> },
+              { key: 'a', label: 'Access', secondary: true, cell: (w) => <Badge tone={ACCESS_TONE[w.access]}>{humanize(w.access)}</Badge> },
               { key: 'seats', label: 'Seats', secondary: true, cell: (w) => <span className="tabular">{w.seats}</span> },
               { key: 'w', label: 'Next date', cell: (w) => <span className="text-muted">{when(w)}</span> },
             ]}
-            card={(w) => <span className="flex flex-col gap-1"><span className="flex items-center gap-2"><span className="min-w-0 flex-1 truncate font-medium">{w.name}</span><Badge tone={STATUS_TONE[w.status]}>{STATUS_LABEL[w.status]}</Badge></span><span className="text-xs text-muted"><span className="capitalize">{w.plan_id}</span> · {w.seats} seats · {when(w)}</span></span>} />
+            card={(w) => <span className="flex flex-col gap-1"><span className="flex items-center gap-2"><span className="min-w-0 flex-1 truncate font-medium">{w.name}</span><Badge tone={STATUS_TONE[w.status]}>{STATUS_LABEL[w.status]}</Badge></span><span className="text-xs text-muted"><span className="capitalize">{w.plan_id}</span> · {plural(w.seats, 'seat')} · {when(w)}</span></span>} />
         </Card>
       )}
     </>

@@ -153,7 +153,7 @@ test.describe('V3.1 Admin', () => {
     const card = owner.getByRole('listitem').filter({ hasText: 'E2E: customer reported failed posts' }).first();
     await card.getByRole('button', { name: 'Approve' }).click();
     await owner.getByRole('dialog').getByRole('button', { name: 'Approve', exact: true }).click();
-    await expect(card.getByText('active', { exact: true })).toBeVisible();
+    await expect(card.getByText('Active', { exact: true })).toBeVisible();
     await expect(owner.getByText(/Support access is active/)).toBeVisible();
 
     // The operator now has a read-only viewer grant through the normal policy path.
@@ -161,7 +161,7 @@ test.describe('V3.1 Admin', () => {
     expect(after).toContain('Other Workspace');
     await card.getByRole('button', { name: 'End now' }).click();
     await owner.getByRole('dialog').getByRole('button', { name: 'End access' }).click();
-    await expect(card.getByText('ended', { exact: true })).toBeVisible();
+    await expect(card.locator('p').first().getByText('Ended', { exact: true })).toBeVisible(); // status badge (the facts list also has an "Ended" label)
     expect((await oa.get('/api/session')).body.workspaces.map((w: { name: string }) => w.name)).not.toContain('Other Workspace');
     await opCtx.close();
     await wsCtx.close();

@@ -1,0 +1,88 @@
+Audit log
+Export CSV
+All
+Access
+Accounts
+Publishing
+Security
+Collaboration
+Inbox and AI
+Content
+Search
+Brand
+All brands
+TipSignal (demo)
+Vitalos (demo)
+From
+To
+Audit log
+When	Type	Action	By	Brand	Details
+Sun, 8 Nov 2026, 07:00 GMT	
+Access
+	grant.expired	system:system	Vitalos (demo)	role: guest · team id: null · user id: 39fd75e0-9c39-4a26-bd2a-898e0ed39cbf
+Sun, 8 Nov 2026, 06:44 GMT	
+Publishing
+	post.created	editor@demo.social-lite.test	TipSignal (demo)	
+Sun, 8 Nov 2026, 06:44 GMT	
+Publishing
+	schedule.publish_now	owner@demo.social-lite.test	Vitalos (demo)	local: 2026-11-08T06:44 · due at: 2026-11-08T06:44:58.545Z · revision: 1
+Sun, 8 Nov 2026, 06:44 GMT	
+Publishing
+	post.created	owner@demo.social-lite.test	Vitalos (demo)	
+Sun, 8 Nov 2026, 06:44 GMT	
+Accounts
+	connection.created	owner@demo.social-lite.test	Vitalos (demo)	is mock: true · provider: x · scenario: fail_permanent
+Sun, 8 Nov 2026, 06:44 GMT	
+Publishing
+	schedule.publish_now	owner@demo.social-lite.test	Vitalos (demo)	local: 2026-11-08T06:44 · due at: 2026-11-08T06:44:58.487Z · revision: 1
+Sun, 8 Nov 2026, 06:44 GMT	
+Publishing
+	post.created	owner@demo.social-lite.test	Vitalos (demo)	
+Sun, 8 Nov 2026, 06:44 GMT	
+Publishing
+	schedule.created	owner@demo.social-lite.test	Vitalos (demo)	local: 2026-11-09T09:00 · due at: 2026-11-09T09:00:00.000Z · revision: 1
+Sun, 8 Nov 2026, 06:44 GMT	
+Publishing
+	post.created	owner@demo.social-lite.test	Vitalos (demo)	
+Sun, 8 Nov 2026, 06:44 GMT	
+Publishing
+	post.created	owner@demo.social-lite.test	Vitalos (demo)	
+Sun, 8 Nov 2026, 06:44 GMT	
+Content
+	asset.ready	owner@demo.social-lite.test	TipSignal (demo)	mime: image/png · bytes: 106940 · width: 1080
+Sun, 8 Nov 2026, 06:44 GMT	
+Content
+	asset.upload_intent	owner@demo.social-lite.test	TipSignal (demo)	filename: tipsignal-sample.png · declared mime: image/png · declared bytes: 106940
+Sun, 8 Nov 2026, 06:44 GMT	
+Content
+	asset.ready	owner@demo.social-lite.test	Vitalos (demo)	mime: image/png · bytes: 105282 · width: 1080
+Sun, 8 Nov 2026, 06:44 GMT	
+Content
+	asset.upload_intent	owner@demo.social-lite.test	Vitalos (demo)	filename: vitalos-sample.png · declared mime: image/png · declared bytes: 105282
+Sun, 8 Nov 2026, 06:44 GMT	
+Accounts
+	connection.created	owner@demo.social-lite.test	TipSignal (demo)	is mock: true · provider: x · scenario: success
+Sun, 8 Nov 2026, 06:44 GMT	
+Accounts
+	connection.created	owner@demo.social-lite.test	TipSignal (demo)	is mock: true · provider: telegram · scenario: success
+Sun, 8 Nov 2026, 06:44 GMT	
+Accounts
+	connection.created	owner@demo.social-lite.test	TipSignal (demo)	is mock: true · provider: facebook · scenario: success
+Sun, 8 Nov 2026, 06:44 GMT	
+Accounts
+	connection.created	owner@demo.social-lite.test	TipSignal (demo)	is mock: true · provider: instagram · scenario: success
+Sun, 8 Nov 2026, 06:44 GMT	
+Accounts
+	connection.created	owner@demo.social-lite.test	Vitalos (demo)	is mock: true · provider: x · scenario: success
+Sun, 8 Nov 2026, 06:44 GMT	
+Accounts
+	connection.created	owner@demo.social-lite.test	Vitalos (demo)	is mock: true · provider: telegram · scenario: success
+Sun, 8 Nov 2026, 06:44 GMT	
+Accounts
+	connection.created	owner@demo.social-lite.test	Vitalos (demo)	is mock: true · provider: facebook · scenario: success
+Sun, 8 Nov 2026, 06:44 GMT	
+Accounts
+	connection.created	owner@demo.social-lite.test	Vitalos (demo)	is mock: true · provider: instagram · scenario: success
+Page 1
+Previous
+Next

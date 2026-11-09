@@ -86,5 +86,7 @@ export default function NotificationsPage() {
 
 /** One line of context: "Check image alt text · Spring menu launch · due Sat 7 Nov, 08:03 GMT". */
 function detailLine(n: { context?: string | null; body: string | null }): string {
-  return [n.context, n.body ? n.body.replace(/^Due /, 'due ') : null].filter(Boolean).join(' · ');
+  // Publishing bodies start with "Post: <title>", which repeats the context line — show it once.
+  const body = n.body ? n.body.split('\n').filter((l) => !(n.context && l.trim() === `Post: ${n.context}`)).join(' ').trim() : '';
+  return [n.context, body ? body.replace(/^Due /, 'due ') : null].filter(Boolean).join(' · ');
 }

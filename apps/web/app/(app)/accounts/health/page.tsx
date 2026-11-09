@@ -30,9 +30,9 @@ export default function AccountHealthPage() {
   return (
     <>
       <PageHeader
-        title="Account health"
-        eyebrow={<Link href={brand ? `/accounts?brand=${brand}` : '/accounts'} className="inline-flex items-center gap-1 text-xs text-muted hover:text-fg"><ArrowLeft aria-hidden className="size-3.5" />Accounts</Link>}
-        meta={data ? (
+        title="Connection health"
+        eyebrow={<Link href={brand ? `/accounts?brand=${brand}` : '/accounts'} className="inline-flex items-center gap-1 text-xs text-muted hover:text-fg"><ArrowLeft aria-hidden className="size-3.5" />Connections</Link>}
+        meta={data && (data.summary.critical || data.summary.warning || data.summary.affected_schedules) ? (
           <span className="flex flex-wrap gap-2">
             {data.summary.critical ? <Badge tone="danger">{data.summary.critical} blocked</Badge> : null}
             {data.summary.warning ? <Badge tone="warn">{data.summary.warning} warning{data.summary.warning === 1 ? '' : 's'}</Badge> : null}
@@ -43,13 +43,13 @@ export default function AccountHealthPage() {
         actions={<Button variant="secondary" icon={<RefreshCw aria-hidden className="size-4" />} onClick={() => void refetch()} loading={loading && !!data}>Refresh</Button>}
       />
       {error && !data ? <ErrorState error={error} onRetry={refetch} /> : !data ? <SkeletonRows rows={4} /> : !data.items.length ? (
-        <EmptyState icon={<HeartPulse aria-hidden />} title="No destinations" />
+        <EmptyState icon={<HeartPulse aria-hidden />} title="No connections" />
       ) : (
         <div className="flex flex-col gap-4">
-          {!problems.length ? <EmptyState compact icon={<HeartPulse aria-hidden />} title="All destinations healthy" /> : null}
+          {!problems.length ? <EmptyState compact icon={<HeartPulse aria-hidden />} title="All connections healthy" /> : null}
           {problems.map((i) => <HealthCard key={i.connection.id} item={i} onChanged={refetch} />)}
           {ok.length ? (
-            <section aria-label="Healthy destinations">
+            <section aria-label="Healthy connections">
               <button type="button" className="flex items-center gap-1 text-[13px] text-muted hover:text-fg" aria-expanded={showOk} onClick={() => setShowOk((v) => !v)}>
                 <ChevronDown aria-hidden className={cn('size-4 transition-transform', showOk && 'rotate-180')} /> {ok.length} healthy
               </button>

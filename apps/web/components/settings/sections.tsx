@@ -28,8 +28,7 @@ export function ProfileSection() {
   const ws = session.workspace;
   return (
     <Card className="max-w-2xl">
-      <CardHeader title="Profile" />
-      <div className="p-4 pt-0">
+      <div className="p-4">
         <Facts items={[
           ['Name', session.user.name || '—'],
           ['Email', session.user.email],
@@ -94,7 +93,7 @@ export function WorkspaceSection({ part }: { part: 'general' | 'timezone' }) {
       const w = await api.patch<Workspace>('/api/workspace', { name: name.trim(), timezone: tz });
       setData(w);
       await refresh();
-      toast.success('Workspace saved');
+      toast.success('Saved');
     } catch (e) {
       setSaveErr(e);
     } finally {
@@ -104,8 +103,8 @@ export function WorkspaceSection({ part }: { part: 'general' | 'timezone' }) {
 
   return (
     <Card className="max-w-2xl">
-      <CardHeader title={part === 'general' ? 'Workspace' : 'Default time zone'} actions={editable ? null : <MetaChip>View only</MetaChip>} />
-      <div className="flex flex-col gap-6 p-4 pt-0">
+      <div className="flex flex-col gap-6 p-4">
+        {editable ? null : <div className="-mb-2 flex justify-end"><MetaChip>View only</MetaChip></div>}
         {part === 'general' ? (
           <>
             <Field label="Name"><Input value={name} onChange={(e) => setName(e.target.value)} readOnly={!editable} maxLength={120} /></Field>
@@ -224,7 +223,7 @@ function BrandForm({ brandId, section }: { brandId: string; section: 'details' |
       });
       setData(b);
       await refresh();
-      toast.success('Brand saved');
+      toast.success('Saved');
     } catch (e) {
       setSaveErr(e);
     } finally {
@@ -242,8 +241,8 @@ function BrandForm({ brandId, section }: { brandId: string; section: 'details' |
       ) : null}
       {section === 'details' ? (
         <Card>
-          <CardHeader title="Brand" actions={editable ? null : <MetaChip>View only</MetaChip>} />
-          <div className="grid grid-cols-1 gap-6 p-4 pt-0 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 p-4 sm:grid-cols-2">
+            {editable ? null : <div className="-mb-2 flex justify-end sm:col-span-2"><MetaChip>View only</MetaChip></div>}
             <Field label="Name" error={fe?.name}><Input value={f.name} onChange={(e) => set({ name: e.target.value })} readOnly={!editable} /></Field>
             <Field label="Time zone" info="Default for new schedules. Existing ones keep their time.">
               <Select value={f.timezone} onChange={(e) => set({ timezone: e.target.value })} disabled={!editable}>
@@ -255,8 +254,8 @@ function BrandForm({ brandId, section }: { brandId: string; section: 'details' |
       ) : null}
       {section === 'publishing' ? (
         <Card>
-          <CardHeader title="Defaults" actions={editable ? null : <MetaChip>View only</MetaChip>} />
-          <div className="grid grid-cols-1 gap-6 p-4 pt-0 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 p-4 sm:grid-cols-2">
+            {editable ? null : <div className="-mb-2 flex justify-end sm:col-span-2"><MetaChip>View only</MetaChip></div>}
             <div className="flex flex-col gap-4 sm:col-span-2">
               <Switch checked={f.editors_can_publish} onCheckedChange={(v) => set({ editors_can_publish: v })} disabled={!editable} label="Editors can publish" description="Off: editors submit for review." />
             </div>
@@ -268,8 +267,8 @@ function BrandForm({ brandId, section }: { brandId: string; section: 'details' |
       ) : null}
       {section === 'voice' ? (
         <Card>
-          <CardHeader title="Voice" actions={editable ? null : <MetaChip>View only</MetaChip>} />
-          <div className="grid grid-cols-1 gap-6 p-4 pt-0 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 p-4 sm:grid-cols-2">
+            {editable ? null : <div className="-mb-2 flex justify-end sm:col-span-2"><MetaChip>View only</MetaChip></div>}
             <Field label="Tone" className="sm:col-span-2"><Textarea value={f.tone} onChange={(e) => set({ tone: e.target.value })} rows={2} readOnly={!editable} className="min-h-16" placeholder="Warm, plain-spoken" /></Field>
             <Field label="Preferred terms"><Input value={f.terminology} onChange={(e) => set({ terminology: e.target.value })} readOnly={!editable} placeholder="Comma-separated" /></Field>
             <Field label="Avoid terms" hint="Composer warns on these."><Input value={f.prohibited} onChange={(e) => set({ prohibited: e.target.value })} readOnly={!editable} placeholder="Comma-separated" /></Field>

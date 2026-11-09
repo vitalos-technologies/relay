@@ -1,0 +1,10 @@
+/team/invitations
+
+Team
+Bulk
+Invite
+Members
+Invitations
+Teams
+Held posts
+No open invitations

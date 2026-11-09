@@ -8,13 +8,13 @@ import { mcpConfig } from './config.js';
 /** Compatibility as evidenced in this repository (tests/integration/mcp.test.ts). Never claims untested clients work. */
 export const TESTED_CLIENTS: McpSetupInfo['tested_clients'] = [
   { client: `MCP TypeScript SDK Client + StreamableHTTPClientTransport ${MCP_SDK_VERSION}`, status: 'tested', protocol: MCP_PROTOCOL_VERSION,
-    notes: 'In-repo protocol test against the real handler: discovery, tools, resources, prompts, auth negatives, publication flow.' },
-  { client: 'MCP Inspector', status: 'not_tested', protocol: null, notes: 'Not runnable in the build environment. Activation item.' },
-  { client: 'Claude Code (remote HTTP server)', status: 'not_tested', protocol: null, notes: 'Not verified here. Activation item.' },
-  { client: 'Claude (web/desktop) custom connectors', status: 'not_tested', protocol: null, notes: 'Needs a public HTTPS endpoint and an OAuth client registered for its redirect URI. Activation item.' },
-  { client: 'ChatGPT connectors', status: 'not_tested', protocol: null, notes: 'Needs a public HTTPS endpoint and an OAuth client registered for its redirect URI. Activation item.' },
-  { client: 'Clients speaking only MCP 2026-07-28 (sessionless)', status: 'unsupported', protocol: '2026-07-28', notes: `The pinned SDK ${MCP_SDK_VERSION} negotiates ${MCP_PROTOCOL_VERSION}, 2025-06-18 and 2025-03-26.` },
-  { client: 'stdio-only clients', status: 'unsupported', protocol: null, notes: 'Relay is a remote Streamable HTTP server; a stdio bridge is not provided or tested.' },
+    notes: 'Protocol test passes: discovery, tools, resources, prompts, sign-in refusals, publishing.' },
+  { client: 'MCP Inspector', status: 'not_tested', protocol: null, notes: '' },
+  { client: 'Claude Code (remote HTTP server)', status: 'not_tested', protocol: null, notes: '' },
+  { client: 'Claude (web/desktop) custom connectors', status: 'not_tested', protocol: null, notes: 'Needs a public HTTPS endpoint and an OAuth client registered for its redirect URI.' },
+  { client: 'ChatGPT connectors', status: 'not_tested', protocol: null, notes: 'Needs a public HTTPS endpoint and an OAuth client registered for its redirect URI.' },
+  { client: 'Clients speaking only MCP 2026-07-28 (sessionless)', status: 'unsupported', protocol: '2026-07-28', notes: `Supported versions: ${MCP_PROTOCOL_VERSION}, 2025-06-18 and 2025-03-26.` },
+  { client: 'stdio-only clients', status: 'unsupported', protocol: null, notes: 'Relay is a remote (Streamable HTTP) server; no stdio bridge is provided.' },
 ];
 
 export function mcpSetupInfo(): McpSetupInfo {

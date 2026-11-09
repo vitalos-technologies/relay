@@ -25,7 +25,7 @@ export default function PlatformAiPage() {
               ) : <p className="px-4 pb-4 text-[13px] text-muted">None in the last 24 hours</p>}
             </Card>
             <Card aria-labelledby="h-pout">
-              <CardHeader id="h-pout" title="Why runs stopped short (7 days)" />
+              <CardHeader id="h-pout" title="Stop reasons (7 days)" />
               <div className="flex flex-col gap-2 px-4 pb-4 text-[13px]">
                 {data.outcomes_7d.length ? data.outcomes_7d.map((o) => <div key={o.outcome_code} className="flex justify-between"><span className="font-mono text-xs">{o.outcome_code}</span><span className="tabular">{o.n}</span></div>) : <p className="text-muted">None</p>}
                 {data.failed_steps_7d.length ? <p className="pt-2 text-xs text-muted">Failed steps: {data.failed_steps_7d.map((s) => `${s.step} (${s.n})`).join(', ')}</p> : null}

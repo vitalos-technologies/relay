@@ -59,7 +59,7 @@ export async function retryDelivery(ctx: Ctx, deliveryId: string, opts: { acknow
       if (!ok) throw new AppError('invalid_state', 'Approval for this content is no longer valid. Submit it for review again.');
     }
     const conn = await one<{ status: string; paused: boolean; disconnected_at: Date | null }>(tx, `SELECT status, paused, disconnected_at FROM connections WHERE id=$1`, [d.connection_id]);
-    if (conn.disconnected_at || !['ready', 'expiring'].includes(conn.status)) throw new AppError('invalid_state', 'Fix the account on Accounts before retrying.');
+    if (conn.disconnected_at || !['ready', 'expiring'].includes(conn.status)) throw new AppError('invalid_state', 'Fix the account on Connections, then retry.');
     const graceMin = opts.deadline_minutes ?? brand.default_deadline_minutes;
     const publishBefore = d.publish_before.getTime() > Date.now() + 60_000 ? d.publish_before : new Date(Date.now() + graceMin * 60_000);
     const wasUnknown = d.state === 'unknown';

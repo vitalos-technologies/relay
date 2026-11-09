@@ -29,5 +29,5 @@ export class AppError extends Error {
 }
 
 export const notFound = (what = 'Resource') => new AppError('not_found', `${what} not found`);
-export const forbidden = (msg = 'You do not have permission to do that') => new AppError('forbidden', msg);
+export const forbidden = (msg = 'You don’t have permission to do that.') => new AppError('forbidden', msg);
 export const invalidState = (msg: string, details?: Record<string, unknown>) => new AppError('invalid_state', msg, undefined, details);

@@ -108,7 +108,7 @@ export async function sweepDeadlines(db: Pool = getPool()): Promise<number> {
   return withTx(async (tx) => {
     const r = await tx.query<{ id: string; workspace_id: string }>(
       `UPDATE deliveries SET state='expired', phase='idle', last_error_code='deadline_passed',
-              last_error_message='Missed: the publish-before deadline passed before this could be sent (for example during downtime or a pause). Review and reschedule if still relevant.',
+              last_error_message='Missed: the publish-before deadline passed before this could be sent. Review and reschedule if still relevant.',
               updated_at=now()
         WHERE state IN ('scheduled','retry_wait','paused','blocked') AND lease_owner IS NULL AND publish_before <= now()
         RETURNING id, workspace_id`);

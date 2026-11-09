@@ -6,6 +6,7 @@ import { useState } from 'react';
 import type { CataloguePlanDto } from '@social-lite/services/billing/catalogue';
 import { api } from '@/lib/client/api';
 import { useApi } from '@/lib/client/use-api';
+import { plural } from '@/lib/client/format';
 import { useSession } from '@/lib/client/session';
 import { Badge, Banner, Button, Card, CardHeader, ErrorState, Field, Input, PageHeader, Select, SkeletonRows, useToast } from '@/components/ui';
 import { ReasonDialog } from '@/components/admin/ui';
@@ -27,7 +28,7 @@ export default function PlatformPlansPage() {
   const operator = session.platform_role === 'operator';
   return (
     <>
-      <PageHeader title="Plans" meta={data.provider ? `${data.provider.name === 'test' ? 'Test double' : 'Stripe'} · ${data.provider.livemode ? 'live' : 'test mode'}` : 'Payments not set up'} />
+      <PageHeader title="Plans" meta={data.provider ? (data.provider.name === 'test' ? 'Test payment provider' : `Stripe · ${data.provider.livemode ? 'live' : 'test mode'}`) : 'Payments not set up'} />
       <div className="flex flex-col gap-6">
         {data.plans.map((p) => (
           <Card key={p.id} data-testid={`platform-plan-${p.id}`}>
@@ -45,13 +46,13 @@ export default function PlatformPlansPage() {
                     <span className="tabular">{v.unit_amount_minor != null ? `${money(v.unit_amount_minor)} per user / ${v.interval}` : 'No price'}</span>
                     {v.trial_days ? <span className="text-muted">{v.trial_days}-day trial</span> : null}
                     <Badge tone={v.retired_at ? 'neutral' : 'success'}>{v.retired_at ? `Retired ${day(v.retired_at)}` : 'Current'}</Badge>
-                    <span className="text-muted">{v.subscriptions} workspaces</span>
+                    <span className="text-muted">{plural(v.subscriptions, 'workspace')}</span>
                     {data.can_edit && v.purchasable && !v.retired_at ? <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setMap({ version: v.id })}>Map Stripe price</Button> : null}
                   </div>
                   <p className="text-muted">{v.features.length} features · created {day(v.created_at)}</p>
                   {v.prices.length ? (
                     <ul className="flex flex-col gap-1">
-                      {v.prices.map((x) => <li key={x.id} className="flex flex-wrap items-center gap-2"><code className="break-all text-[12px]">{x.price_ref}</code><Badge tone={x.provider === 'test' ? 'warn' : 'info'}>{x.provider === 'test' ? 'test double' : x.livemode ? 'Stripe live' : 'Stripe test'}</Badge>{x.retired_at ? <span className="text-muted">retired</span> : null}</li>)}
+                      {v.prices.map((x) => <li key={x.id} className="flex flex-wrap items-center gap-2"><code className="break-all text-[12px]">{x.price_ref}</code><Badge tone={x.provider === 'test' ? 'warn' : 'info'}>{x.provider === 'test' ? 'Test provider' : x.livemode ? 'Stripe live' : 'Stripe test'}</Badge>{x.retired_at ? <span className="text-muted">Retired</span> : null}</li>)}
                     </ul>
                   ) : <p className="text-muted">No provider price</p>}
                 </li>
@@ -61,7 +62,7 @@ export default function PlatformPlansPage() {
         ))}
       </div>
       <ReasonDialog open={!!publish} onOpenChange={(o) => !o && setPublish(null)} confirmLabel="Publish version" title={`Publish a new ${publish} version?`}
-        description="New checkouts use it; existing subscriptions keep their version until explicitly migrated. Needs a fresh sign-in."
+        description="New checkouts use it; existing subscriptions keep their version until migrated. Needs a fresh sign-in."
         onConfirm={async (reason) => { await api.post('/api/platform/billing/plans', { plan_id: publish, reason }); toast.success('Published'); await refetch(); }} />
       <ReasonDialog open={!!map} onOpenChange={(o) => !o && setMap(null)} confirmLabel="Save mapping" title="Map a Stripe price"
         description="Create the price in Stripe first with the same amount, GBP, monthly, per unit. Needs a fresh sign-in."
