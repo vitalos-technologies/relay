@@ -1,5 +1,7 @@
 # V3.1 final activation checklist
 
+> **Superseded (2026-11-09):** the consolidated list is [FINAL_ACTIVATION_CHECKLIST.md](FINAL_ACTIVATION_CHECKLIST.md). This per-phase file is kept for history; any "§n" reference to the V1 checklist points at its pre-consolidation version in git history.
+
 Only things a human operator must do outside the code. Earlier checklists still apply:
 - [FINAL_ACTIVATION_CHECKLIST.md](FINAL_ACTIVATION_CHECKLIST.md) (V1)
 - [V2_FINAL_ACTIVATION_CHECKLIST.md](V2_FINAL_ACTIVATION_CHECKLIST.md)

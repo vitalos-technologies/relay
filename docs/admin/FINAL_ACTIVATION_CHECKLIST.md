@@ -1,5 +1,7 @@
 # Final activation checklist (admin)
 
+> **Superseded (2026-11-09):** the consolidated list is [../FINAL_ACTIVATION_CHECKLIST.md](../FINAL_ACTIVATION_CHECKLIST.md). This per-phase file is kept for history; any "§n" reference to the V1 checklist points at its pre-consolidation version in git history.
+
 ## Only the user can do (from HANDOFF — repeat in the final consolidated list)
 1. Network approvals (Meta incl. insights, TikTok, YouTube/Google, LinkedIn, Threads, Pinterest, X credits) before real customers connect.
 2. Publish the version tags from your own machine.

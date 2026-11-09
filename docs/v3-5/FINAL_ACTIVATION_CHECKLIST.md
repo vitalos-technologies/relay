@@ -1,5 +1,7 @@
 # V3.5 final activation checklist
 
+> **Superseded (2026-11-09):** the consolidated list is [../FINAL_ACTIVATION_CHECKLIST.md](../FINAL_ACTIVATION_CHECKLIST.md). This per-phase file is kept for history; any "§n" reference to the V1 checklist points at its pre-consolidation version in git history.
+
 Everything V3.5 needs from outside the codebase before a capability can be used against a real provider. Nothing on this
 list has been done: every V3.5 flow is **implemented and locally tested on simulated transports / signed fixtures**, and
 **none has been verified against a live provider** (no credentials, approvals or test accounts were available, and the

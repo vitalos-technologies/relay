@@ -1,5 +1,7 @@
 # V5 activation checklist
 
+> **Superseded (2026-11-09):** the consolidated list is [../FINAL_ACTIVATION_CHECKLIST.md](../FINAL_ACTIVATION_CHECKLIST.md). This per-phase file is kept for history; any "§n" reference to the V1 checklist points at its pre-consolidation version in git history.
+
 Only genuinely remaining external steps. V4's checklist (`docs/v4/FINAL_ACTIVATION_CHECKLIST.md`) still applies (Stripe,
 support staff, SMTP, etc.). Both are merged into the final Relay checklist after Docs + Help Centre. Never paste keys into
 chat; use the deployment secret manager.

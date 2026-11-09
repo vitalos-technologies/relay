@@ -1,5 +1,7 @@
 # V2 final activation checklist
 
+> **Superseded (2026-11-09):** the consolidated list is [FINAL_ACTIVATION_CHECKLIST.md](FINAL_ACTIVATION_CHECKLIST.md). This per-phase file is kept for history; any "§n" reference to the V1 checklist points at its pre-consolidation version in git history.
+
 Things a human operator must do outside the code before Relay V2 runs in production. Engineering gaps are in [V2_IMPLEMENTATION_GAPS.md](V2_IMPLEMENTATION_GAPS.md); upgrade steps in [V2_MIGRATION_RUNBOOK.md](V2_MIGRATION_RUNBOOK.md). V1 items that are unchanged (Meta, X, Telegram apps and canaries) stay in [FINAL_ACTIVATION_CHECKLIST.md](FINAL_ACTIVATION_CHECKLIST.md) §2–5.
 
 Store every secret in the secret manager. Never paste values into chat, tickets or this repo. `<APP_BASE_URL>` = the final https origin (not chosen yet).
