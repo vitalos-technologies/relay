@@ -34,6 +34,7 @@ export default function PlatformPlansPage() {
           <Card key={p.id} data-testid={`platform-plan-${p.id}`}>
             <CardHeader title={<span className="capitalize">{p.id}</span>} actions={<div className="flex flex-wrap gap-2">
               <Badge tone={p.public ? 'success' : 'neutral'}>{p.public ? 'Public' : 'Not purchasable'}</Badge>
+              {p.id === 'free' ? <Badge tone="neutral">No checkout · no provider price</Badge> : null}
               {p.drift ? <Badge tone="warn">Catalogue changed</Badge> : null}
             </div>} />
             {p.drift ? <Banner className="mx-4 mb-3" tone="warn" title="The catalogue file differs from the current version"
@@ -43,7 +44,7 @@ export default function PlatformPlansPage() {
                 <li key={v.id} className="flex flex-col gap-2 px-4 py-3 text-[13px]">
                   <div className="flex flex-wrap items-center gap-2">
                     <strong>v{v.version}</strong>
-                    <span className="tabular">{v.unit_amount_minor != null ? `${money(v.unit_amount_minor)} per user / ${v.interval}` : 'No price'}</span>
+                    <span className="tabular">{v.unit_amount_minor === 0 ? '£0 (Free)' : v.unit_amount_minor != null ? `${money(v.unit_amount_minor)} per user / ${v.interval}` : 'No price'}</span>
                     {v.trial_days ? <span className="text-muted">{v.trial_days}-day trial</span> : null}
                     <Badge tone={v.retired_at ? 'neutral' : 'success'}>{v.retired_at ? `Retired ${day(v.retired_at)}` : 'Current'}</Badge>
                     <span className="text-muted">{plural(v.subscriptions, 'workspace')}</span>
@@ -54,7 +55,7 @@ export default function PlatformPlansPage() {
                     <ul className="flex flex-col gap-1">
                       {v.prices.map((x) => <li key={x.id} className="flex flex-wrap items-center gap-2"><code className="break-all text-[12px]">{x.price_ref}</code><Badge tone={x.provider === 'test' ? 'warn' : 'info'}>{x.provider === 'test' ? 'Test provider' : x.livemode ? 'Stripe live' : 'Stripe test'}</Badge>{x.retired_at ? <span className="text-muted">Retired</span> : null}</li>)}
                     </ul>
-                  ) : <p className="text-muted">No provider price</p>}
+                  ) : <p className="text-muted">{v.unit_amount_minor === 0 ? 'Free has no provider product or price' : 'No provider price'}</p>}
                 </li>
               ))}
             </ul>

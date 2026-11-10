@@ -1,21 +1,21 @@
 ---
 title: Upgrade, downgrade, cancel or resume
-summary: Move between Standard and Professional, cancel renewal, resume it, and know when each change takes effect.
+summary: Upgrade from Free, move between Standard and Professional, cancel renewal (back to Free), resume it, and know when each change takes effect.
 section: billing-and-plans
 audience: admin
 roles: [owner, admin]
 status: needs-setup
 related: [plans-and-features, manage-seats, when-paid-actions-are-paused, invoices-and-payment-details]
 product_version: "2026-11"
-reviewed: 2026-11-09
+reviewed: 2026-11-10
 order: 40
-keywords: [upgrade, downgrade, cancel subscription, resume, change plan, switch plan]
+keywords: [upgrade, downgrade, cancel subscription, resume, change plan, switch plan, free plan]
 ---
 
 **Required:** `billing.manage` (Owner, Admin) with two-step verification. Open **Settings → Workspace → Plan and billing**
 ([/settings/workspace/billing](/settings/workspace/billing)).
 
-## Subscribe (from a trial or a restricted workspace)
+## Subscribe (from Free, a trial or a restricted workspace)
 
 1. Select **Choose a plan** (or the plan card's button) and set the seats.
 2. **Continue to checkout**. *Payment is collected on the provider's secure page. Relay never sees your card.*
@@ -44,13 +44,15 @@ force**, but a second stage can't be added.
 ## Cancel renewal
 
 1. Select **Cancel renewal** → **Cancel renewal?**
-2. Read the consequences: until the period ends nothing changes. *After that, publishing, AI and other paid actions pause.
-   Scheduled posts are held, not deleted. Your content, settings and exports are kept. You can resume or resubscribe any time.*
-3. Confirm. **Result:** *Renewal cancelled*; the page shows **Service ends** with the date.
+2. Read the consequences: until the period ends nothing changes. After that the workspace moves to **Free**: anything
+   over Free's limits and features Free doesn't include are paused, not deleted. Your content and settings are kept, data
+   export always works, and you can resume or resubscribe any time.
+3. Confirm. **Result:** *Renewal cancelled*; the page shows the date the plan ends.
 
 **Resume renewal** before that date undoes it (*Renewal resumed*).
 
 ## Limitations
 
 - Monthly billing only; no annual plans.
-- Cancelling never deletes the workspace. Closing a workspace is a separate request to Relay support.
+- Cancelling never deletes the workspace or its content. Closing a workspace is a separate request to Relay support.
+- Free has one user, so teammates beyond the owner are paused on Free until you subscribe again.

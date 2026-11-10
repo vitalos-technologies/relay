@@ -1,10 +1,13 @@
 // Trials (V5 §7): 14-day, no card, on the selected plan, ONCE per workspace (billing_trial_redemptions PK). Joining a
 // workspace, changing plan, refreshing, repeating checkout or replaying a request never creates or extends a trial; only an
 // audited staff extension moves the end (bounded). Exact started_at / ends_at are stored server-side.
+// D33: trials are for the paid plans only (never Free). A trial that ends without a subscription moves the workspace to
+// Free (sweepTrials); a Free workspace that never redeemed a trial may still start one (Settings or checkout).
 import { AppError } from '@social-lite/core';
 import type { PlanId, PublicPlanId } from '@social-lite/core/contracts/v4-plans';
 import { maybeOne, type Queryable } from '@social-lite/db';
-import { currentVersion, isPublicPlan } from './catalogue.js';
+import { currentVersion, isPaidPlan } from './catalogue.js';
+import { moveToFreeTx } from './free.js';
 import { MAX_TRIAL_EXTENSIONS, MAX_TRIAL_EXTENSION_DAYS, TRIAL_ENDING_NOTICE_DAYS } from './policy.js';
 import { billableSeats } from './seats.js';
 import { legacyRow, loadBilling, saveBilling, type BillingRow } from './store.js';
@@ -21,13 +24,13 @@ export async function trialRedemption(db: Queryable, workspaceId: string, lock =
  * workspace that ever redeemed a trial gets `trial_already_used`.
  */
 export async function startTrialTx(tx: Queryable, p: { workspaceId: string; planId: string; userId: string; source: 'signup' | 'onboarding' | 'settings'; now?: Date }): Promise<BillingRow> {
-  if (!isPublicPlan(p.planId)) throw new AppError('validation_failed', 'Choose Standard or Professional', { plan: 'Unknown plan' });
+  if (!isPaidPlan(p.planId)) throw new AppError('validation_failed', 'Choose Standard or Professional', { plan: 'Unknown plan' });
   // Whole seconds: provider timestamps (trial_end, period ends) are in seconds, so dates compare exactly everywhere.
   const now = new Date(Math.floor((p.now ?? new Date()).getTime() / 1000) * 1000);
   await tx.query(`SELECT pg_advisory_xact_lock(hashtext('billing-trial:' || $1::text))`, [p.workspaceId]);
   if (await trialRedemption(tx, p.workspaceId, true)) throw new AppError('conflict', 'This workspace has already used its free trial.', undefined, { reason: 'trial_already_used' });
   const existing = await loadBilling(tx, p.workspaceId, { lock: true });
-  if (existing && existing.status !== 'none') {
+  if (existing && existing.status !== 'none' && existing.status !== 'free') {
     throw new AppError('invalid_state', existing.status === 'legacy' ? 'This workspace is on the legacy plan; choose a plan to subscribe instead.' : 'A trial cannot start for this workspace now.');
   }
   const version = await currentVersion(tx, p.planId as PublicPlanId);
@@ -48,7 +51,7 @@ export async function startTrialTx(tx: Queryable, p: { workspaceId: string; plan
 
 /** Switch the plan of a running no-card trial. The end date never changes (V5 §7). */
 export async function changeTrialPlanTx(tx: Queryable, p: { workspaceId: string; planId: string; userId: string }): Promise<BillingRow> {
-  if (!isPublicPlan(p.planId)) throw new AppError('validation_failed', 'Choose Standard or Professional', { plan: 'Unknown plan' });
+  if (!isPaidPlan(p.planId)) throw new AppError('validation_failed', p.planId === 'free' ? 'Your trial moves to Free by itself when it ends unless you subscribe.' : 'Choose Standard or Professional', { plan: 'Choose Standard or Professional' });
   const prev = await loadBilling(tx, p.workspaceId, { lock: true });
   if (!prev || prev.status !== 'trialing' || !prev.trial_ends_at || prev.trial_ends_at.getTime() <= Date.now()) throw new AppError('invalid_state', 'There is no running trial.');
   if (prev.provider_subscription_ref && prev.provider_status && !['canceled', 'incomplete_expired'].includes(prev.provider_status)) {
@@ -72,17 +75,20 @@ export async function extendTrialTx(tx: Queryable, p: { workspaceId: string; day
   if (!red || !prev) throw new AppError('invalid_state', 'This workspace has no trial to extend.');
   if (red.extensions >= MAX_TRIAL_EXTENSIONS) throw new AppError('invalid_state', `This trial was already extended ${MAX_TRIAL_EXTENSIONS} times.`);
   const liveSub = !!prev.provider_subscription_ref && !!prev.provider_status && !['canceled', 'incomplete_expired'].includes(prev.provider_status);
-  if (liveSub || !['trialing', 'expired'].includes(prev.status)) throw new AppError('invalid_state', 'Only a no-card trial (running or expired, not subscribed) can be extended.');
+  // D33: an ended trial is now on Free; extending it resumes the trial on its plan (only while not subscribed).
+  if (liveSub || !['trialing', 'expired', 'free'].includes(prev.status)) throw new AppError('invalid_state', 'Only a no-card trial (running or ended, not subscribed) can be extended.');
   const base = red.ends_at.getTime() > now.getTime() ? red.ends_at : now;
   const to = new Date(base.getTime() + p.days * 86400_000);
   await tx.query(`UPDATE billing_trial_redemptions SET ends_at=$2, extensions=extensions+1 WHERE workspace_id=$1`, [p.workspaceId, to]);
-  const next: BillingRow = { ...prev, status: 'trialing', trial_ends_at: to };
+  const resumed = prev.status === 'trialing' ? null : await currentVersion(tx, red.plan_id as PublicPlanId);
+  const next: BillingRow = { ...prev, status: 'trialing', trial_ends_at: to,
+    ...(resumed ? { plan_id: red.plan_id, plan_version_id: resumed.id, trial_plan_id: red.plan_id, seats: await billableSeats(tx, p.workspaceId) } : {}) };
   const saved = await saveBilling(tx, prev, next, { kind: 'staff.trial_extended', source: 'staff', actorUserId: p.userId, reason: p.reason,
     detail: { from: red.ends_at.toISOString(), to: to.toISOString(), days: p.days } }, ['billing.subscription_changed']);
   return { row: saved.row, from: red.ends_at, to };
 }
 
-/** Sweep: no-card trials past their end → expired (+ billing.trial_expired); 3-day notice once (+ billing.trial_ending). */
+/** Sweep: no-card trials past their end → Free (D33; + billing.trial_expired); 3-day notice once (+ billing.trial_ending). */
 export async function sweepTrials(db: Queryable, now = new Date()): Promise<{ expired: number; ending: number }> {
   const { withTx } = await import('@social-lite/db');
   const due = await db.query<{ workspace_id: string }>(
@@ -92,7 +98,7 @@ export async function sweepTrials(db: Queryable, now = new Date()): Promise<{ ex
     await withTx(async (tx) => {
       const prev = await loadBilling(tx, r.workspace_id, { lock: true });
       if (!prev || prev.status !== 'trialing' || !prev.trial_ends_at || prev.trial_ends_at.getTime() > now.getTime()) return;
-      await saveBilling(tx, prev, { ...prev, status: 'expired' }, { kind: 'trial_expired', source: 'system', actorService: 'billing-sweep' }, ['billing.trial_expired']);
+      await moveToFreeTx(tx, prev, { kind: 'trial_expired', source: 'system', actorService: 'billing-sweep', detail: { trial_plan: prev.trial_plan_id, now: 'free' } }, ['billing.trial_expired']);
     });
   }
   const soon = await db.query<{ workspace_id: string; trial_ends_at: Date }>(

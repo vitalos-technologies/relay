@@ -18,6 +18,12 @@ export interface WorkspaceAccess {
   isDemo: boolean;
   /** V2 policy state. Present for every real request (route() → loadAccess). Tests may omit it (legacy role matrix). */
   authz?: AuthzState;
+  /**
+   * D33: this person is over the plan's user limit (e.g. a teammate on a Free workspace). Their product access is paused
+   * (no brands visible; only billing, support and workspace-read permissions pass requireAction) until the owner
+   * upgrades or removes them. The value is the reason shown to them. Absent/null = not held.
+   */
+  memberHold?: string | null;
 }
 
 export interface Ctx {

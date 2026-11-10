@@ -7,7 +7,7 @@ roles: [owner, admin, brand_manager, editor, care_agent]
 status: needs-setup
 related: [ai-help-while-writing-and-replying, approved-knowledge-and-brand-voice, ai-limits-privacy-and-usage, automation-rules-and-policies]
 product_version: "2026-11"
-reviewed: 2026-11-09
+reviewed: 2026-11-10
 order: 10
 keywords: [ai, assistant, workflow, generate, campaign brief, weekly plan, summarise, chatbot]
 ---
@@ -20,7 +20,7 @@ keywords: [ai, assistant, workflow, generate, campaign brief, weekly plan, summa
 
 - **Required:** `ai.use` (Owner, Admin, Brand manager, Editor, Care agent) plus read access to what the task uses
   (inbox for conversations, analytics for reports).
-- **Plan:** **Ask** is on every plan. Multi-step tasks need **Professional** (*Multi-step tasks are on the Professional plan*).
+- **Plan:** **Ask** is on every plan, including Free (small monthly AI allowance). Multi-step tasks need **Professional** (*Multi-step tasks are on Professional*).
 - Open **Assistant** in the sidebar ([/assistant](/assistant)).
 
 ![AI workspace for the brand Lumen Lane Bakery with the "AI is not set up" notice, a task box with brand and task-type pickers, and suggested tasks such as Draft replies to unanswered messages and Plan this week's posts](/help/img/ai-and-mcp/ai-workspace.png)

@@ -27,6 +27,8 @@ export interface BillingActionsDto {
   cancel: boolean;
   reactivate: boolean;
   portal: boolean;
+  /** D33: cancel renewal at period end, then Free (same provider call as `cancel`; offered as "Downgrade to Free"). */
+  downgrade_to_free: boolean;
 }
 
 export interface BillingOverviewDto {
@@ -35,6 +37,8 @@ export interface BillingOverviewDto {
   plan: { id: PlanId; name: string; unit_amount_minor: number | null; currency: string; interval: string; version: number | null } | null;
   trial: { started_at: string; ends_at: string; plan_id: PlanId; days_left: number; redeemed: boolean } | null;
   trial_used: boolean;
+  /** D33: days of trial an upgrade checkout includes now (14 when the workspace never redeemed its trial; else 0). */
+  upgrade_trial_days: number;
   seats: BillingSeatsDto;
   recurring_total_minor: number | null;
   /** Next renewal (active) or first charge (subscribed during the trial = trial end). */

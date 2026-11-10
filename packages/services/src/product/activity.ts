@@ -114,7 +114,7 @@ export async function activityCsv(ctx: Ctx, raw: unknown, db: Queryable = getPoo
   const q = activityQuerySchema.parse(raw ?? {});
   requireAction(ctx, 'exports.create', q.brand_id ? { brandId: q.brand_id } : { brandId: null });
   await enforceRateLimit('activityExport', ctx.actor.userId, EXPORT_RATE);
-  const reservation = await reserveUsage({ workspaceId: ctx.access.workspaceId, meter: 'exports.count', amount: 1, userId: ctx.actor.userId, ref: `export:activity:${ctx.correlationId.slice(0, 60)}`, ttlSeconds: 600 });
+  const reservation = await reserveUsage({ workspaceId: ctx.access.workspaceId, meter: 'exports.count', amount: 1, userId: ctx.actor.userId, ref: `export:activity:${ctx.correlationId.slice(0, 60)}`, ttlSeconds: 600, planExempt: true }); // D33: data export always works
   try {
     const header = ['created_at_utc', 'category', 'action', 'actor', 'brand', 'resource_type', 'resource_id', 'details', 'correlation_id', 'event_id'];
     const lines = [header.join(',')];

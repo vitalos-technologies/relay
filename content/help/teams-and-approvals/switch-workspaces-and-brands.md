@@ -6,7 +6,7 @@ audience: user
 status: available
 related: [roles-and-permissions, workspace-and-brand-settings, accept-an-invitation]
 product_version: "2026-11"
-reviewed: 2026-11-09
+reviewed: 2026-11-10
 order: 5
 keywords: [workspace switcher, brand filter, context, agency, multiple clients, search, command menu]
 ---
@@ -49,5 +49,5 @@ only include things you can open. *Partial results* means the list was cut short
 | Demo · simulated destinations | This workspace publishes to simulated accounts only. Nothing reaches a real network. |
 | Publishing paused | Someone paused publishing for the workspace (see [Pause publishing](/help/calendar-and-scheduling/pause-publishing-in-an-emergency)). |
 | Relay support has read-only access | You approved a support-access request; it ends automatically. |
-| Paid actions paused | A billing problem or an ended trial restricts paid actions (see [Billing restrictions](/help/billing-and-plans/when-paid-actions-are-paused)). |
+| Paid actions paused | A billing problem restricts paid actions (see [Billing restrictions](/help/billing-and-plans/when-paid-actions-are-paused)). |
 | Offline | Your browser lost its connection; drafts are kept locally until you're back. |

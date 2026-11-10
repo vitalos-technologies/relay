@@ -46,7 +46,7 @@ export function PlatformBillingPanel({ workspaceId, operator }: { workspaceId: s
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <Facts items={[
             ['Plan', `${d.plan_name ?? 'None'}${d.plan_version ? ` · v${d.plan_version}` : ''}`],
-            ['Seats', `${seatsLabel(d.seats.paid)} · ${d.seats.billable} billable`],
+            ['Seats', s.plan_id === 'free' ? `Free · ${d.seats.billable} ${d.seats.billable === 1 ? 'user' : 'users'} (1 included)` : `${seatsLabel(d.seats.paid)} · ${d.seats.billable} billable`],
             ['Trial', d.trial ? `${day(d.trial.started_at)} → ${day(d.trial.ends_at)}${d.trial.extensions ? ` (+${d.trial.extensions} ext.)` : ''}` : '—'],
             ['Period', s.current_period ? `${day(s.current_period.start)} → ${day(s.current_period.end)}` : '—'],
             ['Cancels', s.cancel_at ? day(s.cancel_at) : '—'],

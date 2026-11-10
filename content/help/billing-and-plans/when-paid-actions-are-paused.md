@@ -1,17 +1,18 @@
 ---
 title: When paid actions are paused
-summary: What a billing restriction does to scheduled posts, replies, AI, automations and integrations - and what always keeps working.
+summary: What a billing restriction or a move to Free does to scheduled posts, replies, AI, automations and integrations - and what always keeps working.
 section: billing-and-plans
 audience: user
 status: available
 related: [invoices-and-payment-details, change-plan-or-cancel, start-a-free-trial, delivery-statuses]
 product_version: "2026-11"
-reviewed: 2026-11-09
+reviewed: 2026-11-10
 order: 60
-keywords: [restricted, paused, read only, trial ended, payment failed, held, billing hold]
+keywords: [restricted, paused, read only, trial ended, payment failed, held, billing hold, free plan, over limit]
 ---
 
-When a trial ends without a subscription, a payment problem outlasts the grace period, or a cancellation takes effect,
+When a trial ends without a subscription, or a cancellation takes effect, the workspace moves to **Free** (see
+[Over a plan limit](#over-a-plan-limit-not-a-billing-problem) below). When a payment problem outlasts the grace period,
 the workspace becomes **restricted**. A **Paid actions paused** strip appears with links to **Billing**, **Held work** and
 **Support**: *Scheduled posts and replies are held until this is resolved. Your data, exports, billing and support stay
 available.*
@@ -41,10 +42,11 @@ held, automation runs blocked, accounts and searches over the limit — *Nothing
 
 ## Over a plan limit (not a billing problem)
 
-If a downgrade leaves you with more connected accounts or listening searches than the plan allows, nothing is
-disconnected. An admin with `billing.manage` chooses **Accounts that stay active** / **Searches that stay active** and
-**Save choice**; until then the oldest stay active. Paused accounts stay connected (inbox and analytics continue), but
-publishing to them is held.
+If a downgrade or a move to Free leaves you with more than the plan allows — members, brands, connected accounts,
+scheduled posts or listening searches — nothing is deleted or disconnected. An admin with `billing.manage` chooses what
+stays active (for example **Accounts that stay active**) and **Save choice**; until then the oldest stay active. Paused
+accounts stay connected, but publishing to them is held. Features the plan doesn't include keep their configuration,
+readable, but don't run. On every plan you can read your existing content and export your data.
 
 A Relay operator may keep full access on temporarily while a billing issue is resolved; it's shown as **Full access kept
 on** *Until <date>*.

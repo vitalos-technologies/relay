@@ -84,6 +84,8 @@ function HeldCard({ e }: { e: EntitlementsDto }) {
     ['Automation runs blocked (24 h)', h.automation_runs_blocked_24h, '/automation'],
     ['Accounts over the limit', h.held_social_accounts, null],
     ['Searches over the limit', h.held_listening_searches, null],
+    ['Brands over the limit', h.held_brands, null],
+    ['People with paused access', h.held_members, '/settings/workspace/members'],
   ];
   const shown = rows.filter((r) => r[1] > 0);
   if (!shown.length) return null;
@@ -105,6 +107,8 @@ function HeldCard({ e }: { e: EntitlementsDto }) {
 const SEL_LABEL: Record<SelectionDto['allowance'], { title: string; noun: string }> = {
   social_accounts: { title: 'Accounts that stay active', noun: 'accounts' },
   listening_searches: { title: 'Searches that stay active', noun: 'searches' },
+  brands: { title: 'Brands that stay active', noun: 'brands' },
+  members: { title: 'People who keep access', noun: 'people' },
 };
 
 function SelectionCard({ sel, canManage, onSaved }: { sel: SelectionDto; canManage: boolean; onSaved: () => void }) {
@@ -128,7 +132,9 @@ function SelectionCard({ sel, canManage, onSaved }: { sel: SelectionDto; canMana
   return (
     <Card data-testid={`selection-${sel.allowance}`}>
       <CardHeader title={l.title} actions={<MetaChip>{chosen.length} of {limit}</MetaChip>} />
-      <p className="px-4 text-xs text-muted">Up to {limit} can stay active. The others stay connected but paused. Nothing is deleted.</p>
+      <p className="px-4 text-xs text-muted">{sel.allowance === 'members'
+        ? <>Up to {limit} can use the workspace. Owners always keep access; others keep their account but are paused. Nothing is deleted.</>
+        : <>Up to {limit} can stay active. The others stay connected but paused. Nothing is deleted.</>}</p>
       <ul className="mt-2 divide-y divide-border">
         {sel.items.map((i) => (
           <li key={i.id} className="flex items-center justify-between gap-3 px-4 py-2">

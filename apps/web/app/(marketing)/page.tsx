@@ -13,14 +13,16 @@ import { CapabilityStrip } from '@/components/marketing/capability-strip';
 import { ProductDemos } from '@/components/marketing/product-demos';
 import { IntegrationsSection } from '@/components/marketing/integrations-section';
 import { PricingSection } from '@/components/marketing/pricing-section';
+import { TRIAL_DAYS, freePlan, paidPlans } from '@/components/marketing/plan-data';
 import { FaqSection } from '@/components/marketing/faq-section';
 import { FinalCta } from '@/components/marketing/final-cta';
 import { SiteFooter } from '@/components/marketing/site-footer';
 import { SupportWidgetMount } from '@/components/support-widget/mount'; // V5 WID: single widget mount point
 
+const paid = paidPlans();
 export const metadata: Metadata = {
   title: { absolute: 'Relay — Your social world. Working together.' },
-  description: 'Plan content, manage conversations, and get work done with AI. Standard and Professional plans, per user, with a 14-day free trial.',
+  description: `Plan content, manage conversations, and get work done with AI. ${freePlan()?.name ?? 'Free'} for one person; ${paid.map((p) => `${p.name} ${p.price}`).join(' and ')} per user / month, with a ${TRIAL_DAYS}-day free trial.`,
 };
 
 async function signedIn(): Promise<boolean> {

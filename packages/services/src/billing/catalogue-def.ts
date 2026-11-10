@@ -26,7 +26,8 @@ export function planVersionDefinition(id: PlanId): PlanVersionDefinition {
   return {
     plan_id: p.id, name: p.name, summary: p.summary, unit_amount_minor: p.unit_amount_minor, currency: p.currency, interval: p.interval,
     per_seat: p.per_seat, trial_days: p.trial_days, features: [...p.features], allowances: p.allowances, trial_allowances: p.trial_allowances,
-    highlights: [...p.highlights], purchasable: p.public && p.unit_amount_minor != null,
+    // Purchasable = sold through checkout. Free (£0) is public but never purchased: no checkout, no provider price (D33).
+    highlights: [...p.highlights], purchasable: p.public && p.unit_amount_minor != null && p.unit_amount_minor > 0,
   };
 }
 

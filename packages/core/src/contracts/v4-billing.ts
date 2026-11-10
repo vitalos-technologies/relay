@@ -3,6 +3,9 @@
 // read billing tables directly. BIL may ADD fields; renaming/removing needs the lead.
 import type { AccessLevel, PlanId, SubscriptionStatus } from './v4-plans.js';
 
+/** Billing status: a provider-backed subscription status, or 'none' (transient) / 'legacy' (pre-V4) / 'free' (D33 Free plan). */
+export type BillingStatusValue = SubscriptionStatus | 'none' | 'legacy' | 'free';
+
 /** Verified billing facts for one workspace (from provider-verified events + reconciliation; never from redirects). */
 export interface BillingState {
   workspace_id: string;
@@ -10,7 +13,12 @@ export interface BillingState {
   plan_id: PlanId | null;
   /** Immutable persisted plan version the subscription is bound to (null for legacy/no plan). */
   plan_version_id: string | null;
-  status: SubscriptionStatus | 'none' | 'legacy';
+  /**
+   * 'free' (D33): the workspace is on the Free plan — no provider subscription, no checkout, full access within Free's
+   * limits. A trial that ended without a subscription, an ended (cancelled) subscription and onboarding without a plan
+   * all land here. Nothing is deleted; over-limit resources are held by the entitlement service.
+   */
+  status: BillingStatusValue;
   /** Paid (or trial) seat quantity on the subscription; billable-user count is computed separately. */
   seats: number;
   trial: { started_at: string; ends_at: string; plan_id: PlanId } | null;

@@ -154,6 +154,9 @@ async function insertInvitation(tx: Queryable, ctx: Ctx, p: Prepared, batchId: s
   // V4 billing: with a paid subscription, pending member invitations reserve paid seats; never add paid seats silently.
   const { assertSeatForInvite } = await import('../billing/seats.js');
   await assertSeatForInvite(tx, ctx.access.workspaceId, p.kind);
+  // D33: the plan's user limit (Free = 1 user: "Upgrade to add teammates"). Pending invitations count.
+  const { assertCanAddMember } = await import('../entitlements/actions.js');
+  await assertCanAddMember(tx, ctx.access.workspaceId, { phase: 'invite' });
   const policy = await workspacePolicy(tx, ctx.access.workspaceId);
   const token = randomToken(32);
   const stored: StoredGrant[] = p.grants.map((g) => ({ role: g.role, scope_type: g.scopeType, brand_id: g.brandId, connection_id: g.connectionId }));
@@ -360,6 +363,11 @@ export async function acceptInvitation(tx: Queryable, tokenHash: Buffer, user: {
     const { seatAvailableOnAccept } = await import('../billing/seats.js');
     if (!(await seatAvailableOnAccept(tx, inv.workspace_id, inv.kind === 'guest' ? 'guest' : 'member'))) {
       throw new LoginError('seats_unavailable', 'This workspace has no free paid seat. Ask its owner to add a seat, then open the invitation again.');
+    }
+    // D33: the plan may have changed since the invitation (e.g. a trial ended on Free, which includes 1 user).
+    const { assertCanAddMember } = await import('../entitlements/actions.js');
+    try { await assertCanAddMember(tx, inv.workspace_id, { phase: 'accept' }); } catch {
+      throw new LoginError('seats_unavailable', 'This workspace’s plan has no room for another person. Ask its owner to upgrade, then open the invitation again.');
     }
     if (m) {
       await tx.query(

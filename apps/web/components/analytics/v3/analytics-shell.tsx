@@ -10,16 +10,19 @@ import { AnalyticsTabs, useAnalyticsQuery } from './shared';
 import { AssistantButton } from '@/components/assistant/assistant-panel'; // V3.5 stream E
 import { useBrandFilter } from '@/lib/client/hooks';
 import { HelpLink } from '@/components/help/help-link';
+import { FeatureGate } from '@/components/entitlements/feature-gate'; // D33: Free has no analytics
+import { useEntitlements } from '@/components/entitlements/use-entitlements';
 
 export function AnalyticsShell({ children }: { children: ReactNode }) {
   const { canV2 } = useSession();
   const [brand] = useBrandFilter();
+  const ent = useEntitlements();
+  const inPlan = !ent.data || ent.check('analytics_standard').ok; // D33: no export / assistant actions on a page Free can't use
   if (!canV2('analytics.read')) return <><PageHeader title="Analytics" /><EmptyState icon={<ChartColumn aria-hidden />} title="No access" /></>;
   return (
     <>
-      <PageHeader title="Analytics" actions={<><HelpLink slug="analytics-metric-dictionary" label="What each metric means" /><AssistantButton surface="analytics" size="md" brandId={brand || null} />{canV2('exports.create') ? <ExportMenu /> : null}</>} />
-      <AnalyticsTabs />
-      {children}
+      <PageHeader title="Analytics" actions={<><HelpLink slug="analytics-metric-dictionary" label="What each metric means" />{inPlan ? <AssistantButton surface="analytics" size="md" brandId={brand || null} /> : null}{inPlan && canV2('exports.create') ? <ExportMenu /> : null}</>} />
+      <FeatureGate feature="analytics_standard"><AnalyticsTabs />{children}</FeatureGate>
     </>
   );
 }

@@ -473,6 +473,8 @@ export async function saveApprovalPolicy(ctx: Ctx, brandId: string, input: Polic
     // V4 entitlements: ADDING a second review stage is a Professional capability. Existing multi-step policies stay in
     // force (and editable) after a downgrade — an approval control is never weakened by a plan change.
     if (after.stages.length > 1 && before.stages.length < 2) await assertFeatureConfigurable(tx, ctx.access.workspaceId, 'approvals_advanced');
+    // D33: turning approvals ON needs team collaboration (not in Free). Turning them off is always allowed.
+    if (after.stages.length > 0 && before.stages.length === 0) await assertFeatureConfigurable(tx, ctx.access.workspaceId, 'collaboration');
     const gen = lock.generation + 1;
     await tx.query(`INSERT INTO approval_policy_versions(workspace_id, brand_id, generation, separation_of_duties, stage_count, created_by, reason)
                     VALUES ($1,$2,$3,$4,$5,$6,$7)`, [ctx.access.workspaceId, brand.id, gen, after.separation_of_duties, after.stages.length, ctx.actor.userId, input.reason?.slice(0, 500) ?? null]);

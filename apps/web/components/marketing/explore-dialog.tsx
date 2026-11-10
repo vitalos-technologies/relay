@@ -9,7 +9,7 @@ import { ArrowRight } from 'lucide-react';
 const load = () => import('./explore-panel');
 const ExplorePanel = dynamic(load, { ssr: false });
 
-export function ExploreDialog({ label, title, description, children, testId }: { label: string; title: string; description: string; children: ReactNode; testId?: string }) {
+export function ExploreDialog({ label, title, description, media, children, testId }: { label: string; title: string; description: string; media?: ReactNode; children: ReactNode; testId?: string }) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const ref = useRef<HTMLButtonElement>(null);
@@ -20,7 +20,7 @@ export function ExploreDialog({ label, title, description, children, testId }: {
         className="group inline-flex min-h-10 items-center gap-1.5 rounded-full text-[15px] font-semibold text-v5-primary-text outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-v5-ring" data-testid={testId}>
         {label}<ArrowRight aria-hidden className="size-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" />
       </button>
-      {mounted ? <ExplorePanel open={open} onOpenChange={setOpen} returnFocus={ref} title={title} description={description}>{children}</ExplorePanel> : null}
+      {mounted ? <ExplorePanel open={open} onOpenChange={setOpen} returnFocus={ref} title={title} description={description} media={media}>{children}</ExplorePanel> : null}
     </>
   );
 }

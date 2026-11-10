@@ -8,6 +8,10 @@
 //   - sync jobs:         stay 'queued'/'waiting_retry' with last_error_code 'entitlement_hold'.
 //   - listening:         new items are still observed (data kept) but not matched to saved searches; on restore the
 //                        searches are re-matched over the stored observations.
+//   D33 (Free plan) adds three reasons a scheduled post is held (same 'entitlement_hold' mechanics): its brand is over the
+//   brand limit, its account is over the account limit, or its publication month has no scheduled-post allowance left
+//   (posts are counted once per post per month; the earliest-due posts use the allowance first). Members over the user
+//   limit lose product access (tenancy.ts loadAccess), never their account.
 // Release triggers: billing.access_changed (outbox → worker), override changes, selection changes, and a worker sweep
 // (safety net for a missed event). The dispatch-time gate is authoritative either way.
 import { ENTITLEMENT_HOLD } from '@social-lite/core/contracts/v4-entitlements';
@@ -16,7 +20,8 @@ import { audit } from '../audit.js';
 import { writeOutbox } from '../outbox.js';
 import { log } from '../log.js';
 import { checkFeature, entitlementsCore, invalidateEntitlements, type EntitlementsCore } from './resolve.js';
-import { connectionHeld, heldIds } from './gauges.js';
+import { brandHeld, connectionHeld, heldIds } from './gauges.js';
+import { chargeScheduledPost } from './actions.js';
 
 export const HOLD_RECHECK_MINUTES = 15;
 /** automation_runs.reason prefix for runs blocked by the plan/billing state (counted on the usage page). */
@@ -24,8 +29,15 @@ export const AUTOMATION_HOLD_PREFIX = 'Held by plan: ';
 
 export type HoldDecision = { held: false } | { held: true; message: string };
 
-/** Publishing gate for one delivery (engine/process.ts gate, inside its transaction). */
-export async function publishingHold(db: Queryable, workspaceId: string, connectionId: string): Promise<HoldDecision> {
+const brandHoldMessage = (limit: number | null) => `Held: this brand is over the plan’s limit of ${limit} brand${limit === 1 ? '' : 's'}. Upgrade, or choose which brand stays active in Usage.`;
+const postHoldMessage = (m: string) => `Held: ${m} It publishes if an allowance frees up in time (or after an upgrade).`;
+
+/**
+ * Publishing gate for one delivery (engine/process.ts gate: once before the send transaction, again inside it). With the
+ * delivery's post/brand/due time it also applies the D33 brand and scheduled-post limits (the post is counted once for
+ * its month — idempotent, so both gate runs and the scheduling-time count are the same unit).
+ */
+export async function publishingHold(db: Queryable, workspaceId: string, connectionId: string, d?: { brandId: string; postId: string; dueAt: Date }): Promise<HoldDecision> {
   const core = await entitlementsCore(db, workspaceId);
   // A staff suspension is already enforced by the engine (paused, resumed on reactivation); nothing to add here.
   if (core.access === 'suspended') return { held: false };
@@ -33,6 +45,16 @@ export async function publishingHold(db: Queryable, workspaceId: string, connect
   if (!c.ok) return { held: true, message: `Held: ${c.message} It publishes when access returns, if still timely.` };
   const h = await connectionHeld(db, workspaceId, connectionId, core);
   if (h.held) return { held: true, message: `Held: this account is over the plan’s limit of ${h.limit} connected accounts. Choose which accounts stay active in Usage.` };
+  if (d) {
+    const b = await brandHeld(db, workspaceId, d.brandId, core);
+    if (b.held) return { held: true, message: brandHoldMessage(b.limit) };
+    if (core.limits.scheduled_posts.limit !== null) {
+      // Counter locks need a transaction: the pre-send check runs on the pool, so give it its own.
+      const charge = (tx: Queryable) => chargeScheduledPost(tx, workspaceId, { postId: d.postId, dueAt: d.dueAt, userId: null, core });
+      const r = db === getPool() ? await withTx(charge) : await charge(db);
+      if (!r.ok) return { held: true, message: postHoldMessage(r.message) };
+    }
+  }
   return { held: false };
 }
 
@@ -81,6 +103,22 @@ export async function reevaluateHolds(workspaceId: string, opts: { reason?: stri
       // ---- scheduled posts
       const pub = checkFeature(core, 'publishing', { paid: true });
       const heldConns = pub.ok ? [...await heldIds(tx, workspaceId, 'social_accounts', core)] : [];
+      const heldBrands = pub.ok ? [...await heldIds(tx, workspaceId, 'brands', core)] : [];
+      // D33 scheduled-post allowance: waiting posts (earliest due first) are counted for their month until it is full;
+      // the rest are held. Already-counted posts are free (ledger dedupe), so this is idempotent.
+      const heldPosts: string[] = [];
+      let postMsg = '';
+      if (pub.ok && core.limits.scheduled_posts.limit !== null) {
+        const waiting = await many<{ post_id: string; due_at: Date }>(tx,
+          `SELECT post_id, min(due_at) due_at FROM deliveries
+            WHERE workspace_id=$1 AND (state IN ('scheduled','retry_wait') AND lease_owner IS NULL OR (state='blocked' AND last_error_code=$2))
+              AND publish_before > now() AND NOT (connection_id = ANY($3::uuid[])) AND NOT (brand_id = ANY($4::uuid[]))
+            GROUP BY post_id ORDER BY min(due_at), post_id LIMIT 500`, [workspaceId, ENTITLEMENT_HOLD, heldConns, heldBrands]);
+        for (const w of waiting) {
+          const r = await chargeScheduledPost(tx, workspaceId, { postId: w.post_id, dueAt: w.due_at, userId: null, core });
+          if (!r.ok) { heldPosts.push(w.post_id); postMsg = postHoldMessage(r.message); }
+        }
+      }
       if (pub.ok) {
         const exp = await tx.query(
           `UPDATE deliveries SET state='expired', last_error_code='deadline_passed',
@@ -90,23 +128,34 @@ export async function reevaluateHolds(workspaceId: string, opts: { reason?: stri
         for (const r of exp.rows as Array<{ id: string }>) await writeOutbox(tx, { workspaceId, aggregateType: 'delivery', aggregateId: r.id, eventType: 'delivery.state_changed', payload: { state: 'expired' } });
         const rel = await tx.query<{ id: string }>(
           `UPDATE deliveries SET state='scheduled', blocked_reason=NULL, last_error_code=NULL, last_error_message=NULL, next_attempt_at=greatest(next_attempt_at, now()), updated_at=now()
-            WHERE workspace_id=$1 AND state='blocked' AND last_error_code=$2 AND publish_before > now() AND NOT (connection_id = ANY($3::uuid[])) RETURNING id`,
-          [workspaceId, ENTITLEMENT_HOLD, heldConns]);
+            WHERE workspace_id=$1 AND state='blocked' AND last_error_code=$2 AND publish_before > now() AND NOT (connection_id = ANY($3::uuid[]))
+              AND NOT (brand_id = ANY($4::uuid[])) AND NOT (post_id = ANY($5::uuid[])) RETURNING id`,
+          [workspaceId, ENTITLEMENT_HOLD, heldConns, heldBrands, heldPosts]);
         out.released.deliveries = rel.rowCount ?? 0;
         for (const r of rel.rows) await writeOutbox(tx, { workspaceId, aggregateType: 'delivery', aggregateId: r.id, eventType: 'delivery.due' });
       }
-      const holdMsg = !pub.ok ? `Held: ${pub.message} It publishes when access returns, if still timely.`
-        : 'Held: this account is over the plan’s limit of connected accounts. Choose which accounts stay active in Usage.';
-      if (!pub.ok || heldConns.length) {
+      // One pass per reason (the first matching reason wins: plan/access, then account, then brand, then allowance).
+      const passes: Array<{ msg: string; all: boolean; conns: string[]; brands: string[]; posts: string[] }> = !pub.ok
+        ? [{ msg: `Held: ${pub.message} It publishes when access returns, if still timely.`, all: true, conns: [], brands: [], posts: [] }]
+        : [
+          { msg: 'Held: this account is over the plan’s limit of connected accounts. Choose which accounts stay active in Usage.', all: false, conns: heldConns, brands: [], posts: [] },
+          { msg: brandHoldMessage(core.limits.brands.limit), all: false, conns: [], brands: heldBrands, posts: [] },
+          { msg: postMsg, all: false, conns: [], brands: [], posts: heldPosts },
+        ].filter((x) => x.conns.length || x.brands.length || x.posts.length);
+      const already = new Set<string>();
+      for (const ps of passes) {
         const h = await tx.query<{ id: string }>(
           `UPDATE deliveries SET state='blocked', blocked_reason=$2, last_error_code=$3, last_error_message=$2, updated_at=now()
-            WHERE workspace_id=$1 AND state IN ('scheduled','retry_wait') AND lease_owner IS NULL AND ($4::boolean OR connection_id = ANY($5::uuid[])) RETURNING id`,
-          [workspaceId, holdMsg.slice(0, 500), ENTITLEMENT_HOLD, !pub.ok, heldConns]);
-        out.held.deliveries = h.rowCount ?? 0;
+            WHERE workspace_id=$1 AND state IN ('scheduled','retry_wait') AND lease_owner IS NULL
+              AND ($4::boolean OR connection_id = ANY($5::uuid[]) OR brand_id = ANY($6::uuid[]) OR post_id = ANY($7::uuid[])) RETURNING id`,
+          [workspaceId, ps.msg.slice(0, 500), ENTITLEMENT_HOLD, ps.all, ps.conns, ps.brands, ps.posts]);
+        out.held.deliveries += h.rowCount ?? 0;
         for (const r of h.rows) await writeOutbox(tx, { workspaceId, aggregateType: 'delivery', aggregateId: r.id, eventType: 'delivery.state_changed', payload: { state: 'blocked' } });
         // Keep the visible reason current on deliveries that stay held for a different reason now.
-        await tx.query(`UPDATE deliveries SET blocked_reason=$2, last_error_message=$2 WHERE workspace_id=$1 AND state='blocked' AND last_error_code=$3 AND ($4::boolean OR connection_id = ANY($5::uuid[])) AND blocked_reason IS DISTINCT FROM $2`,
-          [workspaceId, holdMsg.slice(0, 500), ENTITLEMENT_HOLD, !pub.ok, heldConns]);
+        const upd = await tx.query<{ id: string }>(`UPDATE deliveries SET blocked_reason=$2, last_error_message=$2 WHERE workspace_id=$1 AND state='blocked' AND last_error_code=$3
+            AND ($4::boolean OR connection_id = ANY($5::uuid[]) OR brand_id = ANY($6::uuid[]) OR post_id = ANY($7::uuid[])) AND NOT (id = ANY($8::uuid[])) AND blocked_reason IS DISTINCT FROM $2 RETURNING id`,
+          [workspaceId, ps.msg.slice(0, 500), ENTITLEMENT_HOLD, ps.all, ps.conns, ps.brands, ps.posts, [...already]]);
+        for (const r of [...h.rows, ...upd.rows]) already.add(r.id);
       }
 
       // ---- queued replies

@@ -105,7 +105,7 @@ async function gate(db: Queryable, d: ClaimedDelivery): Promise<GateResult> {
   }
   // V4 entitlements (entitlements/holds.ts): plan/billing state re-checked at dispatch AND again in the send gate (this
   // function runs in both). Not allowed ⇒ HOLD with the reason; released when access returns (never dropped or resent).
-  const ent = await publishingHold(db, d.workspace_id, d.connection_id);
+  const ent = await publishingHold(db, d.workspace_id, d.connection_id, { brandId: d.brand_id, postId: d.post_id, dueAt: d.due_at });
   if (ent.held) return { ok: false, state: 'blocked', code: ENTITLEMENT_HOLD, message: ent.message };
   return { ok: true };
 }

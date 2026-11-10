@@ -25,7 +25,7 @@ const reason = z.string().trim().min(10, 'Give a reason (10+ characters)').max(5
 const iso = (d: Date | null | undefined) => d?.toISOString() ?? null;
 
 const listQuery = z.object({
-  status: z.enum(['trialing', 'active', 'payment_action_required', 'past_due', 'cancel_scheduled', 'cancelled', 'expired', 'incomplete', 'none', 'legacy', 'attention']).optional().nullable(),
+  status: z.enum(['free', 'trialing', 'active', 'payment_action_required', 'past_due', 'cancel_scheduled', 'cancelled', 'expired', 'incomplete', 'none', 'legacy', 'attention']).optional().nullable(),
   q: z.string().trim().max(80).optional().nullable(),
   limit: z.coerce.number().int().min(1).max(100).optional().nullable(),
 });
@@ -94,7 +94,7 @@ export async function platformBillingDetail(p: PlatformCtx, workspaceId: string,
     trial: red ? {
       started_at: red.started_at.toISOString(), ends_at: red.ends_at.toISOString(), original_ends_at: red.original_ends_at.toISOString(), extensions: red.extensions,
       redeemed_by: redeemer?.email ?? null, source: red.source,
-      eligible_for_extension: red.extensions < MAX_TRIAL_EXTENSIONS && !liveSub && ['trialing', 'expired'].includes(b.status),
+      eligible_for_extension: red.extensions < MAX_TRIAL_EXTENSIONS && !liveSub && ['trialing', 'expired', 'free'].includes(b.status),
     } : null,
     payment_issue: ['past_due', 'payment_action_required', 'incomplete'].includes(b.status) ? { since: iso(b.past_due_since), grace_ends_at: iso(b.grace_ends_at), action_required: b.payment_action_required } : null,
     invoices: invoices.map((i) => ({ ...invoiceDto(i), provider_url: sameProvider ? provider!.dashboardUrl('invoice', i.provider_invoice_ref) : null })),
@@ -228,7 +228,7 @@ export async function mapProviderPrice(p: PlatformCtx, raw: unknown) {
 export async function publishPlanVersion(p: PlatformCtx, raw: unknown) {
   requirePlatform(p, 'operator');
   requireFresh(p);
-  const input = z.object({ plan_id: z.enum(['standard', 'professional', 'legacy']), reason }).strict().parse(raw);
+  const input = z.object({ plan_id: z.enum(['free', 'standard', 'professional', 'legacy']), reason }).strict().parse(raw);
   return withTx(async (tx) => {
     const v = await publishVersionTx(tx, input.plan_id, p.actor.userId);
     await platformAudit(tx, p, { action: 'billing.plan_version_published', targetType: 'plan_version', targetId: v.id, reason: input.reason, diff: { plan: v.plan_id, version: v.version, unit_amount_minor: v.unit_amount_minor } });

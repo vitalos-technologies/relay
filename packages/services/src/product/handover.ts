@@ -32,7 +32,7 @@ export async function handoverExport(ctx: Ctx, brandId: string, raw: unknown, db
   const brand = await brandForPermission(ctx, brandId, 'exports.create', db);
   await enforceRateLimit('handoverExport', `${ctx.actor.userId}`, HANDOVER_RATE);
   const reservation = await reserveUsage({ workspaceId: ctx.access.workspaceId, meter: 'exports.count', amount: 1, userId: ctx.actor.userId,
-    ref: `export:handover:${brand.id}:${ctx.correlationId.slice(0, 40)}`, ttlSeconds: 600 });
+    ref: `export:handover:${brand.id}:${ctx.correlationId.slice(0, 40)}`, ttlSeconds: 600, planExempt: true }); // D33: data export always works
   try {
     const ws = ctx.access.workspaceId;
     const posts = await many<{ id: string; title: string | null; tags: string[]; draft: Record<string, unknown>; version: number; created_at: Date; updated_at: Date; archived_at: Date | null; created_by_email: string | null }>(db,

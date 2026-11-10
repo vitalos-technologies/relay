@@ -36,7 +36,7 @@ self-registration + email verification; Mailpit for email. No real campaigns, no
 | 2 | Signup, login, dashboard links reach the correct routes | same + "a signed-in visitor sees Open dashboard on / (no redirect) and reaches /overview"; integration `auth` (return paths) |
 | 3 | Relay branding and the supplied visual direction | E2E "§18.3–4 Relay branding and visual direction"; screenshots `evidence/v5/mkt/` |
 | 4 | No fabricated endorsements or outcomes | same E2E (no testimonials, ratings, customer logos or growth claims; hero captioned as illustrative) |
-| 5 | Exactly two public plans at £10 and £25 per user per month | E2E "§18.5–6"; unit `v4-plans` |
+| 5 | Exactly two public plans at £10 and £25 per user per month *(superseded by D33: three plans £0 / £5 / £15; marketing E2E now asserts those)* | E2E "§18.5–6"; unit `v4-plans` |
 | 6 | Genuine 14-day trial on both plans | E2E "new visitor: pricing → register → verify email → workspace → 14-day Professional trial → Billing"; V4 integration `v4-billing` |
 | 7 | Seat totals match across marketing handoff, checkout, billing and admin | integration `v5-marketing` (3 Standard = £30, 3 Professional = £75 across marketing, Billing, checkout, provider state, Platform admin) + the E2E above |
 | 8 | Trial expiry and plan changes don't reset trial eligibility | integration `v4-billing` (once per workspace; plan change/replay never extends) |

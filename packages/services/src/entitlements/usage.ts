@@ -15,6 +15,7 @@ import { BUDGET_METERS, customerCap, workspaceCap, type BudgetMeter } from '../p
 import { entitlementsCore, entitlementsCoreCached, meterRules, trialDaysLeft, type EntitlementsCore, type MeterKey } from './resolve.js';
 import { activeSplit, gaugeItems } from './gauges.js';
 import { AUTOMATION_HOLD_PREFIX, reevaluateHolds } from './holds.js';
+import { memberHold } from './actions.js';
 
 const allowed = (ctx: Ctx, perm: Parameters<typeof authorizeCtx>[1]) => {
   const r = authorizeCtx(ctx, perm);
@@ -71,7 +72,8 @@ export async function heldSummary(db: Queryable, core: EntitlementsCore): Promis
     return s.items.length - s.active.size;
   };
   return { scheduled_posts: r.posts, queued_replies: r.replies, sync_jobs: r.jobs, automation_runs_blocked_24h: r.runs,
-    held_social_accounts: await held('social_accounts'), held_listening_searches: await held('listening_searches') };
+    held_social_accounts: await held('social_accounts'), held_listening_searches: await held('listening_searches'),
+    held_brands: await held('brands'), held_members: await held('members') };
 }
 
 export async function overrideDtos(db: Queryable, workspaceId: string, opts: { history?: boolean } = {}): Promise<EntitlementOverrideDto[]> {
@@ -98,19 +100,22 @@ function reasonsFor(core: EntitlementsCore, allowances: AllowanceState[], held: 
   if (held.queued_replies) out.push(`${held.queued_replies} repl${held.queued_replies === 1 ? 'y is' : 'ies are'} held.`);
   if (held.held_social_accounts) out.push(`${held.held_social_accounts} social account${held.held_social_accounts === 1 ? ' is' : 's are'} over the plan limit.`);
   if (held.held_listening_searches) out.push(`${held.held_listening_searches} listening search${held.held_listening_searches === 1 ? ' is' : 'es are'} over the plan limit.`);
+  if (held.held_brands) out.push(`${held.held_brands} brand${held.held_brands === 1 ? ' is' : 's are'} over the plan limit (posts paused, nothing deleted).`);
+  if (held.held_members) out.push(`${held.held_members} ${held.held_members === 1 ? 'person has' : 'people have'} paused access (over the plan’s user limit).`);
   for (const a of allowances) if (a.status === 'exhausted' || a.status === 'over_limit') out.push(`${a.label}: limit reached.`);
   return out;
 }
 
 /** The full DTO. `detail` adds allowances, held work and overrides (billing/admin readers). */
-export async function buildEntitlementsDto(db: Queryable, core: EntitlementsCore, opts: { detail: boolean; canManage: boolean; history?: boolean }): Promise<EntitlementsDto> {
+export async function buildEntitlementsDto(db: Queryable, core: EntitlementsCore, opts: { detail: boolean; canManage: boolean; history?: boolean; userId?: string | null }): Promise<EntitlementsDto> {
   const b = core.billing;
   const allowances = opts.detail ? await allowanceStates(db, core) : [];
-  const held = opts.detail ? await heldSummary(db, core) : { scheduled_posts: 0, queued_replies: 0, sync_jobs: 0, automation_runs_blocked_24h: 0, held_social_accounts: 0, held_listening_searches: 0 };
+  const held = opts.detail ? await heldSummary(db, core) : { scheduled_posts: 0, queued_replies: 0, sync_jobs: 0, automation_runs_blocked_24h: 0, held_social_accounts: 0, held_listening_searches: 0, held_brands: 0, held_members: 0 };
+  const memberHoldReason = opts.userId ? await memberHold(db, core.workspaceId, opts.userId, core) : null;
   return {
     workspace_id: core.workspaceId,
     plan: core.plan ? { id: core.plan.id, name: core.plan.name, public: core.plan.public } : null,
-    status: b.status, access: core.access, access_reason: core.accessReason, trial: b.trial, period: core.period,
+    status: b.status, access: core.access, access_reason: core.accessReason, member_hold: memberHoldReason, trial: b.trial, period: core.period,
     features: core.features, allowances, overrides: opts.detail ? await overrideDtos(db, core.workspaceId, { history: opts.history }) : [], held,
     reasons: opts.detail ? reasonsFor(core, allowances, held) : core.accessReason ? [core.accessReason] : [],
     can_manage: opts.canManage, as_of: new Date().toISOString(),
@@ -124,7 +129,7 @@ export async function buildEntitlementsDto(db: Queryable, core: EntitlementsCore
 export async function workspaceEntitlements(ctx: Ctx, db: Queryable = getPool()): Promise<EntitlementsDto> {
   const detail = allowed(ctx, 'billing.read') || allowed(ctx, 'workspace.manage');
   const core = detail ? await entitlementsCore(db, ctx.access.workspaceId) : await entitlementsCoreCached(ctx.access.workspaceId, db);
-  return buildEntitlementsDto(db, core, { detail, canManage: allowed(ctx, 'billing.manage') });
+  return buildEntitlementsDto(db, core, { detail, canManage: allowed(ctx, 'billing.manage'), userId: ctx.actor.userId });
 }
 
 // ------------------------------------------------------------------ downgrade selections

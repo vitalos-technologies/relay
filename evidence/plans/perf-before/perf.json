@@ -1,0 +1,87 @@
+{
+  "base": "http://localhost:3000",
+  "at": "2026-11-10T05:03:22.276Z",
+  "conditions": "headless Chromium, cold cache per run; mobile = 390x844, DPR 2, CPU 4x, 150ms RTT, 1.6/0.75 Mbps",
+  "results": [
+    {
+      "path": "/",
+      "profile": "desktop",
+      "runs": 3,
+      "lcp_ms_median": 464,
+      "fcp_ms_median": 232,
+      "cls_max": 0,
+      "ttfb_ms_median": 35,
+      "html_kb": 57.4,
+      "js_files": 22,
+      "js_transfer_kb": 364.3,
+      "js_decoded_kb": 1130.2,
+      "css_kb": 20,
+      "fonts": [
+        "2bcd4b1f8f3a3e9f.p.woff2",
+        "3835a68e46c991a5-s.p.woff2",
+        "6c596dfcddeca1e9-s.p.woff2"
+      ],
+      "images": 0
+    },
+    {
+      "path": "/",
+      "profile": "mobile",
+      "runs": 3,
+      "lcp_ms_median": 1944,
+      "fcp_ms_median": 1156,
+      "cls_max": 0,
+      "ttfb_ms_median": 30,
+      "html_kb": 57.4,
+      "js_files": 22,
+      "js_transfer_kb": 364.3,
+      "js_decoded_kb": 1130.2,
+      "css_kb": 20,
+      "fonts": [
+        "2bcd4b1f8f3a3e9f.p.woff2",
+        "3835a68e46c991a5-s.p.woff2",
+        "6c596dfcddeca1e9-s.p.woff2"
+      ],
+      "images": 0
+    },
+    {
+      "path": "/login",
+      "profile": "desktop",
+      "runs": 3,
+      "lcp_ms_median": 88,
+      "fcp_ms_median": 88,
+      "cls_max": 0,
+      "ttfb_ms_median": 10,
+      "html_kb": 14.9,
+      "js_files": 18,
+      "js_transfer_kb": 294.9,
+      "js_decoded_kb": 919.8,
+      "css_kb": 18.8,
+      "fonts": [
+        "2bcd4b1f8f3a3e9f.p.woff2",
+        "3835a68e46c991a5-s.p.woff2",
+        "6c596dfcddeca1e9-s.p.woff2"
+      ],
+      "images": 0
+    },
+    {
+      "path": "/login",
+      "profile": "mobile",
+      "runs": 3,
+      "lcp_ms_median": 932,
+      "fcp_ms_median": 932,
+      "cls_max": 0,
+      "ttfb_ms_median": 11,
+      "html_kb": 14.9,
+      "js_files": 18,
+      "js_transfer_kb": 294.9,
+      "js_decoded_kb": 919.8,
+      "css_kb": 18.8,
+      "fonts": [
+        "2bcd4b1f8f3a3e9f.p.woff2",
+        "3835a68e46c991a5-s.p.woff2",
+        "6c596dfcddeca1e9-s.p.woff2"
+      ],
+      "images": 0
+    }
+  ]
+}

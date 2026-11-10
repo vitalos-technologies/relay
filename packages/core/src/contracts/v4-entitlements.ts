@@ -2,7 +2,8 @@
 // One shared entitlement service (packages/services/src/entitlements) answers "may this workspace do X now, and how much
 // is left" for the app, admin, API routes, workers, MCP, AI actions and integrations. Billing facts come only from
 // BillingState (v4-billing.ts); plan features/allowances from v4-plans.ts; platform overrides are audited.
-import type { AccessLevel, Allowance, Feature, PlanId, SubscriptionStatus } from './v4-plans.js';
+import type { AccessLevel, Allowance, Feature, PlanId } from './v4-plans.js';
+import type { BillingStatusValue } from './v4-billing.js';
 
 /** Error code returned by API/MCP when an entitlement blocks an action (HTTP 402). */
 export const ENTITLEMENT_ERROR = 'entitlement_required' as const;
@@ -38,7 +39,7 @@ export type PaidAction = (typeof PAID_ACTIONS)[number];
 export const ALWAYS_ALLOWED = ['read', 'billing', 'support', 'export', 'drafts', 'approvals_record', 'team'] as const;
 
 /** Budget meter behind each allowance (usage counters); `gauge` = counted live from resources (no period). */
-export const ALLOWANCE_METER: Record<Allowance, 'ai.tokens' | 'storage.bytes' | 'exports.count' | 'x.write' | 'x.read' | 'integration.jobs' | 'mcp.calls' | 'gauge'> = {
+export const ALLOWANCE_METER: Record<Allowance, 'ai.tokens' | 'storage.bytes' | 'exports.count' | 'x.write' | 'x.read' | 'integration.jobs' | 'mcp.calls' | 'posts.scheduled' | 'gauge'> = {
   ai_tokens: 'ai.tokens',
   storage_bytes: 'storage.bytes',
   exports: 'exports.count',
@@ -48,9 +49,13 @@ export const ALLOWANCE_METER: Record<Allowance, 'ai.tokens' | 'storage.bytes' | 
   mcp_calls: 'mcp.calls',
   listening_searches: 'gauge',
   social_accounts: 'gauge',
+  // D33: posts scheduled or published now, counted once per post per calendar month of publication (Free only today).
+  scheduled_posts: 'posts.scheduled',
+  brands: 'gauge',
+  members: 'gauge',
 };
 
-export const ALLOWANCE_LABEL: Record<Allowance, { label: string; unit: 'tokens' | 'bytes' | 'exports' | 'calls' | 'searches' | 'accounts' | 'jobs' }> = {
+export const ALLOWANCE_LABEL: Record<Allowance, { label: string; unit: 'tokens' | 'bytes' | 'exports' | 'calls' | 'searches' | 'accounts' | 'jobs' | 'posts' | 'brands' | 'members' }> = {
   ai_tokens: { label: 'AI tokens', unit: 'tokens' },
   storage_bytes: { label: 'Media storage', unit: 'bytes' },
   exports: { label: 'Exports', unit: 'exports' },
@@ -60,10 +65,17 @@ export const ALLOWANCE_LABEL: Record<Allowance, { label: string; unit: 'tokens' 
   social_accounts: { label: 'Connected social accounts', unit: 'accounts' },
   integration_jobs: { label: 'Integration sync jobs', unit: 'jobs' },
   mcp_calls: { label: 'MCP tool calls', unit: 'calls' },
+  scheduled_posts: { label: 'Scheduled posts', unit: 'posts' },
+  brands: { label: 'Brands', unit: 'brands' },
+  members: { label: 'Users', unit: 'members' },
 };
 
-/** Allowances where a lowered limit lets the customer choose which resources stay active (nothing deleted/disconnected). */
-export const SELECTABLE_ALLOWANCES = ['social_accounts', 'listening_searches'] as const;
+/**
+ * Allowances where a lowered limit lets the customer choose which resources stay active (nothing deleted/disconnected).
+ * members: owners always stay active; other people over the limit keep their account but lose product access (billing,
+ * support and export stay reachable) until the plan allows them or they are removed.
+ */
+export const SELECTABLE_ALLOWANCES = ['social_accounts', 'listening_searches', 'brands', 'members'] as const;
 export type SelectableAllowance = (typeof SELECTABLE_ALLOWANCES)[number];
 
 /** Warning threshold (percent of the effective limit) shown in UI and notified once per period. */
@@ -121,6 +133,8 @@ export interface HeldWorkSummary {
   automation_runs_blocked_24h: number;
   held_social_accounts: number;
   held_listening_searches: number;
+  held_brands: number;
+  held_members: number;
 }
 
 export interface PeriodInfo {
@@ -135,9 +149,14 @@ export interface PeriodInfo {
 export interface EntitlementsDto {
   workspace_id: string;
   plan: { id: PlanId; name: string; public: boolean } | null;
-  status: SubscriptionStatus | 'none' | 'legacy';
+  status: BillingStatusValue;
   access: AccessLevel;
   access_reason: string | null;
+  /**
+   * The CALLER is over the plan's user limit (e.g. a teammate on a Free workspace): product access is paused for them
+   * until the owner upgrades or removes them; billing, support and export stay available. null when not held.
+   */
+  member_hold: string | null;
   trial: { started_at: string; ends_at: string; plan_id: PlanId } | null;
   period: PeriodInfo;
   features: Record<Feature, FeatureState>;

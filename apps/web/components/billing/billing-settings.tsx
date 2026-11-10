@@ -85,7 +85,8 @@ export function BillingSettings() {
           <Button size="sm" variant="ghost" icon={<RefreshCw aria-hidden className={cn('size-4', syncing && 'animate-spin')} />} onClick={() => void refresh(false)} loading={false} disabled={syncing}>Refresh</Button>
         ) : null}
       </div>
-      {welcome ? <Banner tone="success" title="Your 14-day free trial has started">No card needed. Choose a plan any time before {day(d.trial?.ends_at)}.</Banner> : null}
+      {welcome && d.state.status === 'trialing' ? <Banner tone="success" title="Your 14-day free trial has started">No card needed. Choose a plan any time before {day(d.trial?.ends_at)}.</Banner> : null}
+      {welcome && d.state.plan_id === 'free' ? <Banner tone="success" title="You’re on Free">No card needed. Upgrade any time.</Banner> : null}
       {confirming ? (
         <Banner tone="info" icon={<Spinner label="Confirming" />} title="Confirming with the payment provider…">Your plan updates once payment is confirmed.</Banner>
       ) : returned === 'returned' && !d.payment_method ? (
@@ -93,6 +94,7 @@ export function BillingSettings() {
       ) : null}
       {returned === 'cancelled' ? <Banner tone="neutral" title="Checkout cancelled">Nothing was charged.</Banner> : null}
       <AccessBanner d={d} onPortal={() => void openPortal('payment_method_update')} />
+      {d.state.plan_id === 'free' && d.state.access === 'full' ? <FreeBanner d={d} /> : null}
       <PlanCard d={d} onChanged={refetch} />
       {showPlans ? <ChoosePlan d={d} onChanged={refetch} /> : null}
       <SeatsCard d={d} />
@@ -107,6 +109,18 @@ export function BillingSettings() {
       window.location.assign(r.url);
     } catch (e) { toast.error((e as Error).message); }
   }
+}
+
+/** D33: on Free. After a trial or subscription ended, say what happened to over-limit items (paused, never deleted). */
+function FreeBanner({ d }: { d: BillingOverviewDto }) {
+  const ended = d.trial_used || d.invoices.length > 0;
+  if (!ended && d.state.status !== 'incomplete') return null;
+  return (
+    <Banner tone="info" title="You’re on Free"
+      actions={d.can_manage ? <Button size="sm" variant="primary" onClick={() => document.getElementById('choose-plan')?.scrollIntoView({ behavior: 'smooth' })}>Upgrade</Button> : null}>
+      Anything over Free’s limits is paused, never deleted. Your data export always works. <Link href="/admin/usage" className="font-medium underline">See what’s paused</Link>
+    </Banner>
+  );
 }
 
 function AccessBanner({ d, onPortal }: { d: BillingOverviewDto; onPortal: () => void }) {
@@ -140,10 +154,12 @@ function PlanCard({ d, onChanged }: { d: BillingOverviewDto; onChanged: () => un
   if (d.first_charge_at) facts.push(['First charge', day(d.first_charge_at)]);
   else if (d.next_charge_at) facts.push(['Renews', day(d.next_charge_at)]);
   if (s.cancel_at) facts.push(['Service ends', day(s.cancel_at)]);
-  if (d.plan && d.plan.id !== 'legacy') facts.push(['Seats', <span key="seats">{seatsLabel(d.seats.paid || d.seats.billable)} · {usersLabel(d.seats.billable)}</span>]);
-  if (d.recurring_total_minor != null) facts.push(['Monthly total', <span key="m" className="tabular">{money(d.recurring_total_minor)} <span className="text-muted">excl. any tax shown at checkout</span></span>]);
+  const onFree = d.plan?.id === 'free';
+  if (onFree) facts.push(['Users', <span key="users">{usersLabel(d.seats.billable)} · Free includes 1</span>]);
+  else if (d.plan && d.plan.id !== 'legacy') facts.push(['Seats', <span key="seats">{seatsLabel(d.seats.paid || d.seats.billable)} · {usersLabel(d.seats.billable)}</span>]);
+  if (d.recurring_total_minor != null && !onFree) facts.push(['Monthly total', <span key="m" className="tabular">{money(d.recurring_total_minor)} <span className="text-muted">excl. any tax shown at checkout</span></span>]);
   if (d.scheduled_change) facts.push(['Scheduled', <span key="sc">{[d.scheduled_change.plan_name, d.scheduled_change.seats ? seatsLabel(d.scheduled_change.seats) : null].filter(Boolean).join(' · ')} from {day(d.scheduled_change.effective_at)}</span>]);
-  facts.push(['Payment method', pm ? <span key="pm" className="inline-flex items-center gap-1.5"><CreditCard aria-hidden className="size-4 text-muted" />{pm.brand} •••• {pm.last4}{pm.exp_month ? ` · ${String(pm.exp_month).padStart(2, '0')}/${String(pm.exp_year).slice(-2)}` : ''}</span> : <span className="text-muted">{s.status === 'trialing' && !d.first_charge_at ? 'Not needed for the trial' : 'None'}</span>]);
+  if (!onFree || pm) facts.push(['Payment method', pm ? <span key="pm" className="inline-flex items-center gap-1.5"><CreditCard aria-hidden className="size-4 text-muted" />{pm.brand} •••• {pm.last4}{pm.exp_month ? ` · ${String(pm.exp_month).padStart(2, '0')}/${String(pm.exp_year).slice(-2)}` : ''}</span> : <span className="text-muted">{s.status === 'trialing' && !d.first_charge_at ? 'Not needed for the trial' : 'None'}</span>]);
 
   const portal = async (flow: 'payment_method_update' | null) => {
     try { window.location.assign((await api.post<{ url: string }>('/api/billing/portal', { flow })).url); } catch (e) { toast.error((e as Error).message); }
@@ -154,7 +170,8 @@ function PlanCard({ d, onChanged }: { d: BillingOverviewDto; onChanged: () => un
       <div className="flex flex-col gap-4 px-4 pb-4">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <p className="text-[22px] font-semibold tracking-[-0.01em]">{d.plan?.name ?? 'No plan'}</p>
-          {d.plan?.unit_amount_minor != null ? <p className="text-sm text-muted tabular">{money(d.plan.unit_amount_minor)} per user / month</p> : null}
+          {d.plan?.unit_amount_minor ? <p className="text-sm text-muted tabular">{money(d.plan.unit_amount_minor)} per user / month</p> : null}
+          {d.plan?.id === 'free' ? <p className="text-sm text-muted tabular">£0 · no card, no invoices</p> : null}
           {d.plan?.id === 'legacy' ? <p className="text-sm text-muted">Your existing access, unchanged</p> : null}
         </div>
         <Facts items={facts} />
@@ -164,17 +181,17 @@ function PlanCard({ d, onChanged }: { d: BillingOverviewDto; onChanged: () => un
             {d.actions.portal ? <Button className="w-full sm:w-auto" icon={<CreditCard aria-hidden className="size-4" />} onClick={() => void portal('payment_method_update')}>Update payment details</Button> : null}
             {d.actions.reactivate ? <Button variant="primary" className="w-full sm:w-auto" onClick={async () => { try { await api.post('/api/billing/reactivate', {}); toast.success('Renewal resumed'); await onChanged(); } catch (e) { toast.error((e as Error).message); } }}>Resume renewal</Button> : null}
             {d.scheduled_change && d.actions.change_subscription ? <Button variant="ghost" className="w-full sm:w-auto" onClick={async () => { try { await api.del('/api/billing/change'); toast.success('Scheduled change removed'); await onChanged(); } catch (e) { toast.error((e as Error).message); } }}>Keep current plan</Button> : null}
-            {d.actions.cancel ? <Button variant="ghost" className="w-full sm:w-auto sm:ml-auto" onClick={() => setCancel(true)}>Cancel renewal</Button> : null}
+            {d.actions.cancel ? <Button variant="ghost" className="w-full sm:w-auto sm:ml-auto" onClick={() => setCancel(true)}>Downgrade to Free</Button> : null}
           </div>
         ) : <ManageHint />}
       </div>
       {change ? <ChangeDialog d={d} onClose={() => setChange(false)} onDone={onChanged} /> : null}
-      <ConfirmDialog open={cancel} onOpenChange={setCancel} title="Cancel renewal?" confirmLabel="Cancel renewal" confirmVariant="danger"
-        onConfirm={async () => { await api.post('/api/billing/cancel', {}); toast.success('Renewal cancelled'); await onChanged(); }}>
+      <ConfirmDialog open={cancel} onOpenChange={setCancel} title="Downgrade to Free?" confirmLabel="Downgrade at period end" confirmVariant="danger"
+        onConfirm={async () => { await api.post('/api/billing/cancel', {}); toast.success('Renewal cancelled. You move to Free at the end of the period.'); await onChanged(); }}>
         <ul className="list-disc space-y-1 pl-5 text-[13px]">
           <li>Your plan stays active until {day(d.next_charge_at ?? d.state.current_period?.end)}. No further charges.</li>
-          <li>After that, publishing, AI and other paid actions pause. Scheduled posts are held, not deleted.</li>
-          <li>Your content, settings and exports are kept. You can resume or resubscribe any time.</li>
+          <li>Then the workspace moves to Free. Anything over Free’s limits is paused, never deleted.</li>
+          <li>Your content, settings and data export are kept. You can resume or upgrade any time.</li>
         </ul>
       </ConfirmDialog>
     </Card>
@@ -202,10 +219,12 @@ function ChoosePlan({ d, onChanged }: { d: BillingOverviewDto; onChanged: () => 
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<unknown>(null);
   const trialRunning = d.state.status === 'trialing' && !!d.trial && d.trial.days_left > 0;
-  const go = async (plan: PlanId) => {
-    setBusy(plan); setErr(null);
+  const paid = d.catalogue.filter((p) => p.unit_amount_minor > 0); // Free is never bought
+  const onFree = d.state.plan_id === 'free';
+  const go = async (plan: PlanId, viaCheckout = false) => {
+    setBusy(viaCheckout ? `checkout-${plan}` : plan); setErr(null);
     try {
-      if (d.actions.start_trial) {
+      if (d.actions.start_trial && !viaCheckout) {
         await api.post('/api/billing/trial', { plan });
         toast.success('Free trial started'); await onChanged(); setBusy(null);
         return;
@@ -221,12 +240,13 @@ function ChoosePlan({ d, onChanged }: { d: BillingOverviewDto; onChanged: () => 
   return (
     <section id="choose-plan" aria-labelledby="choose-plan-h" className="flex flex-col gap-3" data-testid="billing-choose">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <h2 id="choose-plan-h" className="text-[14px] font-semibold">{d.actions.start_trial ? 'Start your free trial' : trialRunning ? 'Subscribe' : 'Choose a plan'}</h2>
+        <h2 id="choose-plan-h" className="text-[14px] font-semibold">{onFree ? 'Upgrade' : d.actions.start_trial ? 'Start your free trial' : trialRunning ? 'Subscribe' : 'Choose a plan'}</h2>
         {!d.actions.start_trial ? <SeatStepper value={seats} min={minSeats} onChange={setSeats} /> : null}
       </div>
       {trialRunning && !d.actions.start_trial ? <p className="text-[13px] text-muted">You keep your free trial: the first charge is on {day(d.trial!.ends_at)}.</p> : null}
+      {onFree && !d.actions.start_trial && d.upgrade_trial_days === 0 ? <p className="text-[13px] text-muted">Your free trial has been used, so checkout starts the paid plan straight away.</p> : null}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {d.catalogue.map((p) => {
+        {paid.map((p) => {
           const current = d.plan?.id === p.id;
           const total = p.unit_amount_minor * seats;
           return (
@@ -246,6 +266,7 @@ function ChoosePlan({ d, onChanged }: { d: BillingOverviewDto; onChanged: () => 
                   disabledReason={!d.actions.start_trial && !d.actions.checkout ? 'Payments are not set up yet' : null} onClick={() => void go(p.id as PlanId)}>
                   {d.actions.start_trial ? 'Start free trial' : 'Continue to checkout'}
                 </Button>
+                {d.actions.start_trial && d.actions.checkout ? <Button variant="ghost" size="sm" loading={busy === `checkout-${p.id}`} disabled={!!busy} onClick={() => void go(p.id as PlanId, true)}>Subscribe now</Button> : null}
                 {d.actions.change_trial_plan && !current ? <Button variant="ghost" size="sm" loading={busy === `trial-${p.id}`} disabled={!!busy} onClick={() => void switchTrial(p.id as PlanId)}>Switch trial to {p.name}</Button> : null}
               </div>
             </Card>
@@ -293,7 +314,7 @@ function ChangeDialog({ d, onClose, onDone }: { d: BillingOverviewDto; onClose: 
         {preview?.kind === 'scheduled' ? 'Schedule change' : 'Confirm change'}</Button></>}>
       <div className="flex flex-col gap-4">
         <div role="radiogroup" aria-label="Plan" className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {d.catalogue.map((p) => (
+          {d.catalogue.filter((p) => p.unit_amount_minor > 0).map((p) => (
             <button key={p.id} type="button" role="radio" aria-checked={plan === p.id} onClick={() => setPlan(p.id as PlanId)}
               className={cn('touch-target flex flex-col items-start rounded-lg border px-3 py-2 text-left', plan === p.id ? 'border-accent bg-accent-soft' : 'border-border hover:bg-raised')}>
               <span className="text-sm font-medium">{p.name}</span><span className="text-xs text-muted tabular">{money(p.unit_amount_minor)} per user / month</span>
@@ -334,6 +355,7 @@ function SeatsCard({ d }: { d: BillingOverviewDto }) {
           ...(s.pending_member_invites ? [['Pending invitations', <span key="p" className="tabular">{s.pending_member_invites}</span>] as [string, ReactNode]] : []),
           ...(s.support_operators ? [['Relay support (not billed)', <span key="o" className="tabular">{s.support_operators}</span>] as [string, ReactNode]] : []),
         ]} />
+        {d.state.plan_id === 'free' ? <p className="mt-3 text-xs text-muted">Free includes 1 user. Upgrade to add teammates.</p> : null}
         {d.state.status !== 'legacy' && s.paid > 0 && s.paid < s.billable + s.pending_member_invites ? (
           <p className="mt-3 text-xs text-muted">All paid seats are in use. Add seats with “Change plan or seats” before inviting more people.</p>
         ) : null}
@@ -343,6 +365,7 @@ function SeatsCard({ d }: { d: BillingOverviewDto }) {
 }
 
 function InvoicesCard({ d }: { d: BillingOverviewDto }) {
+  if (d.state.plan_id === 'free' && !d.invoices.length) return null; // Free: nothing is ever invoiced
   return (
     <Card>
       <CardHeader title={<span className="inline-flex items-center gap-2"><Receipt aria-hidden className="size-4 text-muted" />Invoices</span>} />
@@ -369,7 +392,8 @@ const fmtUnit = (unit: string, n: number) => unit === 'bytes' ? `${(n / 1024 ** 
 /** Usage and limits summary from the shared entitlement service (ENT). Hidden when unavailable. */
 function UsageCard() {
   const { data } = useApi<EntitlementsDto>('/api/entitlements');
-  const metered = (data?.allowances ?? []).filter((a) => a.hard_limit != null).slice(0, 6);
+  // Allowances the plan doesn't include at all (limit 0, nothing used — e.g. X API on Free) are noise here.
+  const metered = (data?.allowances ?? []).filter((a) => a.hard_limit != null && !(a.hard_limit === 0 && a.used === 0)).slice(0, 6);
   if (!data || !metered.length) return null;
   return (
     <Card>

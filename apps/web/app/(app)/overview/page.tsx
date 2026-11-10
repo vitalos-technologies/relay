@@ -17,6 +17,7 @@ import { useBrandFilter, useHrefWithBrand } from '@/lib/client/hooks';
 import { connectionFix } from '@/lib/client/connection-fix';
 import { fmtTime, localDateKey, postTitle, zoneAbbr } from '@/lib/client/format';
 import type { ApprovalSummary, Dashboard, Delivery, PlannerItem, PostDetail } from '@/lib/client/types';
+import { useEntitlements } from '@/components/entitlements/use-entitlements';
 import {
   Badge, Banner, buttonClass, Card, CardHeader, ConnectionStatusBadge, ContentCard, CoverageMeter, DeliveryStateBadge, EmptyState, ErrorState, fmtMetric,
   LineChart, LinkButton, MetricCard, PageHeader, PlatformIcon, PostStatusBadge, SimulatedBadge, Skeleton, SkeletonRows, Thumb, useToast,
@@ -47,6 +48,9 @@ export default function OverviewPage() {
   const approvals = useApi<{ items: ApprovalSummary[]; next_cursor?: string | null }>('/api/approvals?status=pending', { poll: 60_000 });
   const [drawer, setDrawer] = useState<PlannerItem | null>(null);
   const [showAllHealth, setShowAllHealth] = useState(false);
+  // D33: Free has no analytics — skip the performance card instead of showing an error.
+  const ent = useEntitlements();
+  const analyticsInPlan = !!ent.data && ent.check('analytics_standard').ok;
   const brandName = (id: string) => session.brands.find((b) => b.id === id)?.name ?? 'Unknown brand';
   const noBrands = session.brands.length === 0;
 
@@ -130,7 +134,7 @@ export default function OverviewPage() {
                 </div>
               </Card>
 
-              {canV2('analytics.read') ? <PerformanceSummary brand={brand} demo={!!session.workspace?.is_demo} /> : null}
+              {canV2('analytics.read') && analyticsInPlan ? <PerformanceSummary brand={brand} demo={!!session.workspace?.is_demo} /> : null}
             </div>
 
             <div className="flex min-w-0 flex-col gap-6">

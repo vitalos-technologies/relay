@@ -4,9 +4,11 @@
 // events converge on the provider's current truth.
 import type { BillingEvent } from '@social-lite/core/contracts/v4-billing';
 import type { PaymentMethodSummary, ProviderInvoice, ProviderSubscription } from '@social-lite/providers/stripe/types';
+import type { PlanId } from '@social-lite/core/contracts/v4-plans';
 import { maybeOne, type Queryable } from '@social-lite/db';
 import { log } from '../log.js';
-import { versionByPriceRef } from './catalogue.js';
+import { currentVersion, versionByPriceRef } from './catalogue.js';
+import { freeRow } from './free.js';
 import { PAST_DUE_GRACE_DAYS, deriveStatus, type BillingStatus } from './policy.js';
 import { lockBilling, saveBilling, type BillingRow, type LifecycleEntry } from './store.js';
 
@@ -24,7 +26,7 @@ function eventsFor(prev: BillingRow, next: BillingRow, hadSub: boolean): Billing
   if ((b === 'past_due' || b === 'payment_action_required') && a !== 'past_due' && a !== 'payment_action_required') out.push('billing.payment_failed');
   if ((a === 'past_due' || a === 'payment_action_required') && (b === 'active' || b === 'cancel_scheduled')) out.push('billing.payment_recovered');
   if (b === 'cancel_scheduled' && a !== 'cancel_scheduled') out.push('billing.cancellation_scheduled');
-  if ((b === 'cancelled' || b === 'expired') && (PAID_STATES.includes(a) || (a === 'trialing' && hadSub))) out.push('billing.subscription_ended');
+  if ((b === 'cancelled' || b === 'expired' || b === 'free') && (PAID_STATES.includes(a) || (a === 'trialing' && hadSub))) out.push('billing.subscription_ended');
   if (prev.plan_version_id !== next.plan_version_id || prev.seats !== next.seats || prev.scheduled_effective_at?.getTime() !== next.scheduled_effective_at?.getTime()
       || (a === 'cancel_scheduled' && b !== 'cancel_scheduled' && b !== 'cancelled')) out.push('billing.subscription_changed');
   return [...new Set(out)];
@@ -60,7 +62,21 @@ export async function applySubscription(tx: Queryable, workspaceId: string, sub:
   const hadSub = !!prev.provider_subscription_ref && !!prev.provider_status && LIVE.includes(prev.provider_status);
   const version = sub.price_ref ? await versionByPriceRef(tx, p.provider, sub.price_ref) : null;
   if (!version) log.warn('billing_unknown_price', { workspaceId, price: sub.price_ref });
-  const trial = prev.trial_started_at && prev.trial_ends_at ? { started_at: prev.trial_started_at, ends_at: prev.trial_ends_at } : null;
+  // D33: an upgrade checkout from Free that included the workspace's one trial — record the redemption when the
+  // provider confirms the trialing subscription (once per workspace, PK), so the trial can never be used twice. An
+  // abandoned checkout records nothing.
+  let providerTrial: { start: Date; end: Date; plan: PlanId } | null = null;
+  if (!prev.trial_started_at && version && sub.trial_start && sub.trial_end && sub.trial_end.getTime() > sub.trial_start.getTime() && LIVE.includes(sub.status)) {
+    const t0 = new Date(Math.floor(sub.trial_start.getTime() / 1000) * 1000);
+    const red = await tx.query(
+      `INSERT INTO billing_trial_redemptions(workspace_id, plan_id, plan_version_id, redeemed_by, source, started_at, ends_at, original_ends_at)
+       SELECT $1, $2, $3, (SELECT created_by FROM billing_checkout_sessions WHERE workspace_id=$1 AND provider_subscription_ref=$5 ORDER BY created_at DESC LIMIT 1), 'settings', $4, $6, $6
+       ON CONFLICT (workspace_id) DO NOTHING`,
+      [workspaceId, version.plan_id, version.id, t0, sub.ref, sub.trial_end]);
+    if (red.rowCount) providerTrial = { start: t0, end: sub.trial_end, plan: version.plan_id };
+  }
+  const trial = prev.trial_started_at && prev.trial_ends_at ? { started_at: prev.trial_started_at, ends_at: prev.trial_ends_at }
+    : providerTrial ? { started_at: providerTrial.start, ends_at: providerTrial.end } : null;
   const status = deriveStatus({ sub, trial, actionRequired: prev.payment_action_required && sub.status !== 'trialing', now });
   const next: BillingRow = { ...prev };
   Object.assign(next, {
@@ -71,6 +87,7 @@ export async function applySubscription(tx: Queryable, workspaceId: string, sub:
     cancelled_at: sub.canceled_at, ended_at: sub.ended_at, provider_synced_at: now,
   });
   if (!LIVE.includes(sub.status)) next.payment_action_required = false;
+  if (providerTrial) Object.assign(next, { trial_started_at: providerTrial.start, trial_ends_at: providerTrial.end, trial_plan_id: providerTrial.plan });
   // Plan + seats. A pending scheduled change (downgrade / seat reduction) keeps the CURRENT entitlements until its
   // effective instant even though the provider already carries the new price/quantity (proration_behavior=none).
   const target = { versionId: version?.id ?? prev.plan_version_id, planId: version?.plan_id ?? prev.plan_id, seats: sub.quantity };
@@ -94,7 +111,11 @@ export async function applySubscription(tx: Queryable, workspaceId: string, sub:
     next.grace_ends_at = null;
   }
   if (p.paymentMethod !== undefined) next.payment_method = p.paymentMethod;
-  const saved = await saveBilling(tx, prev, next, p.entry, eventsFor(prev, next, hadSub));
+  // D33: an ended subscription (cancelled, or a trial the provider ended without payment) lands on Free — no provider
+  // charge, nothing deleted; the provider references stay as history so a later checkout reuses the customer.
+  const ended = status === 'cancelled' || (status === 'expired' && !LIVE.includes(sub.status));
+  const finalRow = ended ? freeRow(next, (await currentVersion(tx, 'free')).id) : next;
+  const saved = await saveBilling(tx, prev, finalRow, p.entry, eventsFor(prev, finalRow, hadSub));
   return { row: saved.row, changed: true };
 }
 

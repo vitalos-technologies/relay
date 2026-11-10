@@ -5,7 +5,7 @@ import type { BillingEvent } from '@social-lite/core/contracts/v4-billing';
 import type { PlanId } from '@social-lite/core/contracts/v4-plans';
 import { writeOutbox } from '../outbox.js';
 import { log } from '../log.js';
-import { deriveAccess, isDocumentedTransition, type BillingStatus } from './policy.js';
+import { deriveAccess, isDocumentedTransition, liveProviderSubscription, type BillingStatus } from './policy.js';
 
 export interface BillingRow {
   workspace_id: string;
@@ -103,7 +103,8 @@ const same = (a: unknown, b: unknown) => (a instanceof Date || b instanceof Date
  */
 export async function saveBilling(tx: Queryable, prev: BillingRow, next: BillingRow, entry: LifecycleEntry, events: BillingEvent[] = []): Promise<{ row: BillingRow; accessChanged: boolean }> {
   const suspended = await serviceSuspended(tx, prev.workspace_id);
-  const { access, reason } = deriveAccess({ status: next.status, serviceSuspended: suspended, graceEndsAt: next.grace_ends_at, trialEndsAt: next.trial_ends_at, cancelAt: next.cancel_at, now: new Date() });
+  const { access, reason } = deriveAccess({ status: next.status, serviceSuspended: suspended, graceEndsAt: next.grace_ends_at, trialEndsAt: next.trial_ends_at, cancelAt: next.cancel_at, now: new Date(),
+    liveSubscription: liveProviderSubscription(next) });
   const changed = COLUMNS.filter((c) => !same(prev[c], next[c]));
   const accessChanged = access !== prev.access_level || reason !== prev.access_reason;
   if (changed.length || accessChanged) {

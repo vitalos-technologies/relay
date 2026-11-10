@@ -14,6 +14,7 @@ import type { BillingState } from '@social-lite/core/contracts/v4-billing';
 import {
   ALLOWANCE_METER, FEATURE_LABEL, type AllowanceSource, type BlockReason, type EntitlementErrorDetails, type FeatureState, type PeriodInfo,
 } from '@social-lite/core/contracts/v4-entitlements';
+import { featureUpgradeMessage } from '@social-lite/core/contracts/plan-copy';
 import { getPool, many, type Queryable } from '@social-lite/db';
 import { billingStateFor } from './source.js';
 
@@ -155,8 +156,9 @@ export function invalidateEntitlements(workspaceId?: string): void {
 // ------------------------------------------------------------------ checks
 export type Check = { ok: true } | { ok: false; reason: BlockReason; message: string; details: EntitlementErrorDetails };
 
+/** Smallest PAID public plan that includes the feature (Free is never an upgrade target). */
 export function upgradeTarget(feature: Feature): PlanId | null {
-  return PUBLIC_PLAN_IDS.find((id) => PLANS[id].features.includes(feature)) ?? null;
+  return PUBLIC_PLAN_IDS.find((id) => (PLANS[id].unit_amount_minor ?? 0) > 0 && PLANS[id].features.includes(feature)) ?? null;
 }
 
 /**
@@ -175,7 +177,7 @@ export function checkFeature(core: EntitlementsCore, feature: Feature, opts: { p
     }
     const to = upgradeTarget(feature);
     const message = f.source === 'override' ? `${FEATURE_LABEL[feature]} is turned off for this workspace by Relay.`
-      : `${FEATURE_LABEL[feature]} isn’t included in ${core.plan?.name ?? 'your plan'}.${to ? ` It’s part of ${PLANS[to].name}.` : ''}`;
+      : featureUpgradeMessage(FEATURE_LABEL[feature], core.plan?.name, to);
     return { ok: false, reason: 'feature_not_in_plan', message, details: { reason: 'feature_not_in_plan', feature, upgrade_to: to } };
   }
   if (opts.paid && core.access === 'restricted') {
@@ -202,7 +204,7 @@ export async function requireEntitlement(db: Queryable, workspaceId: string, fea
 }
 
 // ------------------------------------------------------------------ budget meters (used by product/budgets.ts)
-export type MeterKey = 'ai.tokens' | 'x.write' | 'x.read' | 'storage.bytes' | 'exports.count' | 'mcp.calls' | 'integration.jobs';
+export type MeterKey = 'ai.tokens' | 'x.write' | 'x.read' | 'storage.bytes' | 'exports.count' | 'mcp.calls' | 'integration.jobs' | 'posts.scheduled';
 
 /** Which entitlement guards consumption of a meter. exports and X reads are never held by access (§13). */
 export const METER_GATE: Record<MeterKey, { feature: Feature; paid: boolean } | null> = {
@@ -212,6 +214,7 @@ export const METER_GATE: Record<MeterKey, { feature: Feature; paid: boolean } | 
   'integration.jobs': { feature: 'integrations_business', paid: true },
   'mcp.calls': { feature: 'mcp', paid: false },
   'exports.count': null,
+  'posts.scheduled': { feature: 'publishing', paid: false }, // D33: counted when a post is scheduled / published now
   'x.read': null, // reconciliation of in-flight publications must continue whatever the billing state
 };
 

@@ -5,6 +5,8 @@ import { ALLOWANCES, FEATURES, PLANS } from '@social-lite/core/contracts/v4-plan
 import { ALLOWANCE_METER, FEATURE_LABEL } from '@social-lite/core/contracts/v4-entitlements';
 import { checkFeature, deriveEntitlements, meterRules, periodOf, upgradeTarget, type OverrideRow } from '@social-lite/services/entitlements/resolve';
 import { workspaceCap } from '@social-lite/services/product/budgets';
+import { routeFeature } from '@social-lite/services/entitlements/routes';
+import { postMonth } from '@social-lite/services/entitlements/actions';
 
 const NOW = new Date('2026-11-08T12:00:00Z');
 const base = (p: Partial<BillingState> = {}): BillingState => ({
@@ -84,5 +86,33 @@ describe('derivation', () => {
     const c = deriveEntitlements(base({ plan_id: null, status: 'none' }), [], NOW);
     expect(c.access).toBe('restricted');
     expect(checkFeature(c, 'publishing', { paid: false })).toMatchObject({ ok: false, reason: 'no_plan' });
+  });
+
+  it('D33 Free: Free limits and features; upgrade prompts name Standard with its price; calendar-month period', () => {
+    const f = deriveEntitlements(base({ plan_id: 'free', status: 'free', seats: 0, current_period: null }), [], NOW);
+    expect(f.access).toBe('full');
+    expect([f.limits.members.limit, f.limits.brands.limit, f.limits.social_accounts.limit, f.limits.scheduled_posts.limit, f.limits.ai_tokens.limit, f.limits.exports.limit])
+      .toEqual([1, 1, 2, 10, 20_000, 0]);
+    expect(f.limits.storage_bytes.limit).toBe(500 * 1024 ** 2);
+    expect(checkFeature(f, 'publishing', { paid: true })).toEqual({ ok: true });
+    expect(checkFeature(f, 'analytics_standard', { paid: false })).toMatchObject({ ok: false, reason: 'feature_not_in_plan', details: { upgrade_to: 'standard' },
+      message: 'Standard analytics isn’t included in Free. Upgrade to Standard (£5 per user / month).' });
+    expect(checkFeature(f, 'mcp', { paid: false })).toMatchObject({ details: { upgrade_to: 'professional' } });
+    expect(f.period).toMatchObject({ key: '2026-11', kind: 'calendar_month' });
+    expect(meterRules(f, 'posts.scheduled', 'month')).toMatchObject({ ceiling: 10, gate: { ok: true } });
+    // paid plans never meter posts / brands / members
+    const std = deriveEntitlements(base(), [], NOW);
+    expect([std.limits.scheduled_posts.limit, std.limits.brands.limit, std.limits.members.limit]).toEqual([null, null, null]);
+  });
+
+  it('D33 route gate: analytics and inbox API areas map to their features; everything else is ungated; posts count by month of publication', () => {
+    expect(routeFeature('/api/analytics')).toBe('analytics_standard');
+    expect(routeFeature('/api/analytics/exports/abc/download')).toBe('analytics_standard');
+    expect(routeFeature('/api/inbox/conversations')).toBe('inbox');
+    expect(routeFeature('/api/analyticsx')).toBeNull();
+    expect(routeFeature('/api/posts')).toBeNull();
+    expect(routeFeature('/api/brands/1/handover-export')).toBeNull(); // the data export is never gated
+    expect(postMonth(new Date('2026-11-30T23:59:59Z'))).toBe('2026-11');
+    expect(postMonth(new Date('2026-12-01T00:00:00Z'))).toBe('2026-12');
   });
 });

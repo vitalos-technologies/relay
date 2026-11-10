@@ -141,15 +141,30 @@ describe('billing policy', () => {
     expect(deriveStatus({ sub: sub({ status: 'paused' }), trial: null, actionRequired: false, now })).toBe('expired');
   });
   it('keeps billing status, service suspension and access as separate dimensions', () => {
-    expect(deriveAccess({ status: 'active', serviceSuspended: true, graceEndsAt: null, trialEndsAt: null, cancelAt: null, now })).toEqual({ access: 'suspended', reason: ACCESS_REASONS.suspended });
+    expect(deriveAccess({ status: 'active', serviceSuspended: true, graceEndsAt: null, trialEndsAt: null, cancelAt: null, now })).toEqual({ access: 'suspended', reason: ACCESS_REASONS.suspended, free: false });
     expect(deriveAccess({ status: 'past_due', serviceSuspended: false, graceEndsAt: new Date('2026-11-10T00:00:00Z'), trialEndsAt: null, cancelAt: null, now }).access).toBe('full');
-    expect(deriveAccess({ status: 'past_due', serviceSuspended: false, graceEndsAt: new Date('2026-11-01T00:00:00Z'), trialEndsAt: null, cancelAt: null, now }).access).toBe('restricted');
-    expect(deriveAccess({ status: 'trialing', serviceSuspended: false, graceEndsAt: null, trialEndsAt: new Date('2026-11-01T00:00:00Z'), cancelAt: null, now }).access).toBe('restricted');
+    expect(deriveAccess({ status: 'past_due', serviceSuspended: false, graceEndsAt: new Date('2026-11-01T00:00:00Z'), trialEndsAt: null, cancelAt: null, now })).toMatchObject({ access: 'restricted', free: false });
     expect(deriveAccess({ status: 'legacy', serviceSuspended: false, graceEndsAt: null, trialEndsAt: null, cancelAt: null, now }).access).toBe('full');
     expect(deriveAccess({ status: 'none', serviceSuspended: false, graceEndsAt: null, trialEndsAt: null, cancelAt: null, now }).access).toBe('restricted');
   });
+  it('D33: no paid entitlement in force ⇒ Free (full access within Free limits), never restricted', () => {
+    const base = { serviceSuspended: false, graceEndsAt: null, cancelAt: null, now };
+    const past = new Date('2026-11-01T00:00:00Z');
+    const future = new Date('2026-11-20T00:00:00Z');
+    expect(deriveAccess({ ...base, status: 'free', trialEndsAt: null })).toEqual({ access: 'full', reason: null, free: true });
+    expect(deriveAccess({ ...base, status: 'trialing', trialEndsAt: past })).toEqual({ access: 'full', reason: null, free: true }); // no-card trial ended
+    expect(deriveAccess({ ...base, status: 'trialing', trialEndsAt: past, liveSubscription: true })).toEqual({ access: 'full', reason: null, free: false }); // provider trial: first charge pending
+    expect(deriveAccess({ ...base, status: 'trialing', trialEndsAt: future }).free).toBe(false);
+    expect(deriveAccess({ ...base, status: 'expired', trialEndsAt: past })).toMatchObject({ access: 'full', free: true });
+    expect(deriveAccess({ ...base, status: 'cancelled', trialEndsAt: null })).toMatchObject({ access: 'full', free: true });
+    expect(deriveAccess({ ...base, status: 'cancel_scheduled', trialEndsAt: null, cancelAt: past })).toMatchObject({ access: 'full', free: true });
+    expect(deriveAccess({ ...base, status: 'cancel_scheduled', trialEndsAt: null, cancelAt: future })).toMatchObject({ access: 'full', free: false });
+    expect(deriveAccess({ ...base, status: 'incomplete', trialEndsAt: null })).toMatchObject({ access: 'full', free: true }); // declined upgrade never worse than Free
+    expect(deriveAccess({ ...base, status: 'free', trialEndsAt: null, serviceSuspended: true })).toMatchObject({ access: 'suspended', free: true });
+  });
   it('documents the lifecycle transitions of the brief (§10)', () => {
-    for (const [a, b] of [['none', 'trialing'], ['trialing', 'active'], ['trialing', 'expired'], ['active', 'past_due'], ['past_due', 'active'], ['active', 'cancel_scheduled'], ['cancel_scheduled', 'active'], ['cancel_scheduled', 'cancelled'], ['expired', 'active']] as const) {
+    for (const [a, b] of [['none', 'trialing'], ['trialing', 'active'], ['trialing', 'expired'], ['active', 'past_due'], ['past_due', 'active'], ['active', 'cancel_scheduled'], ['cancel_scheduled', 'active'], ['cancel_scheduled', 'cancelled'], ['expired', 'active'],
+      ['none', 'free'], ['trialing', 'free'], ['cancel_scheduled', 'free'], ['free', 'trialing'], ['free', 'active']] as const) {
       expect(isDocumentedTransition(a, b), `${a} → ${b}`).toBe(true);
     }
     expect(isDocumentedTransition('cancelled', 'past_due')).toBe(false);
@@ -166,10 +181,11 @@ describe('billing policy', () => {
     expect(checkoutTiming(soon, now)).toEqual({ trialEnd: null, billingCycleAnchor: soon, firstChargeAt: soon });
     expect(checkoutTiming(null, now)).toEqual({ trialEnd: null, billingCycleAnchor: null, firstChargeAt: now });
   });
-  it('prices: exactly two public plans; 3 Standard users £30, 3 Professional users £75; ≥ 1 seat', () => {
-    expect(publicCatalogue().map((p) => [p.id, p.unit_amount_minor, p.trial_days])).toEqual([['standard', 1000, 14], ['professional', 2500, 14]]);
-    expect(formatMinorGBP(recurringTotalMinor('standard', 3))).toBe('£30');
-    expect(formatMinorGBP(recurringTotalMinor('professional', 3))).toBe('£75');
+  it('prices (D33): Free £0, Standard £5, Professional £15; 3 Standard users £15, 3 Professional users £45; ≥ 1 seat', () => {
+    expect(publicCatalogue().map((p) => [p.id, p.unit_amount_minor, p.trial_days])).toEqual([['free', 0, 0], ['standard', 500, 14], ['professional', 1500, 14]]);
+    expect(formatMinorGBP(recurringTotalMinor('standard', 3))).toBe('£15');
+    expect(formatMinorGBP(recurringTotalMinor('professional', 3))).toBe('£45');
+    expect(recurringTotalMinor('free', 1)).toBe(0);
     expect(() => recurringTotalMinor('standard', 0)).toThrow();
     expect(catalogueHash(planVersionDefinition('standard'))).toMatch(/^[0-9a-f]{64}$/);
   });

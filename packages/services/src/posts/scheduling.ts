@@ -18,7 +18,7 @@ import { loadPost, validateDraft, deliveriesForSchedule, type PostRow } from './
 import { approvalJson, deliveryJson, scheduleJson, type ApprovalRow, type ScheduleRow } from './serialize.js';
 import { enforceBrandRules } from '../gov/brand-rules.js';
 import { approvalRequiredFor, createReviewRequest, recordApproval, recordRejection, type ReviewRequestRow } from './approval-policy.js';
-import { assertSchedulingEntitled } from '../entitlements/actions.js';
+import { assertFeatureConfigurable, assertScheduledPostAllowed, assertSchedulingEntitled } from '../entitlements/actions.js';
 
 const PAST_TOLERANCE_MS = 60_000;
 
@@ -129,6 +129,7 @@ async function createScheduleTx(ctx: Ctx, postId: string, rawReq: unknown, idemK
     if (mode === 'submit') {
       requireAction(ctx, 'drafts.edit', { brandId: post.brand_id });
       if (!reviewRequired) throw new AppError('invalid_state', 'This brand does not require approval. Schedule it directly.');
+      await assertFeatureConfigurable(tx, ctx.access.workspaceId, 'collaboration'); // D33: approvals are not in Free
     } else {
       if (reviewRequired) throw new AppError('invalid_state', 'This brand requires approval: submit for review instead.', undefined, { reason: 'approval_required' });
       // V2: scheduling/publishing come from publisher/brand_manager (or admin/owner) grants on this brand.
@@ -138,7 +139,7 @@ async function createScheduleTx(ctx: Ctx, postId: string, rawReq: unknown, idemK
     }
     const ids = [...new Set(req.connection_ids)];
     // V4 entitlements: publishing must be in the plan; publish-now needs paid access; held (over-limit) accounts refused.
-    await assertSchedulingEntitled(tx, ctx.access.workspaceId, ids, { immediate: mode === 'immediate' });
+    await assertSchedulingEntitled(tx, ctx.access.workspaceId, ids, { immediate: mode === 'immediate', brandId: post.brand_id });
     const conns = await brandConnections(tx, ctx.access.workspaceId, post.brand_id, true);
     const validation = await validateDraft(tx, ctx, post, ids);
     if (!validation.ok) {
@@ -147,6 +148,9 @@ async function createScheduleTx(ctx: Ctx, postId: string, rawReq: unknown, idemK
     const time = resolveScheduleTime(req, brand, mode === 'immediate' || (mode === 'submit' && !req.input_local_time) ? (mode === 'submit' ? 'on_approval' : 'immediate') : 'timed');
     // V3.1 (§12): mandatory brand rules (incl. TipSignal fact preservation, expired assets) refuse submit/schedule/publish.
     await enforceBrandRules(tx, ctx, post, ids, time.dueAt);
+    // D33: count the post (once, whatever the destinations) against the scheduled-post allowance of its publication month.
+    // Submit-for-review is counted when the approved post is dispatched (engine gate) — never twice (ledger dedupe).
+    if (mode !== 'submit') await assertScheduledPostAllowed(tx, ctx.access.workspaceId, { postId: post.id, dueAt: time.dueAt, userId: ctx.actor.userId });
     const snap = await snapshotRevision(tx, ctx, post, ids, conns);
     await supersedeLive(tx, post.id);
     const gen = await one<{ schedule_generation: number }>(tx, `UPDATE posts SET schedule_generation=schedule_generation+1 WHERE id=$1 RETURNING schedule_generation`, [post.id]);

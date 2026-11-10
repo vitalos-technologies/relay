@@ -1,7 +1,7 @@
 // SYNTHETIC "Relay Showcase" workspace for the marketing hero screenshot (V5 MKT; DEV/LOCAL ONLY — refuses production).
 // A fictional bakery brand run by a fictional person, healthy simulated destinations, a believable week (scheduled posts
 // with images over the next days, items in review, a few published), synthetic analytics (labelled "Demo data" in the
-// app), a couple of simulated inbox conversations, and zero failed/expired deliveries. Uses the real services (same
+// app), simulated inbox conversations, one completed AI workspace task, and zero failed/expired deliveries. Uses the real services (same
 // authorization, audit and outbox as the product).
 // REFRESH, not create-once: every run brings the showcase (and ONLY the showcase) to a healthy "this week" relative to now —
 // the previous run's story posts are cancelled (cancelSchedule) and removed, simulated destinations are restored to ready /
@@ -25,6 +25,7 @@ import { completeUpload, createUploadIntent } from '@social-lite/services/media/
 import { seedAnalyticsDemo } from '@social-lite/services/analytics/demo';
 import { updateOnboarding } from '@social-lite/services/gov/onboarding';
 import { enableChannel, simulateInbound } from '@social-lite/services/inbox/index';
+import { createWorkflowRun, executeWorkflowRun } from '@social-lite/services/ai-workflows/index';
 
 const cfg = config();
 if (cfg.APP_ENV === 'production') throw new Error('Refusing to seed showcase data in production');
@@ -290,6 +291,36 @@ async function verify(wsId: string) {
   return result;
 }
 
+/** Believable, synthetic inbox: a handful of comments and messages on the bakery's simulated Facebook and Instagram. */
+async function showcaseInbox(c: Ctx, wsId: string, facebookId: string, instagramId: string) {
+  const have = await one<{ n: number }>(db, `SELECT count(*)::int n FROM inbox_conversations WHERE workspace_id=$1`, [wsId]);
+  if (have.n >= 6) return { conversations: have.n, added: 0 };
+  const fb = await enableChannel(c, { connection_id: facebookId });
+  const insta = await enableChannel(c, { connection_id: instagramId }).catch(() => null);
+  const msgs: Array<[string, 'dm' | 'comment' | 'mention', string, string, number]> = [
+    [fb.id, 'dm', 'Maya Fernandes', 'Hi! Is the brunch menu vegan-friendly?', 18],
+    [fb.id, 'comment', 'Tom Okafor', 'Booked for Saturday — can’t wait!', 9],
+    [fb.id, 'dm', 'Grace Lindqvist', 'Do you take orders for birthday cakes? We need one for 12 people on the 21st.', 42],
+    [fb.id, 'comment', 'Sam Whitaker', 'Those cardamom buns were gone by 9am. Any chance of a second tray on Saturdays?', 64],
+    [insta?.id ?? fb.id, 'comment', 'Leila Haddad', 'The spring menu looks beautiful. Is the rhubarb tart gluten-free?', 27],
+    [insta?.id ?? fb.id, 'dm', 'Jonas Becker', 'Is there space for a stroller at the supper club?', 95],
+  ];
+  let added = 0;
+  for (const [ch, kind, name, text, minutes_ago] of msgs.slice(have.n === 0 ? 0 : 2)) {
+    try { await simulateInbound(c, ch, { kind, name, text, minutes_ago }); added++; } catch (err) { console.warn(JSON.stringify({ msg: 'simulated message skipped', name, err: String(err) })); }
+  }
+  return { conversations: have.n + added, added };
+}
+
+/** A completed performance analysis in the AI workspace (previous showcase tasks archived so the list stays short). */
+async function showcaseAiRun(c: Ctx, wsId: string, brandId: string) {
+  await db.query(`UPDATE ai_threads SET archived_at=now() WHERE workspace_id=$1 AND archived_at IS NULL`, [wsId]);
+  // Performance analysis: its steps are data-only, so it completes without an AI provider (weekly planning needs one).
+  const run = await createWorkflowRun(c, { workflow: 'performance_analysis', inputs: { brand_id: brandId, range_days: 28 }, idempotency_key: `showcase-${randomUUID()}` });
+  const status = await executeWorkflowRun(run.id, 'showcase-seed');
+  return { id: run.id, status };
+}
+
 async function main() {
   await enableWidgetInDev();
   await removePartialSeeds();
@@ -334,19 +365,17 @@ async function main() {
 
   // Synthetic analytics (shown as "Demo data" in the app), refreshed to end today.
   const analytics = await showcaseAnalytics(wsId);
-  // A couple of simulated inbox conversations (first run only: the inbox keeps its history).
-  const hasInbox = await maybeOne(db, `SELECT 1 FROM inbox_conversations WHERE workspace_id=$1 LIMIT 1`, [wsId]);
-  if (!hasInbox) {
-    const ch = await enableChannel(c, { connection_id: ig.facebook! });
-    await simulateInbound(c, ch.id, { kind: 'dm', name: 'Maya Fernandes', text: 'Hi! Is the brunch menu vegan-friendly?', minutes_ago: 18 });
-    await simulateInbound(c, ch.id, { kind: 'comment', name: 'Tom Okafor', text: 'Booked for Saturday — can’t wait!', minutes_ago: 9 });
-  }
+  // Simulated inbox conversations (synthetic people and messages; added once — the inbox keeps its history).
+  const inbox = await showcaseInbox(c, wsId, ig.facebook!, ig.instagram!);
+  // One completed AI workspace task for the Explore capture (data steps run without a provider; AI-written parts are
+  // skipped when no AI provider is configured, which the run shows honestly).
+  const aiRun = await showcaseAiRun(c, wsId, bakery);
   // The owner has finished onboarding in this story: hide the checklist card.
   await updateOnboarding(c, { dismissed: true }).catch(() => undefined);
 
   await waitForPublished(wsId, publishedIds);
   const state = await verify(wsId);
-  console.log(JSON.stringify({ msg: 'showcase workspace refreshed (synthetic)', workspaceId: wsId, owner: SHOWCASE_OWNER.email, cleared_posts: cleared, state, analytics }));
+  console.log(JSON.stringify({ msg: 'showcase workspace refreshed (synthetic)', workspaceId: wsId, owner: SHOWCASE_OWNER.email, cleared_posts: cleared, state, analytics, inbox, ai_run: aiRun }));
 }
 
 main().then(() => closePool()).catch(async (err) => { console.error(err); await closePool(); process.exit(1); });

@@ -60,8 +60,8 @@ export interface ToolEntry {
   status: IntegrationStatus;
   does: string;
   note: string;
-  /** Plan that includes it (catalogue feature `integrations_business` / `mcp` are Professional). */
-  plan: 'all' | 'professional';
+  /** Plan that includes it (catalogue feature `integrations_business` / `mcp` are Professional; D33: Free has no integrations). */
+  plan: 'paid' | 'professional';
 }
 
 export const TOOLS: ToolEntry[] = [
@@ -72,8 +72,8 @@ export const TOOLS: ToolEntry[] = [
   { key: 'mailchimp', name: 'Mailchimp', status: 'provider_access', does: 'Draft campaigns from approved posts', note: 'Relay Mailchimp app', plan: 'professional' },
   { key: 'google_business_profile', name: 'Google Business Profile', status: 'provider_access', does: 'Local posts and review replies', note: 'Google API approval', plan: 'professional' },
   { key: 'google_translate', name: 'Google Cloud Translation', status: 'provider_access', does: 'Translations, originals kept', note: 'Google Cloud billing', plan: 'professional' },
-  { key: 'whatsapp', name: 'WhatsApp Business', status: 'limited', does: 'Customer chats in the inbox', note: 'Your WhatsApp Business account · Meta charges per message', plan: 'all' },
-  { key: 'google_drive', name: 'Google Drive', status: 'provider_access', does: 'Pick files and docs into drafts', note: 'Google app verification', plan: 'all' },
-  { key: 'notion', name: 'Notion', status: 'provider_access', does: 'Turn pages and rows into drafts', note: 'Relay Notion app', plan: 'all' },
+  { key: 'whatsapp', name: 'WhatsApp Business', status: 'limited', does: 'Customer chats in the inbox', note: 'Your WhatsApp Business account · Meta charges per message', plan: 'paid' },
+  { key: 'google_drive', name: 'Google Drive', status: 'provider_access', does: 'Pick files and docs into drafts', note: 'Google app verification', plan: 'paid' },
+  { key: 'notion', name: 'Notion', status: 'provider_access', does: 'Turn pages and rows into drafts', note: 'Relay Notion app', plan: 'paid' },
   { key: 'mcp', name: 'MCP for AI clients', status: 'available', does: 'Use Relay from your AI assistant, with your permissions', note: 'Professional plan', plan: 'professional' },
 ];

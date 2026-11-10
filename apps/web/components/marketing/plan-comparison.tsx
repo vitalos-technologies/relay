@@ -6,7 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 
 export function PlanComparison({ children }: { children: ReactNode }) {
   return (
-    <Collapsible className="mx-auto w-full min-w-0 max-w-[920px]">
+    <Collapsible className="mx-auto w-full min-w-0 max-w-[1120px]">
       <div className="flex justify-center">
         <CollapsibleTrigger className="group inline-flex min-h-11 items-center gap-2 rounded-full border border-v5-border bg-v5-surface px-5 text-[15px] font-semibold text-v5-fg outline-none hover:bg-v5-raised focus-visible:outline-2 focus-visible:outline-v5-ring" data-testid="mkt-compare">
           Compare plans and allowances

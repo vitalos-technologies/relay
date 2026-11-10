@@ -1,7 +1,8 @@
-// Selected-plan signup handoff (V5 §8): marketing "Start free trial" → /signup?plan=standard|professional → sign in /
-// register with the identity provider → create the workspace → the workspace's one 14-day no-card trial starts on the
-// selected plan (server-side, in the same transaction). The plan name from the URL only chooses WHICH public plan to trial;
-// it never grants anything by itself (unknown plans are refused; the trial is the catalogue's bounded trial).
+// Selected-plan signup handoff (V5 §8, D33): marketing → /signup?plan=free|standard|professional → sign in / register
+// with the identity provider → create the workspace. standard|professional: the workspace's one 14-day no-card trial
+// starts on that plan (server-side, same transaction). free: the workspace starts on Free (no trial, no card, no provider
+// objects). The plan name from the URL only chooses WHICH public plan; it never grants anything by itself (unknown plans
+// are refused; the trial is the catalogue's bounded trial). Onboarding without a plan also starts on Free.
 import { z } from 'zod';
 import { PUBLIC_PLAN_IDS, publicCatalogue } from '@social-lite/core/contracts/v4-plans';
 import { getPool, many, type Queryable } from '@social-lite/db';

@@ -1,7 +1,7 @@
 // Persisted catalogue (billing_plan_versions + billing_provider_prices). Versions are immutable; a subscription stays on
 // the version it was bought at. The catalogue file (core/contracts/v4-plans.ts) is the source for NEW versions.
 import { AppError, notFound } from '@social-lite/core';
-import { PUBLIC_PLAN_IDS, type PlanId } from '@social-lite/core/contracts/v4-plans';
+import { PLANS, PUBLIC_PLAN_IDS, type PlanId } from '@social-lite/core/contracts/v4-plans';
 import { getPool, many, maybeOne, one, type Queryable } from '@social-lite/db';
 import { catalogueHash, planVersionDefinition } from './catalogue-def.js';
 
@@ -78,7 +78,8 @@ export async function publishVersionTx(tx: Queryable, planId: PlanId, userId: st
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
     [planId, nextVersion, def.name, def.summary, def.unit_amount_minor, def.currency, def.interval, def.per_seat, def.trial_days, JSON.stringify(def.features),
       JSON.stringify(def.allowances), JSON.stringify(def.trial_allowances), JSON.stringify(def.highlights), def.purchasable, hash, userId]);
-  // The test double gets its own price automatically; Stripe prices are mapped by staff (activation item).
+  // The test double gets its own price automatically; Stripe prices are mapped by staff (activation item). Free is never
+  // purchasable, so it never gets a provider price.
   if (v.purchasable) {
     await tx.query(`INSERT INTO billing_provider_prices(plan_version_id, provider, livemode, price_ref, product_ref, created_by) VALUES ($1,'test',false,$2,$3,$4)`,
       [v.id, `price_test_${v.plan_id}_v${v.version}`, `prod_test_${v.plan_id}`, userId]);
@@ -88,4 +89,11 @@ export async function publishVersionTx(tx: Queryable, planId: PlanId, userId: st
 
 export function isPublicPlan(id: string): id is (typeof PUBLIC_PLAN_IDS)[number] {
   return (PUBLIC_PLAN_IDS as readonly string[]).includes(id);
+}
+
+/** Plans sold through checkout (D33: Standard, Professional). Free is public but has no checkout or trial. */
+export const PAID_PLAN_IDS = PUBLIC_PLAN_IDS.filter((id) => (PLANS[id].unit_amount_minor ?? 0) > 0) as Array<Exclude<(typeof PUBLIC_PLAN_IDS)[number], 'free'>>;
+export type PaidPlanId = Exclude<(typeof PUBLIC_PLAN_IDS)[number], 'free'>;
+export function isPaidPlan(id: string): id is PaidPlanId {
+  return (PAID_PLAN_IDS as readonly string[]).includes(id);
 }

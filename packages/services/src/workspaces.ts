@@ -255,9 +255,15 @@ export async function createWorkspace(session: SessionRecord, actor: Actor, inpu
     await setActiveWorkspace(tx, session.id, w.id);
     await audit(tx, { workspaceId: w.id, actorUserId: actor.userId, action: 'workspace.created', resourceType: 'workspace', resourceId: w.id,
       diff: { name, timezone: tz, brand_id: b.id }, correlationId });
-    // V4 billing: the workspace's one 14-day no-card trial starts now, on the plan chosen at signup (default Standard).
-    const { startTrialTx } = await import('./billing/trials.js');
-    await startTrialTx(tx, { workspaceId: w.id, planId: opts.plan ?? 'standard', userId: actor.userId, source: opts.source ?? 'onboarding' });
+    // V4/D33 billing: a paid plan chosen at signup starts the workspace's one 14-day no-card trial on it; Free — chosen,
+    // or no plan at all (onboarding default) — starts on Free: no trial redeemed, no card, no provider objects.
+    if (opts.plan && opts.plan !== 'free') {
+      const { startTrialTx } = await import('./billing/trials.js');
+      await startTrialTx(tx, { workspaceId: w.id, planId: opts.plan, userId: actor.userId, source: opts.source ?? 'onboarding' });
+    } else {
+      const { startFreeTx } = await import('./billing/free.js');
+      await startFreeTx(tx, { workspaceId: w.id, userId: actor.userId, source: opts.source ?? 'onboarding' });
+    }
     return { workspace: workspaceDto(w), brand: brandDto(b) };
   });
 }

@@ -4,6 +4,8 @@
 //    the customer sees "Adjusted by Relay", the over-limit chooser (nothing disconnected), the listening upgrade prompt,
 //    and the server refuses the paid capability (402) — UI, API and the chooser agree; overrides revoked afterwards;
 //  - @mobile: the usage page and chooser at 390 px; no page-level horizontal scroll at 320–1440.
+//  - D33 Free ("E2E Free", owner@demo): Usage shows Free's limits; analytics and inbox show the upgrade prompt and their API
+//    answers 402; a second brand and any teammate are refused with the upgrade reason (server-side, 402).
 // Screenshots (1440 + 390, light + dark, DPR 2) go to evidence/v4/ent/.
 import { mkdirSync } from 'node:fs';
 import { expect, test, type Browser, type Page } from '@playwright/test';
@@ -146,6 +148,46 @@ test.describe('V4 entitlements', () => {
     }
     const after = await s.c.get('/api/entitlements');
     expect(after.body.features.listening.enabled).toBe(true);
+  });
+
+  test('D33 Free: usage shows Free limits; analytics/inbox prompt + 402; second brand and teammates refused', async ({ browser }, info) => {
+    test.skip(info.project.name === 'mobile', 'desktop project');
+    for (const dark of [false, true]) {
+      const page = await as(browser, OPERATOR, { dark });
+      const a = await api(page);
+      const s = await a.get('/api/session');
+      const ws = (s.body.workspaces as Array<{ id: string; name: string }>).find((w) => w.name === 'E2E Free');
+      expect(ws, 'E2E Free exists (pnpm db:seed:e2e)').toBeTruthy();
+      if (s.body.workspace?.id !== ws!.id) expect((await a.send('POST', '/api/session/workspace', { workspace_id: ws!.id })).status).toBeLessThan(300);
+      await page.goto('/admin/usage');
+      await expect(page.getByTestId('workspace-usage')).toBeVisible();
+      await expect(page.getByText('Scheduled posts', { exact: true }).first()).toBeVisible();
+      expect(await page.evaluate(noScroll)).toBe(true);
+      await shot(page, `usage-free-1440-${dark ? 'dark' : 'light'}`, true);
+      await page.goto('/analytics');
+      await expect(page.getByText('Not in your plan')).toBeVisible();
+      await expect(page.getByText(/Standard analytics isn’t included in Free/)).toBeVisible();
+      await shot(page, `analytics-free-prompt-1440-${dark ? 'dark' : 'light'}`);
+      if (!dark) {
+        const e = (await a.get('/api/entitlements')).body;
+        expect(e).toMatchObject({ plan: { id: 'free' }, status: 'free', access: 'full', member_hold: null });
+        expect(e.allowances.find((x: { key: string }) => x.key === 'scheduled_posts')).toMatchObject({ hard_limit: 10 });
+        expect(e.allowances.find((x: { key: string }) => x.key === 'members')).toMatchObject({ hard_limit: 1, used: 1 });
+        const ov = await a.get('/api/analytics/overview');
+        expect(ov.status).toBe(402);
+        expect(ov.body.error).toMatchObject({ code: 'entitlement_required', details: { feature: 'analytics_standard', upgrade_to: 'standard' } });
+        expect((await a.get('/api/inbox/conversations')).status).toBe(402);
+        await page.goto('/inbox');
+        await expect(page.getByText('Not in your plan')).toBeVisible();
+        const brand = await a.send('POST', '/api/brands', { name: `Second ${Date.now()}` });
+        expect(brand.status).toBe(402);
+        expect(brand.body.error).toMatchObject({ code: 'entitlement_required', details: { allowance: 'brands', limit: 1 } });
+        const inv = await a.send('POST', '/api/invitations', { email: `free-${Date.now()}@test.social-lite.test`, role: 'editor' });
+        expect(inv.status).toBe(402);
+        expect(inv.body.error.message).toContain('Upgrade to add teammates');
+      }
+      await page.context().close();
+    }
   });
 
   test('usage page and chooser on a phone; no horizontal scroll 320–1440 @mobile', async ({ browser }) => {

@@ -1,10 +1,10 @@
 'use client';
-// Signup step 2 (signed in): create the workspace; the server starts its one 14-day no-card trial on the selected plan in the
-// same transaction. Users who already belong to a workspace are sent to that workspace's Billing instead (no second trial).
+// Signup step 2 (signed in): create the workspace; on a paid plan the server starts its one 14-day no-card trial in the same
+// transaction; on Free (D33) the workspace starts on Free with no trial. Users who already belong to a workspace are sent to that workspace's Billing instead (no second trial).
 import { useMemo, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import type { PlanCatalogueEntry } from '@social-lite/core/contracts/v4-plans';
+import type { PlanCatalogueEntry, PublicPlanId } from '@social-lite/core/contracts/v4-plans';
 import { api } from '@/lib/client/api';
 import { useApi } from '@/lib/client/use-api';
 import { allTimeZones } from '@/lib/client/format';
@@ -27,7 +27,7 @@ export default function SignupWorkspacePage() {
 function SignupWorkspace() {
   const { data, error, refetch } = useApi<Ctx>('/api/billing/signup');
   const initial = useSearchParams().get('plan');
-  const [plan, setPlan] = useState<'standard' | 'professional'>(initial === 'professional' ? 'professional' : 'standard');
+  const [plan, setPlan] = useState<PublicPlanId>(initial === 'professional' || initial === 'free' ? initial : 'standard');
   return (
     <main className="flex min-h-dvh items-start justify-center px-4 py-10 sm:items-center">
       <div className="w-full max-w-[480px]">
@@ -50,7 +50,9 @@ function AlreadyMember({ ctx }: { ctx: Ctx }) {
   );
 }
 
-function CreateForm({ ctx, plan, setPlan }: { ctx: Ctx; plan: 'standard' | 'professional'; setPlan: (p: 'standard' | 'professional') => void }) {
+function CreateForm({ ctx, plan, setPlan }: { ctx: Ctx; plan: PublicPlanId; setPlan: (p: PublicPlanId) => void }) {
+  const selected = ctx.catalogue.find((p) => p.id === plan);
+  const isFree = selected?.unit_amount_minor === 0;
   const zones = useMemo(() => allTimeZones(), []);
   const [name, setName] = useState('');
   const [tz, setTz] = useState('Europe/London');
@@ -64,22 +66,22 @@ function CreateForm({ ctx, plan, setPlan }: { ctx: Ctx; plan: 'standard' | 'prof
     try {
       const r = await api.post<{ workspace: { id: string } }>('/api/billing/signup', { name: name.trim(), timezone: tz, plan }, { idempotent: true });
       try { await api.post('/api/session/workspace', { workspace_id: r.workspace.id }); } catch { /* already active */ }
-      window.location.assign('/settings/workspace/billing?welcome=1');
+      window.location.assign(isFree ? '/overview' : '/settings/workspace/billing?welcome=1');
     } catch (x) { setErr(x); setBusy(false); }
   };
   return (
     <section className="rounded-2xl border border-border bg-surface p-6 sm:p-8">
       <h1 className="text-[22px] font-semibold">Create your workspace</h1>
-      <p className="mt-1 text-[13px] text-muted">Your 14-day free trial starts now. No card needed.</p>
+      <p className="mt-1 text-[13px] text-muted" data-testid="signup-ws-lead">{isFree ? `${selected!.name} for one person. No card needed.` : `Your ${selected?.trial_days ?? 14}-day free trial starts now. No card needed.`}</p>
       <form onSubmit={submit} className="mt-6 flex flex-col gap-5" noValidate>
         <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1 text-[13px] font-medium">Plan to try</legend>
-          <div role="radiogroup" aria-label="Plan to try" className="grid grid-cols-2 gap-2">
+          <legend className="mb-1 text-[13px] font-medium">Plan</legend>
+          <div role="radiogroup" aria-label="Plan" className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-3">
             {ctx.catalogue.map((p) => (
               <button key={p.id} type="button" role="radio" aria-checked={plan === p.id} onClick={() => setPlan(p.id)} data-testid={`signup-ws-plan-${p.id}`}
                 className={cn('touch-target flex flex-col items-start rounded-lg border px-3 py-2 text-left', plan === p.id ? 'border-accent bg-accent-soft' : 'border-border hover:bg-raised')}>
                 <span className="text-sm font-medium">{p.name}</span>
-                <span className="text-xs text-muted tabular">then {money(p.unit_amount_minor)} / user / month</span>
+                <span className="text-xs text-muted tabular">{p.unit_amount_minor === 0 ? `${money(0)} · 1 user` : `then ${money(p.unit_amount_minor)} / user / month`}</span>
               </button>
             ))}
           </div>
@@ -93,7 +95,7 @@ function CreateForm({ ctx, plan, setPlan }: { ctx: Ctx; plan: 'standard' | 'prof
           </Select>
         </Field>
         {err ? <ErrorNotice error={err} /> : null}
-        <Button type="submit" variant="primary" size="lg" loading={busy}>Start free trial</Button>
+        <Button type="submit" variant="primary" size="lg" loading={busy}>{isFree ? 'Create workspace' : 'Start free trial'}</Button>
       </form>
     </section>
   );

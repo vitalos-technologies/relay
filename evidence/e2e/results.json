@@ -4,8 +4,10 @@
       "/opt/node22/bin/node",
       "/home/user/relay/node_modules/@playwright/test/cli.js",
       "test",
-      "tests/e2e/v5-ai.spec.ts",
-      "tests/e2e/ai-automation.spec.ts"
+      "--trace",
+      "off",
+      "tests/e2e/v4-billing.spec.ts",
+      "tests/e2e/v4-entitlements.spec.ts"
     ],
     "configFile": "/home/user/relay/playwright.config.ts",
     "rootDir": "/home/user/relay/tests/e2e",
@@ -83,449 +85,362 @@
   },
   "suites": [
     {
-      "title": "ai-automation.spec.ts",
-      "file": "ai-automation.spec.ts",
+      "title": "v4-billing.spec.ts",
+      "file": "v4-billing.spec.ts",
       "column": 0,
       "line": 0,
       "specs": [],
       "suites": [
         {
-          "title": "AI assistant + automation",
-          "file": "ai-automation.spec.ts",
-          "line": 27,
-          "column": 6,
+          "title": "V4 billing — desktop",
+          "file": "v4-billing.spec.ts",
+          "line": 62,
+          "column": 15,
           "specs": [
             {
-              "title": "assistant reports its provider state honestly and never shows invented output",
+              "title": "§18.9 forged redirect and forged webhook never activate; §18.8 verified test checkout subscribes and keeps the trial",
               "ok": true,
               "tags": [],
               "tests": [
                 {
-                  "timeout": 240000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "desktop",
-                  "projectName": "desktop",
-                  "results": [
-                    {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
-                      "status": "passed",
-                      "duration": 29810,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-11-08T12:09:34.338Z",
-                      "annotations": [],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "expected"
-                }
-              ],
-              "id": "d4d84c67d772666817fe-3db1f1b405b490141bb2",
-              "file": "ai-automation.spec.ts",
-              "line": 30,
-              "column": 7
-            },
-            {
-              "title": "policy + rule: test preview, live routing by the worker, history, emergency stop",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 240000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "desktop",
-                  "projectName": "desktop",
-                  "results": [
-                    {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
-                      "status": "passed",
-                      "duration": 37453,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-11-08T12:10:04.267Z",
-                      "annotations": [],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "expected"
-                }
-              ],
-              "id": "d4d84c67d772666817fe-2c65cb30a0370d050e82",
-              "file": "ai-automation.spec.ts",
-              "line": 59,
-              "column": 7
-            },
-            {
-              "title": "phone: assistant and automation screens fit every width @mobile",
-              "ok": true,
-              "tags": [
-                "mobile"
-              ],
-              "tests": [
-                {
-                  "timeout": 240000,
+                  "timeout": 90000,
                   "annotations": [
                     {
-                      "type": "skip",
-                      "description": "phone layout only",
+                      "type": "serial",
                       "location": {
-                        "file": "/home/user/relay/tests/e2e/ai-automation.spec.ts",
-                        "line": 117,
-                        "column": 10
+                        "file": "/home/user/relay/tests/e2e/v4-billing.spec.ts",
+                        "line": 62,
+                        "column": 15
                       }
                     }
                   ],
-                  "expectedStatus": "skipped",
+                  "expectedStatus": "passed",
                   "projectId": "desktop",
                   "projectName": "desktop",
                   "results": [
                     {
                       "workerIndex": 0,
                       "parallelIndex": 0,
-                      "status": "skipped",
-                      "duration": 80,
+                      "status": "passed",
+                      "duration": 6663,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-08T12:10:41.744Z",
+                      "startTime": "2026-11-10T05:25:43.541Z",
                       "annotations": [
                         {
-                          "type": "skip",
-                          "description": "phone layout only",
+                          "type": "serial",
                           "location": {
-                            "file": "/home/user/relay/tests/e2e/ai-automation.spec.ts",
-                            "line": 117,
-                            "column": 10
+                            "file": "/home/user/relay/tests/e2e/v4-billing.spec.ts",
+                            "line": 62,
+                            "column": 15
                           }
                         }
                       ],
                       "attachments": []
                     }
                   ],
-                  "status": "skipped"
+                  "status": "expected"
                 }
               ],
-              "id": "d4d84c67d772666817fe-ba2e6b3b77690c660c28",
-              "file": "ai-automation.spec.ts",
-              "line": 116,
+              "id": "9640cc24f2e00fab88f2-9a3cdbc5ed658c046bd0",
+              "file": "v4-billing.spec.ts",
+              "line": 67,
               "column": 7
             },
             {
-              "title": "phone: assistant and automation screens fit every width @mobile",
+              "title": "§11/§18.12 update payment details, change plan with a provider preview, cancel and resume renewal",
               "ok": true,
-              "tags": [
-                "mobile"
-              ],
+              "tags": [],
               "tests": [
                 {
-                  "timeout": 240000,
-                  "annotations": [],
+                  "timeout": 90000,
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/user/relay/tests/e2e/v4-billing.spec.ts",
+                        "line": 62,
+                        "column": 15
+                      }
+                    }
+                  ],
                   "expectedStatus": "passed",
-                  "projectId": "mobile",
-                  "projectName": "mobile",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
                   "results": [
                     {
-                      "workerIndex": 1,
+                      "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 30192,
+                      "duration": 3075,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-08T12:14:34.457Z",
-                      "annotations": [],
+                      "startTime": "2026-11-10T05:25:50.311Z",
+                      "annotations": [
+                        {
+                          "type": "serial",
+                          "location": {
+                            "file": "/home/user/relay/tests/e2e/v4-billing.spec.ts",
+                            "line": 62,
+                            "column": 15
+                          }
+                        }
+                      ],
                       "attachments": []
                     }
                   ],
                   "status": "expected"
                 }
               ],
-              "id": "d4d84c67d772666817fe-52789b83971dd8a0dde4",
-              "file": "ai-automation.spec.ts",
-              "line": 116,
+              "id": "9640cc24f2e00fab88f2-e804686adc79b208edbd",
+              "file": "v4-billing.spec.ts",
+              "line": 108,
+              "column": 7
+            },
+            {
+              "title": "§14 staff inspect the tenant billing record, the subscriptions list and the plan catalogue",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/user/relay/tests/e2e/v4-billing.spec.ts",
+                        "line": 62,
+                        "column": 15
+                      }
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2914,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-10T05:25:53.400Z",
+                      "annotations": [
+                        {
+                          "type": "serial",
+                          "location": {
+                            "file": "/home/user/relay/tests/e2e/v4-billing.spec.ts",
+                            "line": 62,
+                            "column": 15
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "9640cc24f2e00fab88f2-61e4b799005f2a8a3379",
+              "file": "v4-billing.spec.ts",
+              "line": 138,
+              "column": 7
+            },
+            {
+              "title": "D33 Free workspace: £0, no portal or invoices, upgrade cards at £5 / £15, no teammates; listed as Free for staff",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/user/relay/tests/e2e/v4-billing.spec.ts",
+                        "line": 62,
+                        "column": 15
+                      }
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 36199,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-10T05:25:56.325Z",
+                      "annotations": [
+                        {
+                          "type": "serial",
+                          "location": {
+                            "file": "/home/user/relay/tests/e2e/v4-billing.spec.ts",
+                            "line": 62,
+                            "column": 15
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "9640cc24f2e00fab88f2-9c81e02f7c3a818e4e93",
+              "file": "v4-billing.spec.ts",
+              "line": 158,
+              "column": 7
+            },
+            {
+              "title": "dark theme screens",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/user/relay/tests/e2e/v4-billing.spec.ts",
+                        "line": 62,
+                        "column": 15
+                      }
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 31842,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-10T05:26:32.533Z",
+                      "annotations": [
+                        {
+                          "type": "serial",
+                          "location": {
+                            "file": "/home/user/relay/tests/e2e/v4-billing.spec.ts",
+                            "line": 62,
+                            "column": 15
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "9640cc24f2e00fab88f2-f4af68f2edbb16e850f2",
+              "file": "v4-billing.spec.ts",
+              "line": 191,
+              "column": 7
+            },
+            {
+              "title": "V5 handoff: /signup?plan=professional preselects the plan from the shared catalogue (public)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/user/relay/tests/e2e/v4-billing.spec.ts",
+                        "line": 62,
+                        "column": 15
+                      }
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2323,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-10T05:27:04.384Z",
+                      "annotations": [
+                        {
+                          "type": "serial",
+                          "location": {
+                            "file": "/home/user/relay/tests/e2e/v4-billing.spec.ts",
+                            "line": 62,
+                            "column": 15
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "9640cc24f2e00fab88f2-c53777a17f17a3749eb8",
+              "file": "v4-billing.spec.ts",
+              "line": 201,
               "column": 7
             }
           ]
-        }
-      ]
-    },
-    {
-      "title": "v5-ai.spec.ts",
-      "file": "v5-ai.spec.ts",
-      "column": 0,
-      "line": 0,
-      "specs": [],
-      "suites": [
+        },
         {
-          "title": "V5 AI workspace",
-          "file": "v5-ai.spec.ts",
-          "line": 44,
-          "column": 6,
+          "title": "V4 billing — mobile @mobile",
+          "file": "v4-billing.spec.ts",
+          "line": 216,
+          "column": 15,
           "specs": [
             {
-              "title": "home: welcome, composer with context, 4–6 actionable suggestions from real data (AT13)",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 240000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "desktop",
-                  "projectName": "desktop",
-                  "results": [
-                    {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
-                      "status": "passed",
-                      "duration": 50994,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-11-08T12:10:41.847Z",
-                      "annotations": [],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "expected"
-                }
-              ],
-              "id": "7ff9db20bc7545eb6c5c-ecd61d3ee9540d2c365f",
-              "file": "v5-ai.spec.ts",
-              "line": 47,
-              "column": 7
-            },
-            {
-              "title": "weekly planning through the UI: progress, refresh-safe, real plan + review schedule preview (AT14/15/16)",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 240000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "desktop",
-                  "projectName": "desktop",
-                  "results": [
-                    {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
-                      "status": "passed",
-                      "duration": 32087,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-11-08T12:11:32.851Z",
-                      "annotations": [],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "expected"
-                }
-              ],
-              "id": "7ff9db20bc7545eb6c5c-1167606b687af981b195",
-              "file": "v5-ai.spec.ts",
-              "line": 83,
-              "column": 7
-            },
-            {
-              "title": "campaign from an attached brief: real campaign record with a working link; honest about AI (AT14)",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 240000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "desktop",
-                  "projectName": "desktop",
-                  "results": [
-                    {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
-                      "status": "passed",
-                      "duration": 30077,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-11-08T12:12:04.955Z",
-                      "annotations": [],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "expected"
-                }
-              ],
-              "id": "7ff9db20bc7545eb6c5c-c72b1f051d18bd0384b7",
-              "file": "v5-ai.spec.ts",
-              "line": 127,
-              "column": 7
-            },
-            {
-              "title": "stop: a run stopped before it starts never runs, and says so (AT15)",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 240000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "desktop",
-                  "projectName": "desktop",
-                  "results": [
-                    {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
-                      "status": "passed",
-                      "duration": 27813,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-11-08T12:12:35.046Z",
-                      "annotations": [],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "expected"
-                }
-              ],
-              "id": "7ff9db20bc7545eb6c5c-10de0d67c17cbf7ad543",
-              "file": "v5-ai.spec.ts",
-              "line": 157,
-              "column": 7
-            },
-            {
-              "title": "keyboard, names and reduced motion: suggestions and composer work without a mouse (AT18)",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 240000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "desktop",
-                  "projectName": "desktop",
-                  "results": [
-                    {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
-                      "status": "passed",
-                      "duration": 28515,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-11-08T12:13:02.874Z",
-                      "annotations": [],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "expected"
-                }
-              ],
-              "id": "7ff9db20bc7545eb6c5c-c9df6c7cf53293d67247",
-              "file": "v5-ai.spec.ts",
-              "line": 177,
-              "column": 7
-            },
-            {
-              "title": "widths 320–1440: no horizontal scroll on the workspace and a run",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 240000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "desktop",
-                  "projectName": "desktop",
-                  "results": [
-                    {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
-                      "status": "passed",
-                      "duration": 35389,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-11-08T12:13:31.403Z",
-                      "annotations": [],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "expected"
-                }
-              ],
-              "id": "7ff9db20bc7545eb6c5c-d3746c44e74260084146",
-              "file": "v5-ai.spec.ts",
-              "line": 201,
-              "column": 7
-            },
-            {
-              "title": "admin: workspace AI workflows and Platform → AI operations (metadata only)",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 240000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "desktop",
-                  "projectName": "desktop",
-                  "results": [
-                    {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
-                      "status": "passed",
-                      "duration": 27122,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-11-08T12:14:06.801Z",
-                      "annotations": [],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "expected"
-                }
-              ],
-              "id": "7ff9db20bc7545eb6c5c-2e61c6a66e09f2f4c9d3",
-              "file": "v5-ai.spec.ts",
-              "line": 217,
-              "column": 7
-            },
-            {
-              "title": "phone: history sheet, composer with the on-screen keyboard, results readable @mobile",
+              "title": "§17 at 390 px: inspect plan, open hosted checkout, update payment details, cancel renewal, staff inspect tenant billing",
               "ok": true,
               "tags": [
                 "mobile"
               ],
               "tests": [
                 {
-                  "timeout": 240000,
+                  "timeout": 90000,
                   "annotations": [
                     {
-                      "type": "skip",
-                      "description": "phone layout only",
+                      "type": "serial",
                       "location": {
-                        "file": "/home/user/relay/tests/e2e/v5-ai.spec.ts",
-                        "line": 231,
+                        "file": "/home/user/relay/tests/e2e/v4-billing.spec.ts",
+                        "line": 216,
+                        "column": 15
+                      }
+                    },
+                    {
+                      "type": "skip",
+                      "description": "runs in the mobile project (fresh \"E2E Billing Mobile\" fixture)",
+                      "location": {
+                        "file": "/home/user/relay/tests/e2e/v4-billing.spec.ts",
+                        "line": 218,
                         "column": 10
                       }
                     }
@@ -543,14 +458,22 @@
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-08T12:14:33.936Z",
+                      "startTime": "2026-11-10T05:27:06.724Z",
                       "annotations": [
                         {
-                          "type": "skip",
-                          "description": "phone layout only",
+                          "type": "serial",
                           "location": {
-                            "file": "/home/user/relay/tests/e2e/v5-ai.spec.ts",
-                            "line": 231,
+                            "file": "/home/user/relay/tests/e2e/v4-billing.spec.ts",
+                            "line": 216,
+                            "column": 15
+                          }
+                        },
+                        {
+                          "type": "skip",
+                          "description": "runs in the mobile project (fresh \"E2E Billing Mobile\" fixture)",
+                          "location": {
+                            "file": "/home/user/relay/tests/e2e/v4-billing.spec.ts",
+                            "line": 218,
                             "column": 10
                           }
                         }
@@ -561,20 +484,229 @@
                   "status": "skipped"
                 }
               ],
-              "id": "7ff9db20bc7545eb6c5c-691d39491f4f24b92822",
-              "file": "v5-ai.spec.ts",
-              "line": 230,
+              "id": "9640cc24f2e00fab88f2-4aa799b0fdbf8d5b91d2",
+              "file": "v4-billing.spec.ts",
+              "line": 217,
               "column": 7
             },
             {
-              "title": "phone: history sheet, composer with the on-screen keyboard, results readable @mobile",
+              "title": "§17 at 390 px: inspect plan, open hosted checkout, update payment details, cancel renewal, staff inspect tenant billing",
               "ok": true,
               "tags": [
                 "mobile"
               ],
               "tests": [
                 {
-                  "timeout": 240000,
+                  "timeout": 90000,
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/user/relay/tests/e2e/v4-billing.spec.ts",
+                        "line": 216,
+                        "column": 15
+                      }
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "mobile",
+                  "projectName": "mobile",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 59105,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-10T05:31:04.512Z",
+                      "annotations": [
+                        {
+                          "type": "serial",
+                          "location": {
+                            "file": "/home/user/relay/tests/e2e/v4-billing.spec.ts",
+                            "line": 216,
+                            "column": 15
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "9640cc24f2e00fab88f2-5777c8146ddd7759188f",
+              "file": "v4-billing.spec.ts",
+              "line": 217,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "v4-entitlements.spec.ts",
+      "file": "v4-entitlements.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "V4 entitlements",
+          "file": "v4-entitlements.spec.ts",
+          "line": 70,
+          "column": 6,
+          "specs": [
+            {
+              "title": "Admin → Usage on a legacy workspace: plan, allowances, budgets; no placeholder billing card",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 300000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 55397,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-10T05:27:06.749Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "f06e401ebc6411da0091-72e785af76a7becefb99",
+              "file": "v4-entitlements.spec.ts",
+              "line": 73,
+              "column": 7
+            },
+            {
+              "title": "operator overrides → customer sees adjusted limits, chooses what stays active, gets an upgrade prompt; server refuses (402)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 300000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 59882,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-10T05:28:02.158Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "f06e401ebc6411da0091-1a2abce3616214d602fd",
+              "file": "v4-entitlements.spec.ts",
+              "line": 90,
+              "column": 7
+            },
+            {
+              "title": "D33 Free: usage shows Free limits; analytics/inbox prompt + 402; second brand and teammates refused",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 300000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 31485,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-10T05:29:02.052Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "f06e401ebc6411da0091-c9e9117ccc141a69c548",
+              "file": "v4-entitlements.spec.ts",
+              "line": 153,
+              "column": 7
+            },
+            {
+              "title": "usage page and chooser on a phone; no horizontal scroll 320–1440 @mobile",
+              "ok": true,
+              "tags": [
+                "mobile"
+              ],
+              "tests": [
+                {
+                  "timeout": 300000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 90434,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-10T05:29:33.548Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "f06e401ebc6411da0091-e14ebed698171c9e5546",
+              "file": "v4-entitlements.spec.ts",
+              "line": 193,
+              "column": 7
+            },
+            {
+              "title": "usage page and chooser on a phone; no horizontal scroll 320–1440 @mobile",
+              "ok": true,
+              "tags": [
+                "mobile"
+              ],
+              "tests": [
+                {
+                  "timeout": 300000,
                   "annotations": [],
                   "expectedStatus": "passed",
                   "projectId": "mobile",
@@ -584,12 +716,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 57319,
+                      "duration": 90390,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-08T12:15:04.788Z",
+                      "startTime": "2026-11-10T05:32:03.720Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -597,9 +729,9 @@
                   "status": "expected"
                 }
               ],
-              "id": "7ff9db20bc7545eb6c5c-ba59803a22405f50731e",
-              "file": "v5-ai.spec.ts",
-              "line": 230,
+              "id": "f06e401ebc6411da0091-af09546ccdf7bb04daca",
+              "file": "v4-entitlements.spec.ts",
+              "line": 193,
               "column": 7
             }
           ]
@@ -609,10 +741,10 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-11-08T12:09:32.346Z",
-    "duration": 389833.998,
-    "expected": 11,
-    "skipped": 2,
+    "startTime": "2026-11-10T05:25:41.802Z",
+    "duration": 472405.18200000003,
+    "expected": 12,
+    "skipped": 1,
     "unexpected": 0,
     "flaky": 0
   }

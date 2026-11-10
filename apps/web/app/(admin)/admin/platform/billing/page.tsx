@@ -12,7 +12,7 @@ import { Badge, Card, EmptyState, ErrorState, FilterBar, FilterSelect, Input, Pa
 import { RecordList } from '@/components/admin/ui';
 import { ACCESS_TONE, STATUS_LABEL, STATUS_TONE, day } from '@/components/billing/format';
 
-const STATUSES = ['attention', 'trialing', 'active', 'past_due', 'payment_action_required', 'incomplete', 'cancel_scheduled', 'cancelled', 'expired', 'legacy'] as const;
+const STATUSES = ['attention', 'free', 'trialing', 'active', 'past_due', 'payment_action_required', 'incomplete', 'cancel_scheduled', 'cancelled', 'expired', 'legacy'] as const;
 
 export default function PlatformBillingPage() {
   const router = useRouter();
@@ -20,7 +20,7 @@ export default function PlatformBillingPage() {
   const [q, setQ] = useState(params.get('q') ?? '');
   const qs = new URLSearchParams(['q', 'status'].flatMap((k) => (params.get(k) ? [[k, params.get(k)!]] : [])));
   const { data, error, loading, refetch } = useApi<{ items: PlatformBillingListItem[]; counts: Record<string, number> }>(`/api/platform/billing?${qs}`, { keepPrevious: true });
-  const when = (w: PlatformBillingListItem) => w.status === 'trialing' ? `Trial ends ${day(w.trial_ends_at)}` : w.grace_ends_at ? `Grace ends ${day(w.grace_ends_at)}` : w.cancel_at ? `Ends ${day(w.cancel_at)}` : w.current_period_end ? `Renews ${day(w.current_period_end)}` : '—';
+  const when = (w: PlatformBillingListItem) => w.status === 'free' ? 'No subscription' : w.status === 'trialing' ? `Trial ends ${day(w.trial_ends_at)}` : w.grace_ends_at ? `Grace ends ${day(w.grace_ends_at)}` : w.cancel_at ? `Ends ${day(w.cancel_at)}` : w.current_period_end ? `Renews ${day(w.current_period_end)}` : '—';
   return (
     <>
       <PageHeader title="Subscriptions" meta={data ? Object.entries(data.counts).map(([k, v]) => `${v} ${STATUS_LABEL[k]?.toLowerCase() ?? k}`).join(' · ') : undefined} />

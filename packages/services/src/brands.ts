@@ -72,6 +72,9 @@ export async function createBrand(ctx: Ctx, input: { name: string; timezone?: st
     const exists = await maybeOne<{ id: string }>(tx,
       `SELECT id FROM brands WHERE workspace_id=$1 AND lower(name)=lower($2) AND archived_at IS NULL`, [ctx.access.workspaceId, name]);
     if (exists) throw new AppError('conflict', 'A brand with this name already exists', { name: 'Already in use' });
+    // D33: the plan's brand limit (Free = 1), race-free in this transaction.
+    const { assertCanCreateBrand } = await import('./entitlements/actions.js');
+    await assertCanCreateBrand(tx, ctx.access.workspaceId);
     const b = (await maybeOne<{ id: string }>(tx,
       `INSERT INTO brands(workspace_id, name, timezone, is_demo)
        SELECT w.id, $2, coalesce($3, w.timezone), w.is_demo FROM workspaces w WHERE w.id=$1 RETURNING id`,

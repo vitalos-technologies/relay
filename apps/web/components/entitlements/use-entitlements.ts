@@ -1,14 +1,16 @@
 'use client';
 // UI side of the shared entitlement service: one GET per page (/api/entitlements), used to hide/upgrade controls and
 // show concise prompts. It is a HINT only — every action is enforced on the server (402 entitlement_required).
-import { PLANS, PUBLIC_PLAN_IDS, type Feature, type PlanId } from '@social-lite/core/contracts/v4-plans';
+import type { Feature, PlanId } from '@social-lite/core/contracts/v4-plans';
+import { cheapestPlanWithFeature, featureUpgradeMessage } from '@social-lite/core/contracts/plan-copy';
 import { FEATURE_LABEL, type EntitlementsDto } from '@social-lite/core/contracts/v4-entitlements';
 import { useApi } from '@/lib/client/use-api';
 
 export type ClientCheck = { ok: true } | { ok: false; reason: 'feature_not_in_plan' | 'access_restricted' | 'access_suspended'; message: string; upgradeTo: PlanId | null };
 
+/** Cheapest plan that includes the feature (D33: Free → Standard → Professional, by catalogue price). */
 export function upgradeTarget(feature: Feature): PlanId | null {
-  return PUBLIC_PLAN_IDS.find((id) => PLANS[id].features.includes(feature)) ?? null;
+  return cheapestPlanWithFeature(feature);
 }
 
 /** Mirror of the server's checkFeature (copy only; never trusted for authorization). */
@@ -20,7 +22,7 @@ export function checkFeatureClient(e: EntitlementsDto | undefined, feature: Feat
   if (!f?.enabled) {
     const to = upgradeTarget(feature);
     return { ok: false, reason: 'feature_not_in_plan', upgradeTo: to,
-      message: f?.source === 'override' ? `${FEATURE_LABEL[feature]} is turned off for this workspace.` : `${FEATURE_LABEL[feature]} isn’t included in ${e.plan?.name ?? 'your plan'}.${to ? ` It’s part of ${PLANS[to].name}.` : ''}` };
+      message: f?.source === 'override' ? `${FEATURE_LABEL[feature]} is turned off for this workspace.` : featureUpgradeMessage(FEATURE_LABEL[feature], e.plan?.name, to) };
   }
   if (opts.paid && e.access === 'restricted') return { ok: false, reason: 'access_restricted', message: e.access_reason ?? 'Paid actions are paused.', upgradeTo: null };
   return { ok: true };

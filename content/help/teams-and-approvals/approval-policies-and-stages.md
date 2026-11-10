@@ -7,7 +7,7 @@ roles: [owner, admin, brand_manager]
 status: available
 related: [submit-a-post-for-review, approve-or-request-changes, when-an-approval-is-reset, guests-and-client-reviews, plans-and-features]
 product_version: "2026-11"
-reviewed: 2026-11-09
+reviewed: 2026-11-10
 order: 42
 keywords: [approval workflow, review stages, quorum, separation of duties, two-step approval, compliance]
 ---
@@ -16,7 +16,7 @@ keywords: [approval workflow, review stages, quorum, separation of duties, two-s
 
 - **Required permission:** `brands.manage` on the brand to change its policy (Brand manager, Admin, Owner). Anyone can
   read it.
-- **Plan:** one review stage is part of every plan. A **second stage** needs Professional (multi-step approvals). If you
+- **Plan:** one review stage is part of Standard and Professional (Free has no approvals). A **second stage** needs Professional (multi-step approvals). If you
   move to Standard, an existing two-stage policy stays in force, but you can't add a second stage.
 - Making a policy weaker (fewer approvals, wider eligibility, guests allowed, separation of duties off, removing a stage)
   asks you to confirm it's you (step-up).

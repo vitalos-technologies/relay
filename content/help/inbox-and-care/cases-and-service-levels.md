@@ -7,12 +7,12 @@ roles: [owner, admin, brand_manager, care_agent]
 status: available
 related: [work-in-the-inbox, reply-and-add-internal-notes, plans-and-features]
 product_version: "2026-11"
-reviewed: 2026-11-09
+reviewed: 2026-11-10
 order: 30
 keywords: [case, ticket, sla, service level, first response time, resolution time, business hours]
 ---
 
-**Plan:** cases work on every plan with the inbox. **Changing service-level targets** needs **Professional**; on Standard,
+**Plan:** cases work on every plan with the inbox (Standard and Professional). **Changing service-level targets** needs **Professional**; on Standard,
 existing targets keep working and stay readable.
 
 ## Work with a case

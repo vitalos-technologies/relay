@@ -12,12 +12,12 @@ export const day = (iso: string | null | undefined) => (iso ? new Date(iso).toLo
 
 export const STATUS_LABEL: Record<string, string> = {
   trialing: 'Free trial', active: 'Active', payment_action_required: 'Action needed', past_due: 'Payment failed', cancel_scheduled: 'Ends at period end',
-  cancelled: 'Cancelled', expired: 'Expired', incomplete: 'Payment pending', none: 'No plan', legacy: 'Legacy',
+  cancelled: 'Cancelled', expired: 'Expired', incomplete: 'Payment pending', none: 'No plan', legacy: 'Legacy', free: 'Free',
 };
 
 export const STATUS_TONE: Record<string, Tone | 'accent'> = {
   trialing: 'accent', active: 'success', payment_action_required: 'danger', past_due: 'danger', cancel_scheduled: 'warn',
-  cancelled: 'neutral', expired: 'warn', incomplete: 'warn', none: 'neutral', legacy: 'neutral',
+  cancelled: 'neutral', expired: 'warn', incomplete: 'warn', none: 'neutral', legacy: 'neutral', free: 'neutral',
 };
 
 export const ACCESS_TONE: Record<string, Tone> = { full: 'success', restricted: 'warn', suspended: 'danger' };

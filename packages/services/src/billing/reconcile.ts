@@ -4,12 +4,14 @@
 //  3. expire abandoned checkout reservations;
 //  4. re-fetch subscriptions from the provider: transitional states (incomplete / past due / scheduled change due) every
 //     15 min, everything else every 6 h — catches any event the provider never delivered;
-//  5. persist derived access changes caused only by the clock (grace end, cancellation date) → billing.access_changed;
+//  5. persist derived access changes caused only by the clock (grace end → restricted + billing.access_changed; a
+//     cancellation date passed with the provider subscription already ended → Free, D33);
 //  6. run staff-scheduled lifecycle actions that are due (service suspension), audited;
 //  7. purge stored webhook bodies older than 90 days (metadata kept).
 import { getPool, withTx, type Queryable } from '@social-lite/db';
 import { log } from '../log.js';
-import { deriveAccess } from './policy.js';
+import { deriveAccess, liveProviderSubscription } from './policy.js';
+import { moveToFreeTx } from './free.js';
 import { getBillingProvider } from './provider.js';
 import { reconcileWorkspace } from './manage.js';
 import { loadBilling, saveBilling, serviceSuspended } from './store.js';
@@ -42,17 +44,26 @@ export async function runBillingSweeps(db: Queryable = getPool(), now = new Date
   });
   await step('access', async () => {
     const rows = await db.query<{ workspace_id: string }>(
-      `SELECT workspace_id FROM workspace_billing WHERE access_level='full' AND (
-          (status IN ('past_due','payment_action_required') AND grace_ends_at <= $1)
+      `SELECT workspace_id FROM workspace_billing WHERE (
+          (access_level='full' AND status IN ('past_due','payment_action_required') AND grace_ends_at <= $1)
        OR (status='cancel_scheduled' AND cancel_at <= $1)
-       OR (status IN ('trialing','incomplete') AND trial_ends_at <= $1 AND provider_subscription_ref IS NULL))
+       OR (status IN ('expired','cancelled') AND (provider_subscription_ref IS NULL OR provider_status IN ('canceled','incomplete_expired'))))
        LIMIT 100`, [now]);
     let n = 0;
     for (const r of rows.rows) {
       await withTx(async (tx) => {
         const prev = await loadBilling(tx, r.workspace_id, { lock: true });
         if (!prev) return;
-        const d = deriveAccess({ status: prev.status, serviceSuspended: await serviceSuspended(tx, r.workspace_id), graceEndsAt: prev.grace_ends_at, trialEndsAt: prev.trial_ends_at, cancelAt: prev.cancel_at, now });
+        const live = liveProviderSubscription(prev);
+        const d = deriveAccess({ status: prev.status, serviceSuspended: await serviceSuspended(tx, r.workspace_id), graceEndsAt: prev.grace_ends_at, trialEndsAt: prev.trial_ends_at, cancelAt: prev.cancel_at, now,
+          liveSubscription: live });
+        if (d.free && !live && prev.status !== 'free') {
+          // The subscription already ended at the provider (or never existed): persist the move to Free now. A live one
+          // waits for the provider's own cancellation (webhook / reconcile above), which also lands on Free.
+          await moveToFreeTx(tx, prev, { kind: prev.status === 'cancel_scheduled' ? 'cancellation_effective' : 'moved_to_free', source: 'system', actorService: 'billing-sweep' }, ['billing.subscription_ended']);
+          n++;
+          return;
+        }
         if (d.access === prev.access_level) return;
         await saveBilling(tx, prev, { ...prev }, { kind: prev.status === 'cancel_scheduled' ? 'cancellation_effective' : 'grace_exhausted', source: 'system', actorService: 'billing-sweep' });
         n++;

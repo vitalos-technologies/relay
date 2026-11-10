@@ -6,7 +6,7 @@ audience: public
 status: available
 related: [what-is-relay, find-your-way-around, roles-and-permissions]
 product_version: "2026-11"
-reviewed: 2026-11-09
+reviewed: 2026-11-10
 order: 10
 keywords: [terms, definitions, vocabulary, meaning, words, dictionary]
 ---
@@ -139,11 +139,11 @@ Terms are grouped by topic. Labels in **bold** are the words you see in the app.
 
 | Term | Meaning |
 |---|---|
-| **Plan** | **Standard** or **Professional**, priced per user per month. |
-| **Trial** | 14 days free on a plan, without a card. |
+| **Plan** | **Free** (£0, one user), or **Standard** or **Professional**, priced per user per month. |
+| **Trial** | 14 days free on Standard or Professional, without a card. Ends on Free if you don't subscribe. |
 | **Seat** | One paid member. Guests don't use a seat. |
 | **Billable user** | A member who counts as a paid seat. |
 | **Allowance** | The monthly amount of a metered feature included in your plan. |
 | **Budget** | A safety cap you set yourself on a metered feature. |
-| **Restricted** | The workspace state when the trial has ended without a plan or a payment failed: paid actions such as publishing are paused until billing is sorted out. |
+| **Restricted** | The workspace state when a payment problem outlasts the grace period: paid actions such as publishing are paused until billing is sorted out. |
 | **Support request** | A message to Relay support, followed in **Help → My requests**. |

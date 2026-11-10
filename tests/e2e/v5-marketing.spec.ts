@@ -35,7 +35,7 @@ test.describe('marketing page (public)', () => {
     const hrefs = await page.$$eval('a[href]', (as) => as.map((a) => a.getAttribute('href')!));
     for (const h of hrefs.filter((x) => x.startsWith('#') && x !== '#support' /* opens the support widget (WID) */)) expect(await page.locator(h === '#' ? 'body' : h).count(), h).toBeGreaterThan(0);
     const leaving = [...new Set(hrefs.filter((h) => !h.startsWith('#')))];
-    for (const h of leaving) expect(h, 'only account / support / help / legal links leave the page').toMatch(/^\/(signup(\?plan=(standard|professional)&seats=\d+)?|login(\?returnTo=.*)?|overview|help|help\/contact)$|^mailto:|^https:/); // HC: footer links the public Help Centre
+    for (const h of leaving) expect(h, 'only account / support / help / legal links leave the page').toMatch(/^\/(signup(\?plan=(standard|professional)&seats=\d+|\?plan=free)?|login(\?returnTo=.*)?|overview|help|help\/contact)$|^mailto:|^https:/); // HC: footer links the public Help Centre
     // Explore Relay scrolls to the product demonstrations (no fake demo video).
     await page.goto('/');
     await page.getByTestId('mkt-hero-explore').click();
@@ -72,33 +72,54 @@ test.describe('marketing page (public)', () => {
     await expect.poll(() => shot.evaluate((el: any) => el.complete && el.naturalWidth > 0 ? (el.currentSrc as string) : '')).toMatch(/\/_next\/image\?url=%2Fmarketing%2Foverview-(light|dark)\.webp/);
     const imgRes = await page.request.get(await shot.evaluate((el: any) => el.currentSrc as string), { headers: { accept: 'image/avif,image/webp,*/*' } }); // eslint-disable-line @typescript-eslint/no-explicit-any
     expect(imgRes.headers()['content-type']).toMatch(/image\/(avif|webp)/);
-    // Purple primary action (marketing palette, D24) in light mode.
-    await page.emulateMedia({ colorScheme: 'light' });
+    // Purple primary action (marketing palette, D24). Light only: same colours even when the OS asks for dark.
+    await page.emulateMedia({ colorScheme: 'dark' });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- no DOM lib in the test tsconfig
+    expect(await page.evaluate(() => (globalThis as any).getComputedStyle((globalThis as any).document.body).backgroundColor)).toBe('rgb(255, 255, 255)');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    await expect(shot).toHaveAttribute('src', /overview-light/);
+    expect(await page.locator('source[media*="prefers-color-scheme"]').count()).toBe(0);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- no DOM lib in the test tsconfig
     const bg = await page.getByTestId('mkt-hero-trial').evaluate((el: any) => (globalThis as any).getComputedStyle(el).backgroundColor as string);
     expect(bg).toBe('rgb(59, 31, 143)');
-    // Integrations carry honest statuses; nothing that needs provider review is "Available".
-    for (const p of ['instagram', 'facebook', 'x', 'tiktok']) await expect(page.getByTestId(`mkt-network-${p}`).locator('[data-status]')).not.toHaveAttribute('data-status', 'available');
-    await expect(page.getByTestId('mkt-network-telegram').locator('[data-status]')).toHaveAttribute('data-status', 'available');
-    await expect(page.getByText(/No endorsement or partnership is implied/)).toBeVisible();
+    // Integrations: tiles are icon, name and one line (no legend, badges, notes or disclaimer line); the intro keeps the
+    // disclosure that some go live after provider approval. Statuses stay honest in data-status.
+    for (const p of ['instagram', 'facebook', 'x', 'tiktok']) await expect(page.getByTestId(`mkt-network-${p}`)).not.toHaveAttribute('data-status', 'available');
+    await expect(page.getByTestId('mkt-network-telegram')).toHaveAttribute('data-status', 'available');
+    await expect(page.getByText('The networks and apps Relay connects to. Some go live as each network approves Relay’s access.')).toBeVisible();
+    await expect(page.locator('#integrations [aria-label="Status labels"]')).toHaveCount(0);
+    await expect(page.locator('#integrations')).not.toContainText(/Needs provider access|Meta app review|No endorsement or partnership/);
+    await expect(page.getByTestId('mkt-network-telegram')).toHaveText('TelegramChannel posts · bot chats'); // name + one line, nothing after it
   });
 
-  test('§18.5–6 exactly two plans at £10 / £25 per user / month, 14 days free, no card; seats and totals; comparison', async ({ page }) => {
+  test('§18.5–6 + D33 three plans: Free £0, Standard £5 / Professional £15 per user / month (14 days free, no card); seats and totals; comparison', async ({ page }) => {
     await page.goto('/#pricing');
     const plans = page.getByTestId('mkt-plans').locator(':scope > li');
-    await expect(plans).toHaveCount(2);
-    await expect(page.getByTestId('mkt-price-standard')).toHaveText('£10');
-    await expect(page.getByTestId('mkt-price-professional')).toHaveText('£25');
+    await expect(plans).toHaveCount(3);
+    await expect(page.getByTestId('mkt-price-free')).toHaveText('£0');
+    await expect(page.getByTestId('mkt-price-standard')).toHaveText('£5');
+    await expect(page.getByTestId('mkt-price-professional')).toHaveText('£15');
     for (const id of ['standard', 'professional']) {
       await expect(page.getByTestId(`mkt-plan-${id}`)).toContainText('per user / month');
       await expect(page.getByTestId(`mkt-plan-${id}`)).toContainText('14 days free');
       await expect(page.getByTestId(`mkt-plan-${id}`)).toContainText('No card required');
+      await expect(page.getByTestId(`mkt-cta-${id}`)).toContainText('Start free trial');
     }
-    await expect(page.getByTestId('mkt-total-standard')).toContainText('3 users · £30 / month');
-    await expect(page.getByTestId('mkt-total-professional')).toContainText('3 users · £75 / month');
+    // Free: one user, no trial wording, no seat estimate, "Start free".
+    const free = page.getByTestId('mkt-plan-free');
+    await expect(free).toContainText('for 1 user');
+    await expect(free).not.toContainText(/trial|days free/i);
+    await expect(page.getByTestId('mkt-total-free')).toContainText('1 user · £0 / month');
+    await expect(page.getByTestId('mkt-cta-free')).toHaveText(/^Start free/);
+    await expect(page.getByTestId('mkt-cta-free')).toHaveAttribute('href', '/signup?plan=free');
+    await expect(page.getByTestId('mkt-hero-prices')).toHaveCount(0); // user request: no price line under the hero CTAs
+    await expect(page.getByTestId('mkt-total-standard')).toContainText('3 users · £15 / month');
+    await expect(page.getByTestId('mkt-total-professional')).toContainText('3 users · £45 / month');
     await page.getByTestId('mkt-seats').fill('5');
-    await expect(page.getByTestId('mkt-total-standard')).toContainText('5 users · £50 / month');
-    await expect(page.getByTestId('mkt-total-professional')).toContainText('5 users · £125 / month');
+    await expect(page.getByTestId('mkt-total-standard')).toContainText('5 users · £25 / month');
+    await expect(page.getByTestId('mkt-total-professional')).toContainText('5 users · £75 / month');
+    await expect(page.getByTestId('mkt-total-free')).toContainText('1 user · £0 / month'); // the stepper is for paid plans only
+    await expect(page.getByTestId('mkt-cta-free')).toHaveAttribute('href', '/signup?plan=free');
     await page.getByRole('button', { name: 'One user more' }).click();
     await expect(page.getByTestId('mkt-cta-professional')).toHaveAttribute('href', '/signup?plan=professional&seats=6');
     // Expandable comparison (features + allowances + bounded trial allowances).
@@ -109,13 +130,18 @@ test.describe('marketing page (public)', () => {
     const table = page.getByTestId('mkt-comparison');
     await expect(table.getByRole('rowheader', { name: 'Multi-step AI workflows' })).toBeVisible();
     await expect(table).toContainText('100k + 50k per user');
+    // Free's limits, stated honestly (D33).
+    for (const [row, v] of [['Users', '1'], ['Brands', '1'], ['Connected social accounts', '2'], ['Scheduled posts a month', '10'], ['Media storage', '500 MB'], ['AI usage a month (tokens)', '20k']] as const) {
+      await expect(table.getByRole('row', { name: new RegExp(`^${row.replace(/[()]/g, '\\$&')}`) }).first().getByRole('cell').first()).toHaveText(v);
+    }
+    await expect(table).toContainText('Data export always works');
     await expect(table).toContainText('During the 14-day trial');
     await expect(table).toContainText('No overage charges');
     // Handoff: the selected plan + seat estimate reach /signup, which shows the same total before anything is bought.
     await page.getByTestId('mkt-cta-professional').click();
     await expect(page).toHaveURL(/\/signup\?plan=professional&seats=6$/);
     await expect(page.getByTestId('signup-plan-professional')).toHaveAttribute('aria-current', 'true');
-    await expect(page.getByTestId('signup-total')).toContainText('6 users × £25 = £150 / month');
+    await expect(page.getByTestId('signup-total')).toContainText('6 users × £15 = £90 / month');
     await expect(page.getByTestId('signup-continue')).toHaveAttribute('href', '/signup/workspace?plan=professional');
   });
 
@@ -134,8 +160,14 @@ test.describe('marketing page (public)', () => {
     await expect(trial).toHaveAttribute('aria-expanded', 'true');
     await expect(page.getByTestId('mkt-faq-trial')).toContainText('no card needed');
     await expect(page.getByTestId('mkt-faq-trial')).toContainText('first charge is on the day the trial ends');
+    await expect(page.getByTestId('mkt-faq-trial')).toContainText('the workspace moves to Free');
+    await expect(page.getByTestId('mkt-faq-trial')).toContainText('Nothing is deleted and data export always works');
     await page.getByTestId('mkt-faq-per-user').getByRole('button').click();
-    await expect(page.getByTestId('mkt-faq-per-user')).toContainText('Three Standard users cost £30 a month; three Professional users cost £75');
+    await expect(page.getByTestId('mkt-faq-per-user')).toContainText('Three Standard users cost £15 a month; three Professional users cost £45');
+    await page.getByTestId('mkt-faq-free').getByRole('button', { name: 'What’s included in Free?' }).click();
+    await expect(page.getByTestId('mkt-faq-free')).toContainText('Free is £0 for one person: 1 brand, 2 social accounts, 10 scheduled posts a month, 500 MB of media');
+    await page.getByTestId('mkt-faq-cancel').getByRole('button').click();
+    await expect(page.getByTestId('mkt-faq-cancel')).toContainText('the workspace moves to Free');
     // Explore: an accessible inline preview; focus moves in, Escape closes, focus returns.
     const explore = page.getByTestId('mkt-explore-ai-assistant');
     await explore.focus();
@@ -143,6 +175,14 @@ test.describe('marketing page (public)', () => {
     const dialog = page.getByRole('dialog', { name: 'AI assistant' });
     await expect(dialog).toBeVisible();
     await expect(dialog).toContainText('Publishing and replies always need approval');
+    // A real screenshot of the matching app screen (synthetic showcase), lazy, with reserved size and a caption.
+    const img = dialog.getByTestId('mkt-explore-shot-ai-assistant').locator('img');
+    await expect(img).toHaveAttribute('alt', /AI workspace/);
+    await expect(img).toHaveAttribute('loading', 'lazy');
+    await expect(img).toHaveAttribute('width', '2560');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- no DOM lib in the test tsconfig
+    await expect.poll(() => img.evaluate((el: any) => el.complete && el.naturalWidth > 0)).toBe(true);
+    await expect(dialog).toContainText('Example workspace');
     await page.keyboard.press('Escape');
     await expect(dialog).toBeHidden();
     await expect(explore).toBeFocused();
@@ -169,7 +209,7 @@ test.describe('marketing page (public)', () => {
     const seats = page.getByTestId('mkt-seats');
     await seats.tap();
     await seats.fill('4');
-    await expect(page.getByTestId('mkt-total-standard')).toContainText('4 users · £40 / month');
+    await expect(page.getByTestId('mkt-total-standard')).toContainText('4 users · £20 / month');
     await expect(page.getByTestId('mkt-cta-standard')).toBeVisible();
     await page.screenshot({ path: `${EVIDENCE}/e2e-pricing-mobile.png` });
     // Plain (non-emulated-mobile) contexts, so the browser cannot zoom out to hide an overflow; comparison table opened.
@@ -186,6 +226,26 @@ test.describe('marketing page (public)', () => {
 });
 
 test.describe('signed in and signup handoff', () => {
+  test('D33 /signup?plan=free shows Free with no trial copy and no seats; the picker shows all three plans', async ({ page }) => {
+    await page.goto('/#pricing');
+    await page.getByTestId('mkt-cta-free').click();
+    await expect(page).toHaveURL(/\/signup\?plan=free$/);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Start on Free');
+    for (const id of ['free', 'standard', 'professional']) await expect(page.getByTestId(`signup-plan-${id}`)).toBeVisible();
+    await expect(page.getByTestId('signup-plan-free')).toHaveAttribute('aria-current', 'true');
+    await expect(page.getByTestId('signup-plan-free')).toContainText('£0 for 1 user');
+    await expect(page.getByTestId('signup-seats')).toHaveCount(0);
+    await expect(page.getByTestId('signup-total')).toHaveCount(0);
+    await expect(page.locator('main')).not.toContainText(/14-day|Start free trial/); // paid cards still say "after the trial" for their own price
+    await expect(page.getByTestId('signup-continue')).toHaveText(/Continue with Free/);
+    await expect(page.getByTestId('signup-continue')).toHaveAttribute('href', '/signup/workspace?plan=free');
+    // Paid plans unchanged: trial heading, seats × price.
+    await page.getByTestId('signup-plan-standard').click();
+    await expect(page).toHaveURL(/\/signup\?plan=standard$/);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Start your 14-day free trial');
+    await expect(page.getByTestId('signup-total')).toContainText('1 user × £5 = £5 / month');
+  });
+
   test('§18.2 a signed-in visitor sees "Open dashboard" on / (no redirect) and reaches /overview', async ({ page }) => {
     await signIn(page, OWNER);
     await page.goto('/');
@@ -240,14 +300,14 @@ test.describe('signed in and signup handoff', () => {
     await page.waitForURL(/\/settings\/workspace\/billing\?welcome=1/, { timeout: 45_000 });
     const plan = page.getByTestId('billing-plan');
     await expect(plan).toContainText('Professional');
-    await expect(plan).toContainText('£25 per user / month');
+    await expect(plan).toContainText('£15 per user / month');
     await expect(plan).toContainText(/Free trial/);
     // Trial facts from the server: one 14-day trial on Professional.
     const ov = await (await page.request.get('/api/billing')).json() as { trial: { started_at: string; ends_at: string; plan_id: string }; seats: { billable: number }; recurring_total_minor: number | null };
     expect(ov.trial.plan_id).toBe('professional');
     expect(new Date(ov.trial.ends_at).getTime() - new Date(ov.trial.started_at).getTime()).toBe(14 * 86_400_000);
     expect(ov.seats.billable).toBe(1);
-    await expect(page.getByTestId('plan-professional-total').or(page.getByTestId('billing-plan'))).toContainText('£25');
+    await expect(page.getByTestId('plan-professional-total').or(page.getByTestId('billing-plan'))).toContainText('£15');
     // Choosing a paid plan needs billing.manage (sensitive → two-step verification by workspace policy): either the plan
     // choices or an explicit hint to set it up is shown — never a dead end.
     await expect(page.getByTestId('billing-mfa-hint').or(page.getByTestId('billing-choose')).first()).toBeVisible();

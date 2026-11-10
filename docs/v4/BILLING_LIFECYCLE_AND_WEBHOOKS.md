@@ -1,6 +1,15 @@
 # Billing lifecycle and webhook design (V4 §9–11; V5 §8)
 
-Stream BIL. Code: `packages/services/src/billing/*`, `packages/providers/src/stripe/*`, migration `035_v4_billing.sql`.
+Stream BIL (D33 Free plan: stream PL). Code: `packages/services/src/billing/*`, `packages/providers/src/stripe/*`, migrations
+`035_v4_billing.sql`, `040_free_plan.sql`.
+
+## Free plan: no provider objects (D33)
+A workspace on **Free** has **no** provider customer, subscription, checkout session, price, invoice or charge — ever. Its
+`workspace_billing` row says `status = 'free'`, `plan_id = 'free'`, `seats = 0` and points at the current Free plan version
+(£0, `purchasable = false`, no `billing_provider_prices` row). Checkout and trials refuse `plan: 'free'`; the customer
+portal is not offered on Free. Code: `billing/free.ts` (`startFreeTx`, `moveToFreeTx`). A former subscriber that dropped to
+Free keeps its provider references as history (a later checkout reuses the same provider customer) and its past invoices
+stay listed. **No Stripe product or price is created for Free** (activation checklist).
 
 ## Provider
 - **Stripe Billing**, hosted flows only: Checkout (`mode=subscription`, one line item = plan price × seat quantity) and the
@@ -19,28 +28,32 @@ Stream BIL. Code: `packages/services/src/billing/*`, `packages/providers/src/str
 ## State dimensions (kept separate)
 | Dimension | Values | Set by |
 |---|---|---|
-| Billing status | `trialing`, `active`, `payment_action_required`, `past_due`, `cancel_scheduled`, `cancelled`, `expired`, `incomplete`, `none`, `legacy` | provider-verified state + the local trial (`policy.ts deriveStatus`) |
+| Billing status | `free`, `trialing`, `active`, `payment_action_required`, `past_due`, `cancel_scheduled`, `cancelled`, `expired`, `incomplete`, `none`, `legacy` | provider-verified state + the local trial (`policy.ts deriveStatus`); `cancelled`/`expired` are persisted as `free` (D33) |
 | Service state | `workspaces.state` = `active` / `suspended` | Relay operators only (Platform), never billing |
 | Access level | `full` / `restricted` / `suspended` | derived (`policy.ts deriveAccess`) from the two above **and the clock** |
 
 `getBillingState(db, workspaceId)` (`billing/state.ts`) is the contract ENT consumes (`core/contracts/v4-billing.ts`). It
-derives access on read, so a trial, grace period or cancellation date that passed before the sweep ran is already
-restricted. A scheduled downgrade / seat reduction takes over at its effective instant on read as well.
+derives access on read, so a grace period that passed before the sweep ran is already restricted, and a trial or
+cancellation date that passed already reads as **Free** (`deriveAccess().free` → `plan_id 'free'`, `status 'free'`, access
+`full`; an `incomplete` first payment keeps its status with Free's plan). A scheduled downgrade / seat reduction takes over at
+its effective instant on read as well.
 
 Provider status → billing status: `trialing`→trialing (or cancel_scheduled when cancelling); `active`→active
 (payment_action_required when the open invoice needs authentication; cancel_scheduled when cancelling); `past_due`/`unpaid`
 →past_due (or payment_action_required); `incomplete`→incomplete (trialing while the no-card trial still runs);
-`incomplete_expired`→back to the local trial state; `paused`→expired; `canceled`→cancelled (trialing while the no-card trial
-still runs — the promised free period is never cut, never extended).
+`incomplete_expired`→back to the local trial state; `paused`→expired (reads as Free); `canceled`→cancelled, persisted as
+**free** (trialing while the no-card trial still runs — the promised free period is never cut, never extended).
 
 ## Transitions (documented; `policy.ts TRANSITIONS`)
 | Trigger | From → To | Effect |
 |---|---|---|
-| Start trial (signup / Settings) | none → trialing | redemption row; `billing.trial_started` |
-| Verified checkout (no trial left) | expired / cancelled / none / legacy → active | `billing.subscription_activated` |
+| Signup / onboarding on Free | none → free | `free_started` lifecycle event; no provider objects |
+| Start trial (signup / Settings) | none / free (never redeemed) → trialing | redemption row; `billing.trial_started` |
+| Verified checkout from Free, trial never used | free → trialing (provider trial 14 days) | redemption recorded when the provider confirms; first charge = trial end; activated event |
+| Verified checkout (no trial left) | free / expired / cancelled / none / legacy → active | `billing.subscription_activated` |
 | Verified checkout during the trial | trialing → trialing (provider trial to the same end) | first charge = trial end; activated event |
-| First payment declined | → incomplete (restricted unless the trial still runs) | — |
-| Trial expiry (no subscription) | trialing → expired | access restricted; `billing.trial_expired`; notice 3 days before (`billing.trial_ending`) |
+| First payment declined | → incomplete (Free's plan applies unless the trial still runs) | — |
+| Trial expiry (no subscription) | trialing → **free** | `billing.trial_expired` + `billing.subscription_changed` (ENT holds what is over Free's limits); notice 3 days before (`billing.trial_ending`) |
 | Renewal | active → active | invoice cached; period moves |
 | Failed payment | active → past_due | grace 7 days (`PAST_DUE_GRACE_DAYS`), then restricted; `billing.payment_failed` |
 | Authentication requested | active/past_due → payment_action_required | same grace |
@@ -49,7 +62,7 @@ still runs — the promised free period is never cut, never extended).
 | Downgrade / seat reduction | active → active (scheduled) | provider updated with `proration_behavior=none`; Relay keeps current plan/seats until period end; `billing.subscription_changed` |
 | Cancel renewal | active/trialing → cancel_scheduled | service until period end; `billing.cancellation_scheduled` |
 | Reactivate | cancel_scheduled → active/trialing | `billing.subscription_changed` |
-| Period end after cancel | cancel_scheduled → cancelled | access restricted; nothing deleted; `billing.subscription_ended` |
+| Period end after cancel ("downgrade to Free") | cancel_scheduled → **free** | nothing deleted; `billing.subscription_ended` + `billing.subscription_changed` |
 | Grace exhausted | (status unchanged) | sweep persists `restricted`; `billing.access_changed` |
 
 Every derived access change writes `billing.access_changed` to the outbox (ENT re-evaluates held work). An undocumented
@@ -115,8 +128,10 @@ state; no amounts or card details in messages; link to Settings → Billing.
 Settings → Workspace → **Plan and billing** (`billing.read` to view, `billing.manage` to act; sensitive ⇒ MFA by workspace
 policy): plan, status, trial/renewal/first-charge date, seats and billable users, monthly total, payment-method summary,
 scheduled change, invoices (provider links), plan cards with seat stepper and total, change dialog with provider preview
-(price, timing, proration), update payment details (portal), cancel renewal (effects listed), resume renewal. Billing stays
-reachable while access is restricted (and it is never gated by entitlements).
+(price, timing, proration), update payment details (portal), "Downgrade to Free" (= cancel renewal; effects listed), resume
+renewal. On Free: price £0, users (Free includes 1), "Upgrade" plan cards for Standard/Professional ("Start free trial" while
+the trial is unused, otherwise checkout straight to paid; `upgrade_trial_days` in the overview), no portal, no invoices unless
+earlier ones exist. Billing stays reachable while access is restricted (and it is never gated by entitlements).
 
 ## Retention
 `billing_lifecycle_events` and `billing_trial_redemptions` are kept for the life of the workspace (append-only / no delete for

@@ -29,7 +29,7 @@ async function staff(role: 'operator' | 'support' | 'billing', fresh = true): Pr
 }
 
 /** The selected-plan handoff: /signup?plan=<id> → create workspace (signupWorkspace) → trial on that plan. */
-async function signupFromMarketing(plan: 'standard' | 'professional') {
+async function signupFromMarketing(plan: 'free' | 'standard' | 'professional') {
   const u = await createUser();
   const { session } = await createSession(testPool(), u.id, {});
   const actor = { userId: u.id, email: u.email, name: 'Owner', sessionId: session.id };
@@ -78,9 +78,9 @@ describe('Platform → Marketing configuration (marketingConfig)', () => {
 });
 
 describe('§18.5–6 the public plans and the trial the page presents', () => {
-  it('exactly two public plans at £10 and £25 per user / month, 14 days free, no card — from the catalogue', () => {
+  it('three public plans (D33): Free £0 (no trial), Standard £5 and Professional £15 per user / month with 14 days free, no card — from the catalogue', () => {
     const plans = pricingPlans();
-    expect(plans.map((p) => [p.id, p.price, p.interval, p.currency, p.trial_days])).toEqual([['standard', '£10', 'month', 'GBP', 14], ['professional', '£25', 'month', 'GBP', 14]]);
+    expect(plans.map((p) => [p.id, p.price, p.interval, p.currency, p.trial_days])).toEqual([['free', '£0', 'month', 'GBP', 0], ['standard', '£5', 'month', 'GBP', 14], ['professional', '£15', 'month', 'GBP', 14]]);
     expect(TRIAL_DAYS).toBe(14);
     expect(TRIAL_REQUIRES_CARD).toBe(false);
   });
@@ -102,6 +102,15 @@ describe('§18.5–6 the public plans and the trial the page presents', () => {
   });
 });
 
+describe('D33 Free handoff (/signup?plan=free)', () => {
+  it('creates a Free workspace with no trial and full access within Free', async () => {
+    const t = await signupFromMarketing('free');
+    const s = await getBillingState(testPool(), t.ws);
+    expect(s).toMatchObject({ plan_id: 'free', status: 'free', access: 'full', trial: null });
+    expect((await q(`SELECT 1 FROM billing_trial_redemptions WHERE workspace_id=$1`, [t.ws])).length).toBe(0);
+  });
+});
+
 describe('§18.7 seats and totals match across marketing, checkout, billing and admin', () => {
   for (const plan of ['standard', 'professional'] as const) {
     it(`3 ${plan} users: marketing estimate = Billing = checkout = provider state = Platform admin`, async () => {
@@ -111,7 +120,7 @@ describe('§18.7 seats and totals match across marketing, checkout, billing and 
       await createInvitation(await t.ctx(), { email: `pending-${randomUUID().slice(0, 6)}@test.social-lite.test`, role: 'editor' } as never, randomUUID());
 
       const marketing = recurringTotalMinor(plan, 3); // what the pricing card / signup handoff shows for 3 users
-      expect(marketing).toBe(plan === 'standard' ? 3000 : 7500);
+      expect(marketing).toBe(plan === 'standard' ? 1500 : 4500);
       expect(marketing).toBe(PLANS[plan].unit_amount_minor! * 3);
 
       const ov = await billingOverview(await t.ctx());

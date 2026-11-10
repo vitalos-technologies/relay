@@ -1,0 +1,46 @@
+{
+  "base": "http://localhost:3000",
+  "at": "2026-11-10T05:35:15.095Z",
+  "results": [
+    {
+      "width": 320,
+      "zoom": 1,
+      "overflow": 0
+    },
+    {
+      "width": 360,
+      "zoom": 1,
+      "overflow": 0
+    },
+    {
+      "width": 390,
+      "zoom": 1,
+      "overflow": 0
+    },
+    {
+      "width": 430,
+      "zoom": 1,
+      "overflow": 0
+    },
+    {
+      "width": 768,
+      "zoom": 1,
+      "overflow": 0
+    },
+    {
+      "width": 1024,
+      "zoom": 1,
+      "overflow": 0
+    },
+    {
+      "width": 1440,
+      "zoom": 1,
+      "overflow": 0
+    },
+    {
+      "width": 1440,
+      "zoom": 2,
+      "overflow": 0
+    }
+  ]
+}

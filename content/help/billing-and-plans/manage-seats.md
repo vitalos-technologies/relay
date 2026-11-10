@@ -7,7 +7,7 @@ roles: [owner, admin]
 status: needs-setup
 related: [plans-and-features, change-plan-or-cancel, invite-people, invoices-and-payment-details]
 product_version: "2026-11"
-reviewed: 2026-11-09
+reviewed: 2026-11-10
 order: 30
 keywords: [seats, users, licences, add users, billable users, per user]
 ---
@@ -38,6 +38,7 @@ Others with `billing.read` can view; *Only people who manage billing can make ch
 ## Limitations
 
 - A paid subscription has at least one seat.
+- Free has one user and no seats to add; subscribe to Standard or Professional to invite people.
 - Removing a member doesn't reduce seats automatically; reduce seats yourself.
 - Live payments need the payment provider to be set up for your Relay installation. Otherwise you see **Payments not set
   up**, or **Test mode · no real payments** where a test environment is used.

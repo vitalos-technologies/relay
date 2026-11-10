@@ -20,7 +20,22 @@ export async function loadAccess(userId: string, workspaceId: string, db: Querya
   if (!m || m.state !== 'active' || m.status !== 'active') return null;
   const authz = await loadUserAuthz(userId, workspaceId, assurance ?? { mfaVerified: false, authTime: null }, db);
   if (authz.subject.status !== 'active') return null;
+  const hold = await memberHoldFor(db, workspaceId, userId);
+  if (hold) return { workspaceId, role: m.role, brandIds: [], isDemo: m.is_demo, authz, memberHold: hold };
   return { workspaceId, role: m.role, brandIds: brandsVisible(authz), isDemo: m.is_demo, authz };
+}
+
+/** Permissions a member held by the plan's user limit keeps (D33): billing, support, and reading the workspace shell. */
+export const MEMBER_HOLD_ALLOWED: ReadonlySet<Permission> = new Set<Permission>(['workspace.read', 'billing.read', 'billing.manage', 'support.workspace']);
+
+/** D33 members gauge: is this person over the plan's user limit? Cheap when the workspace has a single active person. */
+async function memberHoldFor(db: Queryable, workspaceId: string, userId: string): Promise<string | null> {
+  const n = await maybeOne<{ n: number }>(db, `SELECT count(*)::int n FROM memberships WHERE workspace_id=$1 AND status='active' AND removed_at IS NULL`, [workspaceId]);
+  if (!n || n.n <= 1) return null;
+  const [{ memberHold }, { entitlementsCoreCached }] = await Promise.all([import('./entitlements/actions.js'), import('./entitlements/resolve.js')]);
+  const core = await entitlementsCoreCached(workspaceId, db);
+  if (core.limits.members.limit === null) return null;
+  return memberHold(db, workspaceId, userId, core);
 }
 
 const isPermission = (s: string): s is Permission => (PERMISSIONS as readonly string[]).includes(s);
@@ -60,6 +75,9 @@ export function authorizeCtx(ctx: Ctx, action: Action | Permission, resource: { 
 export function requireAction(ctx: Ctx, action: Action | Permission, message?: string | { brandId?: string | null; connectionId?: string | null; stepUp?: boolean; message?: string }): void {
   const opts = typeof message === 'string' ? { message } : (message ?? {});
   const perm = toPermission(action);
+  if (ctx.access.memberHold && !MEMBER_HOLD_ALLOWED.has(perm)) {
+    throw new AppError('entitlement_required', ctx.access.memberHold, undefined, { reason: 'over_limit_held', allowance: 'members', upgrade_to: 'standard' });
+  }
   const a = ctx.access.authz;
   if (opts.brandId !== undefined || opts.connectionId !== undefined) {
     const r = authorizeCtx(ctx, perm, { brandId: opts.brandId, connectionId: opts.connectionId }, { stepUp: opts.stepUp });

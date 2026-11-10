@@ -8,6 +8,8 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { LazyMotion, MotionConfig, domAnimation } from 'motion/react';
 import { BookCheck, History, PanelLeftClose, PanelLeftOpen, Workflow } from 'lucide-react';
 import { WORKFLOW_FEATURE, type AiWorkspaceDto, type SuggestionDto, type ThreadDetailDto, type ThreadDto, type WorkflowRunDto } from '@social-lite/core/contracts/v5-ai';
+import { PLANS } from '@social-lite/core/contracts/v4-plans';
+import { cheapestPlanWithFeature, upgradeSentence } from '@social-lite/core/contracts/plan-copy';
 import { api } from '@/lib/client/api';
 import { useApi } from '@/lib/client/use-api';
 import { useSession } from '@/lib/client/session';
@@ -19,6 +21,8 @@ import { Suggestions } from './suggestions';
 import { HistoryList } from './history';
 import { RunCard } from './run-card';
 import { isActive, newKey } from './shared';
+
+const WORKFLOW_PLAN = cheapestPlanWithFeature('ai_workflows') ?? 'professional';
 
 const SIDEBAR_KEY = 'relay.ai.sidebar';
 
@@ -145,7 +149,7 @@ export function AiWorkspace() {
                   <Banner className="mt-5" tone="info" title="AI is not set up">Data steps (reading, checks, plans, reports) still run; AI-written parts are skipped. An owner can set the provider key and model in Setup.</Banner>
                 ) : null}
                 {!c.features.ai_workflows ? (
-                  <Banner className="mt-5" tone="info" title="Multi-step tasks are on the Professional plan">Your plan includes AI drafting help. <a className="underline" href="/settings/workspace/billing">See plans</a></Banner>
+                  <Banner className="mt-5" tone="info" title={`Multi-step tasks are on ${PLANS[WORKFLOW_PLAN].name}`}>Your plan includes AI drafting help. {upgradeSentence(WORKFLOW_PLAN)} <a className="underline" href="/settings/workspace/billing">See plans</a></Banner>
                 ) : null}
                 <div className="mt-6">
                   <Composer ctx={c} task={task} onTask={setTask} onBrand={changeBrand} onSubmit={() => void submit()} submitting={submitting} activeRunId={null} onStop={() => undefined} autoFocus />

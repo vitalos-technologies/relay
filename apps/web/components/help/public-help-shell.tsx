@@ -1,12 +1,15 @@
-// Help Centre shell for signed-out readers (HC): public articles only. Signed-in readers get the app shell instead.
+// Help Centre shell for signed-out readers (HC): public articles only, always light (like the marketing page). Signed-in
+// readers get the app shell (their own theme) instead.
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { RelayWordmark } from '@/components/brand/relay-mark';
 import { SignInLink } from './sign-in-link';
+import { ForceLightTheme } from '@/components/marketing/force-light';
 
 export function PublicHelpShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
+      <ForceLightTheme />
       <a href="#main" className="sr-only-focusable fixed left-3 top-3 z-[80] rounded-lg bg-accent px-3 py-2 text-on-accent">Skip to content</a>
       <header className="sticky top-0 z-30 border-b border-border bg-surface/95 backdrop-blur">
         <div className="mx-auto flex h-14 w-full max-w-[1200px] items-center gap-3 px-4 sm:px-6">

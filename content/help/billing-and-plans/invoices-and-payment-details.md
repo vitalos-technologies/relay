@@ -7,7 +7,7 @@ roles: [owner, admin]
 status: needs-setup
 related: [change-plan-or-cancel, when-paid-actions-are-paused]
 product_version: "2026-11"
-reviewed: 2026-11-09
+reviewed: 2026-11-10
 order: 50
 keywords: [invoice, receipt, card, payment method, failed payment, update card, vat]
 ---
@@ -30,7 +30,7 @@ The summary shows **Payment method** (*Not needed for the trial* during a trial)
 |---|---|---|
 | *Your bank needs you to confirm a payment* | Strong customer authentication is required. | **Update payment details** and confirm with your bank. |
 | Payment failed (past due) | A renewal payment failed. Full access continues for a **7-day grace period**. | Update payment details; the provider retries. |
-| *Paid actions are paused* | Grace ended, the trial ended, or the subscription was cancelled. | **Update payment details** or **Choose a plan**. |
+| *Paid actions are paused* | A failed payment outlasted the grace period. (An ended trial or cancellation moves the workspace to Free instead.) | **Update payment details** or **Choose a plan**. |
 
 **Refresh** re-reads the state from the provider.
 

@@ -22,7 +22,7 @@ import { addMember, closeTestPool, createUser, createWorkspace, grant, testPool,
 beforeAll(() => { testPool(); delete process.env.RELAY_STRIPE_SECRET_KEY; delete process.env.RELAY_STRIPE_WEBHOOK_SECRET; setBillingProviderForTests(undefined); });
 afterAll(async () => { await closeTestPool(); });
 
-async function signupTenant(plan: 'standard' | 'professional' = 'standard') {
+async function signupTenant(plan: 'free' | 'standard' | 'professional' = 'standard') {
   const u = await createUser();
   const { session } = await createSession(testPool(), u.id, {});
   const actor = { userId: u.id, email: u.email, name: 'Owner', sessionId: session.id };
@@ -55,14 +55,21 @@ async function staff(role: 'operator' | 'support' | 'billing', fresh = true): Pr
 }
 
 describe('catalogue and migration behaviour', () => {
-  it('persisted plan versions match the catalogue file; versions are immutable; test prices exist', async () => {
-    const rows = await q<{ plan_id: string; catalogue_hash: string; unit_amount_minor: number | null }>(`SELECT plan_id, catalogue_hash, unit_amount_minor FROM billing_plan_versions WHERE retired_at IS NULL ORDER BY plan_id`);
+  it('persisted plan versions match the catalogue file (Free £0, Standard £5, Professional £15); old versions retired, not changed; versions immutable', async () => {
+    const rows = await q<{ plan_id: string; catalogue_hash: string; unit_amount_minor: number | null; purchasable: boolean }>(`SELECT plan_id, catalogue_hash, unit_amount_minor, purchasable FROM billing_plan_versions WHERE retired_at IS NULL ORDER BY plan_id`);
+    expect(rows.map((r) => r.plan_id).sort()).toEqual(['free', 'legacy', 'professional', 'standard']);
     for (const r of rows) expect(r.catalogue_hash).toBe(catalogueHash(planVersionDefinition(r.plan_id as 'standard')));
-    expect(rows.find((r) => r.plan_id === 'standard')!.unit_amount_minor).toBe(1000);
-    expect(rows.find((r) => r.plan_id === 'professional')!.unit_amount_minor).toBe(2500);
+    expect(rows.find((r) => r.plan_id === 'free')).toMatchObject({ unit_amount_minor: 0, purchasable: false });
+    expect(rows.find((r) => r.plan_id === 'standard')!.unit_amount_minor).toBe(500);
+    expect(rows.find((r) => r.plan_id === 'professional')!.unit_amount_minor).toBe(1500);
     expect(rows.find((r) => r.plan_id === 'legacy')!.unit_amount_minor).toBeNull();
+    // the V4 prices stay as retired versions (subscriptions bound to them keep them)
+    const old = await q<{ plan_id: string; version: number; unit_amount_minor: number }>(`SELECT plan_id, version, unit_amount_minor FROM billing_plan_versions WHERE retired_at IS NOT NULL AND plan_id IN ('standard','professional') ORDER BY plan_id`);
+    expect(old.map((o) => [o.plan_id, o.version, o.unit_amount_minor])).toEqual([['professional', 1, 2500], ['standard', 1, 1000]]);
     await expect(testPool().query(`UPDATE billing_plan_versions SET unit_amount_minor=1 WHERE plan_id='standard'`)).rejects.toThrow(/immutable/);
-    expect((await q(`SELECT 1 FROM billing_provider_prices WHERE provider='test'`)).length).toBe(2);
+    // test-double prices for every purchasable version; Free never has a provider price
+    expect((await q(`SELECT 1 FROM billing_provider_prices WHERE provider='test'`)).length).toBe(4);
+    expect((await q(`SELECT 1 FROM billing_provider_prices p JOIN billing_plan_versions v ON v.id=p.plan_version_id WHERE v.plan_id='free'`)).length).toBe(0);
   });
 
   it('a generic STRIPE_SECRET_KEY from the host environment is never used (only RELAY_STRIPE_* configure Stripe)', () => {
@@ -106,20 +113,31 @@ describe('trials (V5 §7)', () => {
     await expect(testPool().query(`DELETE FROM billing_trial_redemptions WHERE workspace_id=$1`, [t.ws])).rejects.toThrow();
   });
 
-  it('trial expiry restricts paid actions but keeps billing reachable; data preserved; trial_expired emitted once', async () => {
+  it('D33: trial expiry moves the workspace to Free (full access within Free limits, nothing deleted); trial_expired emitted once', async () => {
     const t = await signupTenant();
     await expireTrial(t.ws);
     await expireTrial(t.ws); // idempotent
     const s = await getBillingState(testPool(), t.ws);
-    expect(s).toMatchObject({ status: 'expired', access: 'restricted' });
-    expect(s.access_reason).toMatch(/trial has ended/);
+    expect(s).toMatchObject({ status: 'free', plan_id: 'free', access: 'full', access_reason: null, seats: 0, current_period: null });
+    expect(s.trial).toMatchObject({ plan_id: 'standard' }); // history kept
+    expect(await billing(t.ws)).toMatchObject({ status: 'free', plan_id: 'free', provider_customer_ref: null, provider_subscription_ref: null });
     expect(await outboxCount(t.ws, 'billing.trial_expired')).toBe(1);
-    expect(await outboxCount(t.ws, 'billing.access_changed')).toBeGreaterThanOrEqual(1);
-    // §18.15: billing remains available while restricted
+    expect(await outboxCount(t.ws, 'billing.subscription_changed')).toBeGreaterThanOrEqual(1); // entitlements re-evaluate holds
+    // billing remains available; upgrade = checkout straight to paid (the trial was used)
     const ov = await billingOverview(await t.ctx());
-    expect(ov.state.access).toBe('restricted');
-    expect(ov.actions.checkout).toBe(true);
-    expect(ov.actions.start_trial).toBe(false); // trial used
+    expect(ov.state.access).toBe('full');
+    expect(ov.plan).toMatchObject({ id: 'free', unit_amount_minor: 0 });
+    expect(ov.recurring_total_minor).toBe(0);
+    expect(ov.actions).toMatchObject({ checkout: true, start_trial: false, portal: false, cancel: false });
+    expect(ov.upgrade_trial_days).toBe(0);
+    const c = await startCheckout(await t.ctx(), { plan: 'standard' });
+    expect(new Date(c.first_charge_at).getTime()).toBeLessThanOrEqual(Date.now() + 1000);
+  });
+
+  it('a stale trialing row past its end already reads as Free before the sweep runs', async () => {
+    const t = await signupTenant('professional');
+    await testPool().query(`UPDATE workspace_billing SET trial_ends_at=now() - interval '1 second' WHERE workspace_id=$1`, [t.ws]);
+    expect(await getBillingState(testPool(), t.ws)).toMatchObject({ status: 'free', plan_id: 'free', access: 'full' });
   });
 
   it('the trial-ending notice is emitted once, three days before the end', async () => {
@@ -142,7 +160,7 @@ describe('checkout (§18 items 8, 9)', () => {
     expect((await q(`SELECT count(*)::int n FROM billing_checkout_sessions WHERE workspace_id=$1 AND status='open'`, [t.ws]))[0]!.n).toBe(1);
     const b = await billing(t.ws);
     expect(new Date(c1.first_charge_at).getTime()).toBe((b.trial_ends_at as Date).getTime());
-    expect(c1.recurring_total_minor).toBe(1000); // 1 billable user × £10
+    expect(c1.recurring_total_minor).toBe(500); // 1 billable user × £5
     expect((await billing(t.ws)).provider_subscription_ref).toBeNull();
     await completeTestCheckout(sessionRef(c1.url), 'paid');
     const after = await billing(t.ws);
@@ -158,18 +176,18 @@ describe('checkout (§18 items 8, 9)', () => {
     await expect(startCheckout(await t.ctx(), { plan: 'standard' })).rejects.toMatchObject({ code: 'conflict' });
   });
 
-  it('after the trial, checkout charges immediately and activates (3 Professional users = £75)', async () => {
+  it('after the trial, checkout charges immediately and activates (3 Professional users = £45)', async () => {
     const t = await signupTenant('professional');
     for (let i = 0; i < 2; i++) { const m = await createUser(); await addMember(t.ws, m.id, 'editor'); }
     await expireTrial(t.ws);
     const c = await startCheckout(await t.ctx(), { plan: 'professional' });
     expect(c.seats).toBe(3);
-    expect(c.recurring_total_minor).toBe(7500);
+    expect(c.recurring_total_minor).toBe(4500);
     await completeTestCheckout(sessionRef(c.url), 'paid');
     const s = await getBillingState(testPool(), t.ws);
     expect(s).toMatchObject({ status: 'active', plan_id: 'professional', seats: 3, access: 'full' });
     const inv = await q<{ amount_paid_minor: number }>(`SELECT amount_paid_minor FROM billing_invoices WHERE workspace_id=$1`, [t.ws]);
-    expect(inv[0]!.amount_paid_minor).toBe(7500);
+    expect(inv[0]!.amount_paid_minor).toBe(4500);
   });
 
   it('§18.9 a forged checkout redirect / unsigned or mis-signed events never activate a plan', async () => {
@@ -178,7 +196,7 @@ describe('checkout (§18 items 8, 9)', () => {
     const c = await startCheckout(await t.ctx(), { plan: 'standard' });
     // the customer "returns" to the success URL without paying: the page reconciles from the provider → still open
     await refreshBilling(await t.ctx());
-    expect((await getBillingState(testPool(), t.ws)).status).toBe('expired');
+    expect((await getBillingState(testPool(), t.ws)).status).toBe('free');
     // forged events: unsigned, wrong secret, stale timestamp
     const sub = { id: 'sub_test_forged000000000000', object: 'subscription', customer: (await billing(t.ws)).provider_customer_ref, status: 'active', items: { data: [{ id: 'si_x', price: { id: 'price_test_standard_v1' }, quantity: 1, current_period_start: 1, current_period_end: 2 }] }, metadata: { relay_workspace_id: t.ws } };
     const evt = { id: `evt_test_forged${randomUUID().slice(0, 8)}`, object: 'event', type: 'customer.subscription.created', created: Math.floor(Date.now() / 1000), livemode: false, data: { object: sub } };
@@ -190,20 +208,20 @@ describe('checkout (§18 items 8, 9)', () => {
     // even a correctly signed event is not trusted for its payload: the subscription is re-fetched and does not exist
     const r = await ingestWebhook(raw, signPayload(raw, testWebhookSecret()));
     expect(r.status).toBe('ignored');
-    expect((await getBillingState(testPool(), t.ws)).status).toBe('expired');
+    expect((await getBillingState(testPool(), t.ws)).status).toBe('free');
     // the real completion still works
     await completeTestCheckout(sessionRef(c.url), 'paid');
     expect((await getBillingState(testPool(), t.ws)).status).toBe('active');
   });
 
-  it('a declined first payment leaves the subscription incomplete (restricted after the trial), never active', async () => {
+  it('a declined first payment leaves the subscription incomplete, never active — the workspace keeps Free meanwhile (D33)', async () => {
     const t = await signupTenant();
     await expireTrial(t.ws);
     const c = await startCheckout(await t.ctx(), { plan: 'standard' });
     await completeTestCheckout(sessionRef(c.url), 'declined');
     const s = await getBillingState(testPool(), t.ws);
     expect(s.status).toBe('incomplete');
-    expect(s.access).toBe('restricted');
+    expect(s).toMatchObject({ plan_id: 'free', access: 'full' });
   });
 
   it('concurrent checkout clicks never create two sessions', async () => {
@@ -289,9 +307,9 @@ describe('§18.12 upgrade, downgrade, seats, cancellation, reactivation', () => 
     const ctx = await t.ctx();
     const pv = await previewChange(ctx, { plan: 'professional', seats: 1 });
     expect(pv.kind).toBe('immediate');
-    expect(pv.to.recurring_minor).toBe(2500);
+    expect(pv.to.recurring_minor).toBe(1500);
     expect(pv.proration_minor).toBeGreaterThan(0);
-    expect(pv.proration_minor).toBeLessThanOrEqual(1500);
+    expect(pv.proration_minor).toBeLessThanOrEqual(1000);
     const b0 = await billing(t.ws);
     await applyChange(ctx, { plan: 'professional', seats: 1, proration_date: pv.proration_date, expected_version: b0.version as number }, randomUUID());
     expect((await getBillingState(testPool(), t.ws)).plan_id).toBe('professional');
@@ -326,7 +344,7 @@ describe('§18.12 upgrade, downgrade, seats, cancellation, reactivation', () => 
     await expect(previewChange(ctx, { plan: 'professional', seats: 1 })).rejects.toMatchObject({ code: 'validation_failed' });
     const pv = await previewChange(ctx, { plan: 'standard', seats: 3 });
     expect(pv.kind).toBe('immediate');
-    expect(pv.to.recurring_minor).toBe(3000);
+    expect(pv.to.recurring_minor).toBe(1500);
     const b = await billing(t.ws);
     await applyChange(ctx, { plan: 'standard', seats: 3, proration_date: pv.proration_date, expected_version: b.version as number }, randomUUID());
     expect((await billing(t.ws)).seats).toBe(3);
@@ -334,7 +352,7 @@ describe('§18.12 upgrade, downgrade, seats, cancellation, reactivation', () => 
     await expect(previewChange(await t.ctx(), { plan: 'standard', seats: 1 })).rejects.toMatchObject({ code: 'validation_failed' });
   });
 
-  it('cancel at period end keeps service until then, reactivation undoes it, and the end restricts without deleting', async () => {
+  it('cancel at period end keeps service until then, reactivation undoes it, and the end moves to Free without deleting (D33)', async () => {
     const t = await signupTenant();
     await expireTrial(t.ws);
     await subscribe(t);
@@ -348,7 +366,8 @@ describe('§18.12 upgrade, downgrade, seats, cancellation, reactivation', () => 
     await cancelRenewal(await t.ctx());
     await simulateSubscription(String((await billing(t.ws)).provider_subscription_ref), 'renew'); // period ends → provider cancels
     s = await getBillingState(testPool(), t.ws);
-    expect(s).toMatchObject({ status: 'cancelled', access: 'restricted' });
+    expect(s).toMatchObject({ status: 'free', plan_id: 'free', access: 'full' });
+    expect(await billing(t.ws)).toMatchObject({ status: 'free', provider_status: 'canceled' }); // provider refs kept as history
     expect(await outboxCount(t.ws, 'billing.subscription_ended')).toBe(1);
     expect((await q(`SELECT 1 FROM workspaces WHERE id=$1 AND state='active'`, [t.ws])).length).toBe(1); // not deleted, not suspended
     // resubscribe later (no new trial)
@@ -470,5 +489,118 @@ describe('getBillingState contract', () => {
     expect(Object.keys(s).sort()).toEqual(['access', 'access_reason', 'as_of', 'cancel_at', 'current_period', 'grace_ends_at', 'plan_id', 'plan_version_id', 'scheduled_change', 'seats', 'service_suspended', 'status', 'trial', 'workspace_id'].sort());
     expect(s.trial!.ends_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(s.plan_version_id).toMatch(/^[0-9a-f-]{36}$/);
+  });
+});
+
+describe('Free plan in billing (D33)', () => {
+  it('/signup?plan=free creates the workspace on Free: no trial, no card, no provider objects; Free is never checked out', async () => {
+    const t = await signupTenant('free');
+    expect(await billing(t.ws)).toMatchObject({ status: 'free', plan_id: 'free', seats: 0, provider: null, provider_customer_ref: null, provider_subscription_ref: null, trial_started_at: null });
+    expect((await q(`SELECT 1 FROM billing_trial_redemptions WHERE workspace_id=$1`, [t.ws])).length).toBe(0);
+    expect((await q(`SELECT kind, source FROM billing_lifecycle_events WHERE workspace_id=$1`, [t.ws]))).toEqual([{ kind: 'free_started', source: 'signup' }]);
+    const s = await getBillingState(testPool(), t.ws);
+    expect(s).toMatchObject({ plan_id: 'free', status: 'free', access: 'full', trial: null, current_period: null, cancel_at: null });
+    const ov = await billingOverview(await t.ctx());
+    expect(ov).toMatchObject({ recurring_total_minor: 0, invoices: [], trial_used: false, upgrade_trial_days: 14, next_charge_at: null });
+    expect(ov.actions).toMatchObject({ start_trial: true, checkout: true, portal: false, cancel: false, change_subscription: false, downgrade_to_free: false });
+    expect(ov.catalogue.map((p) => p.id)).toEqual(['free', 'standard', 'professional']);
+    // (ZodError = 422 validation_failed at the API)
+    await expect(startCheckout(await t.ctx(), { plan: 'free' })).rejects.toMatchObject({ name: 'ZodError' });
+    await expect(startTrial(await t.ctx(), { plan: 'free' })).rejects.toMatchObject({ name: 'ZodError' });
+    await expect(previewChange(await t.ctx(), { plan: 'free', seats: 1 })).rejects.toMatchObject({ code: 'invalid_state' });
+    expect((await q(`SELECT 1 FROM billing_test_objects WHERE kind='customer' AND data->'metadata'->>'relay_workspace_id'=$1`, [t.ws])).length).toBe(0);
+    expect((await workspaceCommercialSummary(t.ws))).toMatchObject({ plan: { id: 'free', name: 'Free' }, status: 'free', renews_at: null, payment_issue: false });
+  });
+
+  it('onboarding without a plan starts on Free (documented default)', async () => {
+    const { createWorkspace: createWs } = await import('@social-lite/services/workspaces');
+    const u = await createUser();
+    const { session } = await createSession(testPool(), u.id, {});
+    const r = await createWs(session, { userId: u.id, email: u.email, name: 'Owner', sessionId: session.id }, { name: `Solo ${randomUUID().slice(0, 6)}`, timezone: 'Europe/London' });
+    expect(await getBillingState(testPool(), r.workspace.id)).toMatchObject({ plan_id: 'free', status: 'free', access: 'full' });
+  });
+
+  it('upgrade from Free: checkout includes the never-used 14-day trial (first charge at its end) and redeems it once', async () => {
+    const t = await signupTenant('free');
+    const c = await startCheckout(await t.ctx(), { plan: 'professional' });
+    const firstCharge = new Date(c.first_charge_at).getTime();
+    expect(firstCharge).toBeGreaterThan(Date.now() + 13.9 * 86400_000);
+    expect(c.recurring_total_minor).toBe(1500);
+    expect((await q(`SELECT 1 FROM billing_trial_redemptions WHERE workspace_id=$1`, [t.ws])).length).toBe(0); // not used until confirmed
+    await completeTestCheckout(sessionRef(c.url), 'paid');
+    const s = await getBillingState(testPool(), t.ws);
+    expect(s).toMatchObject({ status: 'trialing', plan_id: 'professional', access: 'full' });
+    const red = (await q<{ source: string; redeemed_by: string; plan_id: string }>(`SELECT source, redeemed_by, plan_id FROM billing_trial_redemptions WHERE workspace_id=$1`, [t.ws]))[0]!;
+    expect(red).toMatchObject({ source: 'settings', redeemed_by: t.owner.id, plan_id: 'professional' });
+    const ov = await billingOverview(await t.ctx());
+    expect(ov).toMatchObject({ trial_used: true, upgrade_trial_days: 0 });
+    // the provider trial ends → first charge → active; a later return to Free never gets a second trial
+    await simulateSubscription(String((await billing(t.ws)).provider_subscription_ref), 'renew');
+    expect((await getBillingState(testPool(), t.ws)).status).toBe('active');
+    await expect(startTrial(await t.ctx(), { plan: 'standard' })).rejects.toMatchObject({ code: 'conflict' });
+  });
+
+  it('upgrade from Free with a no-card trial (Settings) also works once; at its end the workspace is back on Free', async () => {
+    const t = await signupTenant('free');
+    await startTrial(await t.ctx(), { plan: 'standard' });
+    expect(await getBillingState(testPool(), t.ws)).toMatchObject({ status: 'trialing', plan_id: 'standard' });
+    await expireTrial(t.ws);
+    expect(await getBillingState(testPool(), t.ws)).toMatchObject({ status: 'free', plan_id: 'free' });
+    await expect(startTrial(await t.ctx(), { plan: 'professional' })).rejects.toMatchObject({ code: 'conflict' });
+  });
+
+  it('downgrade to Free = cancel renewal at period end: paid plan until then, Free after; nothing charged for Free', async () => {
+    const t = await signupTenant();
+    await expireTrial(t.ws);
+    await subscribe(t, 'professional');
+    const pv = await previewChange(await t.ctx(), { plan: 'free', seats: 1 });
+    expect(pv).toMatchObject({ kind: 'scheduled', to: { plan_id: 'free', recurring_minor: 0 }, proration_minor: 0 });
+    const b0 = await billing(t.ws);
+    expect(new Date(pv.effective_at).getTime()).toBe((b0.current_period_end as Date).getTime());
+    expect((await billingOverview(await t.ctx())).actions.downgrade_to_free).toBe(true);
+    const r = await applyChange(await t.ctx(), { plan: 'free', seats: 1, expected_version: b0.version as number }, randomUUID());
+    expect(r).toMatchObject({ kind: 'scheduled', plan_id: 'free' });
+    let s = await getBillingState(testPool(), t.ws);
+    expect(s).toMatchObject({ status: 'cancel_scheduled', plan_id: 'professional', access: 'full' });
+    // at the period end the provider ends the subscription → Free (the clock alone already reads Free)
+    await testPool().query(`UPDATE workspace_billing SET cancel_at=now() - interval '1 second' WHERE workspace_id=$1`, [t.ws]);
+    expect(await getBillingState(testPool(), t.ws)).toMatchObject({ status: 'free', plan_id: 'free', access: 'full' });
+    await simulateSubscription(String(b0.provider_subscription_ref), 'renew');
+    s = await getBillingState(testPool(), t.ws);
+    expect(s).toMatchObject({ status: 'free', plan_id: 'free', access: 'full' });
+    const invoicesAfter = await q<{ total_minor: number }>(`SELECT total_minor FROM billing_invoices WHERE workspace_id=$1 AND provider_created_at > $2`, [t.ws, b0.current_period_end]);
+    expect(invoicesAfter.every((i) => i.total_minor === 0)).toBe(true);
+  });
+
+  it('an existing subscription keeps its plan version and price (no silent repricing): a V4 Standard subscription still bills £10', async () => {
+    const t = await signupTenant();
+    await expireTrial(t.ws);
+    await subscribe(t, 'standard');
+    // simulate a subscription bought before migration 040: bound to Standard v1 (£10) and its provider price
+    const v1 = (await q<{ id: string }>(`SELECT id FROM billing_plan_versions WHERE plan_id='standard' AND version=1`))[0]!.id;
+    const sub = String((await billing(t.ws)).provider_subscription_ref);
+    await testPool().query(`UPDATE billing_test_objects SET data=jsonb_set(data, '{items,data,0,price,id}', '"price_test_standard_v1"') WHERE kind='subscription' AND ref=$1`, [sub]);
+    await testPool().query(`UPDATE workspace_billing SET plan_version_id=$2, provider_price_ref='price_test_standard_v1' WHERE workspace_id=$1`, [t.ws, v1]);
+    await simulateSubscription(sub, 'renew'); // a renewal re-applies provider state
+    expect(await billing(t.ws)).toMatchObject({ plan_version_id: v1, provider_price_ref: 'price_test_standard_v1' });
+    const ov = await billingOverview(await t.ctx());
+    expect(ov.plan).toMatchObject({ id: 'standard', unit_amount_minor: 1000, version: 1 });
+    expect(ov.recurring_total_minor).toBe(1000);
+    // new checkouts use the current version (£5)
+    expect((await q<{ unit_amount_minor: number }>(`SELECT unit_amount_minor FROM billing_plan_versions WHERE plan_id='standard' AND retired_at IS NULL`))[0]!.unit_amount_minor).toBe(500);
+  });
+
+  it('Platform → Billing lists Free workspaces; staff can extend an ended trial from Free back to the trial plan', async () => {
+    const t = await signupTenant('free');
+    const bil = await staff('billing');
+    const list = await listPlatformBilling(bil, { status: 'free' });
+    expect(list.items.find((i) => i.workspace_id === t.ws)).toMatchObject({ plan_id: 'free', status: 'free', access: 'full', seats: 0 });
+    const d = await platformBillingDetail(bil, t.ws);
+    expect(d).toMatchObject({ plan_name: 'Free', trial: null, payment_issue: null, provider: { customer_ref: null } });
+    const t2 = await signupTenant('professional');
+    await expireTrial(t2.ws);
+    expect((await platformBillingDetail(bil, t2.ws)).trial?.eligible_for_extension).toBe(true);
+    await staffExtendTrial(bil, t2.ws, { days: 5, reason: 'Customer asked for more time' });
+    expect(await getBillingState(testPool(), t2.ws)).toMatchObject({ status: 'trialing', plan_id: 'professional', access: 'full' });
   });
 });

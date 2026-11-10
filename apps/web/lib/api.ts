@@ -15,6 +15,7 @@ import {
   type Actor, type Ctx, type SessionRecord,
 } from '@social-lite/services';
 import { assertExpectedWorkspace } from '@social-lite/services/workspaces';
+import { assertRouteEntitled } from '@social-lite/services/entitlements/routes';
 import { loadOperatorRole, type PlatformCtx } from '@social-lite/services/admin/platform';
 
 const MAX_JSON_BYTES = 256 * 1024;
@@ -114,6 +115,8 @@ export function route<P = Record<string, string>>(handler: Handler<P>, opts: Rou
       const access = await loadAccess(resolved.actor.userId, workspaceId, undefined,
         { mfaVerified: resolved.session.mfaVerified, authTime: resolved.session.authTime?.toISOString() ?? null });
       if (!access) throw new AppError('forbidden', 'You no longer have access to this workspace');
+      // D33: API areas whose plan feature is missing (Free: analytics, inbox) → 402 entitlement_required (shared service).
+      await assertRouteEntitled(req.nextUrl.pathname, workspaceId);
       const ctx: Ctx = { actor: resolved.actor, access, correlationId };
       return toResponse(await handler({ req, params: await segment.params, ctx, session: resolved.session, correlationId }), correlationId);
     } catch (err) {

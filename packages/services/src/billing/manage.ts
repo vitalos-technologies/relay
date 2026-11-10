@@ -2,6 +2,8 @@
 // customer portal, plan/seat change with provider preview, cancel renewal, reactivate, invoices, reconciliation.
 // Authority: billing.read (view) / billing.manage (act; sensitive ⇒ MFA by policy). Billing never implies content access.
 // No provider call happens during page render: the overview reads stored state; refresh() is a separate async request.
+// D33 Free: a Free workspace has no subscription, invoices or portal of its own; "Upgrade" = checkout (with the 14-day
+// trial when the workspace never redeemed one), "Downgrade to Free" = cancel renewal at period end (then Free).
 import { z } from 'zod';
 import { AppError } from '@social-lite/core';
 import { PLANS, PUBLIC_PLAN_IDS, publicCatalogue, type PlanId } from '@social-lite/core/contracts/v4-plans';
@@ -10,7 +12,7 @@ import { getPool, many, maybeOne, one, withTx, type Queryable } from '@social-li
 import type { Ctx } from '../context.js';
 import { audit } from '../audit.js';
 import { authorizeCtx, requireAction } from '../tenancy.js';
-import { currentVersion, priceRefFor, versionById } from './catalogue.js';
+import { PAID_PLAN_IDS, currentVersion, priceRefFor, versionById } from './catalogue.js';
 import { CHECKOUT_TTL_MS, checkoutTiming, classifyChange, hasPaidSubscription } from './policy.js';
 import { appUrl, billingProviderStatus, getBillingProvider, requireBillingProvider } from './provider.js';
 import { billableSeats, requiredSeats, seatCount } from './seats.js';
@@ -20,7 +22,10 @@ import { changeTrialPlanTx, startTrialTx, trialRedemption } from './trials.js';
 import { legacyRow, loadBilling, lockBilling, saveBilling, withBillingLock, type BillingRow } from './store.js';
 
 const LIVE_PROVIDER: readonly string[] = ['trialing', 'active', 'past_due', 'unpaid', 'incomplete', 'paused'];
-const planSchema = z.enum(PUBLIC_PLAN_IDS);
+/** Plans that can be bought / trialled (Standard, Professional). */
+const planSchema = z.enum(PAID_PLAN_IDS as [typeof PAID_PLAN_IDS[number], ...typeof PAID_PLAN_IDS[number][]], { message: 'Choose Standard or Professional' });
+/** Plan changes also accept Free (= cancel renewal at period end, then Free). */
+const changePlanSchema = z.enum(PUBLIC_PLAN_IDS);
 const seatsSchema = z.number().int().min(1).max(10000);
 
 function liveSub(b: BillingRow): boolean {
@@ -61,6 +66,7 @@ export async function billingOverview(ctx: Ctx, db: Queryable = getPool()): Prom
   const sub = liveSub(b);
   const trialRunning = state.status === 'trialing' && !!b.trial_ends_at && b.trial_ends_at.getTime() > Date.now();
   const manage = canManage(ctx);
+  const onFree = state.plan_id === 'free';
   const sched = state.scheduled_change;
   const firstCharge = sub && b.provider_status === 'trialing' ? (b.trial_ends_at ?? b.current_period_end) : null;
   return {
@@ -72,9 +78,11 @@ export async function billingOverview(ctx: Ctx, db: Queryable = getPool()): Prom
       days_left: Math.max(0, Math.ceil((b.trial_ends_at.getTime() - Date.now()) / 86400_000)), redeemed: true,
     } : null,
     trial_used: !!red,
+    // An upgrade checkout from Free (or 'none') includes the workspace's one 14-day trial when it was never redeemed.
+    upgrade_trial_days: !red && !sub && (state.status === 'free' || state.status === 'none') ? PLANS.standard.trial_days : 0,
     seats: { paid: liveSub(b) ? state.seats : 0, billable: seats.billable, members: seats.members, free_guests: seats.free_guests, billable_guests: seats.billable_guests,
       pending_member_invites: seats.pending_member_invites, support_operators: seats.support_operators },
-    recurring_total_minor: unit != null && state.plan_id !== 'legacy' ? unit * paidSeats : null,
+    recurring_total_minor: onFree && !sub ? 0 : unit != null && state.plan_id !== 'legacy' ? unit * paidSeats : null,
     next_charge_at: sub && !b.cancel_at_period_end ? iso(firstCharge ?? b.current_period_end) : null,
     first_charge_at: iso(firstCharge),
     payment_method: b.payment_method,
@@ -84,13 +92,15 @@ export async function billingOverview(ctx: Ctx, db: Queryable = getPool()): Prom
     invoices: invoices.map(invoiceDto),
     can_manage: manage,
     actions: {
-      start_trial: manage && !red && (state.status === 'none'),
+      start_trial: manage && !red && (state.status === 'none' || state.status === 'free'),
       change_trial_plan: manage && trialRunning && !sub,
       checkout: manage && status.configured && !sub,
       change_subscription: manage && status.configured && sub && b.provider_status !== 'incomplete',
       cancel: manage && status.configured && sub && !b.cancel_at_period_end && ['active', 'trialing', 'past_due', 'payment_action_required'].includes(state.status),
       reactivate: manage && status.configured && sub && state.status === 'cancel_scheduled',
-      portal: manage && status.configured && !!b.provider_customer_ref && b.provider === status.provider,
+      // Free: no subscription to manage (past invoices, if any, stay listed above with their hosted links).
+      portal: manage && status.configured && !onFree && !!b.provider_customer_ref && b.provider === status.provider,
+      downgrade_to_free: manage && status.configured && sub && !b.cancel_at_period_end && ['active', 'trialing', 'past_due', 'payment_action_required'].includes(state.status),
     },
     last_synced_at: iso(b.provider_synced_at),
     version: b.version,
@@ -153,7 +163,11 @@ export async function startCheckout(ctx: Ctx, raw: unknown): Promise<CheckoutRes
     const b = (await loadBilling(db, ws)) ?? legacyRow(ws);
     if (liveSub(b) && b.provider === provider.name) throw new AppError('conflict', 'This workspace already has a subscription. Change its plan or seats instead.', undefined, { reason: 'already_subscribed' });
     const trialRunning = b.status === 'trialing' && !!b.trial_ends_at && b.trial_ends_at.getTime() > Date.now();
-    const timing = checkoutTiming(trialRunning ? b.trial_ends_at : null, new Date());
+    // D33: upgrading from Free (or a brand-new workspace) includes the workspace's one 14-day trial if it was never
+    // redeemed — the provider subscription trials until then (first charge at its end). The redemption is recorded when
+    // the provider confirms the subscription (sync.ts), so an abandoned checkout never uses the trial up.
+    const offerTrial = !trialRunning && !b.trial_started_at && !(await trialRedemption(db, ws)) && (b.status === 'free' || b.status === 'none');
+    const timing = checkoutTiming(trialRunning ? b.trial_ends_at : offerTrial ? new Date(Date.now() + version.trial_days * 86400_000) : null, new Date());
     const expiresAt = new Date(Date.now() + CHECKOUT_TTL_MS);
     const reserved = await withTx(async (tx) => {
       const row = await lockBilling(tx, ws);
@@ -260,6 +274,12 @@ export async function openPortal(ctx: Ctx, raw: unknown): Promise<{ url: string;
 
 // ------------------------------------------------------------------ plan / seat changes
 const changeSchema = z.object({ plan: planSchema, seats: seatsSchema }).strict();
+const changeOrFreeSchema = z.object({ plan: changePlanSchema, seats: seatsSchema.optional() }).passthrough();
+
+/** The current period end (when a cancellation / downgrade to Free takes effect). */
+function freeEffective(b: BillingRow): Date {
+  return b.provider_status === 'trialing' ? (b.trial_ends_at ?? b.current_period_end ?? new Date()) : (b.current_period_end ?? new Date());
+}
 
 async function planChange(ctx: Ctx, raw: unknown) {
   const input = changeSchema.parse(raw);
@@ -277,6 +297,7 @@ async function planChange(ctx: Ctx, raw: unknown) {
 
 export async function previewChange(ctx: Ctx, raw: unknown): Promise<BillingChangePreviewDto> {
   requireAction(ctx, 'billing.manage');
+  if (changeOrFreeSchema.parse(raw).plan === 'free') return previewDowngradeToFree(ctx);
   const { input, b, version, fromUnit, toUnit } = await planChange(ctx, raw);
   const from = { plan_id: b.plan_id, seats: b.seats, recurring_minor: b.plan_id === 'legacy' ? null : fromUnit * b.seats };
   const to = { plan_id: input.plan as PlanId, seats: input.seats, recurring_minor: toUnit * input.seats };
@@ -306,8 +327,29 @@ export async function previewChange(ctx: Ctx, raw: unknown): Promise<BillingChan
 
 const applySchema = z.object({ plan: planSchema, seats: seatsSchema, proration_date: z.number().int().positive().nullable().optional(), expected_version: z.number().int().min(0) }).strict();
 
+/** Downgrade to Free = cancel renewal at period end; Free applies from then (nothing charged, nothing deleted). */
+async function previewDowngradeToFree(ctx: Ctx): Promise<BillingChangePreviewDto> {
+  const b = (await loadBilling(getPool(), ctx.access.workspaceId)) ?? legacyRow(ctx.access.workspaceId);
+  if (!liveSub(b)) {
+    throw new AppError('invalid_state', b.status === 'trialing' ? 'Your trial moves to Free by itself when it ends unless you subscribe.' : 'This workspace is not on a paid subscription.');
+  }
+  const fromUnit = (await unitOf(getPool(), b)) ?? 0;
+  const effective = freeEffective(b);
+  return { kind: 'scheduled', from: { plan_id: b.plan_id, seats: b.seats, recurring_minor: fromUnit * b.seats }, to: { plan_id: 'free', seats: 1, recurring_minor: 0 },
+    proration_minor: 0, next_invoice_minor: null, next_invoice_at: null, effective_at: effective.toISOString(), proration_date: null, currency: 'GBP', lines: [],
+    notes: [`Renewal is cancelled. You keep ${PLANS[b.plan_id].name} until ${effective.toISOString().slice(0, 10)}, then move to Free.`,
+      'Anything over Free’s limits is paused, never deleted. Data export always works.'] };
+}
+
 export async function applyChange(ctx: Ctx, raw: unknown, idempotencyKey: string | null) {
   requireAction(ctx, 'billing.manage');
+  if (changeOrFreeSchema.parse(raw).plan === 'free') {
+    const b = (await loadBilling(getPool(), ctx.access.workspaceId)) ?? legacyRow(ctx.access.workspaceId);
+    if (!liveSub(b)) await previewDowngradeToFree(ctx); // throws the explanatory invalid_state
+    if (b.cancel_at_period_end) return { ok: true as const, kind: 'scheduled' as const, plan_id: 'free' as PlanId, seats: 0, scheduled_effective_at: iso(freeEffective(b)) };
+    const r = await setCancel(ctx, true);
+    return { ok: true as const, kind: 'scheduled' as const, plan_id: 'free' as PlanId, seats: 0, scheduled_effective_at: r.cancel_at };
+  }
   const parsed = applySchema.parse(raw);
   if (!idempotencyKey || idempotencyKey.length < 8) throw new AppError('validation_failed', 'An Idempotency-Key header (8-200 characters) is required for this request');
   const ws = ctx.access.workspaceId;

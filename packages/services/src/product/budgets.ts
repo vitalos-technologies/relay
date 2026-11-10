@@ -34,6 +34,8 @@ export const BUDGET_METERS = {
   // V4: plan allowances metered through the same counters (customers may set a lower cap too).
   'mcp.calls': { limitKey: 'mcp_monthly_calls', label: 'MCP tool calls / month', unit: 'calls', period: 'month', defaultCap: null },
   'integration.jobs': { limitKey: 'integration_monthly_jobs', label: 'Integration sync jobs / month', unit: 'jobs', period: 'month', defaultCap: null },
+  // D33: posts scheduled or published now, once per post per calendar month of publication (entitlements/actions.ts).
+  'posts.scheduled': { limitKey: 'monthly_scheduled_posts', label: 'Scheduled posts / month', unit: 'posts', period: 'month', defaultCap: null },
 } as const;
 export type BudgetMeter = keyof typeof BUDGET_METERS;
 export const BUDGET_METER_KEYS = Object.keys(BUDGET_METERS) as BudgetMeter[];
@@ -81,6 +83,13 @@ export interface ReserveInput {
   ttlSeconds?: number;
   /** V4 ledger: consumption with an already-recorded key is not charged again (consumeUsage). */
   dedupeKey?: string | null;
+  /** consumeUsage only: an explicit counter period (D33 scheduled posts: the calendar month of publication). */
+  period?: string;
+  /**
+   * D33: the workspace data export (brand handover bundle, activity log) is never blocked by the PLAN allowance (Free
+   * includes 0 report exports). It is still counted, and a customer-set budget still applies.
+   */
+  planExempt?: boolean;
 }
 
 const fmt = (meter: BudgetMeter, n: number) => {
@@ -120,6 +129,8 @@ export function exhaustedMessage(d: ExhaustedDetail): string {
       return `${who} monthly MCP call budget (${fmt(d.meter, d.cap)}) is used up. It resets next month, or an owner can raise it.`;
     case 'integration.jobs':
       return `${who} monthly integration sync budget (${fmt(d.meter, d.cap)}) is used up. Sync jobs wait until it resets or the cap is raised.`;
+    case 'posts.scheduled':
+      return `${who} monthly scheduled-post budget (${fmt(d.meter, d.cap)}) is used up for that month. Pick another month, or an owner can raise it.`;
   }
 }
 
@@ -222,7 +233,8 @@ export async function reserveUsage(input: ReserveInput, db?: Queryable): Promise
   const amount = Math.max(0, Math.ceil(input.amount));
   if (!db) await sweepExpiredReservations({ workspaceId: input.workspaceId, meter: input.meter }).catch(() => undefined);
   return inTx(db, async (tx) => {
-    const rules = await rulesFor(tx, input.workspaceId, input.meter);
+    const r0 = await rulesFor(tx, input.workspaceId, input.meter);
+    const rules = input.planExempt ? { ...r0, ceiling: null } : r0;
     if (!rules.gate.ok) throw entitlementError(rules.gate);
     const period = rules.period;
     const teamIds = [...new Set(input.teamIds ?? await teamsOf(tx, input.workspaceId, input.userId))].sort();
@@ -292,7 +304,7 @@ export async function consumeUsage(tx: Queryable, input: ReserveInput): Promise<
   const amount = Math.max(0, Math.ceil(input.amount));
   const rules = await rulesFor(tx, input.workspaceId, input.meter);
   if (!rules.gate.ok) return { ok: false, message: rules.gate.message, detail: null, reason: 'entitlement', entitlement: { ...rules.gate.details } };
-  const period = rules.period;
+  const period = input.period ?? rules.period;
   const teamIds = [...new Set(input.teamIds ?? await teamsOf(tx, input.workspaceId, input.userId))].sort();
   const rows = await lockCounters(tx, input.workspaceId, input.meter, period, teamIds);
   // Under the counter locks: a concurrent consumption with the same key has committed or not started.

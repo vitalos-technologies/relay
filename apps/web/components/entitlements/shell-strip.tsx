@@ -9,6 +9,17 @@ import { BILLING_HREF, SUPPORT_HREF, USAGE_HREF } from './use-entitlements';
 
 export function EntitlementStrip() {
   const { data } = useApi<EntitlementsDto>('/api/entitlements', { redirectOn401: false });
+  if (data?.member_hold && data.access !== 'suspended') {
+    // D33: this person is over the plan's user limit (teammate on Free): access paused, account kept.
+    return (
+      <div role="status" data-testid="member-hold-strip" className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-[color-mix(in_srgb,var(--warn)_35%,transparent)] bg-warn-soft px-4 py-2 text-[13px]">
+        <Hourglass aria-hidden className="size-4 text-warn" />
+        <span className="font-medium">Access paused</span>
+        <span className="min-w-0 text-muted">{data.member_hold}</span>
+        <Link href={SUPPORT_HREF} className="font-medium underline">Support</Link>
+      </div>
+    );
+  }
   if (!data || data.access === 'full') return null;
   const suspended = data.access === 'suspended';
   return (
