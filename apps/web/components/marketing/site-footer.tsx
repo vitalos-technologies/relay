@@ -14,7 +14,7 @@ export function SiteFooter({ signedIn, config }: { signedIn: boolean; config: Ma
   ];
   const external = (h: string) => /^https:/.test(h);
   return (
-    <footer className="border-t border-v5-border py-12" data-testid="mkt-footer">
+    <footer className="border-t border-v5-border pt-12 pb-28" data-testid="mkt-footer">
       <Container className="grid grid-cols-2 gap-x-6 gap-y-10 md:grid-cols-[minmax(0,1.2fr)_repeat(3,minmax(0,1fr))]">
         <div className="col-span-2 flex flex-col gap-3 md:col-span-1">
           <RelayWordmark size={24} />
@@ -49,8 +49,9 @@ export function SiteFooter({ signedIn, config }: { signedIn: boolean; config: Ma
           </ul>
         </nav>
       </Container>
-      <Container className="mt-10 flex flex-col gap-1 border-t border-v5-border pt-6 text-[13px] text-v5-muted sm:flex-row sm:justify-between">
+      <Container className="mt-10 flex flex-col gap-1 border-t border-v5-border pt-6 text-[13px] text-v5-muted sm:flex-row sm:gap-3">
         <span>© {new Date().getFullYear()} {BRAND.name}</span>
+        <span aria-hidden="true" className="hidden sm:inline">·</span>
         <span data-testid="mkt-footer-maker">
           {BRAND.name} is a{' '}
           <a href="https://vitalos.co.uk/" rel="noopener" target="_blank" className="font-semibold text-v5-fg underline-offset-2 outline-none hover:underline focus-visible:outline-2 focus-visible:outline-v5-ring">Vitalos Technologies</a>
