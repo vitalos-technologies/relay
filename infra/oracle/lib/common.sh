@@ -40,11 +40,12 @@ env_set() {
   mv "$tmp" "$f"
 }
 
-# Compose wrapper: project "relay", infra env file for interpolation, optional override and bundled-proxy profile.
+# Compose wrapper: project "relay", infra env file for interpolation, optional override; bundled proxy adds its override
+# (public names → Caddy inside the Docker network) and profile.
 compose() {
   local args=(-p "$RELAY_PROJECT" --env-file "$INFRA_ENV" -f "$KIT_DIR/compose.prod.yaml")
   [ -f "$RELAY_HOME/compose.override.yaml" ] && args+=(-f "$RELAY_HOME/compose.override.yaml")
-  [ "$(env_get "$INFRA_ENV" RELAY_PROXY_MODE)" = bundled ] && args+=(--profile caddy)
+  [ "$(env_get "$INFRA_ENV" RELAY_PROXY_MODE)" = bundled ] && args+=(-f "$KIT_DIR/compose.bundled.yaml" --profile caddy)
   docker compose "${args[@]}" "$@"
 }
 

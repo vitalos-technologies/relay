@@ -1,0 +1,16 @@
+# Applied automatically when RELAY_PROXY_MODE=bundled (lib/common.sh). Inside Relay's own Docker network the three public
+# names resolve to the bundled Caddy container (network aliases), so web/worker reach sign-in and media over HTTPS with
+# the real certificates without going through the host: no hairpin NAT, no host firewall (Oracle images reject
+# container→host-IP traffic), and it works with --bind. The host-gateway mapping from compose.prod.yaml is dropped here.
+services:
+  caddy:
+    networks:
+      default:
+        aliases:
+          - ${RELAY_DOMAIN:?}
+          - ${RELAY_AUTH_HOST:?}
+          - ${RELAY_MEDIA_HOST:?}
+  web:
+    extra_hosts: !reset []
+  worker:
+    extra_hosts: !reset []

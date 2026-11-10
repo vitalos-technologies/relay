@@ -50,6 +50,8 @@ switch_to() { # TAG -> restart worker then web on that tag
 if [ $RESTART -eq 1 ]; then
   step "Restart web + worker on $PREV"
   [ -n "$(env_get "$APP_ENV_FILE" SMTP_URL)" ] || die "SMTP_URL is not set in $APP_ENV_FILE: Relay refuses to start in production without it"
+  # Bundled proxy: apply proxy config changes (e.g. network aliases) too; Caddy keeps its certificates in its volume.
+  [ "$(env_get "$INFRA_ENV" RELAY_PROXY_MODE)" = bundled ] && compose up -d --no-deps caddy
   compose up -d --force-recreate --no-deps worker web
   healthy_now 240 && ok "healthy" || { compose logs --tail 40 web worker >&2; die "not healthy after restart (logs above)"; }
   exit 0
