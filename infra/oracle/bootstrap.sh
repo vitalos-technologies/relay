@@ -127,7 +127,7 @@ DOCKER_ROOT=$(docker info --format '{{.DockerRootDir}}' 2>/dev/null || echo /var
 DISK_FREE_GB=$(df -P "$DOCKER_ROOT" 2>/dev/null | awk 'NR==2 {print int($4/1048576)}')
 say "  memory: ${MEM_AVAIL_MB} MB available of ${MEM_TOTAL_MB} MB; disk free under $DOCKER_ROOT: ${DISK_FREE_GB} GB"
 [ "${MEM_AVAIL_MB:-0}" -ge 4500 ] || warn "Relay's default limits add up to about 5.5 GB (about 1 GB used when idle). Lower the RELAY_*_MEM values in $INFRA_ENV if the VM is tight."
-[ "${DISK_FREE_GB:-0}" -ge 15 ] || warn "less than 15 GB free: images (~2.5 GB), the database, media and 14 days of backups need room"
+[ "${DISK_FREE_GB:-0}" -ge 15 ] || warn "less than 15 GB free: images (~2.5 GB) plus build cache, the database, media and nightly backups need room (fewer backups: --backup-days N)"
 
 INSTALLED=0
 if [ -r "$INFRA_ENV" ]; then INSTALLED=1; ok "existing installation found in $RELAY_HOME (re-run: secrets are kept, nothing is regenerated)"; fi
