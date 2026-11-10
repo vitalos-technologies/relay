@@ -1,12 +1,13 @@
-// GET /api/auth/step-up?returnTo=/path[&mode=fresh|mfa] — re-authenticate the CURRENT session at the IdP.
-//  fresh (default): acr_values=mfa + max_age=0 → password + second factor again, new auth_time.
-//  mfa: acr_values=mfa → second factor only on top of the IdP session (used right after password sign-in).
-// Users without a second factor are sent to My Security to set one up. Assurance is only ever updated by the
-// callback from the verified ID token, and only if the returned subject is this session's subject.
+// GET /api/auth/step-up?returnTo=/path[&mode=fresh|mfa] — verify the CURRENT session with the second factor at the IdP (D34).
+//  fresh (default): acr_values=mfa → the authenticator-app code again (no new email), auth_time must be newer than this request.
+//  mfa: the same right after sign-in (Relay staff).
+// Users without a second factor enrol an authenticator app first (Keycloak CONFIGURE_TOTP); that enrolment counts as the
+// verification (see completeSessionUpgrade). Assurance is only ever updated by the callback, from the verified ID token /
+// the IdP admin API, and only if the returned subject is this session's subject.
 import { NextResponse } from 'next/server';
 import { AppError } from '@social-lite/core';
 import { SESSION_COOKIE, config, log, resolveSession } from '@social-lite/services';
-import { LOGIN_BINDING_COOKIE, LOGIN_STATE_TTL_MS, safeReturnTo, startStepUp } from '@social-lite/services/auth/oidc';
+import { LOGIN_BINDING_COOKIE, LOGIN_STATE_TTL_MS, safeReturnTo, startIdpAction, startStepUp } from '@social-lite/services/auth/oidc';
 import { clientIp, enforceRateLimit } from '@social-lite/services/ratelimit';
 import { publicRoute } from '@/lib/api';
 
@@ -21,12 +22,9 @@ export const GET = publicRoute(async ({ req, correlationId }) => {
   if (!current) return NextResponse.redirect(new URL(`/login?returnTo=${encodeURIComponent(returnTo)}`, base), 302);
   try {
     await enforceRateLimit('authLogin', clientIp(req.headers));
-    const started = await startStepUp(current.session, { returnTo, mode: sp.get('mode') === 'mfa' ? 'mfa' : 'fresh', loginHint: current.actor.email });
-    if ('setupRequired' in started) {
-      // Right after sign-in nothing to add; otherwise ask the user to set up a second factor first.
-      const to = sp.get('mode') === 'mfa' ? returnTo : '/security?setup=mfa';
-      return NextResponse.redirect(new URL(to, base), 302);
-    }
+    let started = await startStepUp(current.session, { returnTo, mode: sp.get('mode') === 'mfa' ? 'mfa' : 'fresh', loginHint: current.actor.email });
+    // No second factor yet: set up an authenticator app now, then come straight back (enrol on first step-up).
+    if ('setupRequired' in started) started = await startIdpAction(current.session, 'CONFIGURE_TOTP', { returnTo });
     const res = NextResponse.redirect(started.authorizationUrl, 302);
     res.cookies.set(LOGIN_BINDING_COOKIE, started.binding, {
       httpOnly: true, sameSite: 'lax', secure: config().APP_ENV === 'production', path: '/', maxAge: LOGIN_STATE_TTL_MS / 1000,

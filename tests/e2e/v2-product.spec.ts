@@ -5,20 +5,13 @@
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
-import { api, completeKeycloak, demoBrand, useE2EWorkspace, type Api } from './helpers';
+import { api, demoBrand, signIn, type Api } from './helpers';
 
 const OUT = 'evidence/v2';
 
-/** helpers.signIn with the app port taken from baseURL (the stream-D instance may run on :3100). */
+/** helpers.signIn (port-agnostic: the stream-D instance may run on :3100). */
 async function signInHere(page: Page, email: string) {
-  const port = new URL(test.info().project.use.baseURL ?? 'http://localhost:3000').port || '80';
-  await page.goto('/overview');
-  await page.waitForURL(/\/login/);
-  await page.locator('a[href^="/api/auth/login"]').first().click();
-  await page.waitForURL(/localhost:5556/);
-  await completeKeycloak(page, email);
-  await page.waitForURL((u) => u.port === port && !u.pathname.startsWith('/login') && !u.pathname.startsWith('/api/auth'), { timeout: 45_000 });
-  await useE2EWorkspace(page);
+  await signIn(page, email);
 }
 
 const inHours = (h: number) => {

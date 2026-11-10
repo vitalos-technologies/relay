@@ -6,16 +6,19 @@ audience: public
 status: available
 related: [set-up-two-step-verification, manage-sessions, cant-sign-in]
 product_version: "2026-11"
-reviewed: 2026-11-09
+reviewed: 2026-11-10
 order: 21
 keywords: [lost phone, recovery code, backup code, locked out, reset 2fa, new phone]
 ---
 
-## Sign in with a recovery code
+## Verify with a recovery code
 
-1. On the identity provider's second-factor screen, choose to use a **recovery code** instead.
+Your normal sign-in (email or Google) never needs the authenticator app; you need a recovery code only when Relay asks
+for two-step verification (sensitive actions, or every sign-in for Relay staff).
+
+1. On the two-step screen, select **Try another way** and choose **recovery code**.
 2. Enter one of your saved codes. Each code works only once.
-3. **Result:** you're signed in. For safety Relay **signs out all your other sessions** and emails your verified address.
+3. **Result:** you're verified. For safety Relay **signs out all your other sessions** and emails your verified address.
 
 ## Replace the lost factor
 
@@ -26,7 +29,7 @@ keywords: [lost phone, recovery code, backup code, locked out, reset 2fa, new ph
 
 ## No codes and no factor
 
-Relay has no master password or bypass. Your Relay installation's identity-provider administrator must verify who you are
+Relay has no master key or bypass. Your Relay installation's identity-provider administrator must verify who you are
 (for example by a call with another workspace owner) and reset your second factor. Then sign in, set up a new factor and
 generate new codes. Ask your workspace owner to arrange this. If you are the only owner, contact Relay support (the
 support chat on Relay's website when it is enabled, or ask a colleague to open a request from **Help → Contact support**).

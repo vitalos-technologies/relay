@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 import { createHmac, randomUUID } from 'node:crypto';
+import { waitForSignInEmail } from '../support/mailpit';
 
-export const PASSWORD = 'socialite-demo';
 export const KEYCLOAK = process.env.E2E_KEYCLOAK_URL ?? 'http://localhost:5556';
 
 /**
@@ -43,39 +43,67 @@ export async function freshTotp(key: Buffer, id: string): Promise<string> {
   return totp(key);
 }
 
-/** Complete whatever Keycloak asks for (password, then a TOTP code for users with a second factor). */
-export async function completeKeycloak(page: Page, email: string, opts: { totpKey?: Buffer } = {}): Promise<void> {
+/**
+ * Complete whatever the sign-in server asks for (D34, passwordless): the email page (types the address), "Check your email"
+ * (reads the 6-digit code from the sign-in email in Mailpit and types it), then a TOTP code when a second factor is asked
+ * (privileged demo users / step-up). Returns when the browser has left Keycloak.
+ */
+export async function completeKeycloak(page: Page, email: string, opts: { totpKey?: Buffer; viaLink?: boolean } = {}): Promise<void> {
   const key = opts.totpKey ?? (DEMO_TOTP[email] ? Buffer.from(DEMO_TOTP[email]!, 'utf8') : undefined);
-  for (let i = 0; i < 4; i++) {
+  let requestedAt = Date.now();
+  for (let i = 0; i < 6; i++) {
     await page.waitForLoadState();
     const url = new URL(page.url());
     if (url.port !== '5556') return;
     const otp = page.locator('input[name=otp]');
-    const pwd = page.locator('input[name=password]');
-    await expect(otp.or(pwd).first()).toBeVisible({ timeout: 20_000 });
+    const code = page.locator('input[name=code]');
+    const user = page.locator('input[name=username]');
+    await expect(otp.or(code).or(user).first()).toBeVisible({ timeout: 20_000 });
     if (await otp.isVisible()) {
       if (!key) throw new Error(`Keycloak asked ${email} for a one-time code but no TOTP secret is known`);
       await otp.fill(await freshTotp(key, email));
-      await page.locator('#kc-login, [type=submit]').first().click();
+      await page.locator('#kc-login').click();
+    } else if (await code.isVisible()) {
+      const mail = await waitForSignInEmail(email, requestedAt);
+      if (opts.viaLink) { await page.goto(mail.link); }
+      else { await code.fill(mail.code); await page.locator('#relay-verify').click(); }
     } else {
-      const user = page.locator('input[name=username]');
-      if (await user.isVisible().catch(() => false) && await user.isEditable().catch(() => false)) await user.fill(email);
-      await pwd.fill(PASSWORD);
-      await page.locator('#kc-login, [type=submit]').first().click();
+      requestedAt = Date.now();
+      await user.fill(email);
+      await page.locator('#kc-login').click();
     }
     await page.waitForURL((u) => u.port !== '5556' || u.pathname !== url.pathname || u.search !== url.search, { timeout: 30_000 }).catch(() => undefined);
   }
 }
 
-/** Real OIDC sign-in through the local Keycloak realm (password, then TOTP for privileged demo users). */
-export async function signIn(page: Page, email: string, opts: { totpKey?: Buffer } = {}): Promise<void> {
+/**
+ * Real OIDC sign-in through the local Keycloak realm: email → code from Mailpit (D34). Customers are not asked for a second
+ * factor at sign-in; demo users with a known authenticator app then verify it once (step-up, `mfa` mode) so the suite keeps
+ * running sensitive actions in an MFA-verified session as before. `mfa: false` keeps the plain email sign-in.
+ */
+export async function signIn(page: Page, email: string, opts: { totpKey?: Buffer; mfa?: boolean } = {}): Promise<void> {
   await page.goto('/overview'); // V5: `/` is the public marketing page; the app home is /overview
-  await page.waitForURL(/\/login/);
-  await page.locator('a[href^="/api/auth/login"]').first().click();
-  await page.waitForURL(/localhost:5556/);
+  // /login forwards straight to the sign-in page (an IdP session that is still alive may bring the browser straight back).
+  await expect.poll(async () => {
+    const u = new URL(page.url());
+    if (u.port === '5556') return true;
+    if (u.pathname.startsWith('/login') || u.pathname.startsWith('/api/auth')) return false;
+    return (await page.request.get('/api/session')).ok();
+  }, { timeout: 45_000 }).toBe(true);
   await completeKeycloak(page, email, opts);
-  await page.waitForURL((u) => u.port === '3000' && !u.pathname.startsWith('/login') && !u.pathname.startsWith('/api/auth'), { timeout: 45_000 });
+  await page.waitForURL((u) => u.port !== '5556' && !u.pathname.startsWith('/login') && !u.pathname.startsWith('/api/auth'), { timeout: 45_000 });
+  const key = opts.totpKey ?? (DEMO_TOTP[email] ? Buffer.from(DEMO_TOTP[email]!, 'utf8') : undefined);
+  if (key && opts.mfa !== false) await verifySecondFactor(page, email, key);
   await useE2EWorkspace(page);
+}
+
+/** Step-up to an MFA-verified session (the authenticator-app code only; no new email). */
+export async function verifySecondFactor(page: Page, email: string, key?: Buffer): Promise<void> {
+  const s = await page.request.get('/api/session');
+  if (s.ok() && (await s.json() as { v2?: { mfa_verified?: boolean } }).v2?.mfa_verified) return;
+  await page.goto('/api/auth/step-up?mode=mfa&returnTo=%2Foverview');
+  if (new URL(page.url()).port === '5556') await completeKeycloak(page, email, { totpKey: key });
+  await page.waitForURL((u) => u.port !== '5556' && !u.pathname.startsWith('/api/auth'), { timeout: 45_000 });
 }
 
 /** Playwright works in its own workspace (scripts/seed-e2e.ts) so its fixtures never land in Demo Workspace (V3 §2.7). */

@@ -6,20 +6,22 @@ audience: user
 status: available
 related: [recovery-codes-and-lost-factors, step-up-verification, workspace-security-policy, manage-sessions]
 product_version: "2026-11"
-reviewed: 2026-11-09
+reviewed: 2026-11-10
 order: 20
 keywords: [2fa, mfa, two-factor, authenticator, totp, passkey, webauthn, security key]
 ---
 
-Two-step verification (also called MFA or 2FA) means signing in with your password **and** something you have: an
-authenticator app code or a passkey. Your factors are stored by the identity provider, not by Relay; Relay can only see
+Two-step verification (also called MFA or 2FA) means confirming it's you with something you have — an authenticator app
+code or a passkey — on top of your email or Google sign-in. Relay asks for it when you do something sensitive, not every
+time you sign in (Relay staff confirm it at every sign-in). Your factors are stored by the identity provider, not by Relay; Relay can only see
 which ones you have.
 
 ## Do I need it?
 
 By default your workspace requires it for **Owner, Admin, Publisher and Brand manager** roles. Until you set it up you can
-read everything, but sensitive actions — scheduling, publishing, inviting people, changing roles, connecting accounts,
-exports, billing changes, automation and integrations — are refused with *Two-step verification required*. Owners can
+read everything; the first time you try a sensitive action — scheduling, publishing, inviting or removing people,
+changing roles, connecting accounts, exports, billing changes, automation and integrations — Relay walks you through
+setting up an authenticator app, then carries on. You can also set it up ahead of time below. Owners can
 require it for everyone ([Workspace security policy](/help/account-security/workspace-security-policy)).
 
 ## Add an authenticator app
@@ -47,8 +49,8 @@ require it for everyone ([Workspace security policy](/help/account-security/work
 
 ## Check your session
 
-The **Security** header shows **Two-step verified** or **Password only** for the current session. If it says Password
-only and you have a factor, select **Verify now**.
+The **Security** header shows **Two-step verified** or **Signed in with email or Google** for the current session. To
+verify now (for example before a run of sensitive changes), select **Verify now**.
 
 ## Common errors
 

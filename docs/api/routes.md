@@ -876,7 +876,7 @@ Source: `apps/web/app/api/auth/callback/route.ts`
 
 ### `/api/auth/login`
 
-GET /api/auth/login?returnTo=/path&invite=<token> — starts OIDC (state + nonce + PKCE) and 302s to the IdP.
+GET /api/auth/login?returnTo=/path&invite=<token>[&mode=signup][&login_hint=email] — starts OIDC (state + nonce + PKCE) and 302s to the IdP's passwordless sign-in page (D34: Continue with Google · or · email link + code; mode=signup shows the "Create your Relay account" heading).
 
 Source: `apps/web/app/api/auth/login/route.ts`
 
@@ -896,7 +896,7 @@ Source: `apps/web/app/api/auth/logout/route.ts`
 
 ### `/api/auth/step-up`
 
-GET /api/auth/step-up?returnTo=/path[&mode=fresh\|mfa] — re-authenticate the CURRENT session at the IdP. fresh (default): acr_values=mfa + max_age=0 → password + second factor again, new auth_time. mfa: acr_values=mfa → second factor only on top of the IdP session (used right after password sign-in). Users without a second factor are sent to My Security to set one up. Assurance is only ever updated by the callback from the verified ID token, and only if the returned subject is this session's subject.
+GET /api/auth/step-up?returnTo=/path[&mode=fresh\|mfa] — verify the CURRENT session with the second factor at the IdP (D34). fresh (default): acr_values=mfa → the authenticator-app code again (no new email), auth_time must be newer than this request. mfa: the same right after sign-in (Relay staff). Users without a second factor enrol an authenticator app first (Keycloak CONFIGURE_TOTP); that enrolment counts as the verification (see completeSessionUpgrade). Assurance is only ever updated by the callback, from the verified ID token / the IdP admin API, and only if the returned subject is this session's subject.
 
 Source: `apps/web/app/api/auth/step-up/route.ts`
 

@@ -106,8 +106,14 @@ export function redirectToStepUp() {
   window.location.assign(stepUpHref());
 }
 
+// Set while the user signs out: background requests that now get 401 must not race the sign-out navigation to /login.
+let signingOut = false;
+export function markSigningOut(on = true) {
+  signingOut = on;
+}
+
 export function redirectToLogin() {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || signingOut) return;
   const here = window.location.pathname + window.location.search;
   if (window.location.pathname.startsWith('/login')) return;
   window.location.assign(`/login?returnTo=${encodeURIComponent(here)}`);

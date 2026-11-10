@@ -6,15 +6,17 @@ audience: user
 status: available
 related: [set-up-two-step-verification, workspace-security-policy, roles-and-permissions]
 product_version: "2026-11"
-reviewed: 2026-11-09
+reviewed: 2026-11-10
 order: 22
 keywords: [step-up, verify again, confirm it's you, mfa required, re-authenticate]
 ---
 
 Relay uses two checks on top of your role:
 
+Signing in itself never asks for your authenticator app (Relay staff excepted). Instead:
+
 1. **Two-step verification in this session** — for sensitive actions when your workspace requires it for one of your
-   roles. Message: *Two-step verification required* / *Verify with your second factor to do this.*
+   roles (by default owners, admins, publishers and brand managers). Message: *Two-step verification required* / *Verify with your second factor to do this.*
 2. **Fresh verification (step-up)** — a few high-risk actions also need you to have signed in with your second factor
    within the last **5 minutes** (owners can set 1–60 minutes). Message: *Confirm it's you to continue.*
 
@@ -34,7 +36,8 @@ an approval policy less strict · approving a Relay support-access request.
 ## What to do
 
 1. Select **Verify now** in the prompt (or on [Security](/security)).
-2. Sign in at the identity provider with your password and second factor.
+2. Enter the 6-digit code from your authenticator app (or use a passkey or recovery code). No new email, no password.
 3. **Result:** you return to where you were and can retry the action. Your session token is renewed.
 
-If you have no second factor yet, Relay sends you to set one up first.
+No authenticator app yet? The first time you're asked, Relay walks you through setting one up (scan a QR code, type one
+code) and that counts as your verification — you go straight back.

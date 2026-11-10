@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { LogOut } from 'lucide-react';
-import { api } from '@/lib/client/api';
+import { api, markSigningOut } from '@/lib/client/api';
 import { SessionProvider, useSession } from '@/lib/client/session';
 import { ErrorState, IconButton, Spinner, ToastProvider, TooltipProvider } from '@/components/ui';
 import { RelayMark } from '@/components/brand/relay-mark';
@@ -25,7 +25,8 @@ export function ReviewProviders({ children }: { children: ReactNode }) {
 function ReviewChrome({ children }: { children: ReactNode }) {
   const { session } = useSession();
   const signOut = async () => {
-    let next = '/login';
+    let next = '/';
+    markSigningOut();
     try { const r = await api.post<{ logout_url?: string | null }>('/api/auth/logout', {}); if (r?.logout_url) next = r.logout_url; } catch { /* still leave */ }
     window.location.assign(next);
   };

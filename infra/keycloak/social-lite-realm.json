@@ -350,7 +350,7 @@
         {
           "authenticator": "idp-username-password-form",
           "authenticatorFlow": false,
-          "requirement": "REQUIRED",
+          "requirement": "DISABLED",
           "priority": 10,
           "autheticatorFlow": false,
           "userSetupAllowed": false
@@ -473,7 +473,7 @@
         {
           "authenticator": "direct-grant-validate-password",
           "authenticatorFlow": false,
-          "requirement": "REQUIRED",
+          "requirement": "DISABLED",
           "priority": 20,
           "autheticatorFlow": false,
           "userSetupAllowed": false
@@ -549,7 +549,7 @@
         {
           "authenticator": "auth-username-password-form",
           "authenticatorFlow": false,
-          "requirement": "REQUIRED",
+          "requirement": "DISABLED",
           "priority": 10,
           "autheticatorFlow": false,
           "userSetupAllowed": false
@@ -649,7 +649,7 @@
         {
           "authenticator": "reset-password",
           "authenticatorFlow": false,
-          "requirement": "REQUIRED",
+          "requirement": "DISABLED",
           "priority": 30,
           "autheticatorFlow": false,
           "userSetupAllowed": false
@@ -682,8 +682,8 @@
       ]
     },
     {
-      "alias": "social-lite browser",
-      "description": "Password (LoA 1) then second factor (LoA 2) when the user has one; step-up via acr_values/max_age",
+      "alias": "relay passwordless browser",
+      "description": "Relay (D34): cookie, else email link + code (LoA 1); second factor only when acr mfa (LoA 2) is requested",
       "providerId": "basic-flow",
       "topLevel": true,
       "builtIn": false,
@@ -701,13 +701,13 @@
           "requirement": "ALTERNATIVE",
           "priority": 20,
           "autheticatorFlow": true,
-          "flowAlias": "social-lite forms",
+          "flowAlias": "relay passwordless forms",
           "userSetupAllowed": false
         }
       ]
     },
     {
-      "alias": "social-lite forms",
+      "alias": "relay passwordless forms",
       "description": "Level-of-authentication conditional forms",
       "providerId": "basic-flow",
       "topLevel": false,
@@ -718,7 +718,7 @@
           "requirement": "CONDITIONAL",
           "priority": 10,
           "autheticatorFlow": true,
-          "flowAlias": "social-lite loa1",
+          "flowAlias": "relay passwordless loa1",
           "userSetupAllowed": false
         },
         {
@@ -726,14 +726,14 @@
           "requirement": "CONDITIONAL",
           "priority": 20,
           "autheticatorFlow": true,
-          "flowAlias": "social-lite loa2",
+          "flowAlias": "relay passwordless loa2",
           "userSetupAllowed": false
         }
       ]
     },
     {
-      "alias": "social-lite loa1",
-      "description": "LoA 1: password",
+      "alias": "relay passwordless loa1",
+      "description": "LoA 1: email sign-in (link or 6-digit code)",
       "providerId": "basic-flow",
       "topLevel": false,
       "builtIn": false,
@@ -748,18 +748,18 @@
           "authenticatorConfig": "sl-loa1"
         },
         {
-          "authenticator": "auth-username-password-form",
+          "authenticator": "relay-email-sign-in",
           "authenticatorFlow": false,
           "requirement": "REQUIRED",
           "priority": 20,
           "autheticatorFlow": false,
           "userSetupAllowed": false,
-          "authenticatorConfig": "sl-amr-pwd"
+          "authenticatorConfig": "relay-email-sign-in"
         }
       ]
     },
     {
-      "alias": "social-lite loa2",
+      "alias": "relay passwordless loa2",
       "description": "LoA 2: a second factor the user has configured",
       "providerId": "basic-flow",
       "topLevel": false,
@@ -787,13 +787,13 @@
           "requirement": "REQUIRED",
           "priority": 30,
           "autheticatorFlow": true,
-          "flowAlias": "social-lite second factor",
+          "flowAlias": "relay passwordless second factor",
           "userSetupAllowed": false
         }
       ]
     },
     {
-      "alias": "social-lite second factor",
+      "alias": "relay passwordless second factor",
       "description": "Any one configured second factor",
       "providerId": "basic-flow",
       "topLevel": false,
@@ -825,6 +825,58 @@
           "autheticatorFlow": false,
           "userSetupAllowed": false,
           "authenticatorConfig": "sl-amr-rc"
+        }
+      ]
+    },
+    {
+      "alias": "relay first broker login",
+      "description": "Relay (D34): first sign-in with Google",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "idp-review-profile",
+          "authenticatorConfig": "relay review profile",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "autheticatorFlow": false,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "autheticatorFlow": true,
+          "flowAlias": "relay first broker link or create",
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "relay first broker link or create",
+      "description": "",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "relay-idp-verified-email-link",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 10,
+          "autheticatorFlow": false,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "idp-create-user-if-unique",
+          "authenticatorConfig": "relay create unique user",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 20,
+          "autheticatorFlow": false,
+          "userSetupAllowed": false
         }
       ]
     }
@@ -869,13 +921,6 @@
       }
     },
     {
-      "alias": "sl-amr-pwd",
-      "config": {
-        "default.reference.value": "pwd",
-        "default.reference.maxAge": "43200"
-      }
-    },
-    {
       "alias": "sl-amr-otp",
       "config": {
         "default.reference.value": "otp",
@@ -894,6 +939,26 @@
       "config": {
         "default.reference.value": "rc",
         "default.reference.maxAge": "43200"
+      }
+    },
+    {
+      "alias": "relay-email-sign-in",
+      "config": {
+        "relay.ttl.seconds": "900",
+        "default.reference.value": "email",
+        "default.reference.maxAge": "43200"
+      }
+    },
+    {
+      "alias": "relay review profile",
+      "config": {
+        "update.profile.on.first.login": "missing"
+      }
+    },
+    {
+      "alias": "relay create unique user",
+      "config": {
+        "require.password.update.after.registration": "false"
       }
     }
   ],
@@ -922,7 +987,7 @@
       "alias": "UPDATE_PASSWORD",
       "name": "Update Password",
       "providerId": "UPDATE_PASSWORD",
-      "enabled": true,
+      "enabled": false,
       "defaultAction": false,
       "priority": 30,
       "config": {
@@ -989,7 +1054,7 @@
       "alias": "VERIFY_PROFILE",
       "name": "Verify Profile",
       "providerId": "VERIFY_PROFILE",
-      "enabled": true,
+      "enabled": false,
       "defaultAction": false,
       "priority": 100,
       "config": {}
@@ -1035,7 +1100,7 @@
       "config": {}
     }
   ],
-  "browserFlow": "social-lite browser",
+  "browserFlow": "relay passwordless browser",
   "registrationFlow": "registration",
   "directGrantFlow": "direct grant",
   "resetCredentialsFlow": "reset credentials",
@@ -1066,7 +1131,7 @@
       "webOrigins": [],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "http://localhost:3000/login##http://127.0.0.1:3000/login##http://localhost:3100/login",
+        "post.logout.redirect.uris": "http://localhost:3000/##http://localhost:3000/login##http://127.0.0.1:3000/##http://127.0.0.1:3000/login##http://localhost:3100/##http://localhost:3100/login",
         "backchannel.logout.url": "http://host.docker.internal:3000/api/auth/backchannel-logout",
         "backchannel.logout.session.required": "true",
         "backchannel.logout.revoke.offline.tokens": "false",
@@ -1095,7 +1160,8 @@
         "email",
         "roles"
       ],
-      "optionalClientScopes": []
+      "optionalClientScopes": [],
+      "baseUrl": "http://localhost:3000/"
     },
     {
       "clientId": "relay-mcp",
@@ -1166,12 +1232,6 @@
       "enabled": true,
       "credentials": [
         {
-          "type": "password",
-          "value": "socialite-demo",
-          "temporary": false,
-          "userLabel": "Demo password"
-        },
-        {
           "type": "otp",
           "userLabel": "Demo authenticator",
           "secretData": "{\"value\": \"socialite-demo-totp-owner\"}",
@@ -1190,12 +1250,6 @@
       "enabled": true,
       "credentials": [
         {
-          "type": "password",
-          "value": "socialite-demo",
-          "temporary": false,
-          "userLabel": "Demo password"
-        },
-        {
           "type": "otp",
           "userLabel": "Demo authenticator",
           "secretData": "{\"value\": \"socialite-demo-totp-admin\"}",
@@ -1212,14 +1266,7 @@
       "firstName": "Eden",
       "lastName": "Editor",
       "enabled": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "socialite-demo",
-          "temporary": false,
-          "userLabel": "Demo password"
-        }
-      ],
+      "credentials": [],
       "requiredActions": []
     },
     {
@@ -1230,14 +1277,7 @@
       "firstName": "April",
       "lastName": "Approver",
       "enabled": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "socialite-demo",
-          "temporary": false,
-          "userLabel": "Demo password"
-        }
-      ],
+      "credentials": [],
       "requiredActions": []
     },
     {
@@ -1248,14 +1288,7 @@
       "firstName": "Vic",
       "lastName": "Viewer",
       "enabled": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "socialite-demo",
-          "temporary": false,
-          "userLabel": "Demo password"
-        }
-      ],
+      "credentials": [],
       "requiredActions": []
     },
     {
@@ -1266,14 +1299,7 @@
       "firstName": "Otto",
       "lastName": "Outsider",
       "enabled": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "socialite-demo",
-          "temporary": false,
-          "userLabel": "Demo password"
-        }
-      ],
+      "credentials": [],
       "requiredActions": []
     },
     {
@@ -1284,14 +1310,7 @@
       "firstName": "Ivy",
       "lastName": "Invitee",
       "enabled": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "socialite-demo",
-          "temporary": false,
-          "userLabel": "Demo password"
-        }
-      ],
+      "credentials": [],
       "requiredActions": []
     },
     {
@@ -1303,12 +1322,6 @@
       "lastName": "Publisher",
       "enabled": true,
       "credentials": [
-        {
-          "type": "password",
-          "value": "socialite-demo",
-          "temporary": false,
-          "userLabel": "Demo password"
-        },
         {
           "type": "otp",
           "userLabel": "Demo authenticator",
@@ -1326,14 +1339,7 @@
       "firstName": "Ana",
       "lastName": "Analyst",
       "enabled": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "socialite-demo",
-          "temporary": false,
-          "userLabel": "Demo password"
-        }
-      ],
+      "credentials": [],
       "requiredActions": []
     },
     {
@@ -1344,14 +1350,7 @@
       "firstName": "Gus",
       "lastName": "Guest",
       "enabled": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "socialite-demo",
-          "temporary": false,
-          "userLabel": "Demo password"
-        }
-      ],
+      "credentials": [],
       "requiredActions": []
     },
     {
@@ -1362,14 +1361,7 @@
       "firstName": "Tess",
       "lastName": "Teammanager",
       "enabled": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "socialite-demo",
-          "temporary": false,
-          "userLabel": "Demo password"
-        }
-      ],
+      "credentials": [],
       "requiredActions": []
     },
     {
@@ -1381,12 +1373,6 @@
       "lastName": "Other-Owner",
       "enabled": true,
       "credentials": [
-        {
-          "type": "password",
-          "value": "socialite-demo",
-          "temporary": false,
-          "userLabel": "Demo password"
-        },
         {
           "type": "otp",
           "userLabel": "Demo authenticator",
@@ -2240,5 +2226,29 @@
     "phone",
     "microprofile-jwt",
     "organization"
+  ],
+  "loginTheme": "relay",
+  "emailTheme": "relay",
+  "identityProviders": [
+    {
+      "alias": "google",
+      "displayName": "Google",
+      "providerId": "google",
+      "enabled": false,
+      "trustEmail": true,
+      "storeToken": false,
+      "addReadTokenRoleOnCreate": false,
+      "authenticateByDefault": false,
+      "linkOnly": false,
+      "hideOnLogin": false,
+      "firstBrokerLoginFlowAlias": "relay first broker login",
+      "config": {
+        "clientId": "not-configured",
+        "clientSecret": "not-configured",
+        "syncMode": "IMPORT",
+        "defaultScope": "openid email profile",
+        "guiOrder": "1"
+      }
+    }
   ]
 }

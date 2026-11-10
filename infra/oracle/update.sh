@@ -74,6 +74,19 @@ elif [ -z "$TAG" ]; then
   TAG=$(nice -n 10 "$KIT_DIR/build.sh" | tail -n 1)
 fi
 for t in web worker migrate; do docker image inspect "relay-$t:$TAG" >/dev/null 2>&1 || die "image relay-$t:$TAG not found"; done
+
+# Sign-in server image (infra/keycloak: Keycloak + passwordless provider + Relay theme, D34). Rebuilt from this checkout;
+# restarted only when the image changed (about a minute without sign-in; signed-in Relay sessions keep working).
+step "1b. Sign-in server image"
+kc_before=$(docker image inspect -f '{{.Id}}' relay-keycloak:local 2>/dev/null || true)
+nice -n 10 compose build keycloak >&2 || die "sign-in server image build failed; nothing changed"
+kc_after=$(docker image inspect -f '{{.Id}}' relay-keycloak:local 2>/dev/null || true)
+if [ "$kc_before" != "$kc_after" ]; then
+  compose up -d --no-deps keycloak
+  wait_healthy keycloak 300 && ok "sign-in server updated" || { compose logs --tail 40 keycloak >&2; die "sign-in server not healthy after the image update (logs above)"; }
+else
+  ok "sign-in server image unchanged"
+fi
 [ "$TAG" != "$PREV" ] || { ok "already on $TAG"; exit 0; }
 ok "new $TAG (current $PREV)"
 

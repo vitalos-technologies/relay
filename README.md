@@ -14,12 +14,13 @@ pnpm install
 ./scripts/dev.sh              # infra + migrations + demo seed + worker + web
 ```
 
-Open http://localhost:3000 → **Sign in** → the local Keycloak realm (http://localhost:5556/realms/social-lite).
-All demo users share the password `socialite-demo`:
+Open http://localhost:3000 → **Log in** → the local Keycloak realm (http://localhost:5556/realms/social-lite).
+Sign-in is passwordless (D34): enter a demo email, then use the link or the 6-digit code from the email in Mailpit
+(http://localhost:8025). Two-step is asked for sensitive actions (and at every sign-in for platform operators):
 
 | Demo user (`@demo.social-lite.test`) | Second step |
 |---|---|
-| `owner@`, `admin@`, `publisher@` (and `owner@other.social-lite.test`) | Authenticator code (TOTP) — required for privileged roles |
+| `owner@`, `admin@`, `publisher@` (and `owner@other.social-lite.test`) | Authenticator code (TOTP) — asked for sensitive actions; `owner@` is a platform operator, so also at sign-in |
 | `editor@`, `approver@`, `analyst@`, `viewer@`, `teammanager@`, `guest@` | None (can enrol one on **Security**) |
 
 Get the current code with `npx tsx scripts/demo-totp.ts owner` (`admin`, `publisher`, `other-owner`), or add the local-only secret to an authenticator app (SHA-1, 6 digits, 30 s): owner `ONXWG2LBNRUXIZJNMRSW23ZNORXXI4BNN53W4ZLS`, admin `ONXWG2LBNRUXIZJNMRSW23ZNORXXI4BNMFSG22LO`, publisher `ONXWG2LBNRUXIZJNMRSW23ZNORXXI4BNOB2WE3DJONUGK4Q`.

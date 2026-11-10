@@ -417,13 +417,13 @@ function UsageCard() {
   );
 }
 
-/** V5 (MKT): a new self-serve owner usually lacks a verified second factor, which billing changes require by the workspace
- *  security policy — say so instead of implying they lack the role. */
+/** D34 (supersedes D31): billing changes ask for two-step verification at the action itself (step-up), and someone without
+ *  an authenticator app sets one up right there — say so instead of implying they lack the role. */
 function ManageHint() {
   const { session } = useSession();
   const ownerish = session.workspace?.role === 'owner' || session.workspace?.role === 'admin';
   if (ownerish && session.v2 && !session.v2.mfa_verified) {
-    return <p className="text-xs text-muted" data-testid="billing-mfa-hint">Billing changes need two-step verification. <Link href="/security" className="font-medium text-accent-text hover:underline">Set it up in Security</Link>, then come back to choose a plan.</p>;
+    return <p className="text-xs text-muted" data-testid="billing-mfa-hint">Choosing a plan asks you to confirm with an authenticator app. If you don’t have one set up yet, we’ll walk you through it then.</p>;
   }
   return <p className="text-xs text-muted">Only people who manage billing can make changes.</p>;
 }

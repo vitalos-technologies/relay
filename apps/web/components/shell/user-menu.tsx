@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { BookOpen, Bug, LifeBuoy, LogOut, MessageSquarePlus, Monitor, Moon, ShieldCheck, Sparkles, Sun, UserRound } from 'lucide-react';
 import { useFlag } from '@/lib/client/flags';
 import { ReportProblemDialog, WhatsNewDrawer, useReleaseNotes } from '@/components/support/support';
-import { api } from '@/lib/client/api';
+import { api, markSigningOut } from '@/lib/client/api';
 import { useSession } from '@/lib/client/session';
 import { applyTheme, currentTheme, type Theme } from '@/lib/client/theme';
 import { clearNamespace } from '@/lib/client/draft-recovery';
@@ -27,14 +27,16 @@ export function UserMenu({ compact }: { compact?: boolean }) {
   const initials = (u.name || u.email).split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((s) => s[0]?.toUpperCase()).join('');
 
   const signOut = async () => {
-    let next = '/login';
+    let next = '/';
+    markSigningOut();
     // Workspace policy: browser copies of drafts don't outlive the session.
     if (session.draft_recovery?.clear_on_logout) clearNamespace(session.draft_recovery);
     try {
       const r = await api.post<{ logout_url?: string | null }>('/api/auth/logout', {});
-      // Also end the identity-provider session (RP-initiated logout); it returns to /login.
+      // Also end the identity-provider session (RP-initiated logout, no confirmation page); it returns to the marketing page.
       if (r?.logout_url) next = r.logout_url;
     } catch (e) {
+      markSigningOut(false);
       toast.error(e, 'Couldn’t sign out');
       return;
     }

@@ -1,8 +1,9 @@
 // V2 identity & security journeys against the running app + the local Keycloak realm:
-// TOTP sign-in, My Security, step-up, real TOTP enrolment / recovery codes (incl. reuse refusal) / factor removal,
+// passwordless sign-in (D34: email code; TOTP for step-up), My Security, step-up, real TOTP enrolment / recovery codes (incl. reuse refusal) / factor removal,
 // session revocation, back-channel logout, service-account keys, CSP. Screenshots → evidence/v2/security-*.png
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { KEYCLOAK, api, completeKeycloak, freshTotp, signIn } from './helpers';
+import { waitForSignInEmail } from '../support/mailpit';
 
 const REALM_ADMIN = `${KEYCLOAK}/admin/realms/social-lite`;
 // The shared dev server compiles routes on first use; UI assertions get a generous timeout.
@@ -19,30 +20,35 @@ async function kcUserId(email: string): Promise<string> {
   const r = await fetch(`${REALM_ADMIN}/users?exact=true&email=${encodeURIComponent(email)}`, { headers: { authorization: `Bearer ${await kcAdminToken()}` } });
   return ((await r.json()) as Array<{ id: string }>)[0]!.id;
 }
-/** Test setup only: return a demo identity to "password only" (Keycloak admin API, local realm). */
+/** Test setup only: return a demo identity to "email sign-in only" (Keycloak admin API, local realm). */
 async function resetSecondFactors(email: string): Promise<void> {
   const t = await kcAdminToken();
   const id = await kcUserId(email);
   const creds = (await (await fetch(`${REALM_ADMIN}/users/${id}/credentials`, { headers: { authorization: `Bearer ${t}` } })).json()) as Array<{ id: string; type: string }>;
-  for (const c of creds.filter((x) => x.type !== 'password')) await fetch(`${REALM_ADMIN}/users/${id}/credentials/${c.id}`, { method: 'DELETE', headers: { authorization: `Bearer ${t}` } });
+  for (const c of creds) await fetch(`${REALM_ADMIN}/users/${id}/credentials/${c.id}`, { method: 'DELETE', headers: { authorization: `Bearer ${t}` } });
   await fetch(`${REALM_ADMIN}/attack-detection/brute-force/users/${id}`, { method: 'DELETE', headers: { authorization: `Bearer ${t}` } });
 }
 
-/** On Keycloak: answer password / TOTP re-authentication prompts until `target` shows up. */
+/** On Keycloak: answer email / emailed-code / TOTP re-authentication prompts until `target` shows up. */
 async function kcUntil(page: Page, email: string, key: Buffer | undefined, target: Locator): Promise<void> {
   const otp = page.locator('input[name=otp]');
-  const pwd = page.locator('input[name=password]');
+  const code = page.locator('input[name=code]');
+  const user = page.locator('input[name=username]');
+  let since = Date.now();
   for (let i = 0; i < 6; i++) {
-    await ui(target.or(otp).or(pwd).first()).toBeVisible();
+    await ui(target.or(otp).or(code).or(user).first()).toBeVisible();
     if (await target.first().isVisible()) return;
     if (await otp.isVisible()) {
       await otp.fill(await freshTotp(key!, email));
+      await page.locator('#kc-login').click();
+    } else if (await code.isVisible()) {
+      await code.fill((await waitForSignInEmail(email, since)).code);
+      await page.locator('#relay-verify').click();
     } else {
-      const user = page.locator('input[name=username]');
-      if (await user.isVisible().catch(() => false) && await user.isEditable().catch(() => false)) await user.fill(email);
-      await pwd.fill('socialite-demo');
+      since = Date.now();
+      await user.fill(email);
+      await page.locator('#kc-login').click();
     }
-    await page.locator('#kc-login, [type=submit]').first().click();
     await page.waitForLoadState();
   }
   await ui(target.first()).toBeVisible();
@@ -59,7 +65,7 @@ function trackCspViolations(page: Page): string[] {
 }
 
 test.describe('identity & security (Keycloak)', () => {
-  test('owner signs in with password + TOTP; My Security shows two-step; CSP enforced without violations', async ({ page }) => {
+  test('owner signs in with an emailed code, verifies TOTP (step-up); My Security shows two-step; CSP enforced without violations', async ({ page }) => {
     test.setTimeout(240_000);
     const violations = trackCspViolations(page);
     await signIn(page, 'owner@demo.social-lite.test');
@@ -75,7 +81,8 @@ test.describe('identity & security (Keycloak)', () => {
     await page.screenshot({ path: 'evidence/v2/security-overview.png', fullPage: true });
     const s = await (await api(page)).get('/api/security');
     expect(s.body.assurance).toMatchObject({ mfa_verified: true, acr: 'mfa' });
-    expect(s.body.assurance.amr).toEqual(expect.arrayContaining(['pwd', 'otp']));
+    expect(s.body.assurance.amr).toEqual(expect.arrayContaining(['email', 'otp']));
+    expect(s.body.assurance.amr).not.toContain('pwd');
     expect(violations).toEqual([]);
   });
 
@@ -125,21 +132,27 @@ test.describe('identity & security (Keycloak)', () => {
     const postId = /\/posts\/([0-9a-f-]{36})/.exec(page.url())![1]!;
     expect((await (await api(page)).send('POST', `/api/posts/${postId}/archive`, {})).status).toBeLessThan(300); // tidy up the demo data
 
-    // Sign out (RP-initiated logout at Keycloak, back to /login) under the same policy.
+    // Sign out: one click, RP-initiated logout at Keycloak with no confirmation page, back to the marketing page `/`.
     await page.getByRole('button', { name: /Account menu/ }).first().click();
     await page.getByRole('menuitem', { name: 'Sign out' }).click();
-    await page.waitForURL(/\/login/, { timeout: 60_000 });
+    await page.waitForURL((u) => u.port === '3000' && u.pathname === '/', { timeout: 60_000 });
+    // The IdP session ended too: signing in again asks for the email (no silent SSO).
+    await page.goto('/api/auth/login');
+    await page.waitForURL(/localhost:5556/);
+    await ui(page.locator('input[name=username]')).toBeVisible();
     expect((await page.request.get('/api/session')).status()).toBe(401);
     expect(violations).toEqual([]);
   });
 
-  test('step-up re-authenticates at Keycloak (password + TOTP) and returns verified', async ({ page }) => {
+  test('step-up asks only the authenticator-app code at Keycloak (no new email) and returns verified', async ({ page }) => {
     test.setTimeout(240_000);
     await signIn(page, 'admin@demo.social-lite.test');
     await page.goto('/security');
     const before = (await (await api(page)).get('/api/security')).body.assurance.auth_time;
     await page.getByTestId('verify-now').click();
     await page.waitForURL(/localhost:5556/);
+    await ui(page.locator('input[name=otp]')).toBeVisible();
+    await expect(page.locator('input[name=username], input[name=code], input[name=password]')).toHaveCount(0);
     await completeKeycloak(page, 'admin@demo.social-lite.test');
     await page.waitForURL(/\/security\?verified=1/);
     const after = (await (await api(page)).get('/api/security')).body;
@@ -153,7 +166,7 @@ test.describe('identity & security (Keycloak)', () => {
     await resetSecondFactors(email);
     await signIn(page, email);
     await page.goto('/security');
-    await ui(page.getByText('Password only')).toBeVisible();
+    await ui(page.getByText('Signed in with email or Google')).toBeVisible();
 
     // 1) Enrol an authenticator app through Keycloak's CONFIGURE_TOTP application-initiated action.
     await page.getByTestId('add-totp').click();
@@ -168,11 +181,9 @@ test.describe('identity & security (Keycloak)', () => {
     await page.waitForURL(/\/security/);
     await ui(page.getByTestId('factor-totp')).toContainText('1 active');
 
-    // 2) Recovery codes need a fresh verification now that a factor exists: the app sends us to step-up first.
-    await page.getByTestId('add-codes').click();
-    await page.waitForURL(/localhost:5556/);
-    await completeKeycloak(page, email, { totpKey: key });
-    await page.waitForURL(/\/security\?verified=1/);
+    // 2) Enrolling just now counts as a fresh second-factor verification (D34: the IdP shows the new authenticator was
+    //    created during this round trip), so recovery codes go straight to Keycloak without another step-up.
+    expect((await (await api(page)).get('/api/security')).body.assurance).toMatchObject({ mfa_verified: true, fresh: true });
     await page.getByTestId('add-codes').click();
     await page.waitForURL(/localhost:5556/);
     const list = page.locator('#kc-recovery-codes-list li, .kc-recovery-codes-list li');
@@ -187,15 +198,13 @@ test.describe('identity & security (Keycloak)', () => {
     await ui(page.getByTestId('factor-recovery')).toContainText('Set');
     await page.screenshot({ path: 'evidence/v2/security-factors.png', fullPage: true });
 
-    // 3) Sign in elsewhere with recovery code #1 (Keycloak "Try another way").
+    // 3) Sign in elsewhere (email code) and verify with recovery code #1 instead of the app (Keycloak "Try another way").
     const useRecovery = async (code: string) => {
       const ctx = await browser.newContext();
       const p = await ctx.newPage();
-      await p.goto('/api/auth/login');
+      await signIn(p, email, { mfa: false });
+      await p.goto('/api/auth/step-up?mode=mfa&returnTo=%2Foverview');
       await p.waitForURL(/localhost:5556/);
-      await p.fill('input[name=username]', email);
-      await p.fill('input[name=password]', 'socialite-demo');
-      await p.locator('#kc-login').click();
       await p.locator('#try-another-way').click();
       await p.getByText(/recovery/i).first().click();
       await p.fill('input[name=recoveryCodeInput]', code);

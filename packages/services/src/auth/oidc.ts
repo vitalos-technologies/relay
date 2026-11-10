@@ -7,10 +7,15 @@
 // V2 assurance: acr / amr / auth_time / sid are read ONLY from the ID token returned by the token endpoint,
 // after verifying its signature against the IdP's JWKS (in addition to openid-client's claim checks).
 //  - mfaVerified = acr "mfa" (LoA 2) AND amr contains a second factor.
-//  - step-up (purpose step_up): acr_values=mfa + max_age=0 → updates the CURRENT session only when the
-//    returned subject is the session's subject and auth_time is not older than the step-up request; token rotated.
+//  - D34 (passwordless): people sign in with an email link/code or Google (LoA 1). Customers are NOT asked for a second
+//    factor at sign-in; Relay staff (platform operators) are, and sensitive actions step up.
+//  - step-up (purpose step_up): acr_values=mfa → the realm's LoA 2 always re-asks the second factor (loa-max-age 0) on top
+//    of the IdP session; updates the CURRENT session only when the returned subject is the session's subject and, for
+//    `fresh`, auth_time is not older than the step-up request; token rotated.
 //  - IdP actions (purpose idp_action): Keycloak application-initiated actions (kc_action) for the user's own
-//    factors; assurance is re-read from the returned ID token and the session token rotated.
+//    factors; assurance is re-read from the returned ID token and the session token rotated. A step-up for someone with
+//    no second factor enrols an authenticator app first (CONFIGURE_TOTP); a TOTP credential the IdP shows as created
+//    during that round trip counts as a fresh second-factor verification (the user just entered a code from it).
 import { isIP } from 'node:net';
 import * as oidc from 'openid-client';
 import { AppError } from '@social-lite/core';
@@ -142,17 +147,22 @@ async function startAuthorization(db: Queryable, p: {
   return { authorizationUrl: url.toString(), binding };
 }
 
-export async function startLogin(p: { returnTo?: string | null; invite?: string | null }, db: Queryable = getPool()): Promise<LoginStart> {
+export async function startLogin(p: { returnTo?: string | null; invite?: string | null; mode?: string | null; loginHint?: string | null }, db: Queryable = getPool()): Promise<LoginStart> {
   const invite = p.invite && p.invite.length <= 200 ? p.invite : undefined;
-  return startAuthorization(db, { purpose: 'login', returnTo: p.returnTo, invite });
+  const extra: Record<string, string> = {};
+  // D34: the sign-in page (Keycloak, Relay theme) shows "Create your Relay account" for the marketing sign-up handoff.
+  if (p.mode === 'signup') extra.relay_mode = 'signup';
+  if (p.loginHint && p.loginHint.length <= 254 && /^[^\s@]+@[^\s@]+$/.test(p.loginHint)) extra.login_hint = p.loginHint;
+  return startAuthorization(db, { purpose: 'login', returnTo: p.returnTo, invite, extra });
 }
 
 export type StepUpMode = 'fresh' | 'mfa';
 
 /**
- * Re-authentication for the current session. `fresh` (default): acr_values=mfa + max_age=0 + prompt=login — the user signs in
- * again with password and second factor, giving a new auth_time. `mfa`: acr_values=mfa only (second factor on top
- * of the existing IdP session; used right after login). Users without a second factor are sent to set one up.
+ * Re-authentication for the current session: acr_values=mfa. The realm's LoA 2 (loa-max-age 0) re-asks the second factor
+ * every time on top of the IdP session (no new email round trip) and Keycloak reports a new auth_time. `fresh` (default)
+ * additionally requires that auth_time to be newer than this request (checked at the callback); `mfa` is used right after
+ * sign-in (Relay staff). Users without a second factor get `setupRequired` (the route enrols one first).
  */
 export async function startStepUp(session: SessionRecord, p: { returnTo?: string | null; mode?: StepUpMode; loginHint?: string | null }, db: Queryable = getPool()): Promise<LoginStart | { setupRequired: true }> {
   if (session.idpSubject) {
@@ -160,7 +170,6 @@ export async function startStepUp(session: SessionRecord, p: { returnTo?: string
     if (f.available && !f.hasSecondFactor) return { setupRequired: true };
   }
   const extra: Record<string, string> = { acr_values: ACR_MFA };
-  if ((p.mode ?? 'fresh') === 'fresh') { extra.max_age = '0'; extra.prompt = 'login'; }
   if (p.loginHint) extra.login_hint = p.loginHint;
   return startAuthorization(db, { purpose: 'step_up', returnTo: p.returnTo, sessionId: session.id, userId: session.userId, idpAction: p.mode ?? 'fresh', extra });
 }
@@ -182,7 +191,7 @@ export interface LoginResult {
   userId: string;
   redirectTo: string;
   invitation?: { accepted: boolean; workspaceId?: string; error?: string };
-  /** Login only: the user has a second factor at the IdP but this sign-in did not use it → ask for it now. */
+  /** Login only: Relay staff (platform operator) signed in without a second factor → ask for it (or enrol) now. */
   needsSecondFactor?: boolean;
   /** idp_action only: outcome reported by the IdP (success | cancelled | error). */
   actionStatus?: string;
@@ -303,11 +312,10 @@ export async function completeLogin(
   }
   // Signed in with a recovery code: the other sessions go, and the user is told (spec §5 recovery).
   if (assurance.amr.includes('rc')) await afterSensitiveAuthEvent(db, { userId: user.userId, keepSessionId: session.id, kind: 'recovery_code' });
+  // D34: customers are not asked for a second factor at sign-in (sensitive actions step up instead). Relay staff
+  // (platform operators) always are; staff without one enrol at that step.
   let needsSecondFactor = false;
-  if (!assurance.mfaVerified) {
-    const f = await idpFactors(sub).catch(() => null);
-    needsSecondFactor = !!f?.hasSecondFactor;
-  }
+  if (!assurance.mfaVerified) needsSecondFactor = await isPlatformStaff(db, user.userId);
   return { purpose: 'login', token, session, userId: user.userId, redirectTo, invitation, needsSecondFactor };
 }
 
@@ -329,7 +337,7 @@ async function completeSessionUpgrade(
     return { purpose: row.purpose, token: '', session: { id: current.id }, userId: current.userId, redirectTo: withStatus(redirectTo, 'cancelled'), actionStatus: actionStatus ?? 'cancelled' };
   }
   const fresh = row.purpose === 'step_up' && row.idp_action === 'fresh';
-  const { claims, idToken } = await exchange(callbackParams, state, secret.v, row.nonce, fresh ? 0 : undefined);
+  const { claims, idToken } = await exchange(callbackParams, state, secret.v, row.nonce);
   const user = await maybeOne<{ oidc_issuer: string; oidc_subject: string }>(db, `SELECT oidc_issuer, oidc_subject FROM users WHERE id=$1`, [current.userId]);
   const cfg = await oidcConfiguration();
   if (!user || claims.sub !== user.oidc_subject || user.oidc_issuer !== cfg.serverMetadata().issuer) {
@@ -341,15 +349,23 @@ async function completeSessionUpgrade(
     throw new LoginError('step_up_not_fresh', 'The sign-in provider didn’t confirm it’s you. Try again.');
   }
   let assurance: SessionAssurance = { acr: a.acr, amr: a.amr, authTime: a.authTime, mfaVerified: a.mfaVerified };
+  let method: string | undefined;
   if (row.purpose === 'idp_action') {
     // A removed factor must not leave the session looking MFA-verified: re-check what the user still has.
     const f = await idpFactors(String(claims.sub)).catch(() => null);
     if (f?.available && !f.hasSecondFactor) assurance = { ...assurance, mfaVerified: false };
-    // Never let an action round-trip extend freshness beyond what the IdP reports.
+    // D34 enrol-on-step-up: an authenticator app the IdP shows as created during THIS round trip (server-side admin API,
+    // never the redirect's kc_action_status) means the user just entered a valid code from it → fresh second factor.
+    if (row.idp_action === 'CONFIGURE_TOTP' && (actionStatus ?? 'success') === 'success' && f?.available) {
+      const created = f.totp.map((t) => (t.created_at ? Date.parse(t.created_at) : 0))
+        .filter((t) => t >= row.created_at.getTime() - 5_000 && t <= Date.now() + 60_000).sort((x, y) => y - x)[0];
+      if (created) { assurance = { ...assurance, mfaVerified: true, authTime: new Date(Math.min(created, Date.now())) }; method = 'totp_enrolment'; }
+    }
+    // Otherwise never let an action round-trip extend freshness beyond what the IdP reports.
   }
   const { token } = await rotateSession(db, current.id, { ...assurance, idpSessionId: a.sid, idTokenEnc: encryptSecret(idToken, idTokenAad) });
   const action = row.purpose === 'step_up' ? 'auth.step_up' : `auth.factor_action`;
-  await audit(db, { ...auditBase, action, diff: { action: row.idp_action, status: actionStatus ?? 'success', acr: a.acr, amr: a.amr, mfa: assurance.mfaVerified } });
+  await audit(db, { ...auditBase, action, diff: { action: row.idp_action, status: actionStatus ?? 'success', acr: a.acr, amr: a.amr, mfa: assurance.mfaVerified, ...(method ? { method } : {}) } });
   // A completed factor change, or a verification that used a recovery code: revoke the other sessions + notify.
   if (row.purpose === 'idp_action' && (actionStatus ?? 'success') === 'success') {
     await afterSensitiveAuthEvent(db, { userId: current.userId, keepSessionId: current.id, kind: 'factor_change', action: row.idp_action });
@@ -357,6 +373,13 @@ async function completeSessionUpgrade(
     await afterSensitiveAuthEvent(db, { userId: current.userId, keepSessionId: current.id, kind: 'recovery_code' });
   }
   return { purpose: row.purpose, token, session: { id: current.id }, userId: current.userId, redirectTo: withStatus(redirectTo, actionStatus ?? 'success'), actionStatus: actionStatus ?? 'success' };
+}
+
+/** Relay staff = an active platform operator row (any role), same rule as the Platform routes (admin/platform.ts). */
+export async function isPlatformStaff(db: Queryable, userId: string): Promise<boolean> {
+  const r = await maybeOne(db, `SELECT 1 FROM platform_operators o JOIN users u ON u.id=o.user_id
+    WHERE o.user_id=$1 AND o.revoked_at IS NULL AND u.disabled_at IS NULL`, [userId]).catch(() => null);
+  return !!r;
 }
 
 function withStatus(path: string, status: string): string {
@@ -374,7 +397,8 @@ export async function idpLogoutUrl(sessionId: string, db: Queryable = getPool())
     const r = await maybeOne<{ id_token_enc: EncryptedBlob | null }>(db, `SELECT id_token_enc FROM sessions WHERE id=$1`, [sessionId]);
     const u = new URL(end);
     u.searchParams.set('client_id', config().OIDC_CLIENT_ID!);
-    u.searchParams.set('post_logout_redirect_uri', `${config().APP_BASE_URL.replace(/\/$/, '')}/login`);
+    // D34: one click, no IdP confirmation page (id_token_hint), and back to the public marketing page.
+    u.searchParams.set('post_logout_redirect_uri', `${config().APP_BASE_URL.replace(/\/$/, '')}/`);
     if (r?.id_token_enc) u.searchParams.set('id_token_hint', decryptSecret<string>(r.id_token_enc, idTokenAad));
     return u.toString();
   } catch {

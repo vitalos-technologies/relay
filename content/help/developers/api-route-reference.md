@@ -168,9 +168,9 @@ This page lists 491 route files with 612 handlers (Public: 27, Session: 556, Ses
 |---|---|---|---|---|
 | POST | `/api/auth/backchannel-logout` | Public |  | POST /api/auth/backchannel-logout — OpenID Connect Back-Channel Logout 1.0 receiver (called by the IdP, not by browsers: no session/CSRF). The logout_token is verified (JWKS signature, iss, aud, iat, events, sid/sub, no… |
 | GET | `/api/auth/callback` | Public |  | GET /api/auth/callback — completes OIDC for login, step-up and IdP (Keycloak) actions. login: binds/creates the user, accepts a pending invitation, revokes any session the browser already had, sets a NEW session cookie;… |
-| GET | `/api/auth/login` | Public |  | GET /api/auth/login?returnTo=/path&invite=<token> — starts OIDC (state + nonce + PKCE) and 302s to the IdP. |
+| GET | `/api/auth/login` | Public |  | GET /api/auth/login?returnTo=/path&invite=<token>[&mode=signup][&login_hint=email] — starts OIDC (state + nonce + PKCE) and 302s to the IdP's passwordless sign-in page (D34: Continue with Google · or · email link + code… |
 | POST | `/api/auth/logout` | Session (no workspace) |  | POST /api/auth/logout — revokes the server-side session, clears the cookie and returns the IdP's RP-initiated logout URL (ends the identity-provider session too) for the client to navigate to. |
-| GET | `/api/auth/step-up` | Public |  | GET /api/auth/step-up?returnTo=/path[&mode=fresh\|mfa] — re-authenticate the CURRENT session at the IdP. fresh (default): acr_values=mfa + max_age=0 → password + second factor again, new auth_time. mfa: acr_values=mfa →… |
+| GET | `/api/auth/step-up` | Public |  | GET /api/auth/step-up?returnTo=/path[&mode=fresh\|mfa] — verify the CURRENT session with the second factor at the IdP (D34). fresh (default): acr_values=mfa → the authenticator-app code again (no new email), auth_time mu… |
 
 ### automation
 

@@ -3,8 +3,10 @@
 
     python3 infra/oracle/keycloak/make-prod-realm.py   # rewrites infra/oracle/keycloak/relay-realm.json
 
-Keeps the flows, LoA mapping (password=1, mfa=2), required actions, client scopes and the MCP public client.
-Removes every demo user, password, OTP seed and the local client secret; drops the local SMTP server.
+Keeps the flows (D34 passwordless: email link + code at LoA 1, second factor at LoA 2; first sign-in with Google), LoA
+mapping (password=1 [= email sign-in], mfa=2), required actions, the Relay login/email theme, client scopes, the Google
+identity provider (disabled until `admin.sh google-signin`) and the MCP public client.
+Removes every demo user, OTP seed and the local client secret; drops the local SMTP server.
 Values that differ per installation are Keycloak import placeholders (${ENV_VAR} / ${ENV_VAR:default}) resolved from the
 keycloak container's environment on the first import only. Run it again whenever the reference realm changes.
 """
@@ -52,7 +54,9 @@ for c in ref["clients"]:
         c["redirectUris"] = ["${RELAY_APP_URL}/api/auth/callback"]
         c["webOrigins"] = []
         a = c.setdefault("attributes", {})
-        a["post.logout.redirect.uris"] = "${RELAY_APP_URL}/login"
+        # D34: sign-out lands on the marketing page (/login kept for older links).
+        a["post.logout.redirect.uris"] = "${RELAY_APP_URL}/##${RELAY_APP_URL}/login"
+        c["baseUrl"] = "${RELAY_APP_URL}/"
         # Keycloak calls the web container directly on the private network (no public round trip).
         a["backchannel.logout.url"] = "http://web:3000/api/auth/backchannel-logout"
         a["backchannel.logout.session.required"] = "true"
@@ -66,13 +70,18 @@ for u in ref.get("users", []):
                       "clientRoles": {"realm-management": ["view-users"]}})
 r["users"] = users  # service account only: no people, no passwords
 
+# Google sign-in ships disabled with placeholder credentials; `admin.sh google-signin` sets the real client and enables it.
+for idp in r.get("identityProviders", []):
+    assert idp["alias"] == "google" and idp["enabled"] is False
+    assert idp["config"]["clientId"] == "not-configured" and idp["config"]["clientSecret"] == "not-configured"
+
 csm = json.loads(json.dumps(ref.get("clientScopeMappings", {})).replace(f'"{LOCAL_CLIENT}"', f'"{CLIENT}"'))
 r["clientScopeMappings"] = csm
 
 text = json.dumps(r, indent=2, ensure_ascii=False)
 # MCP token audience (protocol mappers in the client scopes) follows the public origin.
 text = text.replace("http://localhost:3000/mcp", "${RELAY_APP_URL}/mcp")
-for banned in ("socialite-demo", "social-lite-local-client-secret", "demo.social-lite.test", "localhost:3000"):
+for banned in ("socialite-demo", "social-lite-local-client-secret", "demo.social-lite.test", "localhost:3000", '"type": "password"'):
     assert banned not in text, banned
 (Path(__file__).parent / "relay-realm.json").write_text(text + "\n")
 print("wrote relay-realm.json:", len(r["clients"]), "clients,", len(users), "service-account user(s)")

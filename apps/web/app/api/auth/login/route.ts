@@ -1,4 +1,6 @@
-// GET /api/auth/login?returnTo=/path&invite=<token> — starts OIDC (state + nonce + PKCE) and 302s to the IdP.
+// GET /api/auth/login?returnTo=/path&invite=<token>[&mode=signup][&login_hint=email] — starts OIDC (state + nonce + PKCE) and
+// 302s to the IdP's passwordless sign-in page (D34: Continue with Google · or · email link + code; mode=signup shows the
+// "Create your Relay account" heading).
 import { NextResponse } from 'next/server';
 import { AppError } from '@social-lite/core';
 import { config, log } from '@social-lite/services';
@@ -14,7 +16,7 @@ export const GET = publicRoute(async ({ req, correlationId }) => {
   try {
     await enforceRateLimit('authLogin', clientIp(req.headers));
     const sp = req.nextUrl.searchParams;
-    const { authorizationUrl, binding } = await startLogin({ returnTo: sp.get('returnTo'), invite: sp.get('invite') });
+    const { authorizationUrl, binding } = await startLogin({ returnTo: sp.get('returnTo'), invite: sp.get('invite'), mode: sp.get('mode'), loginHint: sp.get('login_hint') });
     const res = NextResponse.redirect(authorizationUrl, 302);
     res.cookies.set(LOGIN_BINDING_COOKIE, binding, {
       httpOnly: true, sameSite: 'lax', secure: config().APP_ENV === 'production', path: '/', maxAge: LOGIN_STATE_TTL_MS / 1000,

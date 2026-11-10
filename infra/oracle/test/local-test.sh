@@ -15,7 +15,7 @@ export RELAY_BACKUP_MIN_FREE_MB=${RELAY_BACKUP_MIN_FREE_MB:-500}   # sandbox dis
 export RELAY_DETECT_HTTP_PORT=18080 RELAY_DETECT_HTTPS_PORT=8443 RELAY_WEB_PORT=13300 RELAY_AUTH_PORT=13380 RELAY_MEDIA_PORT=13333
 DOMAIN=relay-dp.test APP="https://$DOMAIN:8443"
 M=${RELAY_TEST_MIRROR:-}
-[ -n "$M" ] && export RELAY_ALPINE_IMAGE="$M/library/alpine:3.22"
+[ -n "$M" ] && export RELAY_ALPINE_IMAGE="$M/library/alpine:3.22" RELAY_JDK_IMAGE="$M/library/eclipse-temurin:21-jdk"
 # shellcheck source=../lib/common.sh
 source "$KIT/lib/common.sh"
 PASS=0 FAIL=0
@@ -23,6 +23,7 @@ check() { local name=$1; shift; if "$@"; then PASS=$((PASS+1)); echo "PASS $name
 cr() { curl -sk --noproxy "*" --resolve "$DOMAIN:8443:127.0.0.1" --resolve "auth.$DOMAIN:8443:127.0.0.1" --resolve "media.$DOMAIN:8443:127.0.0.1" "$@"; }
 teardown() {
   [ "$KEEP" = --keep ] && { echo "kept: RELAY_HOME=$RELAY_HOME project=$RELAY_PROJECT"; return; }
+  docker rm -f "${RELAY_PROJECT}-mail" >/dev/null 2>&1 || true
   compose --profile caddy --profile jobs down -v --remove-orphans >/dev/null 2>&1 || true
   docker volume ls -q | grep "^${RELAY_PROJECT}_" | xargs -r docker volume rm >/dev/null 2>&1 || true
   docker image rm "relay-web:$TAG-b" "relay-worker:$TAG-b" "relay-migrate:$TAG-b" "relay-web:$TAG-broken" "relay-worker:$TAG-broken" "relay-migrate:$TAG-broken" >/dev/null 2>&1 || true
@@ -102,13 +103,16 @@ SUM2=$(grep -E '^(POSTGRES|RELAY_DB|KEYCLOAK|KC_|RELAY_OIDC|RELAY_S3)' "$RELAY_H
 check "re-run keeps every secret" test "$SUM1" = "$SUM2"
 check "re-run keeps the bundled proxy mode" grep -q 'run the bundled Caddy container' "$WORK/rerun.log"
 check "re-run ends ready" test "$(http_code "http://127.0.0.1:13300/api/ready")" = 200
-echo "== sign in through production-mode Keycloak"
-PWF="$WORK/test-user-password"; ( umask 077; od -An -N18 -tx1 /dev/urandom | tr -d ' \n' > "$PWF" )
-compose exec -T -e TPW="$(cat "$PWF")" keycloak bash -c '
+echo "== sign in through production-mode Keycloak (passwordless, D34: email code read from a throwaway Mailpit)"
+docker rm -f "${RELAY_PROJECT}-mail" >/dev/null 2>&1 || true
+docker run -d --name "${RELAY_PROJECT}-mail" --network "${RELAY_PROJECT}_default" -p 127.0.0.1:18025:8025 "${M:+$M/}axllent/mailpit:latest" >/dev/null
+compose exec -T keycloak bash -c '
   /opt/keycloak/bin/kcadm.sh config credentials --config /tmp/kc.cfg --server http://localhost:8080 --realm master --user bootstrap-admin --password "$KC_BOOTSTRAP_ADMIN_PASSWORD" >/dev/null &&
-  /opt/keycloak/bin/kcadm.sh create users --config /tmp/kc.cfg -r relay -s username=dp-test@relay-dp.test -s email=dp-test@relay-dp.test -s emailVerified=true -s enabled=true -s firstName=DP -s lastName=Test >/dev/null &&
-  /opt/keycloak/bin/kcadm.sh set-password --config /tmp/kc.cfg -r relay --username dp-test@relay-dp.test --new-password "$TPW"' && echo "test user created"
-(cd "$REPO" && node "$KIT/test/signin.mjs" "$APP" dp-test@relay-dp.test "$PWF" "$WORK/shots") | tee "$WORK/signin.log" || true
+  /opt/keycloak/bin/kcadm.sh update realms/relay --config /tmp/kc.cfg -s smtpServer.host='"${RELAY_PROJECT}-mail"' -s smtpServer.port=1025 -s smtpServer.from=no-reply@relay-dp.test >/dev/null &&
+  /opt/keycloak/bin/kcadm.sh create users --config /tmp/kc.cfg -r relay -s username=dp-test@relay-dp.test -s email=dp-test@relay-dp.test -s emailVerified=true -s enabled=true -s firstName=DP -s lastName=Test >/dev/null' && echo "test user created (no password)"
+"$KIT/admin.sh" passwordless </dev/null > "$WORK/passwordless.log" 2>&1 || cat "$WORK/passwordless.log"
+check "admin.sh passwordless confirms the realm (idempotent on a fresh install)" grep -q 'sign-in is passwordless' "$WORK/passwordless.log"
+(cd "$REPO" && node "$KIT/test/signin.mjs" "$APP" dp-test@relay-dp.test "http://127.0.0.1:18025" "$WORK/shots") | tee "$WORK/signin.log" || true
 check "signed in (session 200)" grep -q '"session_status":200' "$WORK/signin.log"
 cp "$WORK"/shots/*.png "${RELAY_TEST_SHOTS:-$WORK}/" 2>/dev/null || true
 APW="$WORK/kc-admin-password"; ( umask 077; env_get "$INFRA_ENV" KC_BOOTSTRAP_ADMIN_PASSWORD > "$APW" )

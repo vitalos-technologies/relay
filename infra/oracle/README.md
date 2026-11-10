@@ -13,7 +13,10 @@ Step-by-step guide for the operator: [`docs/runbooks/oracle-vm-deployment.md`](.
 | `restore.sh` | `--drill` (isolated, nothing live touched), `--promote` (live restore, dispatch forced off), `--extract-config`, `--start-worker` |
 | `build.sh`, `docker-bake.hcl`, `Dockerfile` | Multi-arch images `relay-web`, `relay-worker`, `relay-migrate` (non-root, healthchecks, `public/` and `content/help` included) |
 | `compose.prod.yaml` | The stack: limits, restart policies, log rotation, private network, loopback-only ports |
-| `keycloak/relay-realm.json` | Production realm template (no users or passwords; placeholders filled from the VM's env on first import). Regenerate with `keycloak/make-prod-realm.py` when the reference realm changes |
+| `keycloak/relay-realm.json` | Production realm template (no users or passwords; passwordless sign-in, D34; placeholders filled from the VM's env on first import). Regenerate with `keycloak/make-prod-realm.py` when the reference realm changes |
+| `admin.sh` | Keycloak helpers: `replace-bootstrap`; `passwordless` (switch an existing realm to email link + code, Google ready; refuses without realm SMTP; `--undo`); `google-signin` (Google OAuth client, hidden secret prompt). Secrets via hidden prompts → stdin only |
+| `keycloak/realm-admin.mjs` | The Admin-REST helper `admin.sh passwordless` / `google-signin` run (in the web image, next to Keycloak) |
+| `../keycloak/Dockerfile` | Sign-in server image `relay-keycloak:local` (Keycloak 26.4 + keycloak-magic-link 0.52, sha256-pinned + `relay-auth` provider + Relay theme); built by `update.sh` |
 | `postgres/10-keycloak.sh` | Creates Keycloak's role and database on the first start |
 | `ops/` | Release job (`release.sh`: roles → migrations → grants → media bucket) and bundled operator CLIs |
 | `proxy/Caddyfile.bundled` | Bundled Caddy site config (three Relay hostnames) |

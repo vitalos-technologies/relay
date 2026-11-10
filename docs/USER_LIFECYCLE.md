@@ -49,7 +49,7 @@ Effects: membership created (or a removed one reactivated), status history row, 
   - Factors live in Keycloak: TOTP, passkeys (WebAuthn), recovery codes. Users manage them on **Security** via Keycloak application-initiated actions. Adding the first factor needs no step-up; adding/replacing when one exists, removing, or regenerating recovery codes needs a session that verified MFA within `step_up_seconds` (300 s).
   - A user with a factor who signed in with password only is asked for the second factor right after login. A user without any factor who hits step-up is sent to enrol first.
   - The app can only **read** factors (Keycloak `view-users`); no app endpoint changes anyone else's factors.
-- **Step-up** (`acr_values=mfa`, `max_age=0`, `prompt=login`): must complete in the same session as the same subject with a fresh `auth_time`; the session token and CSRF token rotate.
+- **Step-up** (`acr_values=mfa`; D34: second factor only, no new email): must complete in the same session as the same subject with a fresh `auth_time`; the session token and CSRF token rotate.
 - **Sessions:** 30 min idle, 12 h absolute, no refresh. **Security** lists the user's own live sessions (browser, created, last seen, assurance) and revokes one or all others. Keycloak back-channel logout revokes the app sessions bound to that IdP session.
 - **Grant changes** (direct grants, restrictions, team membership, team grants) follow delegation ceilings; team managers act only on their own team within `delegation_limits` and never on themselves. Joining a team that holds grants is a privilege grant (ceiling-checked; admins adding to a publishing team need step-up).
 

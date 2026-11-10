@@ -122,7 +122,9 @@ test.describe('security', () => {
 
   test('signed-out users are sent to sign in', async ({ page }) => {
     await page.goto('/history');
-    await expect(page).toHaveURL(/\/login/);
+    // /login forwards to the passwordless sign-in page (D34), keeping the return path.
+    await page.waitForURL(/localhost:5556/);
+    await expect(page.locator('input[name=username]')).toBeVisible();
     const r = await page.request.get('/api/posts/00000000-0000-0000-0000-000000000000');
     expect(r.status()).toBe(401);
   });

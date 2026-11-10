@@ -2,6 +2,16 @@
 # Relay — Keycloak admin helpers on the VM.
 #
 #   sudo infra/oracle/admin.sh replace-bootstrap
+#   sudo infra/oracle/admin.sh passwordless           # switch the live realm to passwordless sign-in (D34)
+#   sudo infra/oracle/admin.sh passwordless --undo    # emergency: back to the previous (password) sign-in flow
+#   sudo infra/oracle/admin.sh google-signin          # add your Google OAuth client and switch "Continue with Google" on
+#
+# passwordless: email link + 6-digit code sign-in, Relay login/email theme, no password anywhere (sign-in, reset, account
+# console), Google present but off until configured, two-step kept for staff and sensitive actions. Refuses to switch while
+# the realm has no SMTP server (sign-in emails need it). Idempotent; the previous flow is kept for --undo.
+# Needs the new sign-in server image first (update.sh builds it). Admin sign-in: the temporary bootstrap-admin when it still
+# exists, otherwise you are asked for your Keycloak admin username, password (hidden) and two-step code. Secrets go to the
+# helper on stdin only (never argv, files or the screen); the helper runs in the Relay web image next to Keycloak.
 #
 # Replaces the temporary `bootstrap-admin` (master realm) with your own admin in one go:
 #   1. asks for a username, email and password (typed hidden; never printed, never written to a file or argv),
@@ -24,12 +34,113 @@ kc_exec() {
 
 cmd=${1:-}
 case "$cmd" in
-  replace-bootstrap) ;;
+  replace-bootstrap|passwordless|google-signin) ;;
   -h|--help|"") awk 'NR>1 && /^#/ {sub(/^# ?/, ""); print; next} NR>1 {exit}' "$SELF"; exit 0 ;;
   *) die "unknown command: $cmd (see --help)" ;;
 esac
 
 [ "$(id -u)" -eq 0 ] || [ -n "${RELAY_KC_EXEC_CONTAINER:-}" ] || die "run with sudo"
+
+# ------------------------------------------------------------------ D34: passwordless sign-in / Google
+# Run infra/oracle/keycloak/realm-admin.mjs in the Relay web image, sharing the Keycloak container's network namespace
+# (so it talks to http://localhost:8080 exactly like kcadm inside the container). Secrets: stdin only.
+realm_admin() {
+  local kc image auth
+  if [ -n "${RELAY_KC_EXEC_CONTAINER:-}" ]; then kc=$RELAY_KC_EXEC_CONTAINER; image=${RELAY_NODE_IMAGE:-node:22-bookworm-slim}
+  else
+    kc=$(compose ps -q keycloak 2>/dev/null | head -n 1)
+    image="relay-web:$(env_get "$INFRA_ENV" RELAY_IMAGE_TAG)"
+  fi
+  [ -n "$kc" ] || die "the keycloak container is not running (sudo infra/oracle/status.sh)"
+  docker image inspect "$image" >/dev/null 2>&1 || die "image $image not found (run update.sh first)"
+  auth=${RELAY_KC_PUBLIC_URL:-$(env_get "$INFRA_ENV" RELAY_AUTH_URL 2>/dev/null || true)}
+  docker run --rm -i --network "container:$kc" --user 10001:10001 --read-only --cap-drop ALL --security-opt no-new-privileges:true \
+    -v "$KIT_DIR/keycloak/realm-admin.mjs:/kit/realm-admin.mjs:ro" --entrypoint node "$image" \
+    /kit/realm-admin.mjs "$1" --kc-url http://localhost:8080 --realm "${RELAY_KC_REALM:-relay}" --public-url "$auth"
+}
+
+# Admin credentials -> ADMIN_USER / ADMIN_PW / ADMIN_OTP (never printed). bootstrap-admin first, else ask.
+admin_creds() {
+  ADMIN_OTP="" USED_BOOTSTRAP=0
+  if [ "${1:-}" != ask ] && [ "$(kc_exec "/opt/keycloak/bin/kcadm.sh config credentials --config /tmp/kcadm-p.cfg --server http://localhost:8080 --realm master --user '$OLD_ADMIN' --password \"\$KC_BOOTSTRAP_ADMIN_PASSWORD\" >/dev/null 2>&1 && echo yes || echo no; rm -f /tmp/kcadm-p.cfg" </dev/null)" = yes ]; then
+    ADMIN_USER=$OLD_ADMIN
+    # shellcheck disable=SC2016 # expanded inside the container, on purpose
+    ADMIN_PW=$(kc_exec 'printf %s "$KC_BOOTSTRAP_ADMIN_PASSWORD"' </dev/null)
+    USED_BOOTSTRAP=1
+    say "  signing in to Keycloak as $OLD_ADMIN (temporary admin still present)"
+    return
+  fi
+  read -r -p "  Keycloak admin username (master realm): " ADMIN_USER || die "no input"
+  read -r -s -p "  Password (hidden): " ADMIN_PW || die "no input"; echo
+  read -r -p "  Two-step code from your authenticator app (press Enter if none): " ADMIN_OTP || true
+}
+
+# Print the helper's OK/WARN lines; turn ERR lines into guidance. $1 = output, $2 = exit code.
+report() {
+  local line code
+  while IFS= read -r line; do
+    case "$line" in
+      OK\ *) ok "${line#OK }" ;;
+      WARN\ *) warn "${line#WARN }" ;;
+      ERR\ *) code=${line#ERR }; code=${code%% *}
+        case "$code" in
+          NO_SMTP) warn "${line#ERR NO_SMTP }"
+            say "  Nothing was changed. Set the sign-in email server first:"
+            say "    1. SSH tunnel: ssh -L $(auth_port):127.0.0.1:$(auth_port) <you>@<this VM>, then open http://localhost:$(auth_port)/admin/"
+            say "    2. relay realm -> Realm settings -> Email: host, port, from address, login -> Save -> Test connection"
+            say "    3. run this command again" ;;
+          NO_PROVIDER|NO_THEME) warn "${line#ERR "$code" }"
+            say "  Nothing was changed. Run sudo infra/oracle/update.sh first (it builds the new sign-in server image)." ;;
+          AUTH) warn "Keycloak admin sign-in failed: ${line#ERR AUTH }" ;;
+          *) warn "${line#ERR }" ;;
+        esac ;;
+      *) [ -n "$line" ] && say "  $line" ;;
+    esac
+  done <<<"$1"
+  return "$2"
+}
+
+run_realm_admin() { # $1 = helper command, then extra stdin lines (e.g. Google client) on fd 3
+  local out rc=0
+  out=$( { printf '%s\n%s\n%s\n' "$ADMIN_USER" "$ADMIN_PW" "$ADMIN_OTP"; cat <&3; } | realm_admin "$1" 2>&1) || rc=$?
+  if [ $rc -eq 3 ] && [ "$USED_BOOTSTRAP" = 1 ]; then return 3; fi
+  report "$out" "$rc"
+}
+
+if [ "$cmd" = passwordless ] || [ "$cmd" = google-signin ]; then
+  helper=$cmd
+  [ "$cmd" = passwordless ] && [ "${2:-}" = --undo ] && helper=passwordless-undo
+  case "$helper" in
+    passwordless) step "Passwordless sign-in (D34): email link + code, Google ready, no passwords" ;;
+    passwordless-undo) step "Undo passwordless sign-in: back to the previous sign-in flow" ;;
+    google-signin) step "Continue with Google"
+      auth=${RELAY_KC_PUBLIC_URL:-$(env_get "$INFRA_ENV" RELAY_AUTH_URL 2>/dev/null || true)}
+      say "  In Google Cloud console (APIs & Services -> Credentials -> Create credentials -> OAuth client ID, type 'Web application'):"
+      say "    Authorised redirect URI:  ${auth:-https://<your sign-in address>}/realms/${RELAY_KC_REALM:-relay}/broker/google/endpoint"
+      say "  (OAuth consent screen: External, app name Relay, scopes openid/email/profile. Google charges nothing for this.)"
+      read -r -p "  Google OAuth client ID: " G_ID || die "no input"
+      read -r -s -p "  Google OAuth client secret (hidden): " G_SECRET || die "no input"; echo ;;
+  esac
+  admin_creds
+  extra=""
+  [ "$helper" = google-signin ] && extra=$(printf '%s\n%s\n' "$G_ID" "$G_SECRET")
+  rc=0; run_realm_admin "$helper" 3<<<"$extra" || rc=$?
+  if [ $rc -eq 3 ] && [ "$USED_BOOTSTRAP" = 1 ]; then
+    warn "$OLD_ADMIN was not accepted; sign in with your own admin"
+    admin_creds ask
+    rc=0; run_realm_admin "$helper" 3<<<"$extra" || rc=$?
+  fi
+  unset ADMIN_PW G_SECRET extra
+  [ $rc -eq 0 ] || die "stopped (see above)"
+  case "$helper" in
+    passwordless)
+      say ""
+      say "Try it: open your Relay address in a private window -> Log in -> enter your email -> use the link or the 6-digit code."
+      say "If sign-in emails do not arrive, switch back with: sudo infra/oracle/admin.sh passwordless --undo" ;;
+    google-signin) say ""; say "Try it: Log in -> Continue with Google. Existing accounts link only when Google has verified the same email." ;;
+  esac
+  exit 0
+fi
 
 step "Replace $OLD_ADMIN with your own Keycloak admin"
 # Is the temporary admin still there? (authenticates with the bootstrap password from the container's environment)

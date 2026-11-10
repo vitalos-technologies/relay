@@ -50,7 +50,7 @@ function eventText(e: Overview['events'][number]): string {
   const a = typeof e.detail.action === 'string' ? e.detail.action : '';
   const base = e.action === 'auth.step_up' && a === 'mfa' ? 'Second factor at sign-in' : EVENT_LABEL[e.action] ?? e.action;
   const what = a.startsWith('delete_credential') ? 'removed' : ACTION_LABEL[a] ?? '';
-  const mfa = 'mfa' in e.detail && (e.action === 'user.login' || e.action === 'user.bound' || e.action === 'auth.step_up') ? (e.detail.mfa ? ' · two-step' : ' · password') : '';
+  const mfa = 'mfa' in e.detail && (e.action === 'user.login' || e.action === 'user.bound' || e.action === 'auth.step_up') ? (e.detail.mfa ? ' · two-step' : ' · email or Google') : '';
   return `${base}${what ? ` · ${what}` : ''}${mfa}`;
 }
 
@@ -101,14 +101,14 @@ export function SecurityPage() {
     <>
       <PageHeader
         title="Security"
-        meta={a.mfa_verified ? <><ShieldCheck aria-hidden className="size-3.5 text-success" />Two-step verified</> : <><ShieldAlert aria-hidden className="size-3.5" />Password only</>}
+        meta={a.mfa_verified ? <><ShieldCheck aria-hidden className="size-3.5 text-success" />Two-step verified</> : <><ShieldAlert aria-hidden className="size-3.5" />Signed in with email or Google</>}
         actions={<><HelpLink slug="set-up-two-step-verification" label="About two-step verification" /><a className="touch-target inline-flex h-9 items-center gap-2 rounded-lg border border-border px-3.5 text-sm font-medium hover:bg-raised" href={stepUpHref('/security')} data-testid="verify-now"><KeyRound aria-hidden className="size-4" />Verify now</a></>}
       />
       <div className="flex flex-col gap-6">
         {verified === '0' ? <Banner tone="warn" title="Not changed">Verification was cancelled.</Banner> : null}
         {data.mfa_required && !hasFactor ? (
           <Banner tone="warn" role="alert" title="Two-step verification required" actions={<Button variant="primary" size="sm" onClick={() => void startAction('CONFIGURE_TOTP')} loading={busy === 'CONFIGURE_TOTP:'}>Set up</Button>}>
-            Sensitive actions stay unavailable until you set it up.
+            Sensitive actions (billing, removing people, connections) ask for it. Set it up now, or when you’re asked.
           </Banner>
         ) : setup === 'mfa' && !hasFactor ? (
           <Banner tone="info" title="Set up two-step verification first" />

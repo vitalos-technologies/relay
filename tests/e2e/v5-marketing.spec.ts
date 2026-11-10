@@ -5,9 +5,9 @@ import { mkdirSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
 import { KEYCLOAK, signIn } from './helpers';
+import { waitForSignInEmail } from '../support/mailpit';
 
 const EVIDENCE = 'evidence/v5/mkt';
-const MAILPIT = process.env.E2E_MAILPIT_URL ?? 'http://localhost:8025';
 const OWNER = 'owner@demo.social-lite.test';
 const overflow = (p: Page) => p.evaluate<number>('document.documentElement.scrollWidth - document.documentElement.clientWidth');
 mkdirSync(EVIDENCE, { recursive: true });
@@ -43,8 +43,11 @@ test.describe('marketing page (public)', () => {
     await inView(page, 'product');
     // Account routes.
     await page.getByTestId('mkt-login').click();
-    await expect(page).toHaveURL(/\/login$/);
-    await expect(page.getByRole('link', { name: 'Start a free trial' })).toHaveAttribute('href', '/signup');
+    // D34: "Log in" opens the passwordless sign-in page (Google when configured · or · email); no password field.
+    await page.waitForURL((u) => u.origin === new URL(KEYCLOAK).origin);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sign in to Relay');
+    await expect(page.locator('input[name=username]')).toBeVisible();
+    await expect(page.locator('input[name=password]')).toHaveCount(0);
     await page.goto('/');
     await page.getByTestId('mkt-header-trial').click();
     await expect(page).toHaveURL(/\/signup$/);
@@ -259,40 +262,27 @@ test.describe('signed in and signup handoff', () => {
     await expect(page.getByRole('link', { name: 'Relay home' }).first()).toHaveAttribute('href', '/overview');
   });
 
-  test('§18.6–7 new visitor: pricing → register (local realm) → verify email → workspace → 14-day Professional trial → Billing shows seats and total', async ({ page }) => {
+  test('§18.6–7 new visitor (D34): pricing → sign-up page (email) → code from the email → workspace → 14-day Professional trial → Billing shows seats and total', async ({ page }) => {
     test.setTimeout(180_000);
     const email = `mkt-${randomUUID().slice(0, 8)}@test.social-lite.test`;
     await page.goto('/#pricing');
     await page.getByTestId('mkt-cta-professional').click();
     await expect(page).toHaveURL(/\/signup\?plan=professional/);
     await page.getByTestId('signup-continue').click();
-    await page.waitForURL(/\/login\?returnTo=/);
-    await page.locator('a[href^="/api/auth/login"]').first().click();
+    // /login forwards straight to the passwordless sign-in page, in sign-up mode, with the plan carried in the return path.
     await page.waitForURL((u) => u.origin === new URL(KEYCLOAK).origin);
-    await page.getByRole('link', { name: /register/i }).click();
-    await page.locator('input[name=email]').fill(email);
-    for (const [name, v] of [['firstName', 'Mia'], ['lastName', 'Tester']] as const) {
-      const f = page.locator(`input[name=${name}]`);
-      if (await f.count()) await f.fill(v);
-    }
-    const pwd = `Relay-${randomUUID()}`;
-    await page.locator('input[name=password]').fill(pwd);
-    await page.locator('input[name=password-confirm]').fill(pwd);
-    await page.locator('[type=submit]').first().click();
-    // Keycloak requires a verified email (self-registration never bypasses D20's verified-email binding).
-    await expect(page.locator('body')).toContainText(/verify your email/i, { timeout: 20_000 });
-    let link: string | null = null;
-    for (let i = 0; i < 30 && !link; i++) {
-      const r = await page.request.get(`${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:${email}`)}`);
-      const list = await r.json() as { messages?: Array<{ ID: string }> };
-      if (list.messages?.length) {
-        const m = await (await page.request.get(`${MAILPIT}/api/v1/message/${list.messages[0]!.ID}`)).json() as { Text: string };
-        link = m.Text.match(/https?:\/\/\S+action-token\S+/)?.[0] ?? null;
-      }
-      if (!link) await page.waitForTimeout(1000);
-    }
-    expect(link, 'verification email arrives in the local mail capture').toBeTruthy();
-    await page.goto(link!.replace(/[)>\]]+$/, ''));
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Create your Relay account');
+    await expect(page.locator('input[name=password]')).toHaveCount(0);
+    const since = Date.now();
+    await page.locator('input[name=username]').fill(email);
+    await page.locator('#kc-login').click();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Check your email');
+    // One email with a sign-in link AND a 6-digit code; new accounts are created only because the local realm allows
+    // self-registration, and the code/link proves the address (D20/D26 verified-email binding).
+    const mail = await waitForSignInEmail(email, since);
+    expect(mail.html).toContain(mail.code);
+    await page.locator('input[name=code]').fill(mail.code);
+    await page.locator('#relay-verify').click();
     await page.waitForURL(/\/signup\/workspace\?plan=professional/, { timeout: 45_000 });
     await expect(page.getByTestId('signup-ws-plan-professional')).toHaveAttribute('aria-checked', 'true');
     await page.getByLabel('Workspace name').fill(`Marketing E2E ${randomUUID().slice(0, 4)}`);

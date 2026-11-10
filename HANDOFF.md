@@ -97,6 +97,13 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
   refresh + hero** 3e58b1d, **Oracle VM deploy kit** 53c2c0b (`infra/oracle/`, runbook `docs/runbooks/oracle-vm-deployment.md`;
   tested amd64 + arm64-under-QEMU 43/43 each, never on the VM). Final tree: unit 677, integration 608/608, full E2E
   125 passed / 0 failed / 9 skipped. Decisions D30–D32 recorded.
+- **D34 passwordless sign-in (stream AU, uncommitted until the lead commits):** sign-in = Continue with Google · or · email
+  (one email with a single-use link + 6-digit code); no passwords anywhere; two-step only for Relay staff at sign-in and as
+  step-up for sensitive actions (enrol on first step-up); sign-out one click → `/`. Sign-in server image
+  `infra/keycloak/Dockerfile` (Keycloak 26.4 + Phase Two keycloak-magic-link **0.52, Elastic License 2.0** — not Apache,
+  sha256-pinned + `providers/relay-auth` Java provider + `themes/relay`); dev compose builds it (`relay-keycloak:dev`).
+  Live VM: `update.sh` builds `relay-keycloak:local`, then `admin.sh passwordless` (refuses without realm SMTP; `--undo`) and
+  optional `admin.sh google-signin`. E2E sign-in helper reads the code from Mailpit. Notes: `docs/plan-progress/au.md`.
 - **Waiting on the user:** run the VM kit (commands in the runbook), push version tags (checklist §0.2), SMTP provider
   (production refuses to start without `SMTP_URL`; kit has `--allow-no-smtp` placeholder), DNS for relay/auth/media
   subdomains, the rest of `docs/FINAL_ACTIVATION_CHECKLIST.md`. Remaining Medium/Low items in `docs/help/DISCREPANCIES.md`.

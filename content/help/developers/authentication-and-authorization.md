@@ -6,7 +6,7 @@ audience: developer
 status: available
 related: [api-conventions, mcp-server, architecture-and-modules, data-model-and-migrations]
 product_version: "2026-11"
-reviewed: 2026-11-09
+reviewed: 2026-11-10
 order: 30
 keywords: [auth, login, oidc, sso, session, csrf, mfa, step-up, permissions, roles, authz, api key]
 ---
@@ -26,7 +26,8 @@ Relay never stores passwords or second factors itself: they live at the identity
 ## Sign-in (OpenID Connect)
 
 1. `GET /api/auth/login?returnTo=/path` creates a single-use, hashed `state` with a nonce and a PKCE verifier (10-minute expiry), binds it to the browser with a short-lived HttpOnly cookie and redirects to the identity provider. The endpoint is rate-limited per IP (20 per minute).
-2. The person signs in at the identity provider (password, plus a second factor when required).
+2. The person signs in at the identity provider: passwordless (D34) — Google, or an email with a single-use link and a
+   6-digit code. A second factor is asked only for Relay staff at sign-in and as a step-up (`acr_values=mfa`) for sensitive actions.
 3. `GET /api/auth/callback` checks state, the browser binding, PKCE and the nonce, verifies the ID token, then creates a session. The session's assurance (`acr`, `amr`, `auth_time`) comes only from the verified ID token.
 4. `POST /api/auth/logout` ends the session and redirects to the identity provider's logout.
 5. `POST /api/auth/backchannel-logout` accepts signed logout tokens from the identity provider (replays rejected) and revokes the matching sessions immediately.
@@ -53,7 +54,7 @@ API keys and MCP tokens are not sent automatically by browsers, so `/api/v1/*` a
 
 - Each workspace's security policy (owners, permission `security.manage`) sets which roles must use two-step verification. Default: owner, admin, publisher and brand manager; owners always.
 - **Sensitive permissions** (for example `content.publish`, `content.schedule`, `connections.manage`, `members.invite`, `service_accounts.manage`, `security.manage`, `exports.create`, `billing.manage`) are refused with `mfa_required` when the policy requires two-step verification for the person and the session was not verified with a second factor.
-- **Step-up** actions (for example connecting or disconnecting accounts, creating API keys, platform changes, weakening the security policy) also need a recent authentication: within `step_up_seconds` (default 300 seconds). Otherwise the API returns `401 step_up_required`; the app then sends the browser to `GET /api/auth/step-up`, which re-authenticates at the identity provider with `acr_values=mfa`, `max_age=0` and `prompt=login`.
+- **Step-up** actions (for example connecting or disconnecting accounts, creating API keys, platform changes, weakening the security policy) also need a recent authentication: within `step_up_seconds` (default 300 seconds). Otherwise the API returns `401 step_up_required`; the app then sends the browser to `GET /api/auth/step-up`, which asks for the second factor again at the identity provider with `acr_values=mfa` (the realm's LoA 2 has max age 0, so the code is always re-entered and `auth_time` is fresh). Without a second factor, the person enrols an authenticator app first and that counts as the verification.
 - Second factors (authenticator app, passkeys, recovery codes) are managed at the identity provider through application-initiated actions. The app's identity-provider client can only read a person's factors; no Relay endpoint removes someone else's factor.
 
 ## Authorization model

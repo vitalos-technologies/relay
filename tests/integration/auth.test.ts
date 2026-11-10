@@ -5,7 +5,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { resetConfigCache, resolveSession, type EncryptedBlob } from '@social-lite/services';
 import { createInvitation } from '../../packages/services/src/auth/invitations.js';
-import { completeLogin, safeReturnTo, startLogin, startStepUp } from '../../packages/services/src/auth/oidc.js';
+import { completeLogin, safeReturnTo, startIdpAction, startLogin, startStepUp } from '../../packages/services/src/auth/oidc.js';
 import { sha256, type SessionRecord } from '../../packages/services/src/auth/session.js';
 import { LoginError } from '../../packages/services/src/auth/users.js';
 import { resetIdpAdminCache } from '../../packages/services/src/auth/idp-admin.js';
@@ -21,7 +21,7 @@ beforeAll(async () => {
   resetIdpAdminCache();
   // Requires the local Keycloak from infra/compose.yaml (fails loudly when it is not running).
   expect((await fetch(`${KC_ISSUER}/.well-known/openid-configuration`)).ok).toBe(true);
-  // analyst@ is the "password only" fixture; an interrupted E2E enrolment run may have left factors behind.
+  // analyst@ is the "email sign-in only" fixture; an interrupted E2E enrolment run may have left factors behind.
   await kcResetSecondFactors('analyst@demo.social-lite.test');
 });
 afterAll(async () => {
@@ -149,15 +149,24 @@ describe('assurance, step-up and session rotation (real Keycloak)', () => {
   const sessionRow = async (id: string) => (await testPool().query<{ acr: string | null; amr: string[]; mfa_verified: boolean; auth_time: Date | null; idp_session_id: string | null; idp_subject: string | null; revoked_at: Date | null }>(
     `SELECT acr, amr, mfa_verified, auth_time, idp_session_id, idp_subject, revoked_at FROM sessions WHERE id=$1`, [id])).rows[0]!;
 
-  it('password sign-in records acr/amr/auth_time/sid from the verified ID token and asks for the second factor next', { timeout: 120_000 }, async () => {
+  it('email sign-in (D34) records acr/amr/auth_time/sid from the verified ID token; customers are not asked for the second factor, staff are', { timeout: 120_000 }, async () => {
     const browser = new KcBrowser();
     const { result } = await loginAs('owner@demo.social-lite.test', { browser, returnTo: '/planner' });
     const s = await sessionRow(result.session.id);
-    expect(s).toMatchObject({ acr: 'password', amr: ['pwd'], mfa_verified: false });
+    expect(s).toMatchObject({ acr: 'password', amr: ['email'], mfa_verified: false }); // LoA 1 (acr label kept) = email sign-in
     expect(s.idp_session_id).toBeTruthy();
     expect(s.idp_subject).toBeTruthy();
     expect(Math.abs(s.auth_time!.getTime() - Date.now())).toBeLessThan(60_000);
-    expect(result.needsSecondFactor).toBe(true);
+    // The owner has an authenticator app, but ordinary customer sign-in does not ask for it.
+    expect(result.needsSecondFactor).toBe(false);
+    // Relay staff (a platform operator row) are asked right after sign-in.
+    await testPool().query(`INSERT INTO platform_operators(user_id, role, granted_via) VALUES ($1, 'support', 'cli') ON CONFLICT (user_id) DO UPDATE SET revoked_at = NULL`, [result.userId]);
+    try {
+      const staff = await loginAs('owner@demo.social-lite.test', { browser: new KcBrowser() });
+      expect(staff.result.needsSecondFactor).toBe(true);
+    } finally {
+      await testPool().query(`UPDATE platform_operators SET revoked_at = now() WHERE user_id = $1`, [result.userId]);
+    }
 
     // Second-factor hop on the same IdP session: only the TOTP code is asked; same app session, rotated token.
     const hop = await startStepUp(asSession(result), { returnTo: '/planner', mode: 'mfa' });
@@ -168,7 +177,7 @@ describe('assurance, step-up and session rotation (real Keycloak)', () => {
     const done = await completeLogin(params, { binding: hop.binding, currentSession: asSession(result) });
     expect(done.purpose).toBe('step_up');
     expect(done.redirectTo).toBe('/planner?verified=1');
-    expect(await sessionRow(result.session.id)).toMatchObject({ acr: 'mfa', amr: ['pwd', 'otp'], mfa_verified: true, revoked_at: null });
+    expect(await sessionRow(result.session.id)).toMatchObject({ acr: 'mfa', amr: ['email', 'otp'], mfa_verified: true, revoked_at: null });
     expect(await resolveSession(result.token)).toBeNull(); // old cookie value stops working
     const now = await resolveSession(done.token);
     expect(now?.session).toMatchObject({ id: result.session.id, mfaVerified: true, acr: 'mfa' });
@@ -179,7 +188,7 @@ describe('assurance, step-up and session rotation (real Keycloak)', () => {
     expect(await startStepUp(asSession(analyst.result), {})).toEqual({ setupRequired: true });
   });
 
-  it('fresh step-up (acr_values=mfa, max_age=0) re-authenticates, refreshes auth_time and binds to the same subject + session', { timeout: 120_000 }, async () => {
+  it('fresh step-up (acr_values=mfa) asks only the second factor, refreshes auth_time and binds to the same subject + session', { timeout: 120_000 }, async () => {
     const browser = new KcBrowser();
     const { result } = await loginAs('admin@demo.social-lite.test', { browser });
     await testPool().query(`UPDATE sessions SET auth_time = now() - interval '2 hours' WHERE id=$1`, [result.session.id]);
@@ -187,10 +196,11 @@ describe('assurance, step-up and session rotation (real Keycloak)', () => {
     const up = await startStepUp(before!.session, { returnTo: '/settings' });
     if ('setupRequired' in up) throw new Error('expected a step-up');
     const q = new URL(up.authorizationUrl).searchParams;
-    expect(q.get('max_age')).toBe('0');
+    expect(q.get('max_age')).toBeNull();
+    expect(q.get('prompt')).toBeNull();
     expect(q.get('acr_values')).toBe('mfa');
     const { params, steps } = await browser.authorize(up.authorizationUrl, 'admin@demo.social-lite.test');
-    expect(steps).toEqual(['password', 'otp']); // max_age=0: full re-authentication even with an IdP session
+    expect(steps).toEqual(['otp']); // LoA 2 always re-asks the code (loa-max-age 0); no second email round trip
     // Completing from another session is refused (and the state is single-use).
     const other = await loginAs('viewer@demo.social-lite.test');
     expect(await loginError(completeLogin(params, { binding: up.binding, currentSession: asSession(other.result) }))).toBe('session_mismatch');
@@ -203,6 +213,28 @@ describe('assurance, step-up and session rotation (real Keycloak)', () => {
     expect(s.mfa_verified).toBe(true);
     expect(Date.now() - s.auth_time!.getTime()).toBeLessThan(60_000);
     expect((await resolveSession(done.token))?.session.authTime?.getTime()).toBe(s.auth_time!.getTime());
+  });
+
+  it('a step-up for someone without a second factor enrols an authenticator app, and that counts as a fresh verification', { timeout: 120_000 }, async () => {
+    await kcResetSecondFactors('analyst@demo.social-lite.test');
+    const browser = new KcBrowser();
+    const { result } = await loginAs('analyst@demo.social-lite.test', { browser });
+    const session = asSession(result);
+    expect(await startStepUp(session, {})).toEqual({ setupRequired: true });
+    try {
+      const enrol = await startIdpAction(session, 'CONFIGURE_TOTP', { returnTo: '/settings/workspace/billing' });
+      const { params, steps } = await browser.authorize(enrol.authorizationUrl, 'analyst@demo.social-lite.test');
+      expect(steps).toEqual(['configure_totp']);
+      const done = await completeLogin(params, { binding: enrol.binding, currentSession: session });
+      expect(done.redirectTo).toBe('/settings/workspace/billing?verified=1');
+      const s = await sessionRow(session.id);
+      expect(s.mfa_verified).toBe(true);
+      expect(Date.now() - s.auth_time!.getTime()).toBeLessThan(60_000);
+      const a = await testPool().query(`SELECT diff FROM audit_events WHERE action='auth.factor_action' AND resource_id=$1 ORDER BY created_at DESC LIMIT 1`, [session.id]);
+      expect(a.rows[0]?.diff).toMatchObject({ action: 'CONFIGURE_TOTP', mfa: true, method: 'totp_enrolment' });
+    } finally {
+      await kcResetSecondFactors('analyst@demo.social-lite.test');
+    }
   });
 
   it('refuses a step-up completed by a different identity', { timeout: 120_000 }, async () => {

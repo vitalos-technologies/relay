@@ -6,7 +6,7 @@ audience: developer
 status: available
 related: [environment-variables, architecture-and-modules, testing-and-contributing, data-model-and-migrations]
 product_version: "2026-11"
-reviewed: 2026-11-09
+reviewed: 2026-11-10
 order: 11
 keywords: [setup, install, local, docker, dev, quick start, getting started]
 ---
@@ -56,7 +56,7 @@ To run a second copy next to an existing database, change only the database name
 ## Sign in locally
 
 1. Open the app and choose **Sign in**. You are sent to the local Keycloak realm.
-2. Use one of the seeded demo identities (`owner@demo.social-lite.test`, `admin@…`, `editor@…`, `publisher@…`, `analyst@…` and others in the realm file). The password is printed by `./scripts/dev.sh`.
+2. Use one of the seeded demo identities (`owner@demo.social-lite.test`, `admin@…`, `editor@…`, `publisher@…`, `analyst@…` and others in the realm file). There are no passwords: enter the email and read the link or 6-digit code from Mailpit (http://localhost:8025).
 3. Privileged demo identities (owner, admin, publisher) ask for a one-time code. Print the current code with `npx tsx scripts/demo-totp.ts owner` (also `admin`, `publisher`, `other-owner`).
 
 Other local tools: Keycloak admin console on port 5556, captured email on port 8025, worker health on port 3001.

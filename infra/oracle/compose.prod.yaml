@@ -126,9 +126,16 @@ services:
   # Keycloak in production mode (D20): HTTPS terminates at the reverse proxy, which forwards X-Forwarded-*.
   # The admin console is NOT published on the public hostname; reach it through an SSH tunnel to
   # 127.0.0.1:${RELAY_AUTH_PORT} (see docs/runbooks/oracle-vm-deployment.md).
+  # D34: built from infra/keycloak/Dockerfile (Keycloak 26.4 + pinned, checksum-verified keycloak-magic-link + the relay-auth
+  # provider + the Relay login/email theme). update.sh rebuilds it; the image is pre-built for PostgreSQL + health.
   keycloak:
     <<: *hardening
-    image: ${RELAY_KEYCLOAK_IMAGE:-quay.io/keycloak/keycloak:26.4}
+    image: relay-keycloak:local
+    build:
+      context: ../keycloak
+      args:
+        KEYCLOAK_IMAGE: ${RELAY_KEYCLOAK_BASE_IMAGE:-quay.io/keycloak/keycloak:26.4}
+        JDK_IMAGE: ${RELAY_JDK_IMAGE:-eclipse-temurin:21-jdk}
     command: ["start", "--import-realm"]
     depends_on:
       postgres: { condition: service_healthy }

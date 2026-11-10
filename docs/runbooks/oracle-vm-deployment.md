@@ -202,12 +202,79 @@ Bootstrap points the master realm (the one administrators sign in to) at `http:/
 works through the tunnel; the public sign-in address answers 404 for `/admin` and `/realms/master`.
 
 The imported realm has no people and no passwords: only the Relay client (with a secret generated on the VM) and its
-service account (`view-users` only).
+service account (`view-users` only). Sign-in is passwordless (§7a).
+
+## 7a. Passwordless sign-in (D34) and Google
+
+Relay sign-in is **passwordless**: Continue with Google, or an email with a sign-in button **and** a 6-digit code. Two-step
+(authenticator app) is asked for Relay staff at every sign-in and for sensitive actions (billing, removing people, …),
+not at ordinary customer sign-in. The sign-in server image (`infra/keycloak/Dockerfile`) carries Keycloak 26.4, the Phase
+Two `keycloak-magic-link` extension **0.52** (Elastic License 2.0, from Maven Central, sha256-verified at build), the small
+`relay-auth` provider (one email with link + code; Google linking rules) and the Relay theme. `update.sh` builds it.
+
+The realm was imported once at install, so an existing installation is switched **once** with a command. New installs
+from this version start passwordless already (the command then just confirms) — so on a new install **nobody can
+sign in until the relay realm's email server is set** (§7 step 2).
+
+**Before you switch:** the relay realm needs a working email server (sign-in emails), see §7 step 2 — the command refuses
+to switch without one and tells you what to do.
+
+1. Update (builds the new sign-in server image and restarts Keycloak if it changed; about a minute without new sign-ins):
+
+```sh
+cd /opt/relay/src
+```
+
+```sh
+sudo infra/oracle/update.sh
+```
+
+2. Switch the live realm (asks for your Keycloak admin sign-in unless the temporary `bootstrap-admin` still exists;
+   typed secrets never appear on screen or in files):
+
+```sh
+sudo infra/oracle/admin.sh passwordless
+```
+
+   It binds the new sign-in flow, sets the Relay login/email theme, turns every password step off (sign-in, reset, account
+   console, password grant), adds Google sign-in **switched off**, keeps the two-step flows for staff and step-up, makes
+   sign-out return to the Relay home page, and records the previous flow. Safe to run again.
+
+3. Test in a private window: your Relay address → **Log in** → your email → the link or the 6-digit code.
+
+**Undo (lockout safety):** if sign-in emails stop arriving, go back to the previous password sign-in in one command.
+Accounts created after the switch have no password; set one for them in the admin console if they need it meanwhile.
+
+```sh
+sudo infra/oracle/admin.sh passwordless --undo
+```
+
+### Continue with Google (optional, free)
+
+1. In [Google Cloud console](https://console.cloud.google.com/) (any project you own): **APIs & Services → OAuth consent
+   screen** — External, app name *Relay*, your support email, scopes `openid`, `email`, `profile`; publish it.
+2. **Credentials → Create credentials → OAuth client ID** → *Web application*. Authorised redirect URI (the command below
+   prints it too):
+
+```text
+https://<your sign-in address>/realms/relay/broker/google/endpoint
+```
+
+3. On the VM, paste the client ID and (hidden) client secret when asked. Never put them in chat or the repository.
+
+```sh
+sudo infra/oracle/admin.sh google-signin
+```
+
+Google links to an existing Relay account **only** when Google reports the same email as verified; a new email creates an
+account only when self-registration is on (same rule as email sign-up). Turn Google off again in the admin console:
+**Identity providers → google → Enabled: off**.
 
 ## 8. First platform operator
 
-1. Create your own Relay account: in the relay realm, **Users → Add user** (email as username, email verified) and
-   **Credentials → Set password**; or sign up once self-registration is on.
+1. Create your own Relay account: in the relay realm, **Users → Add user** (email as username, email verified) — no
+   password: you sign in with the emailed link or code (§7a); or sign up once self-registration is on. As a platform
+   operator you set up an authenticator app at your first sign-in after the grant below.
 2. Sign in to `https://relay.vitalos.co.uk` once. The first person to sign in may create the first workspace.
 3. Make that account a platform operator (audited; same as `pnpm platform:operator`):
 
@@ -337,7 +404,7 @@ cd /opt/relay/src
 sudo infra/oracle/update.sh
 ```
 
-It pulls the code (`git pull --ff-only`), builds the images on the VM, backs up the database, runs the release job, and
+It pulls the code (`git pull --ff-only`), builds the images on the VM (including the sign-in server image; Keycloak restarts only when that image changed), backs up the database, runs the release job, and
 restarts worker then web. If the new version is not healthy within four minutes it **switches back to the previous
 version automatically**. Migrations stay applied (they are designed to work with the previous version).
 

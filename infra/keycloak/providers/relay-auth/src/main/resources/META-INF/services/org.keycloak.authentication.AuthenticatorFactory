@@ -1,0 +1,2 @@
+relay.keycloak.EmailSignInAuthenticatorFactory
+relay.keycloak.VerifiedEmailLinkAuthenticatorFactory

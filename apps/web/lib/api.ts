@@ -162,7 +162,7 @@ export interface PlatformRouteArgs<P> { req: NextRequest; params: P; p: Platform
 /**
  * Platform-operator routes. Same session + CSRF + origin checks as route(); authority is the platform_operators row,
  * re-read from the database on every request (never the browser, never a workspace grant). Non-operators get 404 so the
- * platform surface isn't discoverable.
+ * platform surface isn't discoverable. Staff sessions must be MFA-verified (D34; 401 step_up_required → the client verifies).
  */
 export function platformRoute<P = Record<string, string>>(handler: (a: PlatformRouteArgs<P>) => Promise<Response | unknown>) {
   return async (req: NextRequest, segment: { params: Promise<P> }): Promise<Response> => {
@@ -178,6 +178,8 @@ export function platformRoute<P = Record<string, string>>(handler: (a: PlatformR
       }
       const role = await loadOperatorRole(resolved.actor.userId);
       if (!role) throw new AppError('not_found', 'Not found');
+      // D34: Relay staff work only in a session verified with their second factor (asked at sign-in; enrol on first use).
+      if (!resolved.session.mfaVerified) throw new AppError('step_up_required', 'Verify with your authenticator app to use Platform.', undefined, { reason: 'mfa_required' });
       const p: PlatformCtx = { actor: resolved.actor, role, assurance: { mfaVerified: resolved.session.mfaVerified, authTime: resolved.session.authTime ?? null }, correlationId };
       return toResponse(await handler({ req, params: await segment.params, p, session: resolved.session, correlationId }), correlationId);
     } catch (err) {

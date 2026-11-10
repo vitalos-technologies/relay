@@ -3,10 +3,10 @@
 // them Secure; this helper talks to http://localhost directly, as browsers do for localhost).
 import { createHmac } from 'node:crypto';
 import { expect } from 'vitest';
+import { waitForSignInEmail } from '../support/mailpit.js';
 
 export const KC_ISSUER = 'http://localhost:5556/realms/social-lite';
 export const KC_ADMIN = 'http://localhost:5556/admin/realms/social-lite';
-export const PASSWORD = 'socialite-demo';
 export const OIDC_ENV = {
   OIDC_ISSUER: KC_ISSUER,
   OIDC_CLIENT_ID: 'social-lite-local',
@@ -39,6 +39,7 @@ export async function freshTotp(email: string): Promise<string> {
 
 export class KcBrowser {
   private jar = new Map<string, string>();
+  private emailRequestedAt = 0;
   private cookieHeader() { return [...this.jar].map(([k, v]) => `${k}=${v}`).join('; '); }
   private store(res: Response) {
     for (const c of res.headers.getSetCookie()) {
@@ -60,7 +61,8 @@ export class KcBrowser {
   }
 
   /**
-   * Follow the authorization URL, answer password/OTP prompts and return the callback query string.
+   * Follow the authorization URL, answer the passwordless prompts (D34: email → the 6-digit code from the sign-in email in
+   * Mailpit; then a TOTP code when a second factor is requested) and return the callback query string.
    * `steps` records what Keycloak asked for.
    */
   async authorize(authorizationUrl: string, email: string, opts: { otp?: () => Promise<string> } = {}): Promise<{ params: URLSearchParams; steps: string[] }> {
@@ -87,9 +89,20 @@ export class KcBrowser {
         else steps.push('otp');
         const code = opts.otp ? await opts.otp() : await freshTotp(email);
         res = await this.post(action, { otp: code });
-      } else if (/name="password"/.test(html)) {
-        steps.push('password');
-        res = await this.post(action, /name="username"/.test(html) ? { username: email, password: PASSWORD } : { password: PASSWORD });
+      } else if (/name="totpSecret"/.test(html)) {
+        // Keycloak "Configure OTP" (enrolment): the raw secret is in a hidden field; its UTF-8 bytes are the HMAC key.
+        steps.push('configure_totp');
+        const secret = /name="totpSecret"[^>]*value="([^"]+)"/.exec(html)?.[1] ?? /value="([^"]+)"[^>]*name="totpSecret"/.exec(html)?.[1];
+        if (!secret) throw new Error('Configure OTP page without a secret');
+        res = await this.post(action, { totp: totp(secret), totpSecret: secret, userLabel: 'Test authenticator' });
+      } else if (/name="code"/.test(html)) {
+        steps.push('email_code');
+        const mail = await waitForSignInEmail(email, this.emailRequestedAt);
+        res = await this.post(action, { code: mail.code });
+      } else if (/name="username"/.test(html)) {
+        steps.push('email');
+        this.emailRequestedAt = Date.now();
+        res = await this.post(action, { username: email });
       } else {
         throw new Error(`Unexpected Keycloak page: ${html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 300)}`);
       }
@@ -114,7 +127,7 @@ export async function kcUserId(email: string): Promise<string> {
 }
 
 /**
- * Test setup only: return a demo identity to "password only" (removes OTP/passkey/recovery credentials and any
+ * Test setup only: return a demo identity to "email sign-in only" (removes OTP/passkey/recovery credentials and any
  * brute-force lockout). Makes tests independent of factors left behind by an interrupted E2E enrolment run.
  */
 export async function kcResetSecondFactors(email: string): Promise<void> {
@@ -122,6 +135,6 @@ export async function kcResetSecondFactors(email: string): Promise<void> {
   const id = await kcUserId(email);
   const h = { authorization: `Bearer ${t}` };
   const creds = (await (await fetch(`${KC_ADMIN}/users/${id}/credentials`, { headers: h })).json()) as Array<{ id: string; type: string }>;
-  for (const c of creds.filter((x) => x.type !== 'password')) await fetch(`${KC_ADMIN}/users/${id}/credentials/${c.id}`, { method: 'DELETE', headers: h });
+  for (const c of creds) await fetch(`${KC_ADMIN}/users/${id}/credentials/${c.id}`, { method: 'DELETE', headers: h });
   await fetch(`${KC_ADMIN}/attack-detection/brute-force/users/${id}`, { method: 'DELETE', headers: h });
 }
