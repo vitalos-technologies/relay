@@ -169,6 +169,14 @@ list email as configured, because a value is present.) Replace it before invitin
 
 ## 7. Keycloak administration (private)
 
+**Shortcut:** replace the temporary `bootstrap-admin` with your own admin in one command (prompts for username, email
+and password; creates and verifies the new admin before deleting the old one; requires two-step sign-in at your first
+console login):
+
+```sh
+sudo /opt/relay/src/infra/oracle/admin.sh replace-bootstrap
+```
+
 The admin console is not on the public address. Open an SSH tunnel from your own computer:
 
 ```sh
