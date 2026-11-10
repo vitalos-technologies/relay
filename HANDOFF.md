@@ -97,7 +97,7 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
   refresh + hero** 3e58b1d, **Oracle VM deploy kit** 53c2c0b (`infra/oracle/`, runbook `docs/runbooks/oracle-vm-deployment.md`;
   tested amd64 + arm64-under-QEMU 43/43 each, never on the VM). Final tree: unit 677, integration 608/608, full E2E
   125 passed / 0 failed / 9 skipped. Decisions D30–D32 recorded.
-- **D34 passwordless sign-in (stream AU, uncommitted until the lead commits):** sign-in = Continue with Google · or · email
+- **D34 passwordless sign-in (stream AU, committed 7f990c2):** sign-in = Continue with Google · or · email
   (one email with a single-use link + 6-digit code); no passwords anywhere; two-step only for Relay staff at sign-in and as
   step-up for sensitive actions (enrol on first step-up); sign-out one click → `/`. Sign-in server image
   `infra/keycloak/Dockerfile` (Keycloak 26.4 + Phase Two keycloak-magic-link **0.52, Elastic License 2.0** — not Apache,
@@ -112,10 +112,10 @@ Older notes may cite `/root/.claude/uploads/.../*.md`; those are the same files 
   its progress note + the briefing.
 - **Dev environment:** `.env` from `.env.example` with generated `SESSION_SECRET` / `KEY_ENCRYPTION_KEYS` (never commit);
   `dockerd` + `docker compose -f infra/compose.yaml up -d --wait`; `pnpm db:roles && pnpm db:migrate && pnpm db:roles &&
-  pnpm db:seed && pnpm db:seed:e2e`. Migrations 001–038 applied (033 and 039 unused); next free **040**. Web = production
+  pnpm db:seed && pnpm db:seed:e2e`. Migrations 001–038 and 040 applied (033 and 039 unused); next free **041**. Web = production
   build on :3000 (`next start`), worker = `apps/worker/dist/main.mjs`; rebuild/restart/Playwright only under
   `flock -o .data/devserver-v2.lock …`, servers started with `3>&- 9>&-`.
-- **Open user decisions:** V3.1 Admin G-A1 / G-A5; widget default (off); MFA before a self-serve owner's first paid plan;
+- **Open user decisions:** V3.1 Admin G-A1 / G-A5; keycloak-magic-link licence (Elastic License 2.0, checklist 2.15); MCP client setup (which apps); vitalos-platform PR + public "Relay" wording of the legacy assistant;
   marketing palette decided (D24: purple on marketing only).
 - **Activation items:** consolidated in `docs/FINAL_ACTIVATION_CHECKLIST.md` (per-phase checklists kept for history).
 - **Known gaps carried forward:** `docs/V2_IMPLEMENTATION_GAPS.md`, `docs/V3_IMPLEMENTATION_GAPS.md`,
