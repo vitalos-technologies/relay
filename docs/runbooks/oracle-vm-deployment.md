@@ -85,6 +85,31 @@ Read section 3 of the output ("Who serves ports 80/443?"):
 
 If Docker is missing, it stops and tells you where to get it. It never installs software on the shared server.
 
+## 2a. Shared VM: ports already in use
+
+If the dry run stops because a port is taken, nothing has changed. Two common cases on a shared VM:
+
+- **A loopback port is taken** (e.g. Grafana on 3300): choose free ones and pass them on every run (they're saved):
+  `--web-port 3410 --auth-port 3480 --media-port 3433`. Check they're free first:
+
+  ```sh
+  sudo ss -ltn | grep -E ':(3410|3480|3433)\b' || echo free
+  ```
+
+- **443 is held by Tailscale on its own address** (`sudo ss -ltnp 'sport = :443'` shows `100.x.x.x%tailscale0:443`):
+  Tailscale Serve/tailnet-only services keep working if Relay's HTTPS listens on the VM's normal private address
+  instead of all addresses. Find it, then pass `--bind`:
+
+  ```sh
+  ip -4 -brief addr show | grep -v -E '^(lo|docker|br-|veth|tailscale)'
+  ```
+
+  e.g. `--bind 10.0.0.9`. Oracle's public IP is forwarded to that private address, so the site stays reachable. If
+  `sudo tailscale funnel status` shows something published **publicly** (not "tailnet only") on 443, Relay and Funnel
+  can't share it: decide which one owns public 443 first.
+
+- **Little disk** (under 15 GB free): keep fewer nightly backups with `--backup-days 7` (never fewer than the 3 newest).
+
 ## 3. Install
 
 Changes: everything listed in the dry run. Before it writes any existing file, it shows the difference and asks; it

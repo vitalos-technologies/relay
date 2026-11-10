@@ -18,6 +18,11 @@
 #   --domain <name>            public hostname (default: existing value, else relay.vitalos.co.uk). auth.<name> and
 #                              media.<name> are derived; override with --auth-host / --media-host
 #   --proxy <mode>             skip detection: nginx | caddy-host | apache | traefik-file | traefik-docker | bundled | manual
+#   --bind <IPv4>              bundled Caddy listens on this address only (e.g. the VM's private IP) instead of 0.0.0.0.
+#                              80/443 then count as free when nothing listens on that address or on all addresses, so
+#                              listeners on other addresses (e.g. Tailscale's 100.x) are left alone. Saved for re-runs.
+#   --web-port <n> --auth-port <n> --media-port <n>   loopback ports for Relay (defaults 3300 / 3380 / 3333). Saved.
+#   --backup-days <n>          days of nightly backups to keep (default 14; never fewer than the 3 newest). Saved.
 #   --tag <tag>                use already-present images relay-{web,worker,migrate}:<tag> (no build)
 #   --images-tar <file>        `docker load` images built elsewhere (see build.sh --tar), use with --tag
 #   --skip-start               prepare everything but do not start the stack
@@ -37,7 +42,7 @@ SELF=$(readlink -f "${BASH_SOURCE[0]}")
 source "$(dirname "$0")/lib/common.sh"
 
 APPLY=0 DOMAIN="" AUTH_HOST="" MEDIA_HOST="" PROXY_MODE="" TAG="" IMAGES_TAR="" SKIP_START=0 ALLOW_NO_SMTP=0
-SELF_REG=0 CERTBOT_EMAIL="" IDENTITY_OUT="" YES=0
+SELF_REG=0 CERTBOT_EMAIL="" IDENTITY_OUT="" YES=0 BIND_IP="" OPT_WEB_PORT="" OPT_AUTH_PORT="" OPT_MEDIA_PORT="" OPT_BACKUP_DAYS=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --apply) APPLY=1; shift ;;
@@ -46,6 +51,11 @@ while [ $# -gt 0 ]; do
     --auth-host) AUTH_HOST=$2; shift 2 ;;
     --media-host) MEDIA_HOST=$2; shift 2 ;;
     --proxy) PROXY_MODE=$2; shift 2 ;;
+    --bind) BIND_IP=$2; shift 2 ;;
+    --web-port) OPT_WEB_PORT=$2; shift 2 ;;
+    --auth-port) OPT_AUTH_PORT=$2; shift 2 ;;
+    --media-port) OPT_MEDIA_PORT=$2; shift 2 ;;
+    --backup-days) OPT_BACKUP_DAYS=$2; shift 2 ;;
     --tag) TAG=$2; shift 2 ;;
     --images-tar) IMAGES_TAR=$2; shift 2 ;;
     --skip-start) SKIP_START=1; shift ;;
@@ -59,6 +69,13 @@ while [ $# -gt 0 ]; do
     *) die "unknown option: $1 (see --help)" ;;
   esac
 done
+is_port() { [[ "$1" =~ ^[0-9]+$ ]] && [ "$1" -ge 1024 ] && [ "$1" -le 65535 ]; }
+for _v in "$OPT_WEB_PORT" "$OPT_AUTH_PORT" "$OPT_MEDIA_PORT"; do [ -z "$_v" ] || is_port "$_v" || die "ports must be 1024-65535 (got $_v)"; done
+[ -z "$OPT_BACKUP_DAYS" ] || { [[ "$OPT_BACKUP_DAYS" =~ ^[0-9]+$ ]] && [ "$OPT_BACKUP_DAYS" -ge 1 ]; } || die "--backup-days must be a whole number >= 1"
+if [ -n "$BIND_IP" ]; then
+  [[ "$BIND_IP" =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]] || die "--bind takes an IPv4 address (got $BIND_IP)"
+  for _o in "${BASH_REMATCH[@]:1}"; do [ "$_o" -le 255 ] || die "--bind: invalid IPv4 address $BIND_IP"; done
+fi
 
 # Ports the detection looks at (tests use other ports; production is always 80/443).
 HTTP_PORT=${RELAY_DETECT_HTTP_PORT:-80}
@@ -180,10 +197,24 @@ classify() { # NAME [IMAGE] -> nginx | caddy | traefik | apache | other
     *traefik*) echo traefik ;; *caddy*) echo caddy ;; *apache*|*httpd*) echo apache ;; *nginx*|*openresty*) echo nginx ;; *) echo other ;;
   esac
 }
+# Listener on PORT that conflicts with binding ADDR:PORT (same address, or a wildcard 0.0.0.0 / * / [::]). Prints "name pid".
+listener_conflicting() {
+  local port=$1 addr=$2 line local_addr
+  have ss || { listener "$port"; return; }
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    local_addr=$(awk '{print $4}' <<<"$line")
+    case "$local_addr" in
+      "$addr:$port"|"0.0.0.0:$port"|"*:$port"|"[::]:$port"|":::$port")
+        if [[ "$line" =~ users:\(\(\"([^\"]+)\",pid=([0-9]+) ]]; then printf '%s %s' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"; else printf 'unknown -'; fi
+        return ;;
+    esac
+  done < <(ss -H -ltnp "sport = :$port" 2>/dev/null)
+}
 describe_port() { # PORT -> sets D_KIND (free|host|container) D_SERVER D_DETAIL D_PID
   local port=$1 l c
   D_KIND=free D_SERVER="" D_DETAIL="" D_PID=""
-  l=$(listener "$port")
+  if [ -n "$BIND_IP" ]; then l=$(listener_conflicting "$port" "$BIND_IP"); else l=$(listener "$port"); fi
   c=$(container_on "$port")
   if [ -n "$c" ]; then
     D_KIND=container; D_DETAIL="container ${c%% *} (image ${c#* })"; D_SERVER=$(classify "${c%% *}" "${c#* }"); D_PID=""
@@ -193,6 +224,8 @@ describe_port() { # PORT -> sets D_KIND (free|host|container) D_SERVER D_DETAIL 
     if [ "${l%% *}" = unknown ]; then D_DETAIL="a process this user cannot identify (re-run with sudo)"; fi
   fi
 }
+[ -n "$BIND_IP" ] || BIND_IP=$(env_get "$INFRA_ENV" RELAY_BIND_IP)
+[ -z "$BIND_IP" ] || say "  checking ports on $BIND_IP only (plus wildcard listeners); other addresses are left alone"
 describe_port "$HTTP_PORT";  K80=$D_KIND S80=$D_SERVER; say "  port $HTTP_PORT:  ${D_DETAIL:-free}"
 describe_port "$HTTPS_PORT"; K443=$D_KIND S443=$D_SERVER P443=$D_PID; say "  port $HTTPS_PORT: ${D_DETAIL:-free}"
 TRAEFIK_CONTAINER=""
@@ -215,7 +248,7 @@ if [ -z "$PROXY_MODE" ]; then
   if [ "$PREV_MODE" = bundled ] && [ "$K443" = container ] && docker ps --filter "label=com.docker.compose.project=$RELAY_PROJECT" --format '{{.Names}}' | grep -q caddy; then PROXY_MODE=bundled; fi
 fi
 case "$PROXY_MODE" in
-  bundled)         say "  -> 80/443 are free: Relay runs its own Caddy container (automatic HTTPS) for its three names only." ;;
+  bundled)         say "  -> 80/443 are free${BIND_IP:+ on $BIND_IP}: Relay runs its own Caddy container (automatic HTTPS) for its three names only." ;;
   nginx)           say "  -> nginx on the host: a separate Relay server-block file is added; other sites are untouched." ;;
   caddy-host)      say "  -> Caddy on the host: a separate Relay site file is added and imported." ;;
   apache)          say "  -> Apache on the host: a separate Relay vhost file is written; you enable it (commands shown)." ;;
@@ -228,14 +261,14 @@ esac
 
 # ---------------------------------------------------------------------------------------------------------------------
 step "4. Loopback ports for Relay (127.0.0.1 only)"
-WEB_PORT=$(env_get "$INFRA_ENV" RELAY_WEB_PORT); WEB_PORT=${WEB_PORT:-${RELAY_WEB_PORT:-3300}}
-AUTH_PORT=$(env_get "$INFRA_ENV" RELAY_AUTH_PORT); AUTH_PORT=${AUTH_PORT:-${RELAY_AUTH_PORT:-3380}}
-MEDIA_PORT=$(env_get "$INFRA_ENV" RELAY_MEDIA_PORT); MEDIA_PORT=${MEDIA_PORT:-${RELAY_MEDIA_PORT:-3333}}
+WEB_PORT=${OPT_WEB_PORT:-$(env_get "$INFRA_ENV" RELAY_WEB_PORT)}; WEB_PORT=${WEB_PORT:-${RELAY_WEB_PORT:-3300}}
+AUTH_PORT=${OPT_AUTH_PORT:-$(env_get "$INFRA_ENV" RELAY_AUTH_PORT)}; AUTH_PORT=${AUTH_PORT:-${RELAY_AUTH_PORT:-3380}}
+MEDIA_PORT=${OPT_MEDIA_PORT:-$(env_get "$INFRA_ENV" RELAY_MEDIA_PORT)}; MEDIA_PORT=${MEDIA_PORT:-${RELAY_MEDIA_PORT:-3333}}
 for p in "$WEB_PORT" "$AUTH_PORT" "$MEDIA_PORT"; do
   c=$(container_on "$p"); l=$(listener "$p")
   if [ -z "$c$l" ]; then ok "127.0.0.1:$p free"
   elif docker ps --filter "label=com.docker.compose.project=$RELAY_PROJECT" --format '{{.Ports}}' | grep -q ":$p->"; then ok "127.0.0.1:$p is Relay's own"
-  else die "port $p is used by ${c:-$l}. Pick free ports: RELAY_WEB_PORT/RELAY_AUTH_PORT/RELAY_MEDIA_PORT=... sudo -E $0"
+  else die "port $p is used by ${c:-$l}. Pick free ports: sudo $0 --web-port N --auth-port N --media-port N"
   fi
 done
 
@@ -332,6 +365,12 @@ write_infra_env() { # $1 file; keeps existing secrets, fills missing ones, rewri
   env_set "$f" RELAY_WEB_PORT "$WEB_PORT"
   env_set "$f" RELAY_AUTH_PORT "$AUTH_PORT"
   env_set "$f" RELAY_MEDIA_PORT "$MEDIA_PORT"
+  if [ -n "$BIND_IP" ]; then
+    env_set "$f" RELAY_BIND_IP "$BIND_IP"
+    env_set "$f" RELAY_CADDY_HTTP_PORT "$BIND_IP:80"
+    env_set "$f" RELAY_CADDY_HTTPS_PORT "$BIND_IP:443"
+  fi
+  [ -z "$OPT_BACKUP_DAYS" ] || env_set "$f" RELAY_BACKUP_KEEP_DAYS "$OPT_BACKUP_DAYS"
   [ -n "$(env_get "$f" RELAY_SELF_REGISTRATION)" ] || env_set "$f" RELAY_SELF_REGISTRATION "$([ $SELF_REG -eq 1 ] && echo true || echo false)"
   [ -n "$(env_get "$f" RELAY_BACKUP_KEEP_DAYS)" ] || env_set "$f" RELAY_BACKUP_KEEP_DAYS 14
   for k in "${INFRA_SECRETS[@]}"; do
@@ -621,7 +660,7 @@ CERTBOT_CMD="certbot certonly --webroot -w $ACME_WEBROOT --cert-name relay -d $D
 
 case "$PROXY_MODE" in
   bundled)
-    plan "run the bundled Caddy container (compose profile caddy) on 0.0.0.0:80/443 for the Relay names only"
+    plan "run the bundled Caddy container (compose profile caddy) on ${BIND_IP:-0.0.0.0}:80/443 for the Relay names only"
     say "  Firewall: allow inbound TCP 80 and 443 in the OCI security list / network security group of this VM."
     if have iptables && iptables -S INPUT 2>/dev/null | grep -q -- '-j REJECT'; then
       say "  This host also has iptables REJECT rules (Oracle images ship them). Docker-published ports bypass INPUT,"
