@@ -369,6 +369,9 @@ write_infra_env() { # $1 file; keeps existing secrets, fills missing ones, rewri
     env_set "$f" RELAY_BIND_IP "$BIND_IP"
     env_set "$f" RELAY_CADDY_HTTP_PORT "$BIND_IP:80"
     env_set "$f" RELAY_CADDY_HTTPS_PORT "$BIND_IP:443"
+    # Containers reach the three public names through the proxy; with --bind it only listens on BIND_IP (the Docker
+    # host gateway would get no answer, and the VM can't hairpin to its own public IP).
+    env_set "$f" RELAY_PROXY_TARGET "$BIND_IP"
   fi
   [ -z "$OPT_BACKUP_DAYS" ] || env_set "$f" RELAY_BACKUP_KEEP_DAYS "$OPT_BACKUP_DAYS"
   [ -n "$(env_get "$f" RELAY_SELF_REGISTRATION)" ] || env_set "$f" RELAY_SELF_REGISTRATION "$([ $SELF_REG -eq 1 ] && echo true || echo false)"
