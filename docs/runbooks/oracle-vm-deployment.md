@@ -219,6 +219,40 @@ sudo infra/oracle/status.sh --operator grant you@example.com
 sudo infra/oracle/status.sh --operator list
 ```
 
+## 8a. Vitalos Super Admin status
+
+The Vitalos Super Admin (Product Pipeline → Relay) polls `GET https://relay.vitalos.co.uk/api/platform/v1/status`
+with a Bearer token (vitalos-platform ADR-044). It returns aggregates only: workspace and subscription counts and
+generic alerts, never names, emails or ids. Bootstrap generates the token into `/opt/relay/.env.production` (added
+to an existing file if absent; never printed) and only the web container receives it.
+
+1. Read the token on the VM. Don't paste it into chat, tickets or the repository:
+
+```sh
+sudo grep '^RELAY_PLATFORM_STATUS_TOKEN=' /opt/relay/.env.production | cut -d= -f2-
+```
+
+2. Put the value in the Super Admin's secret store as its Relay status token setting: the Container Apps secret
+   `relay-product-status-token`, referenced by `RELAY_PRODUCT_STATUS_TOKEN=secretref:relay-product-status-token`
+   (Super Admin `docs/DEPLOY.md`, products table). Its `RELAY_PRODUCT_STATUS_URL` and `RELAY_PRODUCT_SUPERADMIN_URL`
+   defaults already point at this host.
+3. Check from the VM. The answer should be `401` without the token and `200` with it (the header is read from stdin, so
+   the token doesn't appear in the process list):
+
+```sh
+curl -s -o /dev/null -w '%{http_code}\n' https://relay.vitalos.co.uk/api/platform/v1/status
+sudo grep '^RELAY_PLATFORM_STATUS_TOKEN=' /opt/relay/.env.production | sed 's/^RELAY_PLATFORM_STATUS_TOKEN=/Authorization: Bearer /' \
+  | curl -s -H @- https://relay.vitalos.co.uk/api/platform/v1/status
+```
+
+- **No token** in `.env.production`: the endpoint answers 404 and the Super Admin shows "Status not configured".
+- **Rotate:** in `/opt/relay/.env.production`, copy the old value to `RELAY_PLATFORM_STATUS_TOKEN_PREVIOUS=`, set a new
+  `RELAY_PLATFORM_STATUS_TOKEN=` (`openssl rand -hex 32`), then `sudo infra/oracle/update.sh --restart`. Update the
+  Super Admin secret, then remove the `_PREVIOUS` line and restart again.
+- **Staging:** set `RELAY_ENVIRONMENT=staging` (otherwise `production` is reported).
+- What sets `degraded` or `down`, and how tenants are counted: Help Centre → Developers → Environment variables →
+  "Platform status".
+
 ## Backups
 
 - Every night at about 03:17 (VM time) `relay-backup.timer` runs `infra/oracle/backup.sh`.

@@ -6,7 +6,7 @@ audience: developer
 status: available
 related: [local-development-setup, architecture-and-modules, mcp-server]
 product_version: "2026-11"
-reviewed: 2026-11-09
+reviewed: 2026-11-10
 order: 12
 keywords: [env, environment, configuration, config, settings, dotenv]
 ---
@@ -99,6 +99,23 @@ All optional; defaults are derived from `APP_BASE_URL` and `OIDC_ISSUER`. See [C
 | `BILLING_TEST_WEBHOOK_SECRET` | built-in local value | Signing secret of the local billing test double (outside production with mock providers). |
 
 Without Stripe settings, outside production with mock providers on, a labelled test double is used; otherwise billing pages show stored state and checkout refuses with `provider_not_configured`.
+
+## Platform status (Vitalos Super Admin)
+
+`GET /api/platform/v1/status` reports installation status to the Vitalos Super Admin (contract: vitalos-platform ADR-044). It is server-to-server: no session or CSRF, `Authorization: Bearer <token>` only, rate-limited per IP, `Cache-Control: no-store`, no redirects. The answer holds aggregates only (workspace counts, subscription counts, generic alert titles): never names, emails or ids.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `RELAY_PLATFORM_STATUS_TOKEN` | unset | Bearer token the Super Admin presents (`<random 32 bytes, hex>`, 32–512 visible characters). Unset = the endpoint answers 404. Compared in constant time. The Oracle kit generates it into `/opt/relay/.env.production` and passes it to the web container only. |
+| `RELAY_PLATFORM_STATUS_TOKEN_PREVIOUS` | unset | Previous token, accepted only while rotating: move the old value here, set a new token, update the Super Admin secret, then remove this. Needs `RELAY_PLATFORM_STATUS_TOKEN`. |
+| `RELAY_ENVIRONMENT` | from `APP_ENV` | Lowercase slug reported as `environment` (for example `staging`, since staging runs `APP_ENV=production`). Unset = `production`, `development` or `test` from `APP_ENV`. |
+
+Behaviour:
+
+- **Status.** `down` when the database check fails; `degraded` when migrations are not applied, the worker heartbeat is older than 2 minutes, dispatch is off, publications are stuck (due or leased for over 2 minutes), the outbox has dead-lettered events or events waiting over 5 minutes, or billing webhooks are failing (failed in the last 7 days, or unprocessed for over 15 minutes); otherwise `operational`. Each reason is one alert, with `since` taken from the data and a link to the matching Platform page (`/admin/platform`, `/admin/platform/billing`) when `APP_BASE_URL` is https.
+- **Tenants** count real workspaces (demo, seed and E2E workspaces are excluded). `suspended` = suspended by Relay staff; `trial` = a running trial; `active` = every other workspace with full access, including paid, Free (with trials and subscriptions that ended and fell back to Free) and legacy workspaces. Workspaces whose access is restricted (no plan chosen, or unpaid past the grace period) count only in `total`.
+- **Subscriptions** count live provider subscriptions by billing status: `active` (including those set to cancel at period end), `trialing` and `pastDue` (including payment action required). While billing is in test mode these are test-mode subscriptions.
+- Figures are cached for 30 seconds per web process (5 seconds while the database is down). If this process has no figures yet and the database fails, or the answer would break the contract (for example a non-https `APP_BASE_URL`, since `superadminUrl` must be https), the endpoint answers 503.
 
 ## Worker, publishing and analytics tuning
 

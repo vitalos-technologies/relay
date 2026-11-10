@@ -4,7 +4,7 @@
 > Repository-only reference: includes platform-operator routes. The Help Centre article
 > `content/help/developers/api-route-reference.md` is the member-facing subset. OpenAPI: `docs/api/openapi.json`.
 
-Route files: 542 · handlers: 672 · Public: 26 · Session: 556 · Session (no workspace): 13 · Platform operator: 61 · API key: 2 · Widget: 10 · MCP bearer: 4
+Route files: 543 · handlers: 673 · Public: 27 · Session: 556 · Session (no workspace): 13 · Platform operator: 61 · API key: 2 · Widget: 10 · MCP bearer: 4
 
 ## Access models
 
@@ -4368,6 +4368,16 @@ Source: `apps/web/app/api/platform/support/tickets/[ref]/visitor/route.ts`
 | Method | Access | Body | Query | Idempotency-Key |
 |---|---|---|---|---|
 | POST | Platform operator | `z.unknown` |  |  |
+
+### `/api/platform/v1/status`
+
+GET /api/platform/v1/status — installation status for the Vitalos Super Admin (ADR-044): aggregates only, Bearer token (RELAY_PLATFORM_STATUS_TOKEN), 404 when not configured, no-store. Server-to-server: no session, cookies or CSRF. Auth, rate limit, cache and the contract check live in the service.
+
+Source: `apps/web/app/api/platform/v1/status/route.ts`
+
+| Method | Access | Body | Query | Idempotency-Key |
+|---|---|---|---|---|
+| GET | Public |  |  |  |
 
 ### `/api/platform/workspaces`
 

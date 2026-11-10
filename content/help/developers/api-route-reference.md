@@ -6,7 +6,7 @@ audience: developer
 status: available
 related: [api-conventions, mcp-tool-reference, authentication-and-authorization]
 product_version: 2026-11
-reviewed: 2026-11-09
+reviewed: 2026-11-10
 order: 41
 keywords: [api, endpoints, routes, openapi, rest]
 ---
@@ -17,7 +17,7 @@ keywords: [api, endpoints, routes, openapi, rest]
 
 Only two interfaces are meant for integrations: the machine API under `/api/v1` (service-account API keys) and the MCP endpoint `/mcp`. Every other route is the web app's own API: it needs a browser session cookie plus CSRF protection and can change between releases. Conventions shared by all routes (error envelope, pagination, idempotency, rate limits) are in [API conventions](/help/developers/api-conventions).
 
-This page lists 490 route files with 611 handlers (Public: 26, Session: 556, Session (no workspace): 13, API key: 2, Widget: 10, MCP bearer: 4). 61 handlers used only by Relay staff in the admin console are not listed here.
+This page lists 491 route files with 612 handlers (Public: 27, Session: 556, Session (no workspace): 13, API key: 2, Widget: 10, MCP bearer: 4). 61 handlers used only by Relay staff in the admin console are not listed here.
 
 ## Access models
 
@@ -649,6 +649,7 @@ This page lists 490 route files with 611 handlers (Public: 26, Session: 556, Ses
 | Methods | Path | Access | Idempotency-Key | Purpose |
 |---|---|---|---|---|
 | GET | `/api/platform/me` | Session (no workspace) |  | GET /api/platform/me — is this user a platform operator, and is the session fresh enough for platform changes. |
+| GET | `/api/platform/v1/status` | Public |  | GET /api/platform/v1/status — installation status for the Vitalos Super Admin (ADR-044): aggregates only, Bearer token (RELAY_PLATFORM_STATUS_TOKEN), 404 when not configured, no-store. Server-to-server: no session, cook… |
 
 ### posts
 

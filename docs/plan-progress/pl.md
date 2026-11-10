@@ -64,3 +64,10 @@ Edited shared (small, additive): `packages/services/src/{context,tenancy,workspa
 - Note: catalogue hashes in 040 match v4-plans.ts as of 2026-11-10 ~04:30. Any later edit to PLANS (names, summaries,
   highlights, allowances) shows "Catalogue changed" in Platform → Plans and fails the drift test → publish a new version
   (Platform → Plans) or ask PL for a follow-up migration number.
+
+## Cross-stream note (platform status, not PL work)
+`GET /api/platform/v1/status` (`packages/services/src/platform-status/`) reads billing **read-only**: one grouped aggregate
+over `workspace_billing` (`status`, `trial_ends_at`, `grace_ends_at`, `cancel_at`, `provider_subscription_ref`,
+`provider_status`) and `billing_webhook_events` (`status`, `received_at`), and imports `deriveAccess` +
+`LIVE_PROVIDER_STATUSES` from `billing/policy.ts`. If any of these move or change meaning, `tests/unit/platform-status.test.ts`
+and `tests/integration/platform-status.test.ts` will show it; an unknown billing status counts only in the tenant total.

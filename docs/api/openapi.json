@@ -21859,6 +21859,34 @@
     "x-relay-source": "apps/web/app/api/platform/support/tickets/[ref]/visitor/route.ts"
    }
   },
+  "/api/platform/v1/status": {
+   "get": {
+    "operationId": "get_api_platform_v1_status",
+    "tags": [
+     "platform"
+    ],
+    "summary": "GET /api/platform/v1/status — installation status for the Vitalos Super Admin (ADR-044): aggregates only, Bearer token…",
+    "description": "GET /api/platform/v1/status — installation status for the Vitalos Super Admin (ADR-044): aggregates only, Bearer token (RELAY_PLATFORM_STATUS_TOKEN), 404 when not configured, no-store. Server-to-server: no session, cookies or CSRF. Auth, rate limit, cache and the contract check live in the service.\n\nAccess: Public. No session. Webhooks and callbacks verify their own signature, token or OAuth state.",
+    "security": [],
+    "responses": {
+     "200": {
+      "description": "Success. JSON body returned by the service (or a redirect/stream where the description says so)."
+     },
+     "default": {
+      "description": "Error envelope",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorEnvelope"
+        }
+       }
+      }
+     }
+    },
+    "x-relay-access": "public",
+    "x-relay-source": "apps/web/app/api/platform/v1/status/route.ts"
+   }
+  },
   "/api/platform/workspaces": {
    "get": {
     "operationId": "get_api_platform_workspaces",

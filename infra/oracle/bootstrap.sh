@@ -291,6 +291,11 @@ SESSION_SECRET=$(rand_hex 32)
 # Losing this value makes stored credentials unreadable: it is included (encrypted) in every backup.
 KEY_ENCRYPTION_KEYS=relay-$(date -u +%Y%m):$(rand_b64)
 LOG_LEVEL=info
+# Bearer token for GET /api/platform/v1/status (Vitalos Super Admin, ADR-044). Web only. Copy it into the Super Admin's
+# Relay status token secret (runbook "Vitalos Super Admin status"). Rotate: move it to _PREVIOUS, generate a new one.
+RELAY_PLATFORM_STATUS_TOKEN=$(rand_hex 32)
+# RELAY_PLATFORM_STATUS_TOKEN_PREVIOUS=
+# RELAY_ENVIRONMENT=production
 
 # ---- Activation items (docs/FINAL_ACTIVATION_CHECKLIST.md). Uncomment and fill in on the VM; leave unset until then.
 # Email (§3). REQUIRED: Relay refuses to start in production without it. Oracle blocks outbound port 25: use 587/465.
@@ -401,13 +406,18 @@ fi
 if [ -f "$INFRA_ENV" ]; then plan "keep $INFRA_ENV (existing secrets kept; derived URLs/ports refreshed; missing secrets added)"
 else plan "create $INFRA_ENV (0600): generated ${INFRA_SECRETS[*]}"; fi
 [ $APPLY -eq 1 ] && write_infra_env "$INFRA_ENV"
-if [ -f "$APP_ENV_FILE" ]; then plan "keep $APP_ENV_FILE unchanged"
-else plan "create $APP_ENV_FILE (0600): generated SESSION_SECRET, KEY_ENCRYPTION_KEYS; activation variables listed, unset"
+if [ -f "$APP_ENV_FILE" ]; then
+  if [ -n "$(env_get "$APP_ENV_FILE" RELAY_PLATFORM_STATUS_TOKEN)" ]; then plan "keep $APP_ENV_FILE unchanged"
+  else plan "keep $APP_ENV_FILE; add a generated RELAY_PLATFORM_STATUS_TOKEN (Super Admin status endpoint; other values unchanged)"
+    [ $APPLY -eq 1 ] && env_set "$APP_ENV_FILE" RELAY_PLATFORM_STATUS_TOKEN "$(rand_hex 32)"
+  fi
+else plan "create $APP_ENV_FILE (0600): generated SESSION_SECRET, KEY_ENCRYPTION_KEYS, RELAY_PLATFORM_STATUS_TOKEN; activation variables listed, unset"
   [ $APPLY -eq 1 ] && write_app_env_template "$APP_ENV_FILE"
 fi
 plan "write $RELAY_HOME/secrets/s3.json (0600) from the generated storage keys"
 [ $APPLY -eq 1 ] && write_s3_identity
 say "  Secret values are never printed. To read one on the VM yourself: sudo grep '^NAME=' $INFRA_ENV"
+say "  Super Admin status token (runbook \"Vitalos Super Admin status\"): sudo grep '^RELAY_PLATFORM_STATUS_TOKEN=' $APP_ENV_FILE"
 
 # ---------------------------------------------------------------------------------------------------------------------
 step "6. Backup encryption key"

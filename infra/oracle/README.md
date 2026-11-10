@@ -26,7 +26,7 @@ Files on the VM (all created by `bootstrap.sh --apply`):
 | Path | Contents |
 |---|---|
 | `/opt/relay/.env.infra` (0600) | Domain, ports, image tag, generated database/Keycloak/storage/OIDC secrets |
-| `/opt/relay/.env.production` (0600) | App settings for web + worker: generated `SESSION_SECRET`, `KEY_ENCRYPTION_KEYS`; activation variables listed unset |
+| `/opt/relay/.env.production` (0600) | App settings for web + worker: generated `SESSION_SECRET`, `KEY_ENCRYPTION_KEYS`, `RELAY_PLATFORM_STATUS_TOKEN` (web only; added to an existing file if absent); activation variables listed unset |
 | `/opt/relay/secrets/s3.json` (0600) | SeaweedFS identity |
 | `/opt/relay/backup/recipient.txt` | Backup public key (the private key was shown once and is not on the VM) |
 | `/opt/relay/backups/` | Encrypted backups; `proxy/` holds copies of any proxy file the kit changed |

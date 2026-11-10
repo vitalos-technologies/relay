@@ -63,6 +63,7 @@ echo "== bootstrap --apply"
 [ -n "$(env_get "$INFRA_ENV" RELAY_IMAGE_TAG)" ] || { echo "bootstrap --apply failed; stopping"; exit 1; }
 check "env files are 0600" test "$(stat -c %a "$RELAY_HOME/.env.infra")$(stat -c %a "$RELAY_HOME/.env.production")" = 600600
 check "no secret value printed by bootstrap" bash -c "! grep -qF \"\$(grep '^SESSION_SECRET=' '$RELAY_HOME/.env.production' | cut -d= -f2)\" '$WORK/apply.log'"
+check "status token generated (64 hex), not printed" bash -c "T=\$(grep '^RELAY_PLATFORM_STATUS_TOKEN=' '$RELAY_HOME/.env.production' | cut -d= -f2); [[ \$T =~ ^[0-9a-f]{64}\$ ]] && ! grep -qF \"\$T\" '$WORK/apply.log'"
 # The web/worker trust the Caddy CA only once Caddy has created it.
 for _ in $(seq 30); do compose exec -T caddy cat /data/caddy/pki/authorities/local/root.crt > "$RELAY_HOME/test-ca.crt" 2>/dev/null && [ -s "$RELAY_HOME/test-ca.crt" ] && break; sleep 2; done
 compose restart web worker >/dev/null; wait_ready 180
@@ -70,6 +71,9 @@ check "/api/ready 200 on 127.0.0.1" test "$(http_code "http://127.0.0.1:13300/ap
 check "only 127.0.0.1 bindings (except caddy)" bash -c "! docker ps --filter label=com.docker.compose.project=$RELAY_PROJECT --format '{{.Names}} {{.Ports}}' | grep -v caddy | grep -q '0.0.0.0'"
 check "postgres not published" bash -c "! docker ps --filter label=com.docker.compose.project=$RELAY_PROJECT --format '{{.Names}} {{.Ports}}' | grep postgres | grep -q -- '->'"
 check "via Caddy TLS: /api/ready" test "$(cr -o /dev/null -w '%{http_code}' "$APP/api/ready")" = 200
+check "status endpoint: 401 without the token" test "$(cr -o /dev/null -w '%{http_code}' "$APP/api/platform/v1/status")" = 401
+check "status endpoint: 200 with the token (header from stdin)" test "$(printf 'Authorization: Bearer %s\n' "$(env_get "$RELAY_HOME/.env.production" RELAY_PLATFORM_STATUS_TOKEN)" | cr -H @- -o /dev/null -w '%{http_code}' "$APP/api/platform/v1/status")" = 200
+check "worker holds no status token" test -z "$(compose exec -T worker printenv RELAY_PLATFORM_STATUS_TOKEN 2>/dev/null)"
 H=$(cr -D - -o /dev/null "$APP/login" || true)
 check "CSP with nonce" grep -qi "content-security-policy:.*nonce-" <<<"$H"
 check "HSTS" grep -qi "strict-transport-security" <<<"$H"

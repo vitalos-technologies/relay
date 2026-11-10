@@ -35,6 +35,11 @@ function parseModelPrices(v: string | undefined, ctx: z.RefinementCtx): AiModelP
   return out;
 }
 
+// Vitalos Super Admin status endpoint (GET /api/platform/v1/status, ADR-044). Messages never echo values.
+const STATUS_TOKEN = /^[\x21-\x7e]{32,512}$/;
+const STATUS_TOKEN_HINT = 'must be 32-512 visible ASCII characters (no spaces)';
+const ENVIRONMENT_SLUG = /^[a-z][a-z0-9-]{0,31}$/;
+
 const schema = z.object({
   APP_ENV: z.enum(['development', 'test', 'production']).default('development'),
   APP_BASE_URL: z.string().url().default('http://localhost:3000'),
@@ -77,6 +82,12 @@ const schema = z.object({
   AI_MODEL_PRICES: z.preprocess(blankToUndefined, z.string().optional()).transform(parseModelPrices),
   // Deterministic, clearly labelled AI suggestions for demos/tests. Forbidden in production.
   AI_FIXTURE: bool.default(false),
+  // Bearer token the Vitalos Super Admin presents to GET /api/platform/v1/status. Unset = the endpoint answers 404.
+  RELAY_PLATFORM_STATUS_TOKEN: z.preprocess(blankToUndefined, z.string().regex(STATUS_TOKEN, STATUS_TOKEN_HINT).optional()),
+  // Previous token, accepted only while rotating (set the new token here first, then change the Super Admin secret).
+  RELAY_PLATFORM_STATUS_TOKEN_PREVIOUS: z.preprocess(blankToUndefined, z.string().regex(STATUS_TOKEN, STATUS_TOKEN_HINT).optional()),
+  // Environment slug reported to the Super Admin (e.g. staging). Unset = derived from APP_ENV.
+  RELAY_ENVIRONMENT: z.preprocess(blankToUndefined, z.string().regex(ENVIRONMENT_SLUG, 'must be a lowercase slug (a-z, 0-9, -; starts with a letter; at most 32 characters)').optional()),
   WORKER_ID: z.string().optional(),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 });
@@ -95,6 +106,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     throw new ConfigError(`Invalid configuration: ${fields}`);
   }
   const c = parsed.data;
+  if (c.RELAY_PLATFORM_STATUS_TOKEN_PREVIOUS && !c.RELAY_PLATFORM_STATUS_TOKEN) {
+    throw new ConfigError('Invalid configuration: RELAY_PLATFORM_STATUS_TOKEN_PREVIOUS is set without RELAY_PLATFORM_STATUS_TOKEN');
+  }
   if (c.APP_ENV === 'production') assertProductionSafe(c);
   return c;
 }
