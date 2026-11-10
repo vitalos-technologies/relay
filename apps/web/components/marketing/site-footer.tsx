@@ -49,7 +49,14 @@ export function SiteFooter({ signedIn, config }: { signedIn: boolean; config: Ma
           </ul>
         </nav>
       </Container>
-      <Container className="mt-10 border-t border-v5-border pt-6 text-[13px] text-v5-muted">© {new Date().getFullYear()} {BRAND.name}</Container>
+      <Container className="mt-10 flex flex-col gap-1 border-t border-v5-border pt-6 text-[13px] text-v5-muted sm:flex-row sm:justify-between">
+        <span>© {new Date().getFullYear()} {BRAND.name}</span>
+        <span data-testid="mkt-footer-maker">
+          {BRAND.name} is a{' '}
+          <a href="https://vitalos.co.uk/" rel="noopener" target="_blank" className="font-semibold text-v5-fg underline-offset-2 outline-none hover:underline focus-visible:outline-2 focus-visible:outline-v5-ring">Vitalos Technologies</a>
+          {' '}product
+        </span>
+      </Container>
     </footer>
   );
 }
