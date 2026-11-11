@@ -22,6 +22,26 @@ export function SectionHeading({ id, eyebrow, title, lead, align = 'center', cla
   );
 }
 
+/** Small eyebrow: a short accent pill dash + uppercase label (Integrations and Pricing, user request 2026-11-11). */
+export function Eyebrow({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <p className={cn('flex items-center gap-2 text-[12px] font-semibold uppercase leading-none tracking-[0.08em] text-v5-primary-text', className)}>
+      <span aria-hidden className="h-1.5 w-3 rounded-full bg-[linear-gradient(90deg,var(--mkt-accent-from),var(--mkt-accent-to))]" />
+      {children}
+    </p>
+  );
+}
+
+/** Two-line heading: line 1 ink, line 2 muted grey (large text, 3.4:1 on white). Focusable for in-page navigation. */
+export function TwoToneHeading({ id, lines: [first, second], className }: { id: string; lines: [string, string]; className?: string }) {
+  return (
+    <h2 id={id} tabIndex={-1} className={cn('outline-none text-balance text-[34px] font-semibold leading-[1.06] tracking-[-0.04em] text-v5-fg sm:text-[44px] lg:text-[48px]', className)}>
+      <span className="block">{first}</span>{' '}
+      <span className="block text-[var(--mkt-heading-muted)]">{second}</span>
+    </h2>
+  );
+}
+
 export function IconTile({ children, className }: { children: ReactNode; className?: string }) {
   return <span aria-hidden className={cn('inline-flex size-11 shrink-0 items-center justify-center rounded-xl bg-v5-primary-soft text-v5-primary-text [&>svg]:size-5', className)}>{children}</span>;
 }
