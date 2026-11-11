@@ -16,6 +16,9 @@ const ICONS: Record<Provider, { path: string; bg: string }> = {
   bluesky: { path: siBluesky.path, bg: `#${siBluesky.hex}` },
 };
 
+/** Bare glyph path per network (24×24 viewBox), for single-colour renderings such as the marketing integrations marquee. */
+export const platformGlyphPath = (provider: Provider): string => ICONS[provider].path;
+
 const SIZES = { xs: 'size-5 rounded-[5px] [&>svg]:size-3', sm: 'size-7 rounded-md [&>svg]:size-[15px]', md: 'size-9 rounded-lg [&>svg]:size-[18px]', lg: 'size-10 rounded-[10px] [&>svg]:size-5' };
 
 /**

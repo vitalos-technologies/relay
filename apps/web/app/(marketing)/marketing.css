@@ -32,6 +32,12 @@
   --mkt-rail: #17133a;
   --mkt-shadow: 0 1px 2px rgb(15 15 45 / 0.05), 0 18px 40px -18px rgb(46 26 107 / 0.25);
   --mkt-shadow-lift: 0 2px 4px rgb(15 15 45 / 0.06), 0 28px 56px -22px rgb(46 26 107 / 0.35);
+  /* Integrations + pricing (2026-11-11): soft light-grey tiles/cards, muted second heading line (#868aa0 = 3.4:1 on white,
+     used only for large text), single-grey service glyphs (logos; decorative). */
+  --mkt-tile: #f7f7fa;
+  --mkt-tile-border: #ebebf1;
+  --mkt-heading-muted: #868aa0;
+  --mkt-glyph: #9a9db0;
   background: var(--v5-bg);
   color: var(--v5-fg);
 }
@@ -92,3 +98,43 @@ html:has(.mkt) { scroll-behavior: smooth; scroll-padding-top: 5rem; }
   }
 }
 .mkt-stack [data-shade] { position: absolute; inset: 0; border-radius: inherit; background: var(--v5-fg); opacity: 0; pointer-events: none; }
+
+/* ---------------------------------------------------------------- integrations marquee (user request 2026-11-11)
+   Three rows of icon tiles drifting sideways, alternate directions, ~24 px/s, soft fade at both edges. Each track holds the
+   same set three times (`.mkt-marquee-set`, trailing gap included), so moving it by exactly one third loops seamlessly.
+   Transform-only; the rows have a fixed height (no layout shift) and clip their overflow (no page scroll). Paused on hover, while
+   the section’s link has keyboard focus, by the Pause button (`data-paused`) and while off screen (`data-offscreen`). Reduced motion:
+   no animation at all — the rows are a still, staggered grid. */
+.mkt-marquee {
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 12%, #000 88%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 12%, #000 88%, transparent 100%);
+}
+.mkt-marquee-row { overflow: hidden; height: 84px; }
+.mkt-marquee-track { display: flex; width: max-content; }
+.mkt-marquee-track[data-row="1"] { translate: -60px 0; }
+.mkt-marquee-set { display: flex; gap: 8px; padding-right: 8px; }
+.mkt-int-tile {
+  display: flex; align-items: center; justify-content: center; flex: none;
+  width: 112px; height: 84px; border-radius: 14px;
+  border: 1px solid var(--mkt-tile-border); background: var(--mkt-tile); color: var(--mkt-glyph);
+}
+@media (max-width: 399px) {
+  .mkt-marquee-row { height: 76px; }
+  .mkt-int-tile { width: 100px; height: 76px; }
+}
+@media (hover: hover) {
+  .mkt-int-tile:hover { color: var(--brand, var(--v5-fg)); background: #fff; border-color: var(--v5-border-strong); }
+}
+@keyframes mkt-marquee-left { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(calc(-100% / 3), 0, 0); } }
+@keyframes mkt-marquee-right { from { transform: translate3d(calc(-100% / 3), 0, 0); } to { transform: translate3d(0, 0, 0); } }
+@media (prefers-reduced-motion: no-preference) {
+  .mkt-int-tile { transition: color 220ms ease, background-color 220ms ease, border-color 220ms ease; }
+  .mkt-marquee-track { animation: mkt-marquee-left var(--mkt-marquee-dur, 36s) linear infinite; will-change: transform; }
+  .mkt-marquee-track[data-row="1"] { animation-name: mkt-marquee-right; --mkt-marquee-dur: 40s; }
+  .mkt-marquee-track[data-row="2"] { --mkt-marquee-dur: 38s; }
+  .mkt-marquee:hover .mkt-marquee-track,
+  #integrations:has(a:focus-visible) .mkt-marquee-track,
+  .mkt-marquee[data-paused] .mkt-marquee-track,
+  .mkt-marquee[data-offscreen] .mkt-marquee-track { animation-play-state: paused; }
+}
+@media print { .mkt-marquee { -webkit-mask-image: none; mask-image: none; } }

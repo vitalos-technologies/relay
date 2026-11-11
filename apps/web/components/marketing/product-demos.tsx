@@ -25,7 +25,7 @@ const DEMOS: Demo[] = [
     id: 'publishing', icon: <CalendarClock />, title: 'Publishing and scheduling', text: 'Write once, tailor it per network and schedule it on a shared calendar — with approvals before anything goes out.',
     plan: 'Every plan', explore: 'Explore publishing',
     includes: ['Planner and calendar across brands and channels', 'Per-network checks for length, media and required fields', 'Single-stage approval on Standard; multi-step approvals on Professional', 'Media library with crops per network'],
-    access: 'Live publishing to each network starts once that network approves Relay’s access — see Connect your tools.',
+    access: 'Live publishing to each network starts once that network approves Relay’s access — see Integrations below.',
     preview: <ComposerDemo />,
   },
   {

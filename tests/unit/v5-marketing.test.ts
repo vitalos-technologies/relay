@@ -5,7 +5,7 @@ import { PROVIDERS } from '@social-lite/core';
 import { CONNECTOR_KEYS } from '@social-lite/core/contracts/v35-connectors';
 import { ALLOWANCES, FEATURES, PLANS, PUBLIC_PLAN_IDS, TRIAL_DAYS } from '@social-lite/core/contracts/v4-plans';
 import { APP_HOME, MARKETING_SECTIONS, DEFAULT_MARKETING_CONFIG } from '@social-lite/core/contracts/v5-marketing';
-import { comparison, describeAllowance, freePlan, paidPlans, pricingPlans, recurringTotalMinor } from '../../apps/web/components/marketing/plan-data';
+import { CHECKLIST_LENGTH, cardChecklist, comparison, describeAllowance, freePlan, paidPlans, pricingPlans, recurringTotalMinor } from '../../apps/web/components/marketing/plan-data';
 import { cheapestPlanWithFeature, cheapestPlanWithMore, featureUpgradeMessage, limitUpgradeMessage, planPrice } from '@social-lite/core/contracts/plan-copy';
 import { networks, STATUS_LABEL, TOOLS } from '../../apps/web/components/marketing/integrations-data';
 import { CAPABILITIES, faq } from '../../apps/web/components/marketing/content';
@@ -83,6 +83,32 @@ describe('upgrade prompt copy names the right plan and catalogue price (D33)', (
     expect(featureUpgradeMessage('Standard analytics', 'Free', 'standard')).toBe('Standard analytics isn’t included in Free. Upgrade to Standard (£5 per user / month).');
     expect(featureUpgradeMessage('MCP', 'Standard', 'professional')).toBe('MCP isn’t included in Standard. Upgrade to Professional (£15 per user / month).');
     expect(limitUpgradeMessage('10 scheduled posts a month', 'Free', 'standard')).toBe('Free includes 10 scheduled posts a month. Upgrade to Standard (£5 per user / month).');
+  });
+});
+
+describe('pricing card checklists (catalogue-derived)', () => {
+  it('five lines per plan; Free = its catalogue highlights; later plans start "Everything in <previous>"', () => {
+    const ids = PUBLIC_PLAN_IDS;
+    for (const id of ids) expect(cardChecklist(id)).toHaveLength(CHECKLIST_LENGTH);
+    expect(cardChecklist(ids[0]!)).toEqual(PLANS[ids[0]!].highlights.slice(0, CHECKLIST_LENGTH));
+    for (let i = 1; i < ids.length; i++) expect(cardChecklist(ids[i]!)[0]).toBe(`Everything in ${PLANS[ids[i - 1]!].name}`);
+  });
+  it('"Everything in <previous>" is true: every feature and at least every allowance of the previous plan', () => {
+    const ids = PUBLIC_PLAN_IDS;
+    for (let i = 1; i < ids.length; i++) {
+      const prev = PLANS[ids[i - 1]!], cur = PLANS[ids[i]!];
+      for (const f of prev.features) expect(cur.features, `${cur.id} has ${f}`).toContain(f);
+      for (const a of ALLOWANCES) {
+        const p = prev.allowances[a], c = cur.allowances[a];
+        if (c == null) continue; // not metered by plan on the higher plan
+        expect(p, `${cur.id} ${a} metered while ${prev.id} is not`).not.toBeNull();
+        expect(c.base >= p!.base && c.per_seat >= p!.per_seat, `${cur.id} ${a} ≥ ${prev.id}`).toBe(true);
+      }
+    }
+  });
+  it('no invented or unlimited claims in the checklists', () => {
+    const text = PUBLIC_PLAN_IDS.flatMap((id) => cardChecklist(id)).join(' ');
+    expect(text).not.toMatch(/unlimited|popular|\d+\+|priority/i);
   });
 });
 

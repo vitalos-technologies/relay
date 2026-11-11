@@ -41,6 +41,6 @@ pending invitation, not billed) the marketing estimate (£15 / £45) equals Bill
 quantity and total, the provider-confirmed state after the test checkout, and Platform admin's seats.
 
 ## Plan capabilities shown publicly
-Card bullets are the catalogue's `highlights`; the comparison lists every catalogue feature (✓/—) and allowance per billing
+Card bullets come from `cardChecklist()` in `plan-data.ts` (Free: the catalogue's `highlights`; paid: "Everything in <previous plan>" + added feature groups, unit-tested); the comparison lists every catalogue feature (✓/—) and allowance per billing
 month plus the bounded trial allowances. Feature mapping and enforcement points: `docs/v4/PLANS_AND_ENTITLEMENTS.md`
-"Features". Capabilities that need provider access are labelled on the page (Connect your tools, Explore previews).
+"Features". Capabilities that need provider access are labelled on the page (the Integrations section intro, Explore previews).

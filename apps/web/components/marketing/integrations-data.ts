@@ -1,4 +1,4 @@
-// "Connect your tools" read model (brief §4 Integrations). Only integrations that are IMPLEMENTED in Relay appear, each with
+// Integrations read model (brief §4 Integrations; the section is "Works with the tools you already use" since 2026-11-11). Only integrations that are IMPLEMENTED in Relay appear, each with
 // an honest status taken from the capability records:
 //   - publishing networks: core PROVIDERS + docs/PROVIDER_CAPABILITIES.md (main gate per network),
 //   - inbox: packages/services/src/inbox/capabilities.ts (CHANNEL_CAPABILITIES, implementedChannelKinds),

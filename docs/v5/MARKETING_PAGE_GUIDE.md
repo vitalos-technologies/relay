@@ -9,7 +9,7 @@ its own light/dark). The signed-in app home moved to **`/overview`** (D23). Sign
 | Part | Code |
 |---|---|
 | Route + layout | `apps/web/app/(marketing)/page.tsx`, `layout.tsx`, `marketing.css` (palette scoped to `.mkt`, D24) |
-| Sections | `apps/web/components/marketing/*` — `site-header` + `mobile-menu`, `hero`, `capability-strip`, `product-demos` + `demos` + `explore-dialog`, `integrations-section` (+ `integrations-data`, `tool-icon`), `pricing-section` + `pricing-cards` + `plan-comparison` (+ `plan-data`), `faq-section` (+ `content`), `final-cta`, `site-footer` |
+| Sections | `apps/web/components/marketing/*` — `site-header` + `mobile-menu`, `hero`, `capability-strip`, `product-demos` + `demos` + `explore-dialog`, `integrations-section` (+ `integrations-data`, `tool-icon` glyph data, `marquee-control`), `pricing-section` + `pricing-cards` + `plan-comparison` (+ `plan-data`), `faq-section` (+ `content`), `final-cta`, `site-footer` |
 | Shared V5 UI (also used by WID/AIW) | `apps/web/components/ui-v5/*` — Button/ButtonLink, Card, Badge, Accordion, Collapsible, Sheet/Dialog, Reveal |
 | Configuration | Platform → Marketing (`/admin/platform/marketing`), `packages/services/src/marketing/config.ts`, contract `packages/core/src/contracts/v5-marketing.ts` |
 | Signup handoff | `apps/web/app/signup/page.tsx` (+ `components/marketing/seat-total.tsx`, paid plans only) → `/signup/workspace?plan=` (V4; `free` creates a Free workspace) |
@@ -34,14 +34,36 @@ its own light/dark). The signed-in app home moved to **`/overview`** (D23). Sign
    data, coverage line), AI assistant (`#ai`; suggested tasks → observable steps). Every preview is tagged **Example**.
    **Explore …** opens an accessible inline preview (dialog) with what is included, which plan, and what still needs provider
    access.
-5. **Connect your tools** (`#integrations`, never "Trusted by") — every implemented publishing network (`PROVIDERS`) and the
-   implemented apps (V3.5 connector registry, content hub, MCP). Tiles are icon, name and one line (user request 2026-11-10:
-   no legend, status badges, notes or disclaimer line). The intro keeps the honesty disclosure: "The networks and apps Relay
-   connects to. Some go live as each network approves Relay’s access." Statuses stay in `integrations-data.ts` and on each
-   tile as `data-status`. Slack and monday.com are not in `simple-icons`, so they get monogram tiles.
-6. **Pricing** (`#pricing`) — three cards from `publicCatalogue()` (D33): **Free £0** (1 user, "No card required",
+5. **Integrations** (`#integrations`, never "Trusted by"; redesigned 2026-11-11 after a reference template the user chose,
+   translated to the light page — this supersedes the brief's "Connect your tools" label at the user's request). Two columns
+   on desktop, stacked on small screens (text first, full-bleed rows): eyebrow (accent pill dash + INTEGRATIONS), two-tone
+   heading "Works with the tools / you already use." (line 2 in `--mkt-heading-muted`, large text only), the honest line
+   "*N* social networks and *M* work apps, built into Relay. Some go live as each network approves Relay’s access." (counts
+   from `networks()` / `TOOLS`) and **Get started free** → `/signup?plan=free`. Right: three staggered rows of icon-only
+   tiles (112×84, soft grey fill, hairline border, one grey glyph each; brand colour on hover with a fine pointer) for every
+   implemented publishing network (`PROVIDERS`) and app (V3.5 connector registry, content hub, MCP), interleaved and dealt
+   into rows of seven. Slack and monday.com are not in `simple-icons`, so they get monograms. Glyphs are SVG `<symbol>`s
+   reused with `<use>` (small HTML). **Motion:** a CSS-only marquee (`marketing.css` `.mkt-marquee`): each row's track holds
+   its set three times and moves by exactly one third (seamless loop), rows alternate direction at ~21–24 px/s (36/40/38 s
+   per loop), soft fade mask on both edges, transform only, fixed row height. It pauses on hover, while the section's link
+   has keyboard focus, with the **Pause** button (`marquee-control.tsx`, `aria-pressed`; WCAG 2.2.2) and while off screen
+   (IntersectionObserver). With `prefers-reduced-motion: reduce` nothing moves and the Pause button is hidden.
+   **Accessibility:** the moving rows are `aria-hidden` (no focusable content); one visually hidden list names every
+   network and tool once ("Telegram — Channel posts · bot chats") with its status as `data-status` (`mkt-networks`,
+   `mkt-tools`, `mkt-network-*`, `mkt-tool-*`); tiles carry a `title` for mouse users. No legend, status badges, notes or
+   disclaimer line (user request 2026-11-10).
+6. **Pricing** (`#pricing`; layout redesigned 2026-11-11 after the same reference, light) — centred eyebrow + two-tone
+   heading "Start free. / Pay per user as you grow.", then the team-size stepper as a compact centred pill (where the
+   template has a billing switch — Relay bills monthly only, so there is no monthly/yearly toggle), then three equal cards
+   from `publicCatalogue()` (D33): name, large price with a small suffix, one-line summary, trial line, full-width CTA
+   (filled on Professional, outlined otherwise), the seat total, a hairline and **five checklist lines** from
+   `plan-data.ts` `cardChecklist()` (Free = its catalogue highlights; Standard / Professional = "Everything in <previous
+   plan>" + the feature groups they add, topped up with the accounts allowance — unit-tested that the "Everything in" claim
+   holds for every feature and allowance). Professional is highlighted with a white card, accent border, accent checks and an
+   outlined **All features** badge (factual; no popularity claim). Cards rise in with a stagger (`Reveal`) and lift on hover.
+   **Free £0** (1 user, "No card required",
    **Start free** → `/signup?plan=free`, no trial wording), **Standard £5** and **Professional £15** per user / month
-   ("14 days free", "No card required", **Start free trial**); Professional stays highlighted. A team-size stepper (paid
+   ("14 days free", "No card required", **Start free trial**). The team-size stepper (paid
    plans only) shows *N users · £total / month after the trial* per paid plan (`recurringTotalMinor`) and carries
    `?plan=…&seats=N` to `/signup`; Free shows *1 user · £0 / month · no teammates*. "Compare plans and allowances" expands a
    table generated from the catalogue's features, limits/allowances (users, brands, accounts, scheduled posts, storage, AI
@@ -66,15 +88,15 @@ row cannot put an unsafe link on the page. There is **no public settings API** �
 
 ## Performance and accessibility
 - Server-rendered; the app shell/providers are never loaded on `/`. Client islands: mobile menu button, four demo previews,
-  explore triggers, pricing stepper, comparison, FAQ accordion, `Reveal`. Base UI Dialog (mobile menu sheet, Explore
+  explore triggers, pricing stepper, comparison, FAQ accordion, integrations Pause button, `Reveal`. Base UI Dialog (mobile menu sheet, Explore
   previews) loads on first hover/focus/tap, not with the page. Demo previews are HTML/CSS/SVG; the only image is the hero
   screenshot. One font family (Inter, self-hosted). Client components import core via subpaths (`@social-lite/core/types`,
   `/brand`) so the core barrel (zod, twitter-text + polyfills) never reaches the page bundle.
 - Motion: CSS entrance on the hero; `Reveal` (Motion `motion/react-mini`) brings blocks in with a per-section effect (fade-up
-  headings, staggered rise on the capability strip, scale-in on integration tiles and pricing cards, slides from alternating
+  headings, staggered rise on the capability strip and pricing cards, fade-in on the integrations rows, slides from alternating
   sides on product cards, left/right on the FAQ, scale on the final band), only after hydration and only if they start below
   the viewport — content is visible without JS, with reduced motion, and in print. Hero depth and the product stack: see
-  above. Hover lift (`.mkt-lift`) on pricing cards and integration tiles. Transform/opacity only; everything is static with
+  above. Hover lift (`.mkt-lift`) on pricing cards; the integrations marquee is described in §5. Transform/opacity only; everything is static with
   `prefers-reduced-motion: reduce`.
 - Keyboard: skip link first; visible focus rings; Base UI accordion/collapsible/dialog semantics (aria-expanded, focus trap +
   return, Esc); headings are focus targets for menu navigation. Pressed-state buttons in the demos use `aria-pressed`;

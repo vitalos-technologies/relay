@@ -62,7 +62,7 @@ test.describe('marketing page (public)', () => {
     expect(text).not.toMatch(/SocialFlow|Social Lite/i);
     for (const bad of [/trusted by/i, /testimonial/i, /loved by/i, /\b\d(\.\d)?\s*\/\s*5\b/, /\b\d+[KM]\+/, /join thousands/i, /most popular/i, /enterprise/i, /watch demo/i]) expect(text, String(bad)).not.toMatch(bad);
     expect(text.replace(/nothing is unlimited/gi, '')).not.toMatch(/unlimited/i);
-    await expect(page.getByRole('heading', { name: 'Connect your tools' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Works with the tools you already use.' })).toBeVisible();
     // Example content is labelled as such.
     await expect(page.getByText('Illustrative preview with example content.')).toBeVisible();
     expect(await page.getByText('Example', { exact: true }).count()).toBeGreaterThanOrEqual(4);
@@ -85,20 +85,58 @@ test.describe('marketing page (public)', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- no DOM lib in the test tsconfig
     const bg = await page.getByTestId('mkt-hero-trial').evaluate((el: any) => (globalThis as any).getComputedStyle(el).backgroundColor as string);
     expect(bg).toBe('rgb(59, 31, 143)');
-    // Integrations: tiles are icon, name and one line (no legend, badges, notes or disclaimer line); the intro keeps the
-    // disclosure that some go live after provider approval. Statuses stay honest in data-status.
+    // Integrations (2026-11-11 design): moving rows of icon-only tiles are decorative (aria-hidden); ONE screen-reader list names
+    // every implemented network and tool once (name — one line, nothing else) with its honest status in data-status. The
+    // intro keeps the disclosure that some go live after provider approval; no legend, badges, notes or disclaimer line.
     for (const p of ['instagram', 'facebook', 'x', 'tiktok']) await expect(page.getByTestId(`mkt-network-${p}`)).not.toHaveAttribute('data-status', 'available');
     await expect(page.getByTestId('mkt-network-telegram')).toHaveAttribute('data-status', 'available');
-    await expect(page.getByText('The networks and apps Relay connects to. Some go live as each network approves Relay’s access.')).toBeVisible();
+    await expect(page.getByTestId('mkt-integrations-lead')).toHaveText(/^\d+ social networks and \d+ work apps, built into Relay\. Some go live as each network approves Relay’s access\.$/);
+    await expect(page.getByTestId('mkt-integrations-lead')).toBeVisible();
+    await expect(page.getByTestId('mkt-integrations-cta')).toHaveAttribute('href', '/signup?plan=free');
     await expect(page.locator('#integrations [aria-label="Status labels"]')).toHaveCount(0);
-    await expect(page.locator('#integrations')).not.toContainText(/Needs provider access|Meta app review|No endorsement or partnership/);
-    await expect(page.getByTestId('mkt-network-telegram')).toHaveText('TelegramChannel posts · bot chats'); // name + one line, nothing after it
+    await expect(page.locator('#integrations')).not.toContainText(/Needs provider access|Meta app review|No endorsement or partnership|one click|\d+\+/);
+    await expect(page.getByTestId('mkt-network-telegram')).toHaveText('Telegram — Channel posts · bot chats'); // name + one line, nothing after it
+    const netItems = page.getByTestId('mkt-networks').locator(':scope > li');
+    const toolItems = page.getByTestId('mkt-tools').locator(':scope > li');
+    await expect(netItems).toHaveCount(10);
+    await expect(toolItems).toHaveCount(11);
+    const marquee = page.getByTestId('mkt-marquee');
+    await expect(marquee).toHaveAttribute('aria-hidden', 'true');
+    // Every listed entry has exactly one primary tile in the marquee (the loop copies carry no data-tile), and the marquee
+    // adds no list items or names to the accessibility tree.
+    const testIds = async (l: typeof netItems) => Promise.all((await l.all()).map(async (x) => (await x.getAttribute('data-testid'))!));
+    const ids = [...(await testIds(netItems)).map((t) => t.replace('mkt-network-', '')), ...(await testIds(toolItems)).map((t) => t.replace('mkt-tool-', ''))];
+    for (const id of ids) await expect(marquee.locator(`[data-tile="${id}"]`), id).toHaveCount(1);
+    expect(await marquee.locator('[data-tile]').count()).toBe(ids.length);
+    await expect(marquee.locator('li, a, button, [tabindex]')).toHaveCount(0);
+    // Motion: rows drift (transform only) and the Pause button stops them.
+    const firstTrack = marquee.locator('.mkt-marquee-track').first();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- no DOM lib in the test tsconfig
+    await expect.poll(() => firstTrack.evaluate((el: any) => (globalThis as any).getComputedStyle(el).animationName as string)).toBe('mkt-marquee-left');
+    const toggle = page.getByTestId('mkt-marquee-toggle');
+    await expect(toggle).toHaveAccessibleName('Pause the moving logos');
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await expect(marquee).toHaveAttribute('data-paused', '');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- no DOM lib in the test tsconfig
+    await expect.poll(() => firstTrack.evaluate((el: any) => (globalThis as any).getComputedStyle(el).animationPlayState as string)).toBe('paused');
+    await toggle.click();
+    await expect(marquee).not.toHaveAttribute('data-paused', '');
   });
 
   test('§18.5–6 + D33 three plans: Free £0, Standard £5 / Professional £15 per user / month (14 days free, no card); seats and totals; comparison', async ({ page }) => {
     await page.goto('/#pricing');
+    await expect(page.getByRole('heading', { level: 2, name: 'Start free. Pay per user as you grow.' })).toBeVisible();
     const plans = page.getByTestId('mkt-plans').locator(':scope > li');
     await expect(plans).toHaveCount(3);
+    // Cards: five catalogue-derived checklist lines each; later plans start with "Everything in <previous plan>"; the
+    // highlighted plan's badge is factual (no popularity claim); no monthly/yearly switch (monthly billing only).
+    for (const id of ['free', 'standard', 'professional']) await expect(page.getByTestId(`mkt-plan-${id}`).locator('ul > li')).toHaveCount(5);
+    await expect(page.getByTestId('mkt-plan-standard').locator('ul > li').first()).toHaveText('Everything in Free');
+    await expect(page.getByTestId('mkt-plan-professional').locator('ul > li').first()).toHaveText('Everything in Standard');
+    await expect(page.getByTestId('mkt-plan-professional')).toContainText('All features');
+    await expect(page.locator('#pricing')).not.toContainText(/yearly|annual|popular/i);
     await expect(page.getByTestId('mkt-price-free')).toHaveText('£0');
     await expect(page.getByTestId('mkt-price-standard')).toHaveText('£5');
     await expect(page.getByTestId('mkt-price-professional')).toHaveText('£15');
@@ -155,6 +193,9 @@ test.describe('marketing page (public)', () => {
     await page.evaluate("window.scrollTo({ top: document.body.scrollHeight, behavior: 'instant' })");
     const hidden = await page.evaluate<number>("[...document.querySelectorAll('[data-reveal]')].filter((e) => getComputedStyle(e).opacity !== '1').length");
     expect(hidden).toBe(0);
+    // Reduced motion: the integrations rows do not move and the Pause button is not offered.
+    expect(await page.evaluate<string[]>("[...document.querySelectorAll('.mkt-marquee-track')].map((e) => getComputedStyle(e).animationName)")).toEqual(['none', 'none', 'none']);
+    await expect(page.getByTestId('mkt-marquee-toggle')).toBeHidden();
     // FAQ: real buttons with aria-expanded; Enter toggles; answers match the implementation.
     const trial = page.getByTestId('mkt-faq-trial').getByRole('button', { name: 'How does the free trial work?' });
     await trial.focus();

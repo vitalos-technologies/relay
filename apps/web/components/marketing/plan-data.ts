@@ -98,6 +98,36 @@ export const planAllowance = (id: PublicPlanId, key: Allowance): number | null =
 };
 export const formatAllowance = (key: Allowance, n: number): string => amount(key, n);
 
+/** Pricing-card checklist groups: a group is listed on the first plan whose features include all of it. */
+const CHECK_GROUPS: ReadonlyArray<{ label: string; features: readonly Feature[] }> = [
+  { label: 'Team collaboration and approvals', features: ['collaboration'] },
+  { label: 'Social inbox', features: ['inbox'] },
+  { label: 'Standard analytics', features: ['analytics_standard'] },
+  { label: 'Advanced analytics and listening', features: ['analytics_advanced', 'listening'] },
+  { label: 'Multi-step approvals and customer care', features: ['approvals_advanced', 'care_advanced'] },
+  { label: 'AI workflows and automation', features: ['ai_workflows', 'automation'] },
+  { label: 'Business integrations and MCP', features: ['integrations_business', 'mcp'] },
+];
+export const CHECKLIST_LENGTH = 5;
+
+/**
+ * The five checklist lines on a pricing card, from the catalogue only: the first plan lists its catalogue highlights; each
+ * later plan says "Everything in <previous plan>" (unit-tested: it includes every feature and at least every allowance of
+ * the previous plan) and then the feature groups it adds, topped up with its connected-accounts allowance if short.
+ */
+export function cardChecklist(id: PublicPlanId): string[] {
+  const ids = publicCatalogue().map((p) => p.id);
+  const i = ids.indexOf(id);
+  const plan = PLANS[id];
+  if (i <= 0) return plan.highlights.slice(0, CHECKLIST_LENGTH);
+  const prev = PLANS[ids[i - 1]!];
+  const has = (p: { features: readonly Feature[] }, fs: readonly Feature[]) => fs.every((f) => p.features.includes(f));
+  const lines = [`Everything in ${prev.name}`, ...CHECK_GROUPS.filter((g) => has(plan, g.features) && !has(prev, g.features)).map((g) => g.label)];
+  const acc = plan.allowances.social_accounts;
+  if (lines.length < CHECKLIST_LENGTH && acc) lines.push(`${acc.base} social accounts + ${acc.per_seat} per user`);
+  return lines.slice(0, CHECKLIST_LENGTH);
+}
+
 /** `null` = not applicable (e.g. trial allowances on a plan without a trial). */
 export interface ComparisonRow { key: string; label: string; values: Record<PublicPlanId, string | boolean | null> }
 export interface ComparisonGroup { id: string; title: string; note?: string; rows: ComparisonRow[] }
