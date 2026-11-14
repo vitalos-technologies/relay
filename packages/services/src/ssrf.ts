@@ -90,7 +90,7 @@ function normalizeHost(hostname: string): string {
   return hostname.replace(/^\[|\]$/g, '').toLowerCase().replace(/\.$/, '');
 }
 
-interface Vetted { url: URL; address: string; family: 4 | 6 }
+interface Vetted { url: URL; addresses: Array<{ address: string; family: 4 | 6 }> }
 
 async function vet(url: URL, opts: SafeFetchOptions): Promise<Vetted> {
   const host = normalizeHost(url.hostname);
@@ -119,15 +119,16 @@ async function vet(url: URL, opts: SafeFetchOptions): Promise<Vetted> {
   if (!devAllowed && addresses.some((a) => isBlockedAddress(a.address))) {
     throw new SsrfBlockedError('That address points to a private or reserved network and cannot be fetched.', 'private_address');
   }
-  const first = addresses[0]!;
-  return { url, address: first.address, family: first.family === 6 ? 6 : 4 };
+  // Every vetted address is offered to the socket (in resolver order), so a dual-stack host still connects when its
+  // first address is unreachable (e.g. localhost → ::1 while the service listens on 127.0.0.1). No second lookup.
+  return { url, addresses: addresses.map((a) => ({ address: a.address, family: a.family === 6 ? 6 : 4 })) };
 }
 
 function request(v: Vetted, opts: SafeFetchOptions, deadline: number): Promise<{ status: number; headers: http.IncomingHttpHeaders; body: Buffer }> {
   return new Promise((resolve, reject) => {
     const pinned: LookupFunction = (_hostname, options, cb) => {
-      if ((options as { all?: boolean }).all) (cb as unknown as (e: null, a: Array<{ address: string; family: number }>) => void)(null, [{ address: v.address, family: v.family }]);
-      else cb(null, v.address, v.family);
+      if ((options as { all?: boolean }).all) (cb as unknown as (e: null, a: Array<{ address: string; family: number }>) => void)(null, v.addresses);
+      else cb(null, v.addresses[0]!.address, v.addresses[0]!.family);
     };
     const mod = v.url.protocol === 'https:' ? https : http;
     const remaining = Math.max(1, deadline - Date.now());

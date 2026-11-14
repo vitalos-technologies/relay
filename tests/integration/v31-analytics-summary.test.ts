@@ -26,7 +26,14 @@ async function both(ctx: Ctx, f: AnalyticsFilters) {
   return { rollups: norm(await aggregate(sc, sc.period, { forceRollups: true })), summary: norm(await aggregate(sc, sc.period)), ready: await summaryReady(sc.workspaceId, f.timezone) };
 }
 
-async function backfillAll() { for (let i = 0; i < 20 && (await backfillSummaryZones({ maxCells: 10_000 })).cells > 0; i++) { /* drain */ } }
+// Drain every pending zone. The test database is shared by all integration files, so earlier files leave zones with no
+// rollups (cells = 0 but still made ready): keep going until a call makes no progress at all.
+async function backfillAll() {
+  for (let i = 0; i < 1_000; i++) {
+    const r = await backfillSummaryZones({ maxCells: 10_000 });
+    if (r.ready === 0 && r.cells === 0) return;
+  }
+}
 
 const strip = (o: unknown) => JSON.stringify(o).replace(/"generated_at":"[^"]+"/g, '');
 
