@@ -24,6 +24,8 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
+      - name: Install ffmpeg/ffprobe for the video pipeline tests (the production images ship them too)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg
       - name: Start S3-compatible storage for media tests
         run: |
           docker run -d --name s3 -p 8333:8333 -v $PWD/infra/seaweedfs/s3.json:/etc/s3.json:ro chrislusf/seaweedfs:3.80 \
