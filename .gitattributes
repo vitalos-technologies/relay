@@ -1,0 +1,2 @@
+# Pulse files (vitalos-op pulse/kit): scripts and front matter need LF
+.pulse/** text eol=lf
